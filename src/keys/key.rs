@@ -1,32 +1,33 @@
-use byte::BytesExt;
-use secrets::Secret;
-use bitcoin_hashes::{Hash, hash160};
-use crate::chain::chain::Chain;
-use crate::crypto::{DASH_PUBKEY_ADDRESS, DASH_PUBKEY_ADDRESS_TEST};
-use crate::crypto::byte_util::Data;
+// use byte::BytesExt;
+// use secrets::Secret;
+// use hashes::{Hash, hash160};
+// use crate::crypto::{DASH_PUBKEY_ADDRESS, DASH_PUBKEY_ADDRESS_TEST};
+// use crate::crypto::byte_util::Data;
 
-#[repr(C)]
+use crate::crypto::byte_util::UInt160;
+
+// #[repr(C)]
 #[derive(Debug)]
 pub enum KeyType {
     ECDSA = 0,
     BLS = 1,
 }
 
-#[repr(C)]
+// #[repr(C)]
 #[derive(Debug)]
 pub struct Key<'a> {
-    pub extended_public_key_data: [u8],
-    pub extended_private_key_data: [u8],
-    pub public_key_data: [u8],
-    pub private_key_data: [u8],
-    pub hash160: [u8; 20],
+    pub extended_public_key_data: &'a [u8],
+    pub extended_private_key_data: &'a [u8],
+    pub public_key_data: &'a [u8],
+    pub private_key_data: &'a [u8],
+    pub hash160: UInt160,
     pub secret_key_string: &'a str,
     pub key_type: KeyType,
     pub localized_key_type: &'a str,
 }
 
-impl Key {
-    /*pub fn addressWithPublicKeyData(data: &[u8], chain: Chain) -> &str {
+/*impl Key {
+    pub fn addressWithPublicKeyData(data: &[u8], chain: Chain) -> &str {
         Secret::<[u8; 21]>::random(|mut s| {
             const BUFFER_LENGTH: usize = 1 + 20;
             let mut buffer = [0u8; BUFFER_LENGTH];
@@ -56,5 +57,5 @@ impl Key {
         [d appendBytes:&version length:1];
         [d appendBytes:&hash160 length:sizeof(hash160)];
         return [NSString base58checkWithData:d];
-    }*/
-}
+    }
+}*/

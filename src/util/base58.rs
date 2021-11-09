@@ -14,13 +14,9 @@
 
 //! Base58 encoder and decoder
 
-use prelude::*;
-
 use core::{fmt, str, iter, slice};
-
-use hashes::{sha256d, Hash};
 use secp256k1;
-
+use hashes::{Hash, sha256d};
 use crate::util::{endian, key};
 
 /// An error that might occur during base58 decoding
@@ -257,9 +253,8 @@ impl From<key::Error> for Error {
 
 #[cfg(test)]
 mod tests {
-    use bitcoin_hashes::hex::FromHex;
-    use super::*;
     use hashes::hex::FromHex;
+    use super::*;
 
     #[test]
     fn test_base58_encode() {

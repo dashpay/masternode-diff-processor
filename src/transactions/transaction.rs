@@ -1,13 +1,11 @@
-use std::collections::HashSet;
-use std::convert::TryFrom;
-use std::io::BufWriter;
-use std::time::Instant;
-use byte::{BytesExt, LE, TryWrite};
+use byte::{BytesExt, LE};
+use hashes::Hash;
+use secrets::traits::AsContiguousBytes;
 use crate::blockdata::opcodes::all::OP_RETURN;
+use crate::consensus::{Decodable, Encodable};
 use crate::consensus::encode::VarInt;
-use crate::crypto::{DASH_PUBKEY_ADDRESS, DASH_PUBKEY_ADDRESS_TEST};
-use crate::crypto::data_ops::{address_with_script_pub_key, address_with_script_signature, sha256_2};
-use crate::transactions::instant_send_transaction_lock::InstantSendTransactionLock;
+use crate::crypto::byte_util::{data_at_offset_from, UInt256};
+use crate::hashes::{sha256d};
 use crate::transactions::transaction::TransactionType::Classic;
 
 // estimated size for a typical transaction output
@@ -23,7 +21,7 @@ pub const TX_UNCONFIRMED: i32 = i32::MAX;
 
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TransactionType {
     Classic = 0,
     ProviderRegistration = 1,
@@ -39,143 +37,237 @@ pub enum TransactionType {
     Transition = 12,
 }
 
+impl From<u16> for TransactionType {
+    fn from(orig: u16) -> Self {
+        match orig {
+            0x0000 => TransactionType::Classic,
+            0x0001 => TransactionType::ProviderRegistration,
+            0x0002 => TransactionType::ProviderUpdateService,
+            0x0003 => TransactionType::ProviderUpdateRegistrar,
+            0x0004 => TransactionType::ProviderUpdateRevocation,
+            0x0005 => TransactionType::Coinbase,
+            0x0006 => TransactionType::QuorumCommitment,
+            0x0008 => TransactionType::SubscriptionRegistration,
+            0x0009 => TransactionType::SubscriptionTopUp,
+            0x000A => TransactionType::SubscriptionResetKey,
+            0x000B => TransactionType::SubscriptionCloseAccount,
+            0x000C => TransactionType::Transition,
+            _ => TransactionType::Classic
+        }
+    }
+}
+
+impl Into<u16> for TransactionType {
+    fn into(self) -> u16 {
+        *&self as u16
+    }
+}
+
+
 impl TransactionType {
     fn raw_value(&self) -> u16 {
         *self as u16
     }
+    pub fn requires_inputs(&self) -> bool { true }
 }
 
-#[repr(C)]
+// #[repr(C)]
 #[derive(Debug)]
-pub struct TransactionInput {
-    pub input_hash: [u8; 32],
+pub struct TransactionInput<'a> {
+    pub input_hash: UInt256,
     pub index: u32,
-    pub script: Option<[u8]>,
-    pub signature: Option<[u8]>,
+    pub script: Option<&'a [u8]>,
+    pub signature: Option<&'a [u8]>,
     pub sequence: u32,
 }
-#[repr(C)]
+// #[repr(C)]
 #[derive(Debug)]
 pub struct TransactionOutput<'a> {
     pub amount: u64,
-    pub script: Option<[u8]>,
+    pub script: Option<&'a [u8]>,
     pub address: Option<&'a str>,
 }
 pub trait ITransaction {
     fn payload_data(&self) -> &[u8];
     fn payload_data_for(&self) -> &[u8];
+    // fn transaction_type_requires_inputs() -> bool;
+    fn transaction_type(&self) -> TransactionType;
 }
 
-pub struct Transaction<'a, T: ITransaction> {
+pub struct Transaction<'a> {
 
-    pub inputs: Vec<TransactionInput>,
+    pub inputs: Vec<TransactionInput<'a>>,
     pub outputs: Vec<TransactionOutput<'a>>,
 
     pub lock_time: u32,
     pub version: u16,
-    pub tx_hash: Option<[u8; 32]>,
+    pub tx_hash: Option<UInt256>,
     pub tx_type: TransactionType,
 
     pub payload_offset: &'a mut usize,
     pub block_height: u32,
 }
 
-impl<'a> Transaction<dyn ITransaction> {
+impl Transaction<'static> {
     fn payload_data(&self) -> &[u8] {
-        [] as &[u8]
+        &[]
     }
 
-    fn transaction_type_requires_inputs() -> bool {
-        return true;
-    }
-    fn to_data(&self) -> &[u8] {
+    pub fn to_data(&self) -> &[u8] {
         self.to_data_with_subscript_index(u64::MAX)
     }
 
-    fn to_data_with_subscript_index(&self, subscript_index: u64) -> &[u8] {
-        let mut buffer = [0u8; 12];
+    pub fn to_data_with_subscript_index(&self, subscript_index: u64) -> &[u8] {
+        Self::data_with_subscript_index_static(
+            subscript_index,
+            self.version,
+            self.tx_type,
+            &self.inputs,
+            &self.outputs, self.lock_time)
+    }
+
+    fn data_with_subscript_index_static(
+        subscript_index: u64,
+        version: u16,
+        tx_type: TransactionType,
+        inputs: &Vec<TransactionInput>,
+        outputs: &Vec<TransactionOutput>,
+        lock_time: u32,
+    ) -> &'static [u8] {
+        let mut buffer = [0u8].as_mut_bytes();
         let offset: &mut usize = &mut 0;
-        buffer.write(offset, self.version);
-        buffer.write(offset, self.tx_type.raw_value());
-        let inputs_len = self.inputs.len();
-        buffer.write(offset, VarInt(inputs_len as u64));
+        buffer.write(offset, version);
+        buffer.write(offset, tx_type.raw_value());
+        let inputs_len = inputs.len();
+        *offset += match VarInt(inputs_len as u64).consensus_encode(buffer) {
+            Ok(size) => size,
+            _ => 0
+        };
         for i in 0..inputs_len {
-            let input = self.inputs.get(i)?;
+            let input = &inputs[i];
+            //let input = inputs.get(i)?;
             buffer.write(offset, input.input_hash);
             buffer.write(offset, input.index);
-            if subscript_index == u64::MAX && input.signature != None {
-                let signature = input.signature?;
-                buffer.write(offset, signature?.len());
+            if subscript_index == u64::MAX && input.signature.is_some() {
+                let signature = input.signature.unwrap();
+                buffer.write(offset, signature.len());
                 buffer.write(offset, signature);
-            } else if subscript_index == i && input.script != None {
-                let script = input.script?;
-                buffer.write(offset, VarInt(script.len() as u64));
+            } else if subscript_index == i as u64 && input.script.is_some() {
+                let script = input.script.unwrap();
+                *offset += VarInt(script.len() as u64).consensus_encode(buffer).unwrap_or(0);
                 buffer.write(offset, script);
             } else {
-                buffer.write(offset, VarInt(0 as u64));
+                *offset += match VarInt(0u64).consensus_encode(buffer) {
+                    Ok(size) => size,
+                    _ => 0
+                };
             }
             buffer.write(offset, input.sequence);
         }
-        let outputs_len = self.outputs.len();
-        buffer.write(offset, VarInt(outputs_len as u64));
+
+        let outputs_len = inputs.len();
+        *offset += VarInt(outputs_len as u64).consensus_encode(buffer).unwrap_or(0);
+
         for i in 0..outputs_len {
-            let output = self.outputs.get(i)?;
+            let output = outputs[i];
             buffer.write(offset, output.amount);
-            if output.script != None {
-                let script = output.script?;
-                buffer.write(offset, script.len());
+            if let Some(script) = output.script {
+                *offset += VarInt(script.len() as u64).consensus_encode(buffer).unwrap_or(0);
                 buffer.write(offset, script);
             }
         }
-        buffer.write(offset, self.lock_time);
+        buffer.write(offset, lock_time);
         if subscript_index != u64::MAX {
-            buffer.write(offset, 0x00000001 as u32);
+            buffer.write(offset, 1u32);
         }
         &buffer
     }
-}
-impl<'a> Transaction<dyn ITransaction> {
-    pub fn new(message: &[u8]) -> Option<Self> {
+
+    pub fn new(message: &'static [u8]) -> Option<Self> {
         let off = &mut 0;
-        let version = message.read_with::<u16>(off, LE)?;
-        let tx_type = message.read_with::<u16>(off, LE)?;
-        let count = VarInt(off as u64);
-        if count == 0 && self::transaction_type_requires_inputs() {
+        let version = match message.read_with::<u16>(off, LE) {
+            Ok(data) => data,
+            Err(_err) => { return None; }
+        };
+        let tx_type = match message.read_with::<u16>(off, LE) {
+            Ok(data) => data,
+            Err(_err) => { return None; }
+        };
+        let tx_type = TransactionType::from(tx_type);
+
+        let count_var = match VarInt::consensus_decode(&message[*off..]) {
+            Ok(data) => data,
+            Err(_err) => { return None; }
+        };
+        let count = count_var.0;
+        *off += count_var.len();
+
+        if count == 0 && tx_type.requires_inputs() {
             return None; // at least one input is required
         }
         let mut inputs: Vec<TransactionInput> = Vec::new();
         for _i in 0..count {
-            let input_hash = message.read_with::<[u8; 32]>(off, LE)?;
-            let index = message.read_with::<u32>(off, LE)?;
-            let signature = message.read_with::<[u8]>(off, LE)?;
-            let sequence = message.read_with::<u32>(off, LE)?;
+            let input_hash = match message.read_with::<UInt256>(off, LE) {
+                Ok(data) => data,
+                Err(_err) => { return None; }
+            };
+            let index = match message.read_with::<u32>(off, LE) {
+                Ok(data) => data,
+                Err(_err) => { return None; }
+            };
+            let signature: Option<&[u8]> = match data_at_offset_from(message, off) {
+                Ok(data) => Some(data),
+                Err(_err) => None
+            };
+            let sequence = match message.read_with::<u32>(off, LE) {
+                Ok(data) => data,
+                Err(_err) => { return None; }
+            };
             let input = TransactionInput {
                 input_hash,
                 index,
                 script: None,
-                signature: Some(signature),
+                signature,
                 sequence
             };
             inputs.push(input);
         }
         let mut outputs: Vec<TransactionOutput> = Vec::new();
-        let count = VarInt(off as u64);
+
+        let count_var = match VarInt::consensus_decode(&message[*off..]) {
+            Ok(data) => data,
+            Err(_err) => { return None; }
+        };
+        let count = count_var.0;
+        *off += count_var.len();
+
         for _i in 0..count {
-            let amount = message.read_with::<u64>(off, LE)?;
-            let script = message.read_with::<[u8]>(off, LE)?;
-            let output = TransactionOutput {
-                amount,
-                script: Some(script),
-                address: None
+            let amount = match message.read_with::<u64>(off, LE) {
+                Ok(data) => data,
+                Err(_err) => { return None; }
             };
+            let script: Option<&[u8]> = match data_at_offset_from(message, off) {
+                Ok(data) => Some(data),
+                Err(_err) => None
+            };
+            let output = TransactionOutput { amount, script, address: None };
             outputs.push(output);
         }
 
-        let lock_time = message.read_with::<u32>(off, LE)?;
+        let lock_time = match message.read_with::<u32>(off, LE) {
+            Ok(data) => data,
+            Err(_err) => { return None; }
+        };
         let payload_offset = off;
-        let tx_hash: Option<[u8; 32]> =
-            if tx_type == Classic.raw_value() {
-                Some(sha256_2(&base.data))
+        let tx_hash: Option<UInt256> =
+            if tx_type == Classic {
+                Some(
+                    UInt256(sha256d::Hash::hash(Self::data_with_subscript_index_static(
+                        u64::MAX,
+                        version,
+                        tx_type,
+                        &inputs,
+                        &outputs, lock_time)).into_inner()))
             } else {
                 None
              };
@@ -185,7 +277,7 @@ impl<'a> Transaction<dyn ITransaction> {
             outputs,
             tx_hash,
             version,
-            tx_type: TransactionType::try_from(tx_type)?,
+            tx_type,
             lock_time,
             payload_offset,
             block_height: TX_UNCONFIRMED as u32
@@ -243,11 +335,11 @@ impl<'a> Transaction<dyn ITransaction> {
     }
 
     pub fn standard_fee(&self) -> u64 {
-        (self.size() * TX_FEE_PER_B) as u64
+        self.size() as u64 * TX_FEE_PER_B as u64
     }
 
     pub fn standard_instant_fee(&self) -> u64 {
-        TX_FEE_PER_INPUT * self.inputs.len()
+        TX_FEE_PER_INPUT * self.inputs.len() as u64
     }
 
 
@@ -267,14 +359,18 @@ impl<'a> Transaction<dyn ITransaction> {
 
     pub fn is_coinbase_classic_transaction(&self) -> bool {
         self.inputs.len() == 1 &&
-            self.inputs[0].input_hash.is_empty() &&
+            self.inputs[0].input_hash.0.is_empty() &&
             self.inputs[0].index == u32::MAX
     }
 
     pub fn is_credit_funding_transaction(&self) -> bool {
         for output in self.outputs {
             if let Some(script) = output.script {
-                if script[0..7] == OP_RETURN &&
+                let code = match script.read_with::<u8>(&mut 0, LE) {
+                    Ok(data) => data,
+                    Err(_err) => { continue; }
+                };
+                if code == OP_RETURN.into_u8() &&
                     script.len() == 22 {
                     return true;
                 }

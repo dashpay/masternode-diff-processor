@@ -29,27 +29,22 @@
 //! big-endian decimals, etc.)
 //!
 
-use prelude::*;
-
 use core::{fmt, mem, u32, convert::From};
 use std::borrow::Cow;
 #[cfg(feature = "std")] use std::error;
 
-use hashes::{sha256d, Hash, sha256};
-use hash_types::{BlockHash, FilterHash, TxMerkleNode, FilterHeader};
-
 use std::io::{self, Cursor, Read};
 use std::{rc, sync};
-use bitcoin_hashes::{Hash, sha256, sha256d};
+use hashes::{Hash, sha256, sha256d};
+use crate::hash_types::{BlockHash, FilterHash, FilterHeader, TxMerkleNode};
+use crate::hashes::hex::ToHex;
 
-use util::endian;
-use util::psbt::{Error};
-use hashes::hex::ToHex;
+// use hashes::hex::ToHex;
 
-use blockdata::transaction::{TxOut, Transaction, TxIn};
-#[cfg(feature = "std")]
-use network::{message_blockdata::Inventory, address::{Address, AddrV2Message}};
-use crate::util::psbt;
+// use blockdata::transaction::{TxOut, Transaction, TxIn};
+// #[cfg(feature = "std")]
+// use network::{message_blockdata::Inventory, address::{Address, AddrV2Message}};
+use crate::util::{endian, psbt};
 
 /// Encoding error
 #[derive(Debug)]
@@ -593,15 +588,15 @@ impl_vec!(BlockHash);
 impl_vec!(FilterHash);
 impl_vec!(FilterHeader);
 impl_vec!(TxMerkleNode);
-impl_vec!(Transaction);
-impl_vec!(TxOut);
-impl_vec!(TxIn);
+// impl_vec!(Transaction);
+// impl_vec!(TxOut);
+// impl_vec!(TxIn);
 impl_vec!(Vec<u8>);
 impl_vec!(u64);
 
-#[cfg(feature = "std")] impl_vec!(Inventory);
-#[cfg(feature = "std")] impl_vec!((u32, Address));
-#[cfg(feature = "std")] impl_vec!(AddrV2Message);
+// #[cfg(feature = "std")] impl_vec!(Inventory);
+// #[cfg(feature = "std")] impl_vec!((u32, Address));
+// #[cfg(feature = "std")] impl_vec!(AddrV2Message);
 
 pub(crate) fn consensus_encode_with_size<S: io::Write>(data: &[u8], mut s: S) -> Result<usize, io::Error> {
     let vi_len = VarInt(data.len() as u64).consensus_encode(&mut s)?;

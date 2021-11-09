@@ -37,6 +37,7 @@ macro_rules! define_be_to_array {
         }
     }
 }
+#[macro_export]
 macro_rules! define_le_to_array {
     ($name: ident, $type: ty, $byte_len: expr) => {
         #[inline]
@@ -61,6 +62,7 @@ define_slice_to_le!(slice_to_u64_le, u64);
 define_le_to_array!(u16_to_array_le, u16, 2);
 define_le_to_array!(u32_to_array_le, u32, 4);
 define_le_to_array!(u64_to_array_le, u64, 8);
+define_le_to_array!(u8_to_array_le, u8, 32);
 
 #[inline]
 pub fn i16_to_array_le(val: i16) -> [u8; 2] {

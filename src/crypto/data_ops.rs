@@ -1,27 +1,50 @@
-use std::convert::TryInto;
-use std::mem::size_of;
-use sha2::{Digest, Sha256};
-use sha2::digest::DynDigest;
-use crate::blockdata::opcodes::all::{OP_CHECKSIG, OP_DUP, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4};
-use crate::chain::chain::Chain;
-use crate::crypto::byte_util::Data;
+// use std::convert::TryInto;
+// use sha2::{Digest, Sha256};
+// use sha2::digest::DynDigest;
+use std::collections::HashSet;
+use std::hash::Hash;
 
-pub fn sha256_1(data: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    let result = hasher.finalize();
-    result.try_into().expect("error sha-256")
+
+
+/// Extracts the common values in `a` and `b` into a new set.
+pub fn inplace_intersection<T>(a: &mut HashSet<T>, b: &mut HashSet<T>) -> HashSet<T>
+    where
+        T: Hash,
+        T: Eq,
+{
+    let x: HashSet<(T, bool)> = a
+        .drain()
+        .map(|v| {
+            let intersects = b.contains(&v);
+            (v, intersects)
+        })
+        .collect();
+    let mut c = HashSet::new();
+    for (v, is_inter) in x {
+        if is_inter {
+            c.insert(v);
+        } else {
+            a.insert(v);
+        }
+    }
+    b.retain(|v| !c.contains(&v));
+    c
 }
 
-pub fn sha256_2(data: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    let result = hasher.finalize();
-    hasher.update(&result);
-    hasher.finalize().try_into().expect("error double sha-256")
-}
-
-
+// pub fn sha256_1(data: &[u8]) -> [u8; 32] {
+//     let mut hasher = Sha256::new();
+//     hasher.update(data);
+//     let result = hasher.finalize();
+//     result.try_into().expect("error sha-256")
+// }
+//
+// pub fn sha256_2(data: &[u8]) -> [u8; 32] {
+//     let mut hasher = Sha256::new();
+//     hasher.update(data);
+//     let result = hasher.finalize();
+//     hasher.update(&result);
+//     hasher.finalize().try_into().expect("error double sha-256")
+// }
 
 /*pub fn script_elements(script: &[u8]) -> &[u8] {
     // NSMutableArray *a = [NSMutableArray array];
