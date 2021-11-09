@@ -73,10 +73,10 @@ impl MasternodeEntry {
         self.platform_ping_date = ping_date;
     }
 
-    pub fn host(&self) -> &str {
+    pub fn host(&self) -> String {
         let ip = self.socket_address.ip_address;
         let port = self.socket_address.port;
-        &format!("{}:{}", ip.to_string(), port.to_string())
+        format!("{}:{}", ip.to_string(), port.to_string())
     }
 
     pub fn payload_data(&self) -> UInt256 {
@@ -104,7 +104,7 @@ impl MasternodeEntry {
         }
         let mut min_distance = u32::MAX;
         let mut is_valid = self.is_valid;
-        for (previous_block, validity) in self.previous_validity {
+        for (previous_block, validity) in self.previous_validity.clone() {
             let previous_block_height = previous_block.height;
             let distance = previous_block_height - block_height;
             if (1..min_distance).contains(&distance) {
@@ -122,7 +122,7 @@ impl MasternodeEntry {
         }
         let mut min_distance = u32::MAX;
         let mut used_previous_operator_public_key_at_block_hash = self.operator_public_key;
-        for (block, key) in self.previous_operator_public_keys {
+        for (block, key) in self.previous_operator_public_keys.clone() {
             let prev_block_height = block.height;
             let distance = prev_block_height - block_height;
             if (1..min_distance).contains(&distance) {
@@ -141,14 +141,18 @@ impl MasternodeEntry {
             // if for example we are getting a masternode list at block 402 when we already got the
             // masternode list at block 414 then the other sme might have previousValidity that is
             // in our future we need to ignore them
+
+            let prev_val = masternode_entry.previous_validity.clone();
+            prev_val.into_iter().filter(|(block, validity)|);
+
             for (block, validity) in masternode_entry.previous_validity {
                 if block.height < self.update_height {
-                    self.previous_validity[&block] = validity;
+                    self.previous_validity.insert(block, validity);
                 }
             }
             if masternode_entry.is_valid_at(self.update_height) != self.is_valid {
                 println!("Changed validity from {} to {} on {:?}", masternode_entry.is_valid, self.is_valid, self.provider_registration_transaction_hash);
-                self.previous_validity[&b] = masternode_entry.is_valid;
+                self.previous_validity.insert(b, masternode_entry.is_valid);
             }
             self.previous_operator_public_keys = BTreeMap::new();
             // if for example we are getting a masternode list at block 402 when we already got the
@@ -209,7 +213,7 @@ impl MasternodeEntry {
     }
 
 
-    pub fn unique_id(&self) -> &str {
+    pub fn unique_id(&self) -> String {
         short_hex_string_from(&self.provider_registration_transaction_hash.0)
     }
 

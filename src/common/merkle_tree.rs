@@ -56,7 +56,8 @@ impl<'a> MerkleTree<'a> {
     pub fn merkle_root(&self) -> Option<UInt256> {
         let hash_idx = &mut 0;
         let flag_idx = &mut 0;
-        let mut buffer = [0u8];
+        //let mut buffer = [0u8];
+        let buffer: &mut [u8] = &mut [];
 
         // let mut buffer = Arc::new(Mutex::new([0u8]));
 

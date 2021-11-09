@@ -69,14 +69,14 @@ impl Data for [u8] {
 }
 
 
-pub fn hex_with_data(data: &[u8]) -> &str {
+pub fn hex_with_data(data: &[u8]) -> String {
     let n = data.len();
     let mut s = String::with_capacity(2 * n);
     let mut iter = data.iter();
     while let Some(a) = iter.next() {
         write!(s, "{:02X}", a);
     }
-    &s
+    s
 }
 
 #[inline]
@@ -105,20 +105,10 @@ pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
     while hashes.len() != 1 {
         for i in (0..level.len()).step_by(2) {
             let left = level[i];
-            let mut offset = &mut 0;
-            let mut combo = &[0u8; 64];
+            let offset = &mut 0;
+            let combo = &mut [0u8; 64];
             combo.write(offset, left);
             combo.write(offset, if level.len() - i > 1 { level[i+1] } else { left });
-
-
-            /*let mut combined: Vec<sha256d::Hash> = vec![left];
-            if level.len() - i > 1 {
-                combined.push(level[i + 1]);
-            } else {
-                combined.push(left);
-            }*/
-
-
             higher_level.push(UInt256(sha256d::Hash::hash(combo).into_inner()));
         }
         level = higher_level.clone();
@@ -127,10 +117,10 @@ pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
     return Some(level[0]);
 }
 
-pub fn short_hex_string_from(data: &[u8]) -> &str {
+pub fn short_hex_string_from(data: &[u8]) -> String {
     let hex_data = hex_with_data(data);
     if hex_data.len() > 7 {
-        &hex_data[..7]
+        hex_data[..7].to_string()
     } else {
         hex_data
     }
@@ -239,6 +229,20 @@ impl std::fmt::Display for UInt256 {
         Ok(())
     }
 }
+
+// impl<Idx> Index<Idx> for UInt256 {
+//     type Output = [u8; 32];
+//
+//     fn index(&self, index: Idx) -> &Self::Output {
+//         self.0.index(index)
+//     }
+// }
+//
+// impl<Idx> IndexMut<Idx> for UInt256 {
+//     fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
+//         self.0.index_mut(index)
+//     }
+// }
 
 impl Reversable for UInt256 {
     fn reversed(&mut self) -> Self {

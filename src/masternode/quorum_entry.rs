@@ -126,7 +126,7 @@ impl<'a> QuorumEntry<'a> {
         quorum_threshold_signature: UInt768,
         all_commitment_aggregated_signature: UInt768
     ) -> &[u8] {
-        let mut buffer = [0u8];
+        let buffer: &mut [u8] = &mut [];
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = llmq_type.into();
         buffer.write(offset, version);
@@ -143,7 +143,7 @@ impl<'a> QuorumEntry<'a> {
         buffer.write(offset, quorum_verification_vector_hash);
         buffer.write(offset, quorum_threshold_signature);
         buffer.write(offset, all_commitment_aggregated_signature);
-        &buffer
+        buffer
     }
 
     pub fn to_data(&self) -> &[u8] {
@@ -164,20 +164,21 @@ impl<'a> QuorumEntry<'a> {
     }
 
     pub fn commitment_data(&self) -> &[u8] {
-        let mut buffer = [0u8].as_mut_bytes();
+        let buffer: &mut [u8] = &mut [];
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = self.llmq_type.into();
         buffer.write(offset, llmq_u8);
         buffer.write(offset, self.quorum_hash);
-        let valid_members_count_size = match self.valid_members_count.consensus_encode(buffer) {
+        let mut valid_members_count_buffer = [0u8];
+        match self.valid_members_count.consensus_encode(&mut valid_members_count_buffer.as_mut_bytes()) {
             Ok(size) => size,
             _ => 0
         };
-        *offset += valid_members_count_size;
+        buffer.write(offset, valid_members_count_buffer.as_bytes());
         buffer.write(offset, self.valid_members_bitset);
         buffer.write(offset, self.quorum_public_key);
         buffer.write(offset, self.quorum_verification_vector_hash);
-        &buffer
+        buffer
     }
 
     pub fn commitment_hash(&mut self) -> sha256d::Hash {
@@ -240,7 +241,7 @@ impl<'a> QuorumEntry<'a> {
         let masternodes = masternode_list.valid_masternodes_for(quorum_modifier, quorum_count, block_height_lookup);
         let mut public_keys: Vec<UInt384> = Vec::new();
         let mut i: u32 = 0;
-        let block_height: u32 = block_height_lookup(masternode_list.block_hash.0.as_ptr());
+        let block_height: u32 = unsafe { block_height_lookup(masternode_list.block_hash.0.as_ptr()) };
         for masternode_entry in masternodes {
             if self.signers_bitset.bit_is_true_at_le_index(i) {
                 public_keys.push(masternode_entry.operator_public_key_at(block_height));

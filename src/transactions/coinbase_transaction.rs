@@ -21,7 +21,7 @@ impl<'a> CoinbaseTransaction<'a> {
     pub fn new(message: &'a [u8]) -> Option<Self> {
         if let Some(mut base) = Transaction::new(message) {
             base.tx_type = Coinbase;
-            let mut offset = base.payload_offset;
+            let offset = base.payload_offset;
             let extra_payload_size = match VarInt::consensus_decode(&message[*offset..]) {
                 Ok(data) => data,
                 Err(_err) => { return None; }
@@ -61,15 +61,15 @@ impl<'a> CoinbaseTransaction<'a> {
     }
 
     fn payload_data(&self) -> &[u8] {
-        let mut buf = [0u8];
-        buf[0..15].copy_from_slice(&self.coinbase_transaction_version.as_bytes());
-        buf[16..47].copy_from_slice(&self.height.as_bytes());
-        buf[48..303].copy_from_slice(self.merkle_root_mn_list.0.as_bytes());
+        let buffer: &mut [u8] = &mut [];
+        buffer[0..15].copy_from_slice(&self.coinbase_transaction_version.as_bytes());
+        buffer[16..47].copy_from_slice(&self.height.as_bytes());
+        buffer[48..303].copy_from_slice(self.merkle_root_mn_list.0.as_bytes());
         if self.coinbase_transaction_version >= 2 {
             if let Some(llmq_list) = self.merkle_root_llmq_list {
-                buf[304..559].copy_from_slice(llmq_list.0.as_bytes());
+                buffer[304..559].copy_from_slice(llmq_list.0.as_bytes());
             }
         }
-        &buf
+        buffer
     }
 }

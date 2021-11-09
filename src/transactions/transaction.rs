@@ -133,16 +133,20 @@ impl<'a> Transaction<'a> {
         inputs: &Vec<TransactionInput>,
         outputs: &Vec<TransactionOutput>,
         lock_time: u32,
-    ) -> &'static [u8] {
-        let mut buffer = [0u8].as_mut_bytes();
+    ) -> &'a [u8] {
+        //let mut buffer = [0u8].as_mut_bytes();
+        let buffer: &mut [u8] = &mut [];
         let offset: &mut usize = &mut 0;
         buffer.write(offset, version);
         buffer.write(offset, tx_type.raw_value());
         let inputs_len = inputs.len();
-        *offset += match VarInt(inputs_len as u64).consensus_encode(buffer) {
+        let mut inputs_len_buffer= [0u8];
+        match VarInt(inputs_len as u64).consensus_encode(&mut inputs_len_buffer.as_mut_bytes()) {
             Ok(size) => size,
             _ => 0
         };
+        buffer.write(offset, inputs_len_buffer.as_bytes());
+
         for i in 0..inputs_len {
             let input = &inputs[i];
             //let input = inputs.get(i)?;
@@ -169,7 +173,7 @@ impl<'a> Transaction<'a> {
         *offset += VarInt(outputs_len as u64).consensus_encode(buffer).unwrap_or(0);
 
         for i in 0..outputs_len {
-            let output = outputs[i];
+            let output = &outputs[i];
             buffer.write(offset, output.amount);
             if let Some(script) = output.script {
                 *offset += VarInt(script.len() as u64).consensus_encode(buffer).unwrap_or(0);
@@ -180,46 +184,46 @@ impl<'a> Transaction<'a> {
         if subscript_index != u64::MAX {
             buffer.write(offset, 1u32);
         }
-        &buffer
+        buffer
     }
 
     pub fn new(message: &'a [u8]) -> Option<Self> {
-        let off = &mut 0;
-        let version = match message.read_with::<u16>(off, LE) {
+        let payload_offset = &mut 0;
+        let version = match message.read_with::<u16>(payload_offset, LE) {
             Ok(data) => data,
             Err(_err) => { return None; }
         };
-        let tx_type = match message.read_with::<u16>(off, LE) {
+        let tx_type = match message.read_with::<u16>(payload_offset, LE) {
             Ok(data) => data,
             Err(_err) => { return None; }
         };
         let tx_type = TransactionType::from(tx_type);
 
-        let count_var = match VarInt::consensus_decode(&message[*off..]) {
+        let count_var = match VarInt::consensus_decode(&message[*payload_offset..]) {
             Ok(data) => data,
             Err(_err) => { return None; }
         };
         let count = count_var.0;
-        *off += count_var.len();
+        *payload_offset += count_var.len();
 
         if count == 0 && tx_type.requires_inputs() {
             return None; // at least one input is required
         }
         let mut inputs: Vec<TransactionInput> = Vec::new();
         for _i in 0..count {
-            let input_hash = match message.read_with::<UInt256>(off, LE) {
+            let input_hash = match message.read_with::<UInt256>(payload_offset, LE) {
                 Ok(data) => data,
                 Err(_err) => { return None; }
             };
-            let index = match message.read_with::<u32>(off, LE) {
+            let index = match message.read_with::<u32>(payload_offset, LE) {
                 Ok(data) => data,
                 Err(_err) => { return None; }
             };
-            let signature: Option<&[u8]> = match data_at_offset_from(message, off) {
+            let signature: Option<&[u8]> = match data_at_offset_from(message, payload_offset) {
                 Ok(data) => Some(data),
                 Err(_err) => None
             };
-            let sequence = match message.read_with::<u32>(off, LE) {
+            let sequence = match message.read_with::<u32>(payload_offset, LE) {
                 Ok(data) => data,
                 Err(_err) => { return None; }
             };
@@ -234,19 +238,19 @@ impl<'a> Transaction<'a> {
         }
         let mut outputs: Vec<TransactionOutput> = Vec::new();
 
-        let count_var = match VarInt::consensus_decode(&message[*off..]) {
+        let count_var = match VarInt::consensus_decode(&message[*payload_offset..]) {
             Ok(data) => data,
             Err(_err) => { return None; }
         };
         let count = count_var.0;
-        *off += count_var.len();
+        *payload_offset += count_var.len();
 
         for _i in 0..count {
-            let amount = match message.read_with::<u64>(off, LE) {
+            let amount = match message.read_with::<u64>(payload_offset, LE) {
                 Ok(data) => data,
                 Err(_err) => { return None; }
             };
-            let script: Option<&[u8]> = match data_at_offset_from(message, off) {
+            let script: Option<&[u8]> = match data_at_offset_from(message, payload_offset) {
                 Ok(data) => Some(data),
                 Err(_err) => None
             };
@@ -254,11 +258,11 @@ impl<'a> Transaction<'a> {
             outputs.push(output);
         }
 
-        let lock_time = match message.read_with::<u32>(off, LE) {
+        let lock_time = match message.read_with::<u32>(payload_offset, LE) {
             Ok(data) => data,
             Err(_err) => { return None; }
         };
-        let payload_offset = off;
+        //let payload_offset = off;
         let tx_hash: Option<UInt256> =
             if tx_type == Classic {
                 Some(
@@ -347,7 +351,7 @@ impl<'a> Transaction<'a> {
     // checks if all signatures exist, but does not verify them
     pub fn is_signed(&self) -> bool {
         let mut signed = true;
-        for input in self.inputs {
+        for input in &self.inputs {
             let input_is_signed = input.signature.is_some();
             signed &= input_is_signed;
             if !input_is_signed {
@@ -364,7 +368,7 @@ impl<'a> Transaction<'a> {
     }
 
     pub fn is_credit_funding_transaction(&self) -> bool {
-        for output in self.outputs {
+        for output in &self.outputs {
             if let Some(script) = output.script {
                 let code = match script.read_with::<u8>(&mut 0, LE) {
                     Ok(data) => data,
