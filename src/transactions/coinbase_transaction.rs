@@ -21,7 +21,7 @@ impl<'a> CoinbaseTransaction<'a> {
     pub fn new(message: &'a [u8]) -> Option<Self> {
         if let Some(mut base) = Transaction::new(message) {
             base.tx_type = Coinbase;
-            let offset = base.payload_offset;
+            let offset = &mut base.payload_offset;
             let extra_payload_size = match VarInt::consensus_decode(&message[*offset..]) {
                 Ok(data) => data,
                 Err(_err) => { return None; }
@@ -47,7 +47,7 @@ impl<'a> CoinbaseTransaction<'a> {
                     }
                 } else { None };
 
-            base.payload_offset = offset;
+            base.payload_offset = offset.clone();
             base.tx_hash = Some(UInt256(sha256d::Hash::hash(&base.to_data()).into_inner()));
             return Some(Self {
                 base,

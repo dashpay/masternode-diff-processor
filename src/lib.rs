@@ -165,7 +165,7 @@ pub mod manager {
         let coinbase_transaction = CoinbaseTransaction::new(message);
         if coinbase_transaction.is_none() { return failure(); }
         let coinbase_transaction = coinbase_transaction.unwrap();
-        *offset += *coinbase_transaction.base.payload_offset;
+        *offset += coinbase_transaction.base.payload_offset;
         if length - *offset < 1 { return failure(); }
         let deleted_masternode_var_int = match VarInt::consensus_decode(&message[*offset..]) {
             Ok(data) => data,
@@ -349,16 +349,16 @@ pub mod manager {
             }
         }*/
 
-        added_quorums
-            .keys()
-            .for_each(|key| {
-                if !&quorums.contains_key(key) {
-                    &quorums.insert(*key, HashMap::new());
-                    //quorums.insert(*key, HashMap::new());
-                }
-            });
 
-        quorums.into_iter().for_each(|(quorum_type, mut quorums_of_type)| {
+        let quorums_to_add = added_quorums
+            .clone()
+            .into_iter()
+            .filter(|(key, _entries)| !quorums.contains_key(key))
+            .collect::<HashMap<LLMQType, HashMap<UInt256, QuorumEntry>>>();
+
+        quorums.extend(quorums_to_add);
+
+        quorums.clone().into_iter().for_each(|(quorum_type, mut quorums_of_type)| {
             if deleted_quorums.contains_key(&quorum_type) {
                 if let Some(keys_to_delete) = deleted_quorums.get(&quorum_type) {
                     keys_to_delete.iter().for_each(|key| {
@@ -374,40 +374,6 @@ pub mod manager {
                 }
             }
         });
-
-        /*quorums.iter().for_each(|(quorum_type, quorums_of_type)| {
-            if deleted_quorums.contains_key(quorum_type) {
-                if let Some(keys_to_delete) = deleted_quorums.get(quorum_type) {
-                    keys_to_delete.iter().for_each(|key| {
-                        quorums_of_type.remove(key);
-                    });
-                }
-            }
-            if added_quorums.contains_key(quorum_type) {
-                if let Some(quorums_to_add) = added_quorums.get(quorum_type) {
-                    quorums_to_add.into_iter().for_each(|(key, entry)| {
-                        quorums_of_type.insert(*key, entry.to_owned());
-                    });
-                }
-            }
-        });
-
-        &quorums.into_iter().for_each(|(quorum_type, mut quorums_of_type)| {
-            if deleted_quorums.contains_key(&quorum_type) {
-                if let Some(keys_to_delete) = deleted_quorums.get(&quorum_type) {
-                    keys_to_delete.iter().for_each(|key| {
-                        quorums_of_type.remove(key);
-                    });
-                }
-            }
-            if added_quorums.contains_key(&quorum_type) {
-                if let Some(quorums_to_add) = added_quorums.get(&quorum_type) {
-                    quorums_to_add.into_iter().for_each(|(key, entry)| {
-                        quorums_of_type.insert(*key, entry.to_owned());
-                    });
-                }
-            }
-        });*/
 
         let mut masternode_list = MasternodeList::new(masternodes, quorums, block_hash, block_height);
         let root_mn_list_valid = coinbase_transaction.merkle_root_mn_list == masternode_list.masternode_merkle_root_with(block_height_lookup);

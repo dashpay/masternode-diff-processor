@@ -56,11 +56,6 @@ impl<'a> MerkleTree<'a> {
     pub fn merkle_root(&self) -> Option<UInt256> {
         let hash_idx = &mut 0;
         let flag_idx = &mut 0;
-        //let mut buffer = [0u8];
-        let buffer: &mut [u8] = &mut [];
-
-        // let mut buffer = Arc::new(Mutex::new([0u8]));
-
         self.walk_hash_idx(
             hash_idx,
             flag_idx,
@@ -68,17 +63,14 @@ impl<'a> MerkleTree<'a> {
             |hash, _flag | hash,
             |left, right| {
                 let offset: &mut usize = &mut 0;
+                let buffer: &mut [u8] = &mut [0; 64];
                 buffer.write(offset, left);
-                // buffer.lock().unwrap().write(offset, left);
-                // if right branch is missing, duplicate left branch
                 buffer.write(offset, if right.is_none() { left.clone() } else { right.unwrap() });
-                // buffer.lock().unwrap().write(offset, if right.is_none() { left.clone() } else { right.unwrap() });
                 Some(UInt256(sha256d::Hash::hash(buffer.as_bytes()).into_inner()))
-                // Some(UInt256(sha256d::Hash::hash(buffer.lock().unwrap().as_bytes()).into_inner()))
             })
     }
 
-    pub fn walk_hash_idx<BL: FnMut(UInt256, Option<UInt256>) -> Option<UInt256> /*+ Copy*/>(
+    pub fn walk_hash_idx<BL: Fn(UInt256, Option<UInt256>) -> Option<UInt256> + Copy>(
         &self,
         hash_idx: &mut i32,
         flag_idx: &mut i32,

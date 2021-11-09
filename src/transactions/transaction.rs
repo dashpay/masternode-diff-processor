@@ -105,7 +105,7 @@ pub struct Transaction<'a> {
     pub tx_hash: Option<UInt256>,
     pub tx_type: TransactionType,
 
-    pub payload_offset: &'a mut usize,
+    pub payload_offset: usize,
     pub block_height: u32,
 }
 
@@ -283,7 +283,7 @@ impl<'a> Transaction<'a> {
             version,
             tx_type,
             lock_time,
-            payload_offset,
+            payload_offset: payload_offset.clone(),
             block_height: TX_UNCONFIRMED as u32
         })
       }
