@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+// use std::sync::{Arc, Mutex};
 use hashes::{sha256d};
 use byte::{BytesExt, LE};
 use secrets::traits::AsContiguousBytes;
@@ -78,7 +78,7 @@ impl<'a> MerkleTree<'a> {
             })
     }
 
-    pub fn walk_hash_idx<BL: FnMut(UInt256, Option<UInt256>) -> Option<UInt256>>(
+    pub fn walk_hash_idx<BL: FnMut(UInt256, Option<UInt256>) -> Option<UInt256> /*+ Copy*/>(
         &self,
         hash_idx: &mut i32,
         flag_idx: &mut i32,

@@ -137,19 +137,23 @@ impl MasternodeEntry {
     pub fn keep_info_of_previous_entry_version(&mut self, mut masternode_entry: MasternodeEntry, block_height: u32, block_hash: UInt256) {
         let b = BlockData { height: block_height, hash: block_hash };
         if self.provider_registration_transaction_hash == masternode_entry.provider_registration_transaction_hash {
-            self.previous_validity = HashMap::new();
+            // self.previous_validity = HashMap::new();
             // if for example we are getting a masternode list at block 402 when we already got the
             // masternode list at block 414 then the other sme might have previousValidity that is
             // in our future we need to ignore them
 
-            let prev_val = masternode_entry.previous_validity.clone();
-            prev_val.into_iter().filter(|(block, validity)|);
+            self.previous_validity = masternode_entry
+                .clone()
+                .previous_validity
+                .into_iter()
+                .filter(|(block, _)| block.height < self.update_height)
+                .collect();
 
-            for (block, validity) in masternode_entry.previous_validity {
+            /*for (block, validity) in masternode_entry.previous_validity {
                 if block.height < self.update_height {
                     self.previous_validity.insert(block, validity);
                 }
-            }
+            }*/
             if masternode_entry.is_valid_at(self.update_height) != self.is_valid {
                 println!("Changed validity from {} to {} on {:?}", masternode_entry.is_valid, self.is_valid, self.provider_registration_transaction_hash);
                 self.previous_validity.insert(b, masternode_entry.is_valid);
@@ -158,29 +162,32 @@ impl MasternodeEntry {
             // if for example we are getting a masternode list at block 402 when we already got the
             // masternode list at block 414 then the other sme might have previousOperatorPublicKeys
             // that is in our future we need to ignore them
-            for (block, key) in masternode_entry.previous_operator_public_keys {
+            for (block, key) in &masternode_entry.previous_operator_public_keys {
                 if block.height < self.update_height {
-                    self.previous_operator_public_keys[block.borrow()] = key;
+                    self.previous_operator_public_keys.insert(*block, *key);
                 }
             }
             if masternode_entry.operator_public_key_at(self.update_height) != self.operator_public_key {
                 // the operator public key changed
                 println!("Changed sme operator keys from {:?} to {:?} on {:?}", masternode_entry.operator_public_key, self.operator_public_key, self.provider_registration_transaction_hash);
-                self.previous_operator_public_keys[b.borrow()] = masternode_entry.operator_public_key;
+                self.previous_operator_public_keys.insert(b, masternode_entry.operator_public_key);
             }
-            self.previous_simplified_masternode_entry_hashes = HashMap::new();
             // if for example we are getting a masternode list at block 402 when we already got the
             // masternode list at block 414 then the other sme might have
             // previousSimplifiedMasternodeEntryHashes that is in our future we need to ignore them
-            for (block, entry_hash) in masternode_entry.previous_simplified_masternode_entry_hashes {
-                if block.height < self.update_height {
-                    self.previous_simplified_masternode_entry_hashes[block.borrow()] = entry_hash;
-                }
-            }
-            if masternode_entry.simplified_masternode_entry_hash_at(self.update_height) != self.simplified_masternode_entry_hash {
+
+            self.previous_simplified_masternode_entry_hashes = masternode_entry
+                .clone()
+                .previous_simplified_masternode_entry_hashes
+                .into_iter()
+                .filter(|(block, _hash)| block.height < self.update_height)
+                .collect();
+
+            let hash_for_height = masternode_entry.simplified_masternode_entry_hash_at(self.update_height);
+            if hash_for_height != self.simplified_masternode_entry_hash {
                 // the hashes changed
                 println!("Changed sme hashes from {:?} to {:?} on {:?}", masternode_entry.simplified_masternode_entry_hash, self.simplified_masternode_entry_hash, self.provider_registration_transaction_hash);
-                self.previous_simplified_masternode_entry_hashes[b.borrow()] = masternode_entry.simplified_masternode_entry_hash;
+                self.previous_simplified_masternode_entry_hashes.insert(b, masternode_entry.simplified_masternode_entry_hash);
             }
         }
         // if the masternodeEntry.confirmedHash is not set we do not need to do anything the

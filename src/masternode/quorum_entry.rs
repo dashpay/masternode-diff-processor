@@ -133,10 +133,7 @@ impl<'a> QuorumEntry<'a> {
         buffer.write(offset, llmq_u8);
         buffer.write(offset, quorum_hash);
         let mut signers_count_buffer = [0u8];
-        *offset += match signers_count.consensus_encode(&mut signers_count_buffer.as_mut_bytes()) {
-            Ok(size) => size,
-            _ => 0
-        };
+        *offset += signers_count.consensus_encode(&mut signers_count_buffer.as_mut_bytes()).unwrap_or(0);
         buffer.write(offset, signers_count_buffer.as_bytes());
         buffer.write(offset, signers_bitset);
         buffer.write(offset, quorum_public_key);

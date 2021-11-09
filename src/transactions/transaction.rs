@@ -80,6 +80,7 @@ pub struct TransactionInput<'a> {
     pub signature: Option<&'a [u8]>,
     pub sequence: u32,
 }
+
 // #[repr(C)]
 #[derive(Debug)]
 pub struct TransactionOutput<'a> {
@@ -134,22 +135,20 @@ impl<'a> Transaction<'a> {
         outputs: &Vec<TransactionOutput>,
         lock_time: u32,
     ) -> &'a [u8] {
-        //let mut buffer = [0u8].as_mut_bytes();
+
         let buffer: &mut [u8] = &mut [];
         let offset: &mut usize = &mut 0;
         buffer.write(offset, version);
         buffer.write(offset, tx_type.raw_value());
+
         let inputs_len = inputs.len();
-        let mut inputs_len_buffer= [0u8];
-        match VarInt(inputs_len as u64).consensus_encode(&mut inputs_len_buffer.as_mut_bytes()) {
-            Ok(size) => size,
-            _ => 0
-        };
+
+        let mut inputs_len_buffer = [0u8];
+        VarInt(inputs_len as u64).consensus_encode(&mut inputs_len_buffer.as_mut_bytes());
         buffer.write(offset, inputs_len_buffer.as_bytes());
 
         for i in 0..inputs_len {
             let input = &inputs[i];
-            //let input = inputs.get(i)?;
             buffer.write(offset, input.input_hash);
             buffer.write(offset, input.index);
             if subscript_index == u64::MAX && input.signature.is_some() {
@@ -158,28 +157,29 @@ impl<'a> Transaction<'a> {
                 buffer.write(offset, signature);
             } else if subscript_index == i as u64 && input.script.is_some() {
                 let script = input.script.unwrap();
-                *offset += VarInt(script.len() as u64).consensus_encode(buffer).unwrap_or(0);
+                let script_len_buffer: &mut [u8] = &mut [];
+                VarInt(script.len() as u64).consensus_encode(&mut script_len_buffer.as_mut_bytes());
+                buffer.write(offset, script_len_buffer.as_bytes());
                 buffer.write(offset, script);
             } else {
-                *offset += match VarInt(0u64).consensus_encode(buffer) {
-                    Ok(size) => size,
-                    _ => 0
-                };
+                buffer.write::<u8>(offset, 0);
             }
             buffer.write(offset, input.sequence);
         }
 
-        let outputs_len = inputs.len();
-        *offset += VarInt(outputs_len as u64).consensus_encode(buffer).unwrap_or(0);
-
-        for i in 0..outputs_len {
+        let outputs_len = outputs.len();
+        let mut outputs_len_buffer= [0u8];
+        VarInt(inputs_len as u64).consensus_encode(&mut outputs_len_buffer.as_mut_bytes());
+        buffer.write(offset, outputs_len_buffer.as_bytes());
+        (0..outputs_len).into_iter().for_each(|i| {
             let output = &outputs[i];
             buffer.write(offset, output.amount);
             if let Some(script) = output.script {
-                *offset += VarInt(script.len() as u64).consensus_encode(buffer).unwrap_or(0);
-                buffer.write(offset, script);
+                let script_len_buffer: &mut [u8] = &mut [];
+                VarInt(script.len() as u64).consensus_encode(&mut script_len_buffer.as_mut_bytes());
+                buffer.write(offset, script_len_buffer.as_bytes());
             }
-        }
+        });
         buffer.write(offset, lock_time);
         if subscript_index != u64::MAX {
             buffer.write(offset, 1u32);
