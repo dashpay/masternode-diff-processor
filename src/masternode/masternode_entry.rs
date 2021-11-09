@@ -1,5 +1,5 @@
 use std::borrow::Borrow;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::SystemTime;
 use byte::{BytesExt, LE};
 use secrets::traits::AsContiguousBytes;
@@ -16,7 +16,7 @@ pub struct MasternodeEntry {
     pub confirmed_hash_hashed_with_provider_registration_transaction_hash: Option<UInt256>,
     pub socket_address: SocketAddress,
     pub operator_public_key: UInt384,
-    pub previous_operator_public_keys: HashMap<BlockData, UInt384>,
+    pub previous_operator_public_keys: BTreeMap<BlockData, UInt384>,
     pub previous_simplified_masternode_entry_hashes: HashMap<BlockData, UInt256>,
     pub previous_validity: HashMap<BlockData, bool>,
     pub known_confirmed_at_height: Option<u32>,
@@ -32,7 +32,7 @@ impl MasternodeEntry {
     fn calculate_simplified_masternode_entry_hash(
         provider_registration_transaction_hash: UInt256,
         confirmed_hash: UInt256,
-        socket_address: &SocketAddress,
+        socket_address: SocketAddress,
         operator_public_key: UInt384,
         key_id_voting: UInt160,
         is_valid: u8,
@@ -76,14 +76,14 @@ impl MasternodeEntry {
     pub fn host(&self) -> &str {
         let ip = self.socket_address.ip_address;
         let port = self.socket_address.port;
-        &format!("{}:{}", &ip.to_string(), &port.to_string())
+        &format!("{}:{}", ip.to_string(), port.to_string())
     }
 
     pub fn payload_data(&self) -> UInt256 {
         MasternodeEntry::calculate_simplified_masternode_entry_hash(
             self.provider_registration_transaction_hash,
             self.confirmed_hash,
-            &self.socket_address,
+            self.socket_address,
             self.operator_public_key,
             self.key_id_voting,
             if self.is_valid {1} else {0}
@@ -150,7 +150,7 @@ impl MasternodeEntry {
                 println!("Changed validity from {} to {} on {:?}", masternode_entry.is_valid, self.is_valid, self.provider_registration_transaction_hash);
                 self.previous_validity[&b] = masternode_entry.is_valid;
             }
-            self.previous_operator_public_keys = HashMap::new();
+            self.previous_operator_public_keys = BTreeMap::new();
             // if for example we are getting a masternode list at block 402 when we already got the
             // masternode list at block 414 then the other sme might have previousOperatorPublicKeys
             // that is in our future we need to ignore them
@@ -256,7 +256,7 @@ impl MasternodeEntry {
         let simplified_masternode_entry_hash = MasternodeEntry::calculate_simplified_masternode_entry_hash(
             provider_registration_transaction_hash,
             confirmed_hash,
-            &socket_address,
+            socket_address,
             operator_public_key,
             key_id_voting,
             is_valid
@@ -267,7 +267,7 @@ impl MasternodeEntry {
             confirmed_hash_hashed_with_provider_registration_transaction_hash: None,
             socket_address,
             operator_public_key,
-            previous_operator_public_keys: HashMap::new(),
+            previous_operator_public_keys: BTreeMap::new(),
             previous_simplified_masternode_entry_hashes: HashMap::new(),
             previous_validity: HashMap::new(),
             known_confirmed_at_height,

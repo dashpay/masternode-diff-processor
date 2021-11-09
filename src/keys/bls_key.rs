@@ -1,10 +1,8 @@
-use secrets::traits::AsContiguousBytes;
+/*use secrets::traits::AsContiguousBytes;
 use crate::crypto::byte_util::{UInt256, UInt384, UInt768};
 use crate::hashes::sha256d;
-// use bls_signatures::PrivateKey;
 use crate::keys::key::Key;
-// use signature_bls::{AggregateSignature, PublicKey};
-// #[repr(C)]
+
 #[derive(Debug)]
 pub struct BLSKey<'a> {
     pub base: Option<Key<'a>>,
@@ -14,7 +12,7 @@ pub struct BLSKey<'a> {
 }
 
 impl BLSKey<'static> {
-    pub fn key_with(public_key: UInt384) -> Self {
+    pub fn with(public_key: UInt384) -> Self {
         Self {
             base: None,
             chain_code: None,
@@ -50,7 +48,7 @@ impl BLSKey<'static> {
         bls::Signature::FromBytes(
             signature.0.as_bytes(),
             bls::AggregationInfo::FromMsgHash(
-                BLSKey::key_with(public_key).bls_public_key(),
+                BLSKey::with(public_key).bls_public_key(),
                 message_digest.as_bytes()))
             .Verify()
     }
@@ -68,3 +66,5 @@ impl BLSKey<'static> {
     }
 
 }
+
+ */

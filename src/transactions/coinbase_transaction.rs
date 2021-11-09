@@ -8,7 +8,7 @@ use crate::transactions::transaction::{Transaction};
 use crate::transactions::transaction::TransactionType::{Coinbase};
 
 // #[repr(C)]
-// #[derive(Debug)]
+// #[derive(Clone)]
 pub struct CoinbaseTransaction<'a> {
     pub base: Transaction<'a>,
     pub coinbase_transaction_version: u16,
@@ -17,8 +17,8 @@ pub struct CoinbaseTransaction<'a> {
     pub merkle_root_llmq_list: Option<UInt256>,
 }
 
-impl CoinbaseTransaction<'_> {
-    pub fn new(message: &'static [u8]) -> Option<Self> {
+impl<'a> CoinbaseTransaction<'a> {
+    pub fn new(message: &'a [u8]) -> Option<Self> {
         if let Some(mut base) = Transaction::new(message) {
             base.tx_type = Coinbase;
             let mut offset = base.payload_offset;

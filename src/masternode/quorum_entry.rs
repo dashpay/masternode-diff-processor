@@ -7,12 +7,12 @@ use crate::common::llmq_type::LLMQType;
 use crate::consensus::{Decodable, Encodable};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
-use crate::keys::bls_key::BLSKey;
+// use crate::keys::bls_key::BLSKey;
 use crate::manager::BlockHeightLookup;
 use crate::masternode::masternode_list::MasternodeList;
 
 // #[repr(C)]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct QuorumEntry<'a> {
     pub version: u16,
     pub quorum_hash: UInt256,
@@ -35,7 +35,7 @@ pub struct QuorumEntry<'a> {
 impl<'a> QuorumEntry<'a> {
     pub fn new(message: &'a [u8], data_offset: usize) -> Option<Self> {
         let length = message.len();
-        let mut offset = &mut data_offset.clone();
+        let offset = &mut data_offset.clone();
         let version = match message.read_with::<u16>(offset, LE) {
             Ok(data) => data,
             _ => { return None; }
@@ -126,23 +126,24 @@ impl<'a> QuorumEntry<'a> {
         quorum_threshold_signature: UInt768,
         all_commitment_aggregated_signature: UInt768
     ) -> &[u8] {
-        let mut buffer = [0u8].as_mut_bytes();
+        let mut buffer = [0u8];
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = llmq_type.into();
         buffer.write(offset, version);
         buffer.write(offset, llmq_u8);
         buffer.write(offset, quorum_hash);
-        let signers_count_size = match signers_count.consensus_encode(buffer) {
+        let mut signers_count_buffer = [0u8];
+        *offset += match signers_count.consensus_encode(&mut signers_count_buffer.as_mut_bytes()) {
             Ok(size) => size,
             _ => 0
         };
-        *offset += signers_count_size;
+        buffer.write(offset, signers_count_buffer.as_bytes());
         buffer.write(offset, signers_bitset);
         buffer.write(offset, quorum_public_key);
         buffer.write(offset, quorum_verification_vector_hash);
         buffer.write(offset, quorum_threshold_signature);
         buffer.write(offset, all_commitment_aggregated_signature);
-        buffer
+        &buffer
     }
 
     pub fn to_data(&self) -> &[u8] {
@@ -154,7 +155,7 @@ impl<'a> QuorumEntry<'a> {
     }
 
     pub fn llmq_quorum_hash(&self) -> UInt256 {
-        let mut buffer = [0u8; 32];
+        let mut buffer = [0u8; 33];
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = self.llmq_type.into();
         buffer.write(offset, llmq_u8);
@@ -187,7 +188,7 @@ impl<'a> QuorumEntry<'a> {
         self.commitment_hash.unwrap()
     }
 
-    pub fn validate_with(&mut self, masternode_list: MasternodeList<'static>, block_height_lookup: BlockHeightLookup) -> bool {
+    pub fn validate_payload(&mut self) -> bool {
         // The quorumHash must match the current DKG session
         // todo
         // The byte size of the signers and validMembers bitvectors must match “(quorumSize + 7) / 8”
@@ -229,26 +230,28 @@ impl<'a> QuorumEntry<'a> {
             println!("Error: The number of set bits in the validMembers bitvector {} must be at least >= quorumThreshold {}", self.valid_members_bitset.true_bits_count(), quorum_threshold);
             return false;
         }
+        true
+    }
 
-        // The quorumSig must validate against the quorumPublicKey and the commitmentHash. As this is a recovered threshold signature, normal signature verification can be performed, without the need of the full quorum verification vector. The commitmentHash is calculated in the same way as in the commitment phase.
-
+    pub fn get_operator_public_keys(&self, masternode_list: MasternodeList<'static>, block_height_lookup: BlockHeightLookup) -> Vec<UInt384> {
         const MASTERNODELIST_HEIGHT_TO_SAVE_DATA: u32 = 1377216;
-        // let [DSQuorumEntry quorumSizeForType:self.llmqType]
         let quorum_count = self.llmq_type.quorum_size();
         let quorum_modifier = self.llmq_quorum_hash();
         let masternodes = masternode_list.valid_masternodes_for(quorum_modifier, quorum_count, block_height_lookup);
-        let mut public_keys: Vec<BLSKey> = Vec::new();
+        let mut public_keys: Vec<UInt384> = Vec::new();
         let mut i: u32 = 0;
         let block_height: u32 = block_height_lookup(masternode_list.block_hash.0.as_ptr());
-
         for masternode_entry in masternodes {
             if self.signers_bitset.bit_is_true_at_le_index(i) {
-                let public_key = masternode_entry.operator_public_key_at(block_height);
-                let key = BLSKey::key_with(public_key);
-                public_keys.push(key);
+                public_keys.push(masternode_entry.operator_public_key_at(block_height));
             }
             i += 1;
         }
+        public_keys
+    }
+
+    // The quorumSig must validate against the quorumPublicKey and the commitmentHash. As this is a recovered threshold signature, normal signature verification can be performed, without the need of the full quorum verification vector. The commitmentHash is calculated in the same way as in the commitment phase.
+    /*pub fn validate_signatures(&mut self) -> bool {
         let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(self.commitment_hash(), self.all_commitment_aggregated_signature, public_keys);
         if !all_commitment_aggregated_signature_validated {
             return false;
@@ -262,5 +265,5 @@ impl<'a> QuorumEntry<'a> {
             println!("Issue with quorumSignatureValidated");
             false
         }
-    }
+    }*/
 }

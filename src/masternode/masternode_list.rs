@@ -58,20 +58,21 @@ impl<'a> MasternodeList<'a> {
     pub fn valid_masternodes_for(&self, quorum_modifier: UInt256, quorum_count: u32, block_height_lookup: BlockHeightLookup) -> Vec<MasternodeEntry> {
         let block_height = block_height_lookup(self.block_hash.0.as_ptr());
         let score_dictionary = self.score_dictionary_for_quorum_modifier(quorum_modifier, block_height);
-        let scores: Vec<UInt256> = score_dictionary.into_keys().collect();
-
+        // into_keys perform sorting like below
         /*NSArray *scores = [[score_dictionary allKeys] sortedArrayUsingComparator:^NSComparisonResult(id _Nonnull obj1, id _Nonnull obj2) {
             UInt256 hash1 = *(UInt256 *)((NSData *)obj1).bytes;
             UInt256 hash2 = *(UInt256 *)((NSData *)obj2).bytes;
             return uint256_sup(hash1, hash2) ? NSOrderedAscending : NSOrderedDescending;
         }];*/
+        let scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
         let mut masternodes: Vec<MasternodeEntry> = Vec::new();
         let masternodes_in_list_count = self.masternodes.len();
         let count = min(masternodes_in_list_count, scores.len());
         for i in 0..count {
-            let masternode = score_dictionary[&scores[i]];
+            let score = scores.get(i).unwrap();
+            let masternode = &score_dictionary[score];
             if masternode.is_valid_at(block_height) {
-                masternodes.push(masternode);
+                masternodes.push(masternode.clone());
             }
             if masternodes.len() == quorum_count as usize {
                 break;
@@ -81,15 +82,15 @@ impl<'a> MasternodeList<'a> {
     }
 
     pub fn score_dictionary_for_quorum_modifier(&self, quorum_modifier: UInt256, block_height: u32) -> BTreeMap<UInt256, MasternodeEntry> {
-        let mut score_dict: BTreeMap<UInt256, MasternodeEntry> = BTreeMap::new();
-        for (_hash, mn_entry) in self.masternodes {
-            if let Some(score) = self.masternode_score(mn_entry, quorum_modifier, block_height) {
-                if !score.0.is_empty() {
-                    score_dict[&score] = mn_entry.clone();
-                }
+        self.masternodes.clone().into_iter().filter_map(|(_, entry)| {
+            let score = self.masternode_score(entry, quorum_modifier, block_height);
+            if score.is_some() && !score.unwrap().0.is_empty() {
+                Some((score.unwrap(), entry))
+            } else {
+                None
             }
-        }
-        score_dict
+        }).collect()
+
     }
 
     pub fn masternode_score(&self, masternode_entry: MasternodeEntry, modifier: UInt256, block_height: u32) -> Option<UInt256> {

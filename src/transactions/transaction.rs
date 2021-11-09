@@ -108,7 +108,7 @@ pub struct Transaction<'a> {
     pub block_height: u32,
 }
 
-impl Transaction<'static> {
+impl<'a> Transaction<'a> {
     fn payload_data(&self) -> &[u8] {
         &[]
     }
@@ -183,7 +183,7 @@ impl Transaction<'static> {
         &buffer
     }
 
-    pub fn new(message: &'static [u8]) -> Option<Self> {
+    pub fn new(message: &'a [u8]) -> Option<Self> {
         let off = &mut 0;
         let version = match message.read_with::<u16>(off, LE) {
             Ok(data) => data,
