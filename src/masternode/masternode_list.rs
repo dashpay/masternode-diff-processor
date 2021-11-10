@@ -9,15 +9,15 @@ use crate::manager::BlockHeightLookup;
 use crate::masternode::quorum_entry::QuorumEntry;
 use crate::masternode::masternode_entry::MasternodeEntry;
 
-//#[repr(C)]
+#[repr(C)]
 #[derive(Clone)]
 pub struct MasternodeList<'a> {
-    pub quorums: HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>,
     pub block_hash: UInt256,
     pub known_height: Option<u32>,
     pub masternode_merkle_root: Option<UInt256>,
     pub quorum_merkle_root: Option<UInt256>,
     pub masternodes: BTreeMap<UInt256, MasternodeEntry>,
+    pub quorums: HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>,
 }
 
 impl<'a> MasternodeList<'a> {
@@ -56,8 +56,7 @@ impl<'a> MasternodeList<'a> {
         count
     }
 
-    pub fn valid_masternodes_for(&self, quorum_modifier: UInt256, quorum_count: u32, block_height_lookup: BlockHeightLookup) -> Vec<MasternodeEntry> {
-        let block_height = unsafe { block_height_lookup(self.block_hash.0.as_ptr()) };
+    pub fn valid_masternodes_for(&self, quorum_modifier: UInt256, quorum_count: u32, block_height: u32) -> Vec<MasternodeEntry> {
         let score_dictionary = self.score_dictionary_for_quorum_modifier(quorum_modifier, block_height);
         // into_keys perform sorting like below
         /*NSArray *scores = [[score_dictionary allKeys] sortedArrayUsingComparator:^NSComparisonResult(id _Nonnull obj1, id _Nonnull obj2) {
@@ -126,10 +125,6 @@ impl<'a> MasternodeList<'a> {
                 .into_iter()
                 .map(|(_hash, entry)| entry.simplified_masternode_entry_hash_at(block_height))
                 .collect())
-            // Some(pro_tx_hashes
-            //     .into_iter()
-            //     .map(|hash| self.masternodes[&hash].simplified_masternode_entry_hash_at(block_height))
-            //     .collect())
         }
     }
 

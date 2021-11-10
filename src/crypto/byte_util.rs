@@ -147,8 +147,10 @@ pub trait Reversable {
 pub struct UInt128(pub [u8; 16]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct UInt160(pub [u8; 20]);
+#[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub struct UInt256(pub [u8; 32]);
+#[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct UInt384(pub [u8; 48]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -208,7 +210,12 @@ impl<'a> TryRead<'a, Endian> for UInt256 {
         let offset = &mut 0;
         let mut data: [u8; 32] = [0u8; 32];
         for _i in 0..32 {
-            data[*offset] = bytes.read_with::<u8>(offset, endian).unwrap();
+            let index = offset.clone();
+            let chunk = match bytes.read_with::<u8>(offset, endian) {
+                Ok(data) => data,
+                Err(_err) => { return Err(_err); }
+            };
+            data[index] = chunk;
         }
         Ok((UInt256(data), 32))
     }

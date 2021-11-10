@@ -8,8 +8,6 @@ use crate::consensus::{Decodable, Encodable};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
 // use crate::keys::bls_key::BLSKey;
-use crate::manager::BlockHeightLookup;
-use crate::masternode::masternode_list::MasternodeList;
 
 // #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -229,22 +227,6 @@ impl<'a> QuorumEntry<'a> {
             return false;
         }
         true
-    }
-
-    pub fn get_operator_public_keys(&self, masternode_list: MasternodeList<'static>, block_height_lookup: BlockHeightLookup) -> Vec<UInt384> {
-        let quorum_count = self.llmq_type.quorum_size();
-        let quorum_modifier = self.llmq_quorum_hash();
-        let masternodes = masternode_list.valid_masternodes_for(quorum_modifier, quorum_count, block_height_lookup);
-        let mut public_keys: Vec<UInt384> = Vec::new();
-        let mut i: u32 = 0;
-        let block_height: u32 = unsafe { block_height_lookup(masternode_list.block_hash.0.as_ptr()) };
-        for masternode_entry in masternodes {
-            if self.signers_bitset.bit_is_true_at_le_index(i) {
-                public_keys.push(masternode_entry.operator_public_key_at(block_height));
-            }
-            i += 1;
-        }
-        public_keys
     }
 
     // The quorumSig must validate against the quorumPublicKey and the commitmentHash. As this is a recovered threshold signature, normal signature verification can be performed, without the need of the full quorum verification vector. The commitmentHash is calculated in the same way as in the commitment phase.
