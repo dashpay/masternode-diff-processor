@@ -138,51 +138,51 @@ impl<'a> Transaction<'a> {
 
         let buffer: &mut [u8] = &mut [];
         let offset: &mut usize = &mut 0;
-        buffer.write(offset, version);
-        buffer.write(offset, tx_type.raw_value());
+        buffer.write(offset, version).unwrap();
+        buffer.write(offset, tx_type.raw_value()).unwrap();
 
         let inputs_len = inputs.len();
 
         let mut inputs_len_buffer = [0u8];
-        VarInt(inputs_len as u64).consensus_encode(&mut inputs_len_buffer.as_mut_bytes());
-        buffer.write(offset, inputs_len_buffer.as_bytes());
+        VarInt(inputs_len as u64).consensus_encode(&mut inputs_len_buffer.as_mut_bytes()).unwrap();
+        buffer.write(offset, inputs_len_buffer.as_bytes()).unwrap();
 
         for i in 0..inputs_len {
             let input = &inputs[i];
-            buffer.write(offset, input.input_hash);
-            buffer.write(offset, input.index);
+            buffer.write(offset, input.input_hash).unwrap();
+            buffer.write(offset, input.index).unwrap();
             if subscript_index == u64::MAX && input.signature.is_some() {
                 let signature = input.signature.unwrap();
-                buffer.write(offset, signature.len());
-                buffer.write(offset, signature);
+                buffer.write(offset, signature.len()).unwrap();
+                buffer.write(offset, signature).unwrap();
             } else if subscript_index == i as u64 && input.script.is_some() {
                 let script = input.script.unwrap();
                 let script_len_buffer: &mut [u8] = &mut [];
-                VarInt(script.len() as u64).consensus_encode(&mut script_len_buffer.as_mut_bytes());
-                buffer.write(offset, script_len_buffer.as_bytes());
-                buffer.write(offset, script);
+                VarInt(script.len() as u64).consensus_encode(&mut script_len_buffer.as_mut_bytes()).unwrap();
+                buffer.write(offset, script_len_buffer.as_bytes()).unwrap();
+                buffer.write(offset, script).unwrap();
             } else {
-                buffer.write::<u8>(offset, 0);
+                buffer.write::<u8>(offset, 0).unwrap();
             }
-            buffer.write(offset, input.sequence);
+            buffer.write(offset, input.sequence).unwrap();
         }
 
         let outputs_len = outputs.len();
         let mut outputs_len_buffer= [0u8];
-        VarInt(inputs_len as u64).consensus_encode(&mut outputs_len_buffer.as_mut_bytes());
-        buffer.write(offset, outputs_len_buffer.as_bytes());
+        VarInt(inputs_len as u64).consensus_encode(&mut outputs_len_buffer.as_mut_bytes()).unwrap();
+        buffer.write(offset, outputs_len_buffer.as_bytes()).unwrap();
         (0..outputs_len).into_iter().for_each(|i| {
             let output = &outputs[i];
-            buffer.write(offset, output.amount);
+            buffer.write(offset, output.amount).unwrap();
             if let Some(script) = output.script {
                 let script_len_buffer: &mut [u8] = &mut [];
-                VarInt(script.len() as u64).consensus_encode(&mut script_len_buffer.as_mut_bytes());
-                buffer.write(offset, script_len_buffer.as_bytes());
+                VarInt(script.len() as u64).consensus_encode(&mut script_len_buffer.as_mut_bytes()).unwrap();
+                buffer.write(offset, script_len_buffer.as_bytes()).unwrap();
             }
         });
-        buffer.write(offset, lock_time);
+        buffer.write(offset, lock_time).unwrap();
         if subscript_index != u64::MAX {
-            buffer.write(offset, 1u32);
+            buffer.write(offset, 1u32).unwrap();
         }
         buffer
     }

@@ -129,17 +129,17 @@ impl<'a> QuorumEntry<'a> {
         let buffer: &mut [u8] = &mut [];
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = llmq_type.into();
-        buffer.write(offset, version);
-        buffer.write(offset, llmq_u8);
-        buffer.write(offset, quorum_hash);
+        buffer.write(offset, version).unwrap();
+        buffer.write(offset, llmq_u8).unwrap();
+        buffer.write(offset, quorum_hash).unwrap();
         let mut signers_count_buffer = [0u8];
         *offset += signers_count.consensus_encode(&mut signers_count_buffer.as_mut_bytes()).unwrap_or(0);
-        buffer.write(offset, signers_count_buffer.as_bytes());
-        buffer.write(offset, signers_bitset);
-        buffer.write(offset, quorum_public_key);
-        buffer.write(offset, quorum_verification_vector_hash);
-        buffer.write(offset, quorum_threshold_signature);
-        buffer.write(offset, all_commitment_aggregated_signature);
+        buffer.write(offset, signers_count_buffer.as_bytes()).unwrap();
+        buffer.write(offset, signers_bitset).unwrap();
+        buffer.write(offset, quorum_public_key).unwrap();
+        buffer.write(offset, quorum_verification_vector_hash).unwrap();
+        buffer.write(offset, quorum_threshold_signature).unwrap();
+        buffer.write(offset, all_commitment_aggregated_signature).unwrap();
         buffer
     }
 
@@ -155,8 +155,8 @@ impl<'a> QuorumEntry<'a> {
         let mut buffer = [0u8; 33];
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = self.llmq_type.into();
-        buffer.write(offset, llmq_u8);
-        buffer.write(offset, self.quorum_hash);
+        buffer.write(offset, llmq_u8).unwrap();
+        buffer.write(offset, self.quorum_hash).unwrap();
         UInt256(sha256d::Hash::hash(&buffer).into_inner())
     }
 
@@ -164,17 +164,17 @@ impl<'a> QuorumEntry<'a> {
         let buffer: &mut [u8] = &mut [];
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = self.llmq_type.into();
-        buffer.write(offset, llmq_u8);
-        buffer.write(offset, self.quorum_hash);
+        buffer.write(offset, llmq_u8).unwrap();
+        buffer.write(offset, self.quorum_hash).unwrap();
         let mut valid_members_count_buffer = [0u8];
         match self.valid_members_count.consensus_encode(&mut valid_members_count_buffer.as_mut_bytes()) {
             Ok(size) => size,
             _ => 0
         };
-        buffer.write(offset, valid_members_count_buffer.as_bytes());
-        buffer.write(offset, self.valid_members_bitset);
-        buffer.write(offset, self.quorum_public_key);
-        buffer.write(offset, self.quorum_verification_vector_hash);
+        buffer.write(offset, valid_members_count_buffer.as_bytes()).unwrap();
+        buffer.write(offset, self.valid_members_bitset).unwrap();
+        buffer.write(offset, self.quorum_public_key).unwrap();
+        buffer.write(offset, self.quorum_verification_vector_hash).unwrap();
         buffer
     }
 
@@ -232,7 +232,6 @@ impl<'a> QuorumEntry<'a> {
     }
 
     pub fn get_operator_public_keys(&self, masternode_list: MasternodeList<'static>, block_height_lookup: BlockHeightLookup) -> Vec<UInt384> {
-        const MASTERNODELIST_HEIGHT_TO_SAVE_DATA: u32 = 1377216;
         let quorum_count = self.llmq_type.quorum_size();
         let quorum_modifier = self.llmq_quorum_hash();
         let masternodes = masternode_list.valid_masternodes_for(quorum_modifier, quorum_count, block_height_lookup);

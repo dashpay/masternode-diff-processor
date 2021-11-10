@@ -74,7 +74,7 @@ pub fn hex_with_data(data: &[u8]) -> String {
     let mut s = String::with_capacity(2 * n);
     let mut iter = data.iter();
     while let Some(a) = iter.next() {
-        write!(s, "{:02X}", a);
+        write!(s, "{:02X}", a).unwrap();
     }
     s
 }
@@ -106,10 +106,10 @@ pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
         for i in (0..level.len()).step_by(2) {
             let left = level[i];
             let offset = &mut 0;
-            let combo = &mut [0u8; 64];
-            combo.write(offset, left);
-            combo.write(offset, if level.len() - i > 1 { level[i+1] } else { left });
-            higher_level.push(UInt256(sha256d::Hash::hash(combo).into_inner()));
+            let buffer = &mut [0u8; 64];
+            buffer.write(offset, left).unwrap();
+            buffer.write(offset, if level.len() - i > 1 { level[i+1] } else { left }).unwrap();
+            higher_level.push(UInt256(sha256d::Hash::hash(buffer).into_inner()));
         }
         level = higher_level.clone();
         higher_level.clear();

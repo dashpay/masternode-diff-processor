@@ -11,11 +11,6 @@ use crate::hashes::Hash;
 // }
 
 // pub type HashFunction<T: hashes::Hash> = fn(data: &[u8]) -> T;
-// pub type LeafLookup<T: hashes::Hash> = fn(hash: Option<T>, flag: bool) -> Option<T>;
-// pub type BranchLookup<T: hashes::Hash> = fn(left: T, right: Option<T>) -> Option<T>;
-
-pub type LeafLookup = fn(hash: Option<UInt256>, flag: bool) -> Option<UInt256>;
-pub type BranchLookup = fn(left: UInt256, right: Option<UInt256>) -> Option<UInt256>;
 
 #[inline]
 fn ceil_log2(mut x: i32) -> i32 {
@@ -41,7 +36,6 @@ pub struct MerkleTree<'a> {
 
 impl<'a> MerkleTree<'a> {
     pub fn has_root(&self, desired_merkle_root: UInt256) -> bool {
-        //self.tree_element_count == 0 || self.merkle_root() == desired_merkle_root
         if self.tree_element_count == 0 {
             return true;
         }
@@ -64,20 +58,17 @@ impl<'a> MerkleTree<'a> {
             |left, right| {
                 let offset: &mut usize = &mut 0;
                 let buffer: &mut [u8] = &mut [0; 64];
-                buffer.write(offset, left);
-                buffer.write(offset, if right.is_none() { left.clone() } else { right.unwrap() });
+                buffer.write(offset, left).unwrap();
+                buffer.write(offset, if right.is_none() { left.clone() } else { right.unwrap() }).unwrap();
                 Some(UInt256(sha256d::Hash::hash(buffer.as_bytes()).into_inner()))
             })
     }
 
-    pub fn walk_hash_idx<BL: Fn(UInt256, Option<UInt256>) -> Option<UInt256> + Copy>(
-        &self,
-        hash_idx: &mut i32,
-        flag_idx: &mut i32,
-        depth: i32,
-        leaf: LeafLookup,
-        branch: BL
-    ) -> Option<UInt256> {
+    pub fn walk_hash_idx<
+        BL: Fn(UInt256, Option<UInt256>) -> Option<UInt256> + Copy,
+        LL: Fn(Option<UInt256>, bool) -> Option<UInt256> + Copy>(
+        &self, hash_idx: &mut i32, flag_idx: &mut i32,
+        depth: i32, leaf: LL, branch: BL) -> Option<UInt256> {
         let flags_length = self.flags.len() as i32;
         let hashes_length = self.hashes.len() as i32;
         if *flag_idx / 8 >= flags_length || (*hash_idx + 1) * 32 > hashes_length {

@@ -45,10 +45,10 @@ pub mod manager {
         pub root_quorum_list_valid: bool, //1 byte
         pub valid_quorums: bool, //1 byte
         pub masternode_list: Option<*mut MasternodeList<'a>>,
-        // pub added_masternodes: Option<*mut HashMap<[u8; 32], MasternodeEntry>>,
-        // pub modified_masternodes: Option<*mut HashMap<[u8; 32], MasternodeEntry>>,
-        // pub added_quorums: Option<*mut HashMap<LLMQType, *mut HashMap<[u8; 32], QuorumEntry>>>,
-        // pub needed_masternode_lists: Option<*mut HashSet<[u8; 32]>>,
+        pub added_masternodes: Option<*mut BTreeMap<UInt256, MasternodeEntry>>,
+        pub modified_masternodes: Option<*mut HashMap<UInt256, MasternodeEntry>>,
+        pub added_quorums: Option<*mut HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>>,
+        pub needed_masternode_lists: Option<*mut HashSet<UInt256>>,
 
         // pub value_length: usize, //8 bytes
         // pub value: *mut u8, //value_length bytes
@@ -108,10 +108,10 @@ pub mod manager {
             root_quorum_list_valid: false,
             valid_quorums: false,
             masternode_list: None,
-            // added_masternodes: None,
-            // modified_masternodes: None,
-            // added_quorums: None,
-            // needed_masternode_lists: None,
+            added_masternodes: None,
+            modified_masternodes: None,
+            added_quorums: None,
+            needed_masternode_lists: None,
         })
     }
 
@@ -325,16 +325,16 @@ pub mod manager {
         }
 
         let mut masternodes = if has_old {
-            added_masternodes
+            added_masternodes.clone()
         } else {
             let mut old_mnodes = old_masternodes.clone();
             for hash in deleted_masternode_hashes {
                 old_mnodes.remove(&hash);
             }
-            old_mnodes.extend(added_masternodes);
+            old_mnodes.extend(added_masternodes.clone());
             old_mnodes
         };
-        for (hash, mut modified) in modified_masternodes {
+        for (hash, mut modified) in modified_masternodes.clone() {
             if let Some(old) = masternodes.get_mut(&hash) {
                 if old.update_height < modified.update_height {
                     modified.keep_info_of_previous_entry_version(old.to_owned(), block_height, block_hash);
@@ -343,12 +343,6 @@ pub mod manager {
             }
         }
         let mut quorums = old_quorums.clone();
-        /*for quorum_type in added_quorums.into_keys() {
-            if !quorums.contains_key(&quorum_type) {
-                quorums.insert(quorum_type, HashMap::new());
-            }
-        }*/
-
 
         let quorums_to_add = added_quorums
             .clone()
@@ -404,10 +398,10 @@ pub mod manager {
             root_quorum_list_valid: !quorums_active || coinbase_transaction.merkle_root_llmq_list == masternode_list.quorum_merkle_root,
             valid_quorums,
             masternode_list: Some(boxed(masternode_list)),
-            // added_masternodes: Some(boxed(added_masternodes)),
-            // modified_masternodes: Some(boxed(modified_masternodes)),
-            // added_quorums: Some(boxed(added_quorums)),
-            // needed_masternode_lists: Some(boxed(needed_masternode_lists)),
+            added_masternodes: Some(boxed(added_masternodes)),
+            modified_masternodes: Some(boxed(modified_masternodes)),
+            added_quorums: Some(boxed(added_quorums)),
+            needed_masternode_lists: Some(boxed(needed_masternode_lists)),
         })
     }
 }

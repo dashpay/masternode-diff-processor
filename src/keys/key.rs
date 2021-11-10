@@ -1,9 +1,3 @@
-// use byte::BytesExt;
-// use secrets::Secret;
-// use hashes::{Hash, hash160};
-// use crate::crypto::{DASH_PUBKEY_ADDRESS, DASH_PUBKEY_ADDRESS_TEST};
-// use crate::crypto::byte_util::Data;
-
 use crate::crypto::byte_util::UInt160;
 
 // #[repr(C)]
@@ -38,24 +32,5 @@ pub struct Key<'a> {
             buffer.write(offset, &h160);
             buffer.base_58_check()
         })
-    }
-
-    + (NSString *)addressWithPublicKeyData:(NSData *)data forChain:(DSChain *)chain {
-        NSParameterAssert(data);
-        NSParameterAssert(chain);
-
-        NSMutableData *d = [NSMutableData secureDataWithCapacity:160 / 8 + 1];
-        uint8_t version;
-        UInt160 hash160 = data.hash160;
-
-        if ([chain isMainnet]) {
-            version = DASH_PUBKEY_ADDRESS;
-        } else {
-            version = DASH_PUBKEY_ADDRESS_TEST;
-        }
-
-        [d appendBytes:&version length:1];
-        [d appendBytes:&hash160 length:sizeof(hash160)];
-        return [NSString base58checkWithData:d];
     }
 }*/

@@ -98,13 +98,12 @@ impl<'a> MasternodeList<'a> {
         if masternode_entry.confirmed_hash_at(block_height).is_none() {
             return None;
         }
-        // let mut buffer = [0u8];
         let buffer: &mut [u8] = &mut [];
         let offset = &mut 0;
         if let Some(hash) = masternode_entry.confirmed_hash_hashed_with_provider_registration_transaction_hash_at(block_height) {
-            buffer.write_with(offset, hash, LE);
+            buffer.write_with(offset, hash, LE).unwrap();
         }
-        buffer.write_with(offset, modifier, LE);
+        buffer.write_with(offset, modifier, LE).unwrap();
         Some(UInt256(sha256::Hash::hash(buffer.as_bytes()).into_inner()))
     }
 

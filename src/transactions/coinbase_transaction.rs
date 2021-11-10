@@ -1,6 +1,6 @@
 use byte::{BytesExt, LE};
 use secrets::traits::AsContiguousBytes;
-use crate::consensus::Decodable;
+use crate::consensus::{Decodable, Encodable};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::UInt256;
 use crate::hashes::{Hash, sha256d};
@@ -70,6 +70,22 @@ impl<'a> CoinbaseTransaction<'a> {
                 buffer[304..559].copy_from_slice(llmq_list.0.as_bytes());
             }
         }
+        buffer
+    }
+
+    pub fn to_data(&self) -> &[u8] {
+        self.to_data_with_subscript_index(u64::MAX)
+    }
+
+    pub fn to_data_with_subscript_index(&self, subscript_index: u64) -> &[u8] {
+        let buffer: &mut [u8] = &mut [];
+        let offset: &mut usize = &mut 0;
+        let payload = self.payload_data();
+        let mut payload_len_buffer = [0u8];
+        buffer.write(offset, self.base.to_data_with_subscript_index(subscript_index)).unwrap();
+        VarInt(payload.len() as u64).consensus_encode(&mut payload_len_buffer.as_mut_bytes()).unwrap();
+        buffer.write(offset, payload_len_buffer.as_bytes()).unwrap();
+        buffer.write(offset, payload).unwrap();
         buffer
     }
 }
