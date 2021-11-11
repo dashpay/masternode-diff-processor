@@ -3,7 +3,7 @@ use byte::{BytesExt, LE};
 use byte::ctx::Bytes;
 use hashes::{Hash, sha256d};
 use crate::common::llmq_type::LLMQType;
-use crate::consensus::{Decodable, Encodable};
+use crate::consensus::{Decodable, Encodable, WriteExt};
 use crate::consensus::encode::{consensus_encode_with_size, VarInt};
 use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
 
@@ -87,8 +87,11 @@ impl<'a> QuorumEntry<'a> {
 
         let llmq_type: LLMQType = llmq_type.into();
         let q_data = &QuorumEntry::generate_data(
-            version, llmq_type, quorum_hash, signers_count.clone(), &signers_bitset, quorum_public_key,
-            quorum_verification_vector_hash, quorum_threshold_signature, all_commitment_aggregated_signature);
+            version, llmq_type, quorum_hash,
+            signers_count.clone(), &signers_bitset,
+            valid_members_count.clone(), &valid_members_bitset,
+            quorum_public_key, quorum_verification_vector_hash, quorum_threshold_signature,
+            all_commitment_aggregated_signature);
         let quorum_entry_hash = UInt256(sha256d::Hash::hash(q_data).into_inner());
         let length = *offset - data_offset;
         //LLMQType::try_from(llmq_type)
@@ -118,6 +121,8 @@ impl<'a> QuorumEntry<'a> {
         quorum_hash: UInt256,
         signers_count: VarInt,
         signers_bitset: &[u8],
+        valid_members_count: VarInt,
+        valid_members_bitset: &[u8],
         quorum_public_key: UInt384,
         quorum_verification_vector_hash: UInt256,
         quorum_threshold_signature: UInt768,
@@ -130,11 +135,19 @@ impl<'a> QuorumEntry<'a> {
         *offset += llmq_u8.consensus_encode(&mut buffer).unwrap();
         *offset += quorum_hash.consensus_encode(&mut buffer).unwrap();
         *offset += signers_count.consensus_encode(&mut buffer).unwrap();
-        *offset += consensus_encode_with_size(signers_bitset, &mut buffer).unwrap();
+        buffer.emit_slice(&signers_bitset).unwrap();
+        *offset += signers_bitset.len();
+
+        *offset += valid_members_count.consensus_encode(&mut buffer).unwrap();
+        buffer.emit_slice(&valid_members_bitset).unwrap();
+        *offset += valid_members_bitset.len();
+
         *offset += quorum_public_key.consensus_encode(&mut buffer).unwrap();
+
         *offset += quorum_verification_vector_hash.consensus_encode(&mut buffer).unwrap();
         *offset += quorum_threshold_signature.consensus_encode(&mut buffer).unwrap();
         *offset += all_commitment_aggregated_signature.consensus_encode(&mut buffer).unwrap();
+        println!("generate_data: {}", *offset);
         buffer
     }
 
@@ -142,6 +155,7 @@ impl<'a> QuorumEntry<'a> {
         QuorumEntry::generate_data(
             self.version, self.llmq_type, self.quorum_hash,
             self.signers_count, self.signers_bitset,
+            self.valid_members_count, self.valid_members_bitset,
             self.quorum_public_key, self.quorum_verification_vector_hash,
             self.quorum_threshold_signature, self.all_commitment_aggregated_signature)
     }
