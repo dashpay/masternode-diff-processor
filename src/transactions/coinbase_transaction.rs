@@ -83,7 +83,6 @@ impl<'a> CoinbaseTransaction<'a> {
         let mut buffer = Transaction::data_with_subscript_index_static(subscript_index, self.base.version, self.base.tx_type, &self.base.inputs, &self.base.outputs, self.base.lock_time);
         let offset: &mut usize = &mut 0;
         let payload = self.payload_data();
-        *offset += VarInt(payload.len() as u64).consensus_encode(&mut buffer).unwrap();
         *offset += payload.consensus_encode(&mut buffer).unwrap();
         buffer
     }

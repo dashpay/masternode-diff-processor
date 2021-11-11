@@ -144,22 +144,15 @@ pub mod manager {
             Ok(data) => data,
             Err(_err) => { return failure(); }
         };
-        //if length - *offset < 1 { return failure(); }
-        /*let merkle_hash_count_length = match VarInt::consensus_decode(&message[*offset..]) {
-            Ok(data) => data.len(),
-            Err(_err) => { return failure(); }
-        };*/
         let merkle_hash_var_int = match VarInt::consensus_decode(&message[*offset..]) {
             Ok(data) => data,
             Err(_err) => { return failure(); }
         };
         let merkle_hash_count_length = merkle_hash_var_int.len();
         *offset += merkle_hash_count_length;
-
         let merkle_hashes_count = (merkle_hash_var_int.0 as usize) * 32;
         let merkle_hashes = &message[*offset..*offset + merkle_hashes_count];
         *offset += merkle_hashes_count;
-
         let merkle_flag_var_int = match VarInt::consensus_decode(&message[*offset..]) {
             Ok(data) => data,
             Err(_err) => { return failure(); }
@@ -177,16 +170,6 @@ pub mod manager {
         let coinbase_transaction = coinbase_transaction.unwrap();
 
         let _block_hash_hex = block_hash.0.to_hex();
-        // NSLog(@"CoinbaseTx: (payloadOffset: %u, coinbaseTransactionVersion: %u, height: %d, version: %d, coinbaseHash: %@)",
-        //       coinbaseTransaction.payloadOffset,
-        //       coinbaseTransaction.coinbaseTransactionVersion,
-        //       coinbaseTransaction.height,
-        //       coinbaseTransaction.version,
-        //       uint256_hex(coinbaseTransaction.txHash));
-        let _coinbase_payload_offset = coinbase_transaction.base.payload_offset;
-        let _coinbase_tx_cb_version = coinbase_transaction.coinbase_transaction_version;
-        let _coinbase_tx_height = coinbase_transaction.height;
-        let _coinbase_tx_version = coinbase_transaction.base.version;
         let _coinbase_tx_hash = coinbase_transaction.base.tx_hash.unwrap().0.to_hex();
 
         *offset += coinbase_transaction.base.payload_offset;
@@ -263,7 +246,7 @@ pub mod manager {
         let mut needed_masternode_lists: HashSet<UInt256> = HashSet::new();
 
         if quorums_active {
-            // delete quorums
+            // deleted quorums
             if length - *offset < 1 { return failure(); }
             let deleted_quorums_var_int = match VarInt::consensus_decode(&message[*offset..]) {
                 Ok(data) => data,
@@ -439,10 +422,11 @@ pub mod manager {
             }
         }
         let masternode_list = BaseMasternodeList(Some(boxed(masternode_list)));
-
+        let _desired_merkle_root_hex = desired_merkle_root.0.to_hex();
+        let valid_coinbase = merkle_tree.has_root(desired_merkle_root);
         boxed(Result {
             found_coinbase,
-            valid_coinbase: merkle_tree.has_root(desired_merkle_root),
+            valid_coinbase,
             root_mn_list_valid,
             root_quorum_list_valid,
             valid_quorums,

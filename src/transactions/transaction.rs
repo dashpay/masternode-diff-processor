@@ -147,13 +147,9 @@ impl<'a> Transaction<'a> {
             *offset += input.input_hash.consensus_encode(&mut buffer).unwrap();
             *offset += input.index.consensus_encode(&mut buffer).unwrap();
             if subscript_index == u64::MAX && input.signature.is_some() {
-                let signature = input.signature.unwrap();
-                *offset += VarInt(signature.len() as u64).consensus_encode(&mut buffer).unwrap();
-                *offset += consensus_encode_with_size(signature, &mut buffer).unwrap()
+                *offset += consensus_encode_with_size(input.signature.unwrap(), &mut buffer).unwrap()
             } else if subscript_index == i as u64 && input.script.is_some() {
-                let script = input.script.unwrap();
-                *offset += VarInt(script.len() as u64).consensus_encode(&mut buffer).unwrap();
-                *offset += consensus_encode_with_size(script, &mut buffer).unwrap()
+                *offset += consensus_encode_with_size(input.script.unwrap(), &mut buffer).unwrap()
             } else {
                 *offset += VarInt(0 as u64).consensus_encode(&mut buffer).unwrap();
             }
@@ -162,9 +158,8 @@ impl<'a> Transaction<'a> {
         *offset += VarInt(outputs_len as u64).consensus_encode(&mut buffer).unwrap();
         (0..outputs_len).into_iter().for_each(|i| {
             let output = &outputs[i];
-            output.amount.consensus_encode(&mut buffer).unwrap();
+            *offset += output.amount.consensus_encode(&mut buffer).unwrap();
             if let Some(script) = output.script {
-                *offset += VarInt(script.len() as u64).consensus_encode(&mut buffer).unwrap();
                 *offset += consensus_encode_with_size(script, &mut buffer).unwrap()
             }
         });
