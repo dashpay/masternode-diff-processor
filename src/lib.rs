@@ -411,7 +411,6 @@ mod tests {
     use std::io::Read;
     use byte::{BytesExt, LE};
     use hashes::hex::FromHex;
-    use env::current_dir;
     use crate::common::chain_type::ChainType;
     use crate::common::llmq_type::LLMQType;
     use crate::crypto::byte_util::{UInt256, UInt384};

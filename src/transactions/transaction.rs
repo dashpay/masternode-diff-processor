@@ -1,11 +1,11 @@
 use byte::{BytesExt, LE};
 use hashes::Hash;
-use secrets::traits::AsContiguousBytes;
 use crate::blockdata::opcodes::all::OP_RETURN;
 use crate::consensus::{Decodable, Encodable};
-use crate::consensus::encode::VarInt;
+use crate::consensus::encode::{consensus_encode_with_size, VarInt};
 use crate::crypto::byte_util::{data_at_offset_from, UInt256};
 use crate::hashes::{sha256d};
+use crate::hashes::_export::_core::fmt::Debug;
 use crate::transactions::transaction::TransactionType::Classic;
 
 // estimated size for a typical transaction output
@@ -19,6 +19,7 @@ pub static TX_FEE_PER_INPUT: u64 = 10000;
 // block height indicating transaction is unconfirmed
 pub const TX_UNCONFIRMED: i32 = i32::MAX;
 
+pub static SIGHASH_ALL: u32 = 1;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -114,11 +115,11 @@ impl<'a> Transaction<'a> {
         &[]
     }
 
-    pub fn to_data(&self) -> &[u8] {
+    pub fn to_data(&self) -> Vec<u8> {
         self.to_data_with_subscript_index(u64::MAX)
     }
 
-    pub fn to_data_with_subscript_index(&self, subscript_index: u64) -> &[u8] {
+    pub fn to_data_with_subscript_index(&self, subscript_index: u64) -> Vec<u8> {
         Self::data_with_subscript_index_static(
             subscript_index,
             self.version,
@@ -134,55 +135,43 @@ impl<'a> Transaction<'a> {
         inputs: &Vec<TransactionInput>,
         outputs: &Vec<TransactionOutput>,
         lock_time: u32,
-    ) -> &'a [u8] {
-
-        let buffer: &mut [u8] = &mut [];
+    ) -> Vec<u8> {
+        let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
-        buffer.write(offset, version).unwrap();
-        buffer.write(offset, tx_type.raw_value()).unwrap();
-
         let inputs_len = inputs.len();
-
-        let mut inputs_len_buffer = [0u8];
-        VarInt(inputs_len as u64).consensus_encode(&mut inputs_len_buffer.as_mut_bytes()).unwrap();
-        buffer.write(offset, inputs_len_buffer.as_bytes()).unwrap();
-
-        for i in 0..inputs_len {
+        let outputs_len = outputs.len();
+        *offset += version.consensus_encode(&mut buffer).unwrap();
+        *offset += tx_type.raw_value().consensus_encode(&mut buffer).unwrap();
+        *offset += VarInt(inputs_len as u64).consensus_encode(&mut buffer).unwrap();
+        (0..inputs_len).into_iter().for_each(|i| {
             let input = &inputs[i];
-            buffer.write(offset, input.input_hash).unwrap();
-            buffer.write(offset, input.index).unwrap();
+            *offset += input.input_hash.consensus_encode(&mut buffer).unwrap();
+            *offset += input.index.consensus_encode(&mut buffer).unwrap();
             if subscript_index == u64::MAX && input.signature.is_some() {
                 let signature = input.signature.unwrap();
-                buffer.write(offset, signature.len()).unwrap();
-                buffer.write(offset, signature).unwrap();
+                *offset += VarInt(input.index as u64).consensus_encode(&mut buffer).unwrap();
+                *offset += consensus_encode_with_size(signature, &mut buffer).unwrap()
             } else if subscript_index == i as u64 && input.script.is_some() {
                 let script = input.script.unwrap();
-                let script_len_buffer: &mut [u8] = &mut [];
-                VarInt(script.len() as u64).consensus_encode(&mut script_len_buffer.as_mut_bytes()).unwrap();
-                buffer.write(offset, script_len_buffer.as_bytes()).unwrap();
-                buffer.write(offset, script).unwrap();
+                *offset += VarInt(script.len() as u64).consensus_encode(&mut buffer).unwrap();
+                *offset += consensus_encode_with_size(script, &mut buffer).unwrap()
             } else {
-                buffer.write::<u8>(offset, 0).unwrap();
+                *offset += VarInt(0 as u64).consensus_encode(&mut buffer).unwrap();
             }
-            buffer.write(offset, input.sequence).unwrap();
-        }
-
-        let outputs_len = outputs.len();
-        let mut outputs_len_buffer= [0u8];
-        VarInt(inputs_len as u64).consensus_encode(&mut outputs_len_buffer.as_mut_bytes()).unwrap();
-        buffer.write(offset, outputs_len_buffer.as_bytes()).unwrap();
+            *offset += input.sequence.consensus_encode(&mut buffer).unwrap();
+        });
+        *offset += VarInt(outputs_len as u64).consensus_encode(&mut buffer).unwrap();
         (0..outputs_len).into_iter().for_each(|i| {
             let output = &outputs[i];
-            buffer.write(offset, output.amount).unwrap();
+            output.amount.consensus_encode(&mut buffer).unwrap();
             if let Some(script) = output.script {
-                let script_len_buffer: &mut [u8] = &mut [];
-                VarInt(script.len() as u64).consensus_encode(&mut script_len_buffer.as_mut_bytes()).unwrap();
-                buffer.write(offset, script_len_buffer.as_bytes()).unwrap();
+                *offset += VarInt(script.len() as u64).consensus_encode(&mut buffer).unwrap();
+                *offset += consensus_encode_with_size(script, &mut buffer).unwrap()
             }
         });
-        buffer.write(offset, lock_time).unwrap();
+        *offset += lock_time.consensus_encode(&mut buffer).unwrap();
         if subscript_index != u64::MAX {
-            buffer.write(offset, 1u32).unwrap();
+            *offset += SIGHASH_ALL.consensus_encode(&mut buffer).unwrap();
         }
         buffer
     }
@@ -271,7 +260,7 @@ impl<'a> Transaction<'a> {
                         version,
                         tx_type,
                         &inputs,
-                        &outputs, lock_time)).into_inner()))
+                        &outputs, lock_time).as_slice()).into_inner()))
             } else {
                 None
              };

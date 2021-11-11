@@ -1,8 +1,8 @@
 use byte::{BytesExt, check_len, LE, Result, TryRead, TryWrite};
 use byte::ctx::{Bytes, Endian};
 use std::fmt::Write;
-use crate::consensus::{Decodable, Encodable};
-use crate::consensus::encode::VarInt;
+use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
+use crate::consensus::encode::{Error, VarInt};
 use crate::hashes::{Hash, sha256d};
 
 pub trait Data {
@@ -159,155 +159,250 @@ pub struct UInt768(pub [u8; 96]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct MNPayload(pub [u8; MN_ENTRY_PAYLOAD_LENGTH]);
 
-impl<'a> TryRead<'a, Endian> for UInt128 {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
-        let offset = &mut 0;
-        let mut data: [u8; 16] = [0u8; 16];
-        for _i in 0..16 {
-            data[*offset] = bytes.read_with::<u8>(offset, endian).unwrap();
+
+// impl<'a> TryRead<'a, Endian> for UInt128 {
+//     fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+//         let offset = &mut 0;
+//         let mut data: [u8; 16] = [0u8; 16];
+//         for _i in 0..16 {
+//             data[*offset] = bytes.read_with::<u8>(offset, endian).unwrap();
+//         }
+//         Ok((UInt128(data), 16))
+//     }
+// }
+//
+// impl<'a> TryWrite<Endian> for UInt128 {
+//     fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
+//         bytes.write_with(&mut 0, self, endian).unwrap();
+//         Ok(16)
+//     }
+// }
+//
+// impl std::fmt::Display for UInt128 {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         for ch in &self.0 {
+//             write!(f, "{:02x}", ch)?;
+//         }
+//         Ok(())
+//     }
+// }
+//
+//
+// impl<'a> TryRead<'a, Endian> for UInt160 {
+//     fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+//         let offset = &mut 0;
+//         let mut data: [u8; 20] = [0u8; 20];
+//         for _i in 0..20 {
+//             let index = offset.clone();
+//             let chunk = match bytes.read_with::<u8>(offset, endian) {
+//                 Ok(data) => data,
+//                 Err(_err) => { return Err(_err); }
+//             };
+//             data[index] = chunk;
+//
+//         }
+//         Ok((UInt160(data), 20))
+//     }
+// }
+//
+// impl<'a> TryWrite<Endian> for UInt160 {
+//     fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
+//         bytes.write_with(&mut 0, self, endian).unwrap();
+//         Ok(20)
+//     }
+// }
+//
+// impl<'a> TryRead<'a, Endian> for UInt256 {
+//     fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+//         let offset = &mut 0;
+//         let mut data: [u8; 32] = [0u8; 32];
+//         for _i in 0..32 {
+//             let index = offset.clone();
+//             let chunk = match bytes.read_with::<u8>(offset, endian) {
+//                 Ok(data) => data,
+//                 Err(_err) => { return Err(_err); }
+//             };
+//             data[index] = chunk;
+//         }
+//         Ok((UInt256(data), 32))
+//     }
+// }
+//
+// impl<'a> TryWrite<Endian> for UInt256 {
+//     fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
+//         bytes.write_with(&mut 0, self, endian).unwrap();
+//         Ok(32)
+//     }
+// }
+//
+// impl std::fmt::Display for UInt256 {
+//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+//         for ch in &self.0 {
+//             write!(f, "{:02x}", ch)?;
+//         }
+//         Ok(())
+//     }
+// }
+//
+// impl Reversable for UInt256 {
+//     fn reversed(&mut self) -> Self {
+//         self.0.reverse();
+//         *self
+//     }
+// }
+//
+// impl<'a> TryRead<'a, Endian> for UInt384 {
+//     fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+//         let offset = &mut 0;
+//         let mut data: [u8; 48] = [0u8; 48];
+//         for _i in 0..48 {
+//             let index = offset.clone();
+//             let chunk = match bytes.read_with::<u8>(offset, endian) {
+//                 Ok(data) => data,
+//                 Err(_err) => { return Err(_err); }
+//             };
+//             data[index] = chunk;
+//         }
+//         Ok((UInt384(data), 48))
+//     }
+// }
+//
+// impl<'a> TryWrite<Endian> for UInt384 {
+//     fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
+//         bytes.write_with(&mut 0, self, endian).unwrap();
+//         Ok(48)
+//     }
+// }
+//
+// impl<'a> TryRead<'a, Endian> for UInt768 {
+//     fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+//         let offset = &mut 0;
+//         let mut data: [u8; 96] = [0u8; 96];
+//         for _i in 0..96 {
+//             let index = offset.clone();
+//             let chunk = match bytes.read_with::<u8>(offset, endian) {
+//                 Ok(data) => data,
+//                 Err(_err) => { return Err(_err); }
+//             };
+//             data[index] = chunk;
+//         }
+//         Ok((UInt768(data), 48))
+//     }
+// }
+//
+// impl<'a> TryWrite<Endian> for UInt768 {
+//     fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
+//         bytes.write_with(&mut 0, self, endian).unwrap();
+//         Ok(96)
+//     }
+// }
+//
+// impl<'a> TryRead<'a, Endian> for MNPayload {
+//     fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+//         let offset = &mut 0;
+//         let mut data: [u8; MN_ENTRY_PAYLOAD_LENGTH] = [0u8; MN_ENTRY_PAYLOAD_LENGTH];
+//         for _i in 0..MN_ENTRY_PAYLOAD_LENGTH {
+//             let index = offset.clone();
+//             let chunk = match bytes.read_with::<u8>(offset, endian) {
+//                 Ok(data) => data,
+//                 Err(_err) => { return Err(_err); }
+//             };
+//             data[index] = chunk;
+//         }
+//         Ok((MNPayload(data), MN_ENTRY_PAYLOAD_LENGTH))
+//     }
+// }
+//
+// impl<'a> TryWrite<Endian> for MNPayload {
+//     fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
+//         match bytes.write_with(&mut 0, self, endian) {
+//             Ok(_data) => Ok(MN_ENTRY_PAYLOAD_LENGTH),
+//             Err(_err) => Err(_err)
+//         }
+//     }
+// }
+
+macro_rules! define_bytes_to_big_uint {
+    ($uint_type: ident, $byte_len: expr) => {
+        impl<'a> TryRead<'a, Endian> for $uint_type {
+            fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+                let offset = &mut 0;
+                let mut data: [u8; $byte_len] = [0u8; $byte_len];
+                for _i in 0..$byte_len {
+                    let index = offset.clone();
+                    let chunk = match bytes.read_with::<u8>(offset, endian) {
+                        Ok(data) => data,
+                        Err(_err) => { return Err(_err); }
+                    };
+                    data[index] = chunk;
+                }
+                Ok(($uint_type(data), $byte_len))
+            }
         }
-        Ok((UInt128(data), 16))
-    }
-}
-
-impl<'a> TryWrite<Endian> for UInt128 {
-    fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
-        bytes.write_with(&mut 0, self, endian).unwrap();
-        Ok(16)
-    }
-}
-
-impl std::fmt::Display for UInt128 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for ch in &self.0 {
-            write!(f, "{:02x}", ch)?;
+        impl<'a> TryWrite<Endian> for $uint_type {
+            fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
+                match bytes.write_with(&mut 0, self, endian) {
+                    Ok(_data) => Ok($byte_len),
+                    Err(_err) => Err(_err)
+                }
+            }
         }
-        Ok(())
-    }
-}
-
-
-impl<'a> TryRead<'a, Endian> for UInt160 {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
-        let offset = &mut 0;
-        let mut data: [u8; 20] = [0u8; 20];
-        for _i in 0..20 {
-            data[*offset] = bytes.read_with::<u8>(offset, endian).unwrap();
+        impl std::fmt::Display for $uint_type {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                for ch in &self.0 {
+                    write!(f, "{:02x}", ch)?;
+                }
+                Ok(())
+            }
         }
-        Ok((UInt160(data), 20))
-    }
-}
-
-impl<'a> TryWrite<Endian> for UInt160 {
-    fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
-        bytes.write_with(&mut 0, self, endian).unwrap();
-        Ok(20)
-    }
-}
-
-impl<'a> TryRead<'a, Endian> for UInt256 {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
-        let offset = &mut 0;
-        let mut data: [u8; 32] = [0u8; 32];
-        for _i in 0..32 {
-            let index = offset.clone();
-            let chunk = match bytes.read_with::<u8>(offset, endian) {
-                Ok(data) => data,
-                Err(_err) => { return Err(_err); }
-            };
-            data[index] = chunk;
+        impl Reversable for $uint_type {
+            fn reversed(&mut self) -> Self {
+                self.0.reverse();
+                *self
+            }
         }
-        Ok((UInt256(data), 32))
+        // impl Encodable for $uint_type {
+        //     #[inline]
+        //     fn consensus_encode<S: WriteExt>(&self, mut s: S) -> std::result::Result<usize, std::io::Error> {
+        //         s.emit_slice(&self.0[..])?;
+        //         Ok($byte_len)
+        //     }
+        // }
+        //
+        // impl Decodable for $uint_type {
+        //     #[inline]
+        //     fn consensus_decode<D: std::io::Read>(mut d: D) -> std::result::Result<Self, Error> {
+        //         let mut ret = [0; $byte_len];
+        //         d.0.read_slice(&mut ret)?;
+        //         Ok($uint_type(ret))
+        //     }
+        // }
+
     }
 }
 
-impl<'a> TryWrite<Endian> for UInt256 {
-    fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
-        bytes.write_with(&mut 0, self, endian).unwrap();
+impl Encodable for UInt256 {
+    #[inline]
+    fn consensus_encode<W: std::io::Write>(&self, mut writer: W) -> std::result::Result<usize, std::io::Error> {
+        writer.emit_slice(&self.0[..])?;
         Ok(32)
     }
 }
-
-impl std::fmt::Display for UInt256 {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for ch in &self.0 {
-            write!(f, "{:02x}", ch)?;
-        }
-        Ok(())
-    }
+impl Decodable for UInt256 {
+#[inline]
+fn consensus_decode<D: std::io::Read>(mut d: D) -> std::result::Result<Self, Error> {
+    let mut ret = [0; 32];
+    d.read_slice(&mut ret)?;
+    // d.0.read_slice(&mut ret)?;
+    Ok(UInt256(ret))
+}
 }
 
-// impl<Idx> Index<Idx> for UInt256 {
-//     type Output = [u8; 32];
-//
-//     fn index(&self, index: Idx) -> &Self::Output {
-//         self.0.index(index)
-//     }
-// }
-//
-// impl<Idx> IndexMut<Idx> for UInt256 {
-//     fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
-//         self.0.index_mut(index)
-//     }
-// }
 
-impl Reversable for UInt256 {
-    fn reversed(&mut self) -> Self {
-        self.0.reverse();
-        *self
-    }
-}
 
-impl<'a> TryRead<'a, Endian> for UInt384 {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
-        let offset = &mut 0;
-        let mut data: [u8; 48] = [0u8; 48];
-        for _i in 0..48 {
-            data[*offset] = bytes.read_with::<u8>(offset, endian).unwrap();
-        }
-        Ok((UInt384(data), 48))
-    }
-}
-
-impl<'a> TryWrite<Endian> for UInt384 {
-    fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
-        bytes.write_with(&mut 0, self, endian).unwrap();
-        Ok(48)
-    }
-}
-
-impl<'a> TryRead<'a, Endian> for UInt768 {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
-        let offset = &mut 0;
-        let mut data: [u8; 96] = [0u8; 96];
-        for _i in 0..96 {
-            data[*offset] = bytes.read_with::<u8>(offset, endian).unwrap();
-        }
-        Ok((UInt768(data), 48))
-    }
-}
-
-impl<'a> TryWrite<Endian> for UInt768 {
-    fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
-        bytes.write_with(&mut 0, self, endian).unwrap();
-        Ok(96)
-    }
-}
-
-impl<'a> TryRead<'a, Endian> for MNPayload {
-    fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
-        let offset = &mut 0;
-        let mut data: [u8; MN_ENTRY_PAYLOAD_LENGTH] = [0u8; MN_ENTRY_PAYLOAD_LENGTH];
-        for _i in 0..MN_ENTRY_PAYLOAD_LENGTH {
-            data[*offset] = bytes.read_with::<u8>(offset, endian).unwrap();
-        }
-        Ok((MNPayload(data), MN_ENTRY_PAYLOAD_LENGTH))
-    }
-}
-
-impl<'a> TryWrite<Endian> for MNPayload {
-    fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
-        bytes.write_with(&mut 0, self, endian).unwrap();
-        Ok(MN_ENTRY_PAYLOAD_LENGTH)
-    }
-}
+define_bytes_to_big_uint!(UInt128, 16);
+define_bytes_to_big_uint!(UInt160, 20);
+define_bytes_to_big_uint!(UInt256, 32);
+define_bytes_to_big_uint!(UInt384, 48);
+define_bytes_to_big_uint!(UInt768, 96);
+define_bytes_to_big_uint!(MNPayload, MN_ENTRY_PAYLOAD_LENGTH);

@@ -73,16 +73,18 @@ impl<'a> CoinbaseTransaction<'a> {
         buffer
     }
 
-    pub fn to_data(&self) -> &[u8] {
+    pub fn to_data(&self) -> Vec<u8> {
         self.to_data_with_subscript_index(u64::MAX)
     }
 
-    pub fn to_data_with_subscript_index(&self, subscript_index: u64) -> &[u8] {
-        let buffer: &mut [u8] = &mut [];
+    pub fn to_data_with_subscript_index(&self, subscript_index: u64) -> Vec<u8> {
+        //let buffer: &mut [u8] = &mut [];
+        let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
         let payload = self.payload_data();
         let mut payload_len_buffer = [0u8];
-        buffer.write(offset, self.base.to_data_with_subscript_index(subscript_index)).unwrap();
+
+        buffer.write(offset, self.base.to_data_with_subscript_index(subscript_index).as_bytes()).unwrap();
         VarInt(payload.len() as u64).consensus_encode(&mut payload_len_buffer.as_mut_bytes()).unwrap();
         buffer.write(offset, payload_len_buffer.as_bytes()).unwrap();
         buffer.write(offset, payload).unwrap();
