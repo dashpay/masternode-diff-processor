@@ -1,7 +1,7 @@
 // use std::sync::{Arc, Mutex};
 use hashes::{sha256d};
 use byte::{BytesExt, LE};
-use secrets::traits::AsContiguousBytes;
+use crate::consensus::Encodable;
 use crate::crypto::byte_util::UInt256;
 use crate::hashes::Hash;
 
@@ -56,11 +56,10 @@ impl<'a> MerkleTree<'a> {
             0,
             |hash, _flag | hash,
             |left, right| {
-                let offset: &mut usize = &mut 0;
-                let buffer: &mut [u8] = &mut [0; 64];
-                buffer.write(offset, left).unwrap();
-                buffer.write(offset, if right.is_none() { left.clone() } else { right.unwrap() }).unwrap();
-                Some(UInt256(sha256d::Hash::hash(buffer.as_bytes()).into_inner()))
+                let mut buffer: Vec<u8> = vec![0u8; 64];
+                left.consensus_encode(&mut buffer).unwrap();
+                if right.is_none() { left.clone() } else { right.unwrap() }.consensus_encode(&mut buffer).unwrap();
+                Some(UInt256(sha256d::Hash::hash(&buffer).into_inner()))
             })
     }
 

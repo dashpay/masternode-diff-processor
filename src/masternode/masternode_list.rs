@@ -1,11 +1,10 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
-use byte::{BytesExt, LE};
 use secrets::traits::AsContiguousBytes;
 use crate::common::llmq_type::LLMQType;
-use crate::crypto::byte_util::{merkle_root_from_hashes, UInt256};
+use crate::consensus::Encodable;
+use crate::crypto::byte_util::UInt256;
 use crate::hashes::{Hash, sha256};
-use crate::manager::BlockHeightLookup;
 use crate::masternode::quorum_entry::QuorumEntry;
 use crate::masternode::masternode_entry::MasternodeEntry;
 
@@ -35,17 +34,6 @@ impl<'a> MasternodeList<'a> {
             quorum_merkle_root: None,
             masternodes,
         }
-    }
-
-    pub fn calculate_masternode_merkle_root(&self, block_height_lookup: BlockHeightLookup) -> Option<UInt256> {
-        if let Some(hashes) = self.hashes_for_merkle_root(block_height_lookup) {
-            if !hashes.is_empty() {
-                if let Some(data) = merkle_root_from_hashes(hashes) {
-                    if !data.0.is_empty() { return Some(data); }
-                }
-            }
-        }
-        None
     }
 
     pub fn quorums_count(&self) -> u64 {
@@ -97,12 +85,11 @@ impl<'a> MasternodeList<'a> {
         if masternode_entry.confirmed_hash_at(block_height).is_none() {
             return None;
         }
-        let buffer: &mut [u8] = &mut [];
-        let offset = &mut 0;
+        let mut buffer: Vec<u8> = Vec::new();
         if let Some(hash) = masternode_entry.confirmed_hash_hashed_with_provider_registration_transaction_hash_at(block_height) {
-            buffer.write_with(offset, hash, LE).unwrap();
+            hash.consensus_encode(&mut buffer).unwrap();
         }
-        buffer.write_with(offset, modifier, LE).unwrap();
+        modifier.consensus_encode(&mut buffer).unwrap();
         Some(UInt256(sha256::Hash::hash(buffer.as_bytes()).into_inner()))
     }
 
@@ -112,10 +99,10 @@ impl<'a> MasternodeList<'a> {
     }*/
 
 
-    pub fn hashes_for_merkle_root(&self, block_height_lookup: BlockHeightLookup) -> Option<Vec<UInt256>> {
+    pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<UInt256>> {
         // let pro_tx_hashes = self.provider_tx_ordered_hashes();
         // let pro_tx_hashes: Vec<UInt256> = self.masternodes.into_keys().collect();
-        let block_height = unsafe { block_height_lookup(self.block_hash.0.as_ptr()) };
+        // let block_height = unsafe { block_height_lookup(self.block_hash.0.as_ptr()) };
         if block_height == u32::MAX {
             println!("Block height lookup queried an unknown block {:?}", self.block_hash);
             None
@@ -127,12 +114,4 @@ impl<'a> MasternodeList<'a> {
                 .collect())
         }
     }
-
-    pub fn masternode_merkle_root_with(&mut self, block_height_lookup: BlockHeightLookup) -> UInt256 {
-        if self.masternode_merkle_root.is_none() {
-            self.masternode_merkle_root = self.calculate_masternode_merkle_root(block_height_lookup);
-        }
-        return self.masternode_merkle_root.unwrap();
-    }
-
 }

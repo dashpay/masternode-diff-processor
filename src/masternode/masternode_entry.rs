@@ -5,6 +5,7 @@ use byte::{BytesExt, LE};
 use secrets::traits::AsContiguousBytes;
 use crate::common::block_data::BlockData;
 use crate::common::socket_address::SocketAddress;
+use crate::consensus::Encodable;
 use crate::crypto::byte_util::{MNPayload, short_hex_string_from, UInt128, UInt160, UInt256, UInt384};
 use crate::hashes::{Hash, sha256, sha256d};
 
@@ -39,15 +40,15 @@ impl MasternodeEntry {
     ) -> UInt256 {
         let offset: &mut usize = &mut 0;
         const HASH_IMPORTANT_DATA_LENGTH: usize = 32 + 32 + 16 + 2 + 48 + 20 + 1;
-        let mut buffer = [0u8; HASH_IMPORTANT_DATA_LENGTH];
-        buffer.write(offset, provider_registration_transaction_hash).unwrap();
-        buffer.write(offset, confirmed_hash).unwrap();
-        buffer.write(offset, socket_address.ip_address).unwrap();
-        buffer.write(offset, socket_address.port).unwrap();
-        buffer.write(offset, operator_public_key).unwrap();
-        buffer.write(offset, key_id_voting).unwrap();
-        buffer.write(offset, is_valid).unwrap();
-        UInt256(sha256d::Hash::hash(buffer.as_bytes()).into_inner())
+        let mut buffer: Vec<u8> = Vec::with_capacity(HASH_IMPORTANT_DATA_LENGTH);
+        *offset += provider_registration_transaction_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += confirmed_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += socket_address.ip_address.consensus_encode(&mut buffer).unwrap();
+        *offset += socket_address.port.consensus_encode(&mut buffer).unwrap();
+        *offset += operator_public_key.consensus_encode(&mut buffer).unwrap();
+        *offset += key_id_voting.consensus_encode(&mut buffer).unwrap();
+        *offset += is_valid.consensus_encode(&mut buffer).unwrap();
+        UInt256(sha256d::Hash::hash(&buffer).into_inner())
     }
 
     pub fn confirmed_hash_at(&self, block_height: u32) -> Option<UInt256> {
@@ -91,11 +92,11 @@ impl MasternodeEntry {
     }
 
     pub fn hash_confirmed_hash(confirmed_hash: UInt256, pro_reg_tx_hash: UInt256) -> UInt256 {
+        let mut buffer: Vec<u8> = Vec::with_capacity(64);
         let offset: &mut usize = &mut 0;
-        let mut buffer = [0u8; 64];
-        buffer.write(offset, confirmed_hash).unwrap();
-        buffer.write(offset, pro_reg_tx_hash).unwrap();
-        UInt256(sha256::Hash::hash(buffer.as_bytes()).into_inner())
+        *offset += confirmed_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += pro_reg_tx_hash.consensus_encode(&mut buffer).unwrap();
+        UInt256(sha256::Hash::hash(&buffer).into_inner())
     }
 
     pub fn is_valid_at(&self, block_height: u32) -> bool {

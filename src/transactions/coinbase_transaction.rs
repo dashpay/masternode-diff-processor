@@ -1,10 +1,9 @@
 use byte::{BytesExt, LE};
-use secrets::traits::AsContiguousBytes;
 use crate::consensus::{Decodable, Encodable};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::UInt256;
 use crate::hashes::{Hash, sha256d};
-use crate::transactions::transaction::{Transaction};
+use crate::transactions::transaction::{Transaction, TransactionInput, TransactionOutput, TransactionType};
 use crate::transactions::transaction::TransactionType::{Coinbase};
 
 // #[repr(C)]
@@ -48,26 +47,29 @@ impl<'a> CoinbaseTransaction<'a> {
                 } else { None };
 
             base.payload_offset = offset.clone();
-            base.tx_hash = Some(UInt256(sha256d::Hash::hash(&base.to_data()).into_inner()));
-            return Some(Self {
+
+            let mut tx = Self {
                 base,
                 coinbase_transaction_version,
                 height,
                 merkle_root_mn_list,
                 merkle_root_llmq_list
-            });
+            };
+            tx.base.tx_hash = Some(UInt256(sha256d::Hash::hash(&tx.to_data()).into_inner()));
+            return Some(tx);
         }
         None
     }
 
-    fn payload_data(&self) -> &[u8] {
-        let buffer: &mut [u8] = &mut [];
-        buffer[0..15].copy_from_slice(&self.coinbase_transaction_version.as_bytes());
-        buffer[16..47].copy_from_slice(&self.height.as_bytes());
-        buffer[48..303].copy_from_slice(self.merkle_root_mn_list.0.as_bytes());
+    fn payload_data(&self) -> Vec<u8> {
+        let mut buffer: Vec<u8> = Vec::new();
+        let offset: &mut usize = &mut 0;
+        *offset += self.coinbase_transaction_version.consensus_encode(&mut buffer).unwrap();
+        *offset += self.height.consensus_encode(&mut buffer).unwrap();
+        *offset += self.merkle_root_mn_list.consensus_encode(&mut buffer).unwrap();
         if self.coinbase_transaction_version >= 2 {
             if let Some(llmq_list) = self.merkle_root_llmq_list {
-                buffer[304..559].copy_from_slice(llmq_list.0.as_bytes());
+                *offset += llmq_list.consensus_encode(&mut buffer).unwrap();
             }
         }
         buffer
@@ -78,16 +80,11 @@ impl<'a> CoinbaseTransaction<'a> {
     }
 
     pub fn to_data_with_subscript_index(&self, subscript_index: u64) -> Vec<u8> {
-        //let buffer: &mut [u8] = &mut [];
-        let mut buffer: Vec<u8> = Vec::new();
+        let mut buffer = Transaction::data_with_subscript_index_static(subscript_index, self.base.version, self.base.tx_type, &self.base.inputs, &self.base.outputs, self.base.lock_time);
         let offset: &mut usize = &mut 0;
         let payload = self.payload_data();
-        let mut payload_len_buffer = [0u8];
-
-        buffer.write(offset, self.base.to_data_with_subscript_index(subscript_index).as_bytes()).unwrap();
-        VarInt(payload.len() as u64).consensus_encode(&mut payload_len_buffer.as_mut_bytes()).unwrap();
-        buffer.write(offset, payload_len_buffer.as_bytes()).unwrap();
-        buffer.write(offset, payload).unwrap();
+        *offset += VarInt(payload.len() as u64).consensus_encode(&mut buffer).unwrap();
+        *offset += payload.consensus_encode(&mut buffer).unwrap();
         buffer
     }
 }

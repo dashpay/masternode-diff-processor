@@ -90,9 +90,8 @@ pub struct TransactionOutput<'a> {
     pub address: Option<&'a str>,
 }
 pub trait ITransaction {
-    fn payload_data(&self) -> &[u8];
-    fn payload_data_for(&self) -> &[u8];
-    // fn transaction_type_requires_inputs() -> bool;
+    fn payload_data(&self) -> Vec<u8>;
+    fn payload_data_for(&self) -> Vec<u8>;
     fn transaction_type(&self) -> TransactionType;
 }
 
@@ -111,8 +110,8 @@ pub struct Transaction<'a> {
 }
 
 impl<'a> Transaction<'a> {
-    fn payload_data(&self) -> &[u8] {
-        &[]
+    fn payload_data(&self) -> Vec<u8> {
+        Vec::new()
     }
 
     pub fn to_data(&self) -> Vec<u8> {
@@ -128,7 +127,7 @@ impl<'a> Transaction<'a> {
             &self.outputs, self.lock_time)
     }
 
-    fn data_with_subscript_index_static(
+    pub fn data_with_subscript_index_static(
         subscript_index: u64,
         version: u16,
         tx_type: TransactionType,
@@ -252,30 +251,24 @@ impl<'a> Transaction<'a> {
             Err(_err) => { return None; }
         };
         //let payload_offset = off;
-        let tx_hash: Option<UInt256> =
-            if tx_type == Classic {
-                Some(
-                    UInt256(sha256d::Hash::hash(Self::data_with_subscript_index_static(
-                        u64::MAX,
-                        version,
-                        tx_type,
-                        &inputs,
-                        &outputs, lock_time).as_slice()).into_inner()))
-            } else {
-                None
-             };
 
-        Some(Self {
+        let mut tx = Self {
             inputs,
             outputs,
-            tx_hash,
+            tx_hash: None,
             version,
             tx_type,
             lock_time,
             payload_offset: payload_offset.clone(),
             block_height: TX_UNCONFIRMED as u32
-        })
-      }
+        };
+        tx.tx_hash = if tx_type == Classic {
+            Some(UInt256(sha256d::Hash::hash(&tx.to_data()).into_inner()))
+        } else {
+            None
+        };
+        Some(tx)
+    }
 
     // used in CreditFundingTransaction only
     /*pub fn accounts(&self) -> Vec<Account> {

@@ -5,7 +5,7 @@ use hashes::{Hash, sha256d};
 use secrets::traits::AsContiguousBytes;
 use crate::common::llmq_type::LLMQType;
 use crate::consensus::{Decodable, Encodable};
-use crate::consensus::encode::VarInt;
+use crate::consensus::encode::{consensus_encode_with_size, VarInt};
 use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
 // use crate::keys::bls_key::BLSKey;
 
@@ -90,7 +90,7 @@ impl<'a> QuorumEntry<'a> {
         let llmq_type: LLMQType = llmq_type.into();
         let quorum_entry_hash = sha256d::Hash::hash(QuorumEntry::generate_data(
             version, llmq_type, quorum_hash, signers_count.clone(), &signers_bitset, quorum_public_key,
-            quorum_verification_vector_hash, quorum_threshold_signature, all_commitment_aggregated_signature));
+            quorum_verification_vector_hash, quorum_threshold_signature, all_commitment_aggregated_signature).as_bytes());
         let length = *offset - data_offset;
         //LLMQType::try_from(llmq_type)
         Some(QuorumEntry {
@@ -123,25 +123,23 @@ impl<'a> QuorumEntry<'a> {
         quorum_verification_vector_hash: UInt256,
         quorum_threshold_signature: UInt768,
         all_commitment_aggregated_signature: UInt768
-    ) -> &[u8] {
-        let buffer: &mut [u8] = &mut [];
+    ) -> Vec<u8> {
+        let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = llmq_type.into();
-        buffer.write(offset, version).unwrap();
-        buffer.write(offset, llmq_u8).unwrap();
-        buffer.write(offset, quorum_hash).unwrap();
-        let mut signers_count_buffer = [0u8];
-        *offset += signers_count.consensus_encode(&mut signers_count_buffer.as_mut_bytes()).unwrap_or(0);
-        buffer.write(offset, signers_count_buffer.as_bytes()).unwrap();
-        buffer.write(offset, signers_bitset).unwrap();
-        buffer.write(offset, quorum_public_key).unwrap();
-        buffer.write(offset, quorum_verification_vector_hash).unwrap();
-        buffer.write(offset, quorum_threshold_signature).unwrap();
-        buffer.write(offset, all_commitment_aggregated_signature).unwrap();
+        *offset += version.consensus_encode(&mut buffer).unwrap();
+        *offset += llmq_u8.consensus_encode(&mut buffer).unwrap();
+        *offset += quorum_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += signers_count.consensus_encode(&mut buffer).unwrap();
+        *offset += consensus_encode_with_size(signers_bitset, &mut buffer).unwrap();
+        *offset += quorum_public_key.consensus_encode(&mut buffer).unwrap();
+        *offset += quorum_verification_vector_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += quorum_threshold_signature.consensus_encode(&mut buffer).unwrap();
+        *offset += all_commitment_aggregated_signature.consensus_encode(&mut buffer).unwrap();
         buffer
     }
 
-    pub fn to_data(&self) -> &[u8] {
+    pub fn to_data(&self) -> Vec<u8> {
         QuorumEntry::generate_data(
             self.version, self.llmq_type, self.quorum_hash,
             self.signers_count, self.signers_bitset,
@@ -150,36 +148,31 @@ impl<'a> QuorumEntry<'a> {
     }
 
     pub fn llmq_quorum_hash(&self) -> UInt256 {
-        let mut buffer = [0u8; 33];
+        let mut buffer: Vec<u8> = Vec::with_capacity(33);
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = self.llmq_type.into();
-        buffer.write(offset, llmq_u8).unwrap();
-        buffer.write(offset, self.quorum_hash).unwrap();
+        *offset += llmq_u8.consensus_encode(&mut buffer).unwrap();
+        *offset += self.quorum_hash.consensus_encode(&mut buffer).unwrap();
         UInt256(sha256d::Hash::hash(&buffer).into_inner())
     }
 
-    pub fn commitment_data(&self) -> &[u8] {
-        let buffer: &mut [u8] = &mut [];
+    pub fn commitment_data(&self) -> Vec<u8> {
+        let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = self.llmq_type.into();
-        buffer.write(offset, llmq_u8).unwrap();
-        buffer.write(offset, self.quorum_hash).unwrap();
-        let mut valid_members_count_buffer = [0u8];
-        match self.valid_members_count.consensus_encode(&mut valid_members_count_buffer.as_mut_bytes()) {
-            Ok(size) => size,
-            _ => 0
-        };
-        buffer.write(offset, valid_members_count_buffer.as_bytes()).unwrap();
-        buffer.write(offset, self.valid_members_bitset).unwrap();
-        buffer.write(offset, self.quorum_public_key).unwrap();
-        buffer.write(offset, self.quorum_verification_vector_hash).unwrap();
+        *offset += llmq_u8.consensus_encode(&mut buffer).unwrap();
+        *offset += self.quorum_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += self.valid_members_count.consensus_encode(&mut buffer).unwrap();
+        *offset += consensus_encode_with_size(self.valid_members_bitset, &mut buffer).unwrap();
+        *offset += self.quorum_public_key.consensus_encode(&mut buffer).unwrap();
+        *offset += self.quorum_verification_vector_hash.consensus_encode(&mut buffer).unwrap();
         buffer
     }
 
     pub fn commitment_hash(&mut self) -> sha256d::Hash {
         if self.commitment_hash.is_none() ||
             self.commitment_hash.unwrap().is_empty() {
-            self.commitment_hash = Some(sha256d::Hash::hash(self.commitment_data()));
+            self.commitment_hash = Some(sha256d::Hash::hash(&self.commitment_data()));
         }
         self.commitment_hash.unwrap()
     }

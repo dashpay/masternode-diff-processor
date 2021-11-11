@@ -28,7 +28,7 @@ pub mod manager {
     use crate::common::merkle_tree::{MerkleTree};
     use crate::consensus::Decodable;
     use crate::consensus::encode::VarInt;
-    use crate::crypto::byte_util::{Data, MNPayload, Reversable, UInt256, UInt384};
+    use crate::crypto::byte_util::{Data, merkle_root_from_hashes, MNPayload, Reversable, UInt256, UInt384};
     use crate::crypto::data_ops::inplace_intersection;
     use crate::masternode::masternode_list::MasternodeList;
     use crate::masternode::quorum_entry::QuorumEntry;
@@ -363,7 +363,17 @@ pub mod manager {
         });
 
         let mut masternode_list = MasternodeList::new(masternodes, quorums, block_hash, block_height);
-        let root_mn_list_valid = coinbase_transaction.merkle_root_mn_list == masternode_list.masternode_merkle_root_with(block_height_lookup);
+        if masternode_list.masternode_merkle_root.is_none() {
+            if let Some(hashes) = masternode_list.hashes_for_merkle_root(block_height) {
+                masternode_list.masternode_merkle_root = merkle_root_from_hashes(hashes);
+            }
+        }
+        let root_mn_list_valid =
+            if let Some(mn_merkle_root) = masternode_list.masternode_merkle_root {
+                coinbase_transaction.merkle_root_mn_list == mn_merkle_root
+            } else {
+                false
+            };
         // we need to check that the coinbase is in the transaction hashes we got back
         let coinbase_hash = coinbase_transaction.base.tx_hash.unwrap();
         let mut found_coinbase: bool = false;
@@ -410,7 +420,7 @@ mod tests {
     use std::{env, fs};
     use std::io::Read;
     use byte::{BytesExt, LE};
-    use hashes::hex::FromHex;
+    use hashes::hex::{FromHex, ToHex};
     use crate::common::chain_type::ChainType;
     use crate::common::llmq_type::LLMQType;
     use crate::crypto::byte_util::{UInt256, UInt384};
@@ -484,12 +494,13 @@ mod tests {
 
         let result = unsafe { Box::from_raw(result) };
         let masternode_list = unsafe { Box::from_raw(result.masternode_list.0.unwrap()) };
-        let masternode_list_merkle_root: Vec<u8> = Vec::from_hex("94d0af97187af3b9311c98b1cf40c9c9849df0af55dc63b097b80d4cf6c816c5").expect("Invalid Hex String");
-        let masternode_list_merkle_root = masternode_list_merkle_root.read_with::<UInt256>(&mut 0, LE).unwrap();
-
-        // let masternode_list_merkle_root_bytes: &[u8; 32] = masternode_list_merkle_root.as_slice().as_ptr().try_into
-        let equal = masternode_list_merkle_root == masternode_list.masternode_merkle_root.unwrap();
+        let masternode_list_merkle_root = Vec::from_hex("94d0af97187af3b9311c98b1cf40c9c9849df0af55dc63b097b80d4cf6c816c5").expect("Invalid Hex String").read_with::<UInt256>(&mut 0, LE).unwrap();
+        let obtained_mn_merkle_root = masternode_list.masternode_merkle_root.unwrap();
+        let equal = masternode_list_merkle_root == obtained_mn_merkle_root;
         // let block_height: u32 = chain.height_for(block_hash);
+        let pre_hex = masternode_list_merkle_root.0.to_hex();
+        let obt_hex = obtained_mn_merkle_root.0.to_hex();
+
         assert!(equal, "MNList merkle root should be valid");
         assert!(result.found_coinbase, "Did not find coinbase at height {}", BLOCK_HEIGHT);
         // turned off on purpose as we don't have the coinbase block
