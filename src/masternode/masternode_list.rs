@@ -1,9 +1,10 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
+use hashes::hex::ToHex;
 use secrets::traits::AsContiguousBytes;
 use crate::common::llmq_type::LLMQType;
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::UInt256;
+use crate::crypto::byte_util::{merkle_root_from_hashes, Reversable, UInt256};
 use crate::hashes::{Hash, sha256};
 use crate::masternode::quorum_entry::QuorumEntry;
 use crate::masternode::masternode_entry::MasternodeEntry;
@@ -93,11 +94,9 @@ impl<'a> MasternodeList<'a> {
         Some(UInt256(sha256::Hash::hash(buffer.as_bytes()).into_inner()))
     }
 
-
-    /*pub fn provider_tx_ordered_hashes(&self) -> Vec<UInt256> {
-        self.masternodes.into_keys().collect()
-    }*/
-
+    // pub fn provider_tx_ordered_hashes(&self) -> Vec<UInt256> {
+    //     self.masternodes.into_keys().collect()
+    // }
 
     pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<UInt256>> {
         // let pro_tx_hashes = self.provider_tx_ordered_hashes();
@@ -110,8 +109,29 @@ impl<'a> MasternodeList<'a> {
             Some(self.masternodes
                 .clone()
                 .into_iter()
-                .map(|(_hash, entry)| entry.simplified_masternode_entry_hash_at(block_height))
+                .map(|(_, mn)| mn.simplified_masternode_entry_hash_at(block_height))
                 .collect())
         }
     }
+
+    pub fn q_merkle_root(&mut self) -> Option<UInt256> {
+        if self.quorum_merkle_root.is_none() {
+            let mut llmq_commitment_hashes = Vec::new();
+            let c_quorums = self.quorums.clone();
+            for (_q_type, quorums) in c_quorums {
+                for (_q_hash, q_entry) in quorums {
+                    llmq_commitment_hashes.push(q_entry.quorum_entry_hash.clone());
+                }
+            }
+            llmq_commitment_hashes.sort_by(|h1, h2| {
+                let h1rev = h1.clone().reversed();
+                let h2rev = h2.clone().reversed();
+                return h1rev.cmp(&h2rev);
+            });
+            let debug_hashes: Vec<String> = llmq_commitment_hashes.clone().into_iter().map(|h|h.0.to_hex()).collect();
+            self.quorum_merkle_root = merkle_root_from_hashes(llmq_commitment_hashes);
+        }
+        self.quorum_merkle_root
+    }
+
 }

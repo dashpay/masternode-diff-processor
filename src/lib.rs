@@ -23,6 +23,7 @@ pub mod manager {
     use std::{mem, slice};
     use std::collections::{BTreeMap, HashMap, HashSet};
     use byte::*;
+    use hashes::hex::ToHex;
 
     use crate::common::llmq_type::LLMQType;
     use crate::common::merkle_tree::{MerkleTree};
@@ -131,33 +132,63 @@ pub mod manager {
             Ok(data) => data,
             Err(_err) => { return failure(); }
         };
+        let _base_block_hash_hex = _base_block_hash.0.to_hex();
+
         let block_hash = match message.read_with::<UInt256>(offset, LE) {
             Ok(data) => data,
             Err(_err) => { return failure(); }
         };
+        let _block_hash_hex = block_hash.0.to_hex();
         let block_height = unsafe { block_height_lookup(block_hash.0.as_ptr()) };
         let total_transactions = match message.read_with::<u32>(offset, LE) {
             Ok(data) => data,
             Err(_err) => { return failure(); }
         };
-        if length - *offset < 1 { return failure(); }
-        let merkle_hash_count_length = match VarInt::consensus_decode(&message[*offset..]) {
+        //if length - *offset < 1 { return failure(); }
+        /*let merkle_hash_count_length = match VarInt::consensus_decode(&message[*offset..]) {
             Ok(data) => data.len(),
             Err(_err) => { return failure(); }
+        };*/
+        let merkle_hash_var_int = match VarInt::consensus_decode(&message[*offset..]) {
+            Ok(data) => data,
+            Err(_err) => { return failure(); }
         };
-        let merkle_hashes = &message[*offset..*offset + merkle_hash_count_length];
+        let merkle_hash_count_length = merkle_hash_var_int.len();
         *offset += merkle_hash_count_length;
 
-        let merkle_flag_count_length = match VarInt::consensus_decode(&message[*offset..]) {
-            Ok(data) => data.len(),
+        let merkle_hashes_count = (merkle_hash_var_int.0 as usize) * 32;
+        let merkle_hashes = &message[*offset..*offset + merkle_hashes_count];
+        *offset += merkle_hashes_count;
+
+        let merkle_flag_var_int = match VarInt::consensus_decode(&message[*offset..]) {
+            Ok(data) => data,
             Err(_err) => { return failure(); }
         };
-        let merkle_flags = &message[*offset..*offset + merkle_flag_count_length];
+        let merkle_flag_count_length = merkle_flag_var_int.len();
         *offset += merkle_flag_count_length;
 
+        let merkle_flag_count = merkle_flag_var_int.0 as usize;
+        let merkle_flags = &message[*offset..*offset + merkle_flag_count];
+        *offset += merkle_flag_count;
+
         let coinbase_transaction = CoinbaseTransaction::new(&message[*offset..]);
+
         if coinbase_transaction.is_none() { return failure(); }
         let coinbase_transaction = coinbase_transaction.unwrap();
+
+        let _block_hash_hex = block_hash.0.to_hex();
+        // NSLog(@"CoinbaseTx: (payloadOffset: %u, coinbaseTransactionVersion: %u, height: %d, version: %d, coinbaseHash: %@)",
+        //       coinbaseTransaction.payloadOffset,
+        //       coinbaseTransaction.coinbaseTransactionVersion,
+        //       coinbaseTransaction.height,
+        //       coinbaseTransaction.version,
+        //       uint256_hex(coinbaseTransaction.txHash));
+        let _coinbase_payload_offset = coinbase_transaction.base.payload_offset;
+        let _coinbase_tx_cb_version = coinbase_transaction.coinbase_transaction_version;
+        let _coinbase_tx_height = coinbase_transaction.height;
+        let _coinbase_tx_version = coinbase_transaction.base.version;
+        let _coinbase_tx_hash = coinbase_transaction.base.tx_hash.unwrap().0.to_hex();
+
         *offset += coinbase_transaction.base.payload_offset;
         if length - *offset < 1 { return failure(); }
         let deleted_masternode_var_int = match VarInt::consensus_decode(&message[*offset..]) {
@@ -394,7 +425,19 @@ pub mod manager {
             // hash_function: |data|sha256d::Hash::hash(data)
         };
 
-        let root_quorum_list_valid = !quorums_active || coinbase_transaction.merkle_root_llmq_list == masternode_list.quorum_merkle_root;
+        let mut root_quorum_list_valid = true;
+        if quorums_active {
+            let q_merkle_root = masternode_list.q_merkle_root();
+            let ct_q_merkle_root = coinbase_transaction.merkle_root_mn_list;
+            root_quorum_list_valid = q_merkle_root.is_some() && ct_q_merkle_root == q_merkle_root.unwrap();
+            if !root_quorum_list_valid {
+                println!("Quorum Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
+                         coinbase_transaction.height,
+                         coinbase_transaction.base.version,
+                         coinbase_transaction.merkle_root_llmq_list,
+                         masternode_list.quorum_merkle_root);
+            }
+        }
         let masternode_list = BaseMasternodeList(Some(boxed(masternode_list)));
 
         boxed(Result {

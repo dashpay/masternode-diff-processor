@@ -2,12 +2,10 @@ use std::convert::Into;
 use byte::{BytesExt, LE};
 use byte::ctx::Bytes;
 use hashes::{Hash, sha256d};
-use secrets::traits::AsContiguousBytes;
 use crate::common::llmq_type::LLMQType;
 use crate::consensus::{Decodable, Encodable};
 use crate::consensus::encode::{consensus_encode_with_size, VarInt};
 use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
-// use crate::keys::bls_key::BLSKey;
 
 // #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -24,7 +22,7 @@ pub struct QuorumEntry<'a> {
     pub signers_bitset: &'a [u8],
     pub valid_members_bitset: &'a [u8],
     pub length: usize,
-    pub quorum_entry_hash: sha256d::Hash,
+    pub quorum_entry_hash: UInt256,
     pub verified: bool,
     pub saved: bool,
     pub commitment_hash: Option<sha256d::Hash>,
@@ -88,9 +86,10 @@ impl<'a> QuorumEntry<'a> {
 
 
         let llmq_type: LLMQType = llmq_type.into();
-        let quorum_entry_hash = sha256d::Hash::hash(QuorumEntry::generate_data(
+        let q_data = &QuorumEntry::generate_data(
             version, llmq_type, quorum_hash, signers_count.clone(), &signers_bitset, quorum_public_key,
-            quorum_verification_vector_hash, quorum_threshold_signature, all_commitment_aggregated_signature).as_bytes());
+            quorum_verification_vector_hash, quorum_threshold_signature, all_commitment_aggregated_signature);
+        let quorum_entry_hash = UInt256(sha256d::Hash::hash(q_data).into_inner());
         let length = *offset - data_offset;
         //LLMQType::try_from(llmq_type)
         Some(QuorumEntry {

@@ -3,8 +3,8 @@ use crate::consensus::{Decodable, Encodable};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::UInt256;
 use crate::hashes::{Hash, sha256d};
-use crate::transactions::transaction::{Transaction, TransactionInput, TransactionOutput, TransactionType};
-use crate::transactions::transaction::TransactionType::{Coinbase};
+use crate::transactions::transaction::Transaction;
+use crate::transactions::transaction::TransactionType::Coinbase;
 
 // #[repr(C)]
 // #[derive(Clone)]

@@ -148,7 +148,7 @@ impl<'a> Transaction<'a> {
             *offset += input.index.consensus_encode(&mut buffer).unwrap();
             if subscript_index == u64::MAX && input.signature.is_some() {
                 let signature = input.signature.unwrap();
-                *offset += VarInt(input.index as u64).consensus_encode(&mut buffer).unwrap();
+                *offset += VarInt(signature.len() as u64).consensus_encode(&mut buffer).unwrap();
                 *offset += consensus_encode_with_size(signature, &mut buffer).unwrap()
             } else if subscript_index == i as u64 && input.script.is_some() {
                 let script = input.script.unwrap();

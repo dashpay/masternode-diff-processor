@@ -87,9 +87,10 @@ pub fn data_at_offset_from<'a>(buffer: &'a [u8], offset: &mut usize) -> Result<&
             return byte::Result::Err(byte::Error::Incomplete);
         }
     };
-    let size: usize = var_int.0 as usize + var_int.len();
-    *offset += size;
-    let data: &[u8] = match buffer.read_with(offset, Bytes::Len(size)) {
+    let var_int_value = var_int.0 as usize;
+    let var_int_length = var_int.len();
+    *offset += var_int_length;
+    let data: &[u8] = match buffer.read_with(offset, Bytes::Len(var_int_value)) {
         Ok(data) => data,
         Err(error) => { return byte::Result::Err(error); }
     };
