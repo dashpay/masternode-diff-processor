@@ -74,10 +74,9 @@ impl<'a> TryRead<'a, Endian> for LLMQType {
 }
 
 impl<'a> TryWrite<Endian> for LLMQType {
-    fn try_write(self, bytes: &mut [u8], endian: Endian) -> byte::Result<usize> {
+    fn try_write(self, bytes: &mut [u8], _endian: Endian) -> byte::Result<usize> {
         let orig: u8 = self.into();
         orig.consensus_encode(bytes).unwrap();
-        //bytes.write_with(&mut 0, orig, endian).unwrap();
         Ok(1)
     }
 }

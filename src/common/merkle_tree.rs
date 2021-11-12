@@ -1,16 +1,8 @@
-// use std::sync::{Arc, Mutex};
 use hashes::{sha256d};
 use byte::{BytesExt, LE};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::UInt256;
 use crate::hashes::Hash;
-
-// pub enum MerkleTreeHashFunction {
-//     SHA256_2 = 0,
-//     BLAKE3 = 1,
-// }
-
-// pub type HashFunction<T: hashes::Hash> = fn(data: &[u8]) -> T;
 
 #[inline]
 fn ceil_log2(mut x: i32) -> i32 {
@@ -30,8 +22,6 @@ pub struct MerkleTree<'a> {
     pub tree_element_count: u32,
     pub hashes: &'a [u8],
     pub flags: &'a [u8],
-    // pub hash_function: HashFunction<T>,
-    // pub hash_function: MerkleTreeHashFunction,
 }
 
 impl<'a> MerkleTree<'a> {
@@ -77,24 +67,15 @@ impl<'a> MerkleTree<'a> {
         *flag_idx += 1;
         if !flag || depth == ceil_log2(self.tree_element_count as i32) {
             let off = &mut ((*hash_idx*32) as usize);
-            return if let Ok(hash) = self.hashes.read_with::<UInt256>(off, LE) {
-                leaf(Some(hash), flag)
-            } else {
-                None
+            let hash = match self.hashes.read_with::<UInt256>(off, LE) {
+                Ok(data) => data,
+                Err(_err) => { return None; }
             };
+            *hash_idx += 1;
+            return leaf(Some(hash), flag);
         }
         let left = self.walk_hash_idx(hash_idx, flag_idx, depth + 1, leaf, branch);
         let right = self.walk_hash_idx(hash_idx, flag_idx, depth + 1, leaf, branch);
         branch(left.unwrap(), right)
     }
-
-    /*
-    fn hash(&self, data: &[u8]) -> dyn hashes::Hash {
-        match self.hash_function {
-            MerkleTreeHashFunction::SHA256_2 => sha256d::Hash::hash(data),
-            MerkleTreeHashFunction::BLAKE3 => blake3_wrapper::Hash::hash(data)
-        }
-    }
-    */
-
 }

@@ -1,6 +1,5 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
-use hashes::hex::ToHex;
 use secrets::traits::AsContiguousBytes;
 use crate::common::llmq_type::LLMQType;
 use crate::consensus::Encodable;
@@ -94,22 +93,27 @@ impl<'a> MasternodeList<'a> {
         Some(UInt256(sha256::Hash::hash(buffer.as_bytes()).into_inner()))
     }
 
-    // pub fn provider_tx_ordered_hashes(&self) -> Vec<UInt256> {
-    //     self.masternodes.into_keys().collect()
-    // }
+    pub fn provider_tx_ordered_hashes(&self) -> Vec<UInt256> {
+        let mut pro_tx_hashes: Vec<UInt256> = self.masternodes.clone().into_keys().map(|mut h|h.reversed()).collect();
+        pro_tx_hashes.sort();
+        pro_tx_hashes
+    }
 
     pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<UInt256>> {
-        // let pro_tx_hashes = self.provider_tx_ordered_hashes();
-        // let pro_tx_hashes: Vec<UInt256> = self.masternodes.into_keys().collect();
-        // let block_height = unsafe { block_height_lookup(self.block_hash.0.as_ptr()) };
+        let pro_tx_hashes: Vec<UInt256> = self.provider_tx_ordered_hashes();
         if block_height == u32::MAX {
             println!("Block height lookup queried an unknown block {:?}", self.block_hash);
             None
         } else {
-            Some(self.masternodes
+            let mns = self.masternodes.clone();
+            Some(pro_tx_hashes
                 .clone()
                 .into_iter()
-                .map(|(_, mn)| mn.simplified_masternode_entry_hash_at(block_height))
+                .map(|mut hash| {
+                    let h = hash.reversed();
+                    let mn = &mns[&h];
+                    mn.simplified_masternode_entry_hash_at(block_height)
+                })
                 .collect())
         }
     }
@@ -117,18 +121,13 @@ impl<'a> MasternodeList<'a> {
     pub fn q_merkle_root(&mut self) -> Option<UInt256> {
         if self.quorum_merkle_root.is_none() {
             let mut llmq_commitment_hashes = Vec::new();
-            let c_quorums = self.quorums.clone();
-            for (_q_type, quorums) in c_quorums {
-                for (_q_hash, q_entry) in quorums {
-                    llmq_commitment_hashes.push(q_entry.quorum_entry_hash.clone());
+            let quorums = self.quorums.clone().into_values();
+            for quorums_of_type in quorums {
+                for quorum in quorums_of_type.into_values() {
+                    llmq_commitment_hashes.push(quorum.quorum_entry_hash.clone());
                 }
             }
-            llmq_commitment_hashes.sort_by(|h1, h2| {
-                let h1rev = h1.clone().reversed();
-                let h2rev = h2.clone().reversed();
-                return h1rev.cmp(&h2rev);
-            });
-            let debug_hashes: Vec<String> = llmq_commitment_hashes.clone().into_iter().map(|h|h.0.to_hex()).collect();
+            llmq_commitment_hashes.sort();
             self.quorum_merkle_root = merkle_root_from_hashes(llmq_commitment_hashes);
         }
         self.quorum_merkle_root

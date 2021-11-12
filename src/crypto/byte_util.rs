@@ -3,7 +3,7 @@ use byte::ctx::{Bytes, Endian};
 use std::fmt::Write;
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
 use crate::consensus::encode::{Error, VarInt};
-use crate::hashes::{Hash, sha256d};
+use crate::hashes::{Hash, sha256d, hex::ToHex};
 
 pub trait Data {
     // fn address_from_hash_160_data_for_chain(&self, chain: Chain) -> &str;
@@ -192,9 +192,10 @@ macro_rules! define_bytes_to_big_uint {
         // }
         impl std::fmt::Display for $uint_type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                for ch in &self.0 {
-                    write!(f, "{:02x}", ch)?;
-                }
+                // for ch in &self.0 {
+                //     write!(f, "{:02x}", ch)?;
+                // }
+                write!(f, "{}", self.0.to_hex())?;
                 Ok(())
             }
         }

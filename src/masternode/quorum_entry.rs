@@ -8,7 +8,7 @@ use crate::consensus::encode::{consensus_encode_with_size, VarInt};
 use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
 
 // #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct QuorumEntry<'a> {
     pub version: u16,
     pub quorum_hash: UInt256,
@@ -54,7 +54,6 @@ impl<'a> QuorumEntry<'a> {
         let signers_buffer_length: usize = ((signers_count.0 as usize) + 7) / 8;
         if length - *offset < signers_buffer_length { return None; }
         let signers_bitset: &[u8] = message.read_with(offset, Bytes::Len(signers_buffer_length)).unwrap();
-        //*offset += signers_buffer_length;
 
         let valid_members_count = match VarInt::consensus_decode(&message[*offset..]) {
             Ok(data) => data,
@@ -65,7 +64,6 @@ impl<'a> QuorumEntry<'a> {
         let valid_members_count_buffer_length: usize = ((valid_members_count.0 as usize) + 7) / 8;
         if length - *offset < valid_members_count_buffer_length { return None; }
         let valid_members_bitset: &[u8] = message.read_with(offset, Bytes::Len(valid_members_count_buffer_length)).unwrap();
-        //*offset += valid_members_count_buffer_length;
 
         let quorum_public_key = match message.read_with::<UInt384>(offset, LE) {
             Ok(data) => data,
@@ -147,7 +145,6 @@ impl<'a> QuorumEntry<'a> {
         *offset += quorum_verification_vector_hash.consensus_encode(&mut buffer).unwrap();
         *offset += quorum_threshold_signature.consensus_encode(&mut buffer).unwrap();
         *offset += all_commitment_aggregated_signature.consensus_encode(&mut buffer).unwrap();
-        println!("generate_data: {}", *offset);
         buffer
     }
 
