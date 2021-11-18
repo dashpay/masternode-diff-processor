@@ -1,6 +1,6 @@
 use byte::{BytesExt, LE};
 use hashes::Hash;
-use crate::blockdata::opcodes::all::OP_RETURN;
+//use crate::blockdata::opcodes::all::OP_RETURN;
 use crate::consensus::{Decodable, Encodable};
 use crate::consensus::encode::{consensus_encode_with_size, VarInt};
 use crate::crypto::byte_util::{data_at_offset_from, UInt256};
@@ -9,13 +9,13 @@ use crate::hashes::_export::_core::fmt::Debug;
 use crate::transactions::transaction::TransactionType::Classic;
 
 // estimated size for a typical transaction output
-pub static TX_OUTPUT_SIZE: usize = 34;
+//pub static TX_OUTPUT_SIZE: usize = 34;
 // estimated size for a typical compact pubkey transaction input
-pub static TX_INPUT_SIZE: usize = 148;
+//pub static TX_INPUT_SIZE: usize = 148;
 // standard tx fee per b of tx size
-pub static TX_FEE_PER_B: u64 = 1;
+//pub static TX_FEE_PER_B: u64 = 1;
 // standard ix fee per input
-pub static TX_FEE_PER_INPUT: u64 = 10000;
+//pub static TX_FEE_PER_INPUT: u64 = 10000;
 // block height indicating transaction is unconfirmed
 pub const TX_UNCONFIRMED: i32 = i32::MAX;
 
@@ -110,9 +110,6 @@ pub struct Transaction<'a> {
 }
 
 impl<'a> Transaction<'a> {
-    fn payload_data(&self) -> Vec<u8> {
-        Vec::new()
-    }
 
     pub fn to_data(&self) -> Vec<u8> {
         self.to_data_with_subscript_index(u64::MAX)
@@ -245,8 +242,6 @@ impl<'a> Transaction<'a> {
             Ok(data) => data,
             Err(_err) => { return None; }
         };
-        //let payload_offset = off;
-
         let mut tx = Self {
             inputs,
             outputs,
@@ -265,27 +260,13 @@ impl<'a> Transaction<'a> {
         Some(tx)
     }
 
-    // used in CreditFundingTransaction only
-    /*pub fn accounts(&self) -> Vec<Account> {
-        self.chain.accounts_that_can_contain_transaction(Some(self))
-    }*/
-
-    // used in UI only
-    /*pub fn confirmations(&self) -> u32 {
-        if self.block_height != TX_UNCONFIRMED {
-            self.chain.last_terminal_block_height - self.block_height
-        } else {
-            0
-        }
-    }*/
-
-    // used in CreditFundingTransaction only
-    /*pub fn first_account(&self) -> Option<Account> {
-        self.chain.first_account_that_can_contain_transaction(Some(self))
-    }*/
-
     // unused at this moment
-    /*pub fn input_addresses(&self) -> Vec<&str> {
+    /*
+    fn payload_data(&self) -> Vec<u8> {
+        Vec::new()
+    }
+
+    pub fn input_addresses(&self) -> Vec<&str> {
          self.inputs
              .iter()
              .map(|i| if let Some(script) = i.script {
@@ -301,11 +282,10 @@ impl<'a> Transaction<'a> {
             .iter()
             .map(|o| *o.address)
             .collect()
-    }*/
+    }
 
     // size in bytes if signed, or estimated size assuming compact pubkey sigs
     pub fn size(&self) -> usize {
-        // size in bytes if signed, or estimated size assuming compact pubkey sigs
         if self.tx_hash.is_some() {
             return self.to_data().len();
         }
@@ -322,8 +302,6 @@ impl<'a> Transaction<'a> {
     pub fn standard_instant_fee(&self) -> u64 {
         TX_FEE_PER_INPUT * self.inputs.len() as u64
     }
-
-
 
     // checks if all signatures exist, but does not verify them
     pub fn is_signed(&self) -> bool {
@@ -347,18 +325,14 @@ impl<'a> Transaction<'a> {
     pub fn is_credit_funding_transaction(&self) -> bool {
         for output in &self.outputs {
             if let Some(script) = output.script {
-                let code = match script.read_with::<u8>(&mut 0, LE) {
-                    Ok(data) => data,
-                    Err(_err) => { continue; }
+                if let Ok(code) = script.read_with::<u8>(&mut 0, LE) {
+                    if code == OP_RETURN.into_u8() &&
+                        script.len() == 22 {
+                        return true;
+                    }
                 };
-                if code == OP_RETURN.into_u8() &&
-                    script.len() == 22 {
-                    return true;
-                }
             }
         }
         false
-    }
-
-
+    }*/
 }

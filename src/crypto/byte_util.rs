@@ -3,7 +3,7 @@ use byte::ctx::{Bytes, Endian};
 use std::fmt::Write;
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
 use crate::consensus::encode::{Error, VarInt};
-use crate::hashes::{Hash, sha256d, hex::ToHex};
+use crate::hashes::{Hash, sha256d, hex::{FromHex, ToHex}, hex};
 
 pub trait Data {
     // fn address_from_hash_160_data_for_chain(&self, chain: Chain) -> &str;
@@ -150,17 +150,30 @@ pub trait Reversable {
     fn reversed(&mut self) -> Self;
 }
 
+/*#[repr(C)] #[derive(Copy, Clone, Ord)]
+pub union UInt128 { u8: [u8; 16], u16: [u16; 8], u32: [u32; 4], u64: [u64; 2] }
+#[repr(C)] #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub union UInt160 { u8: [u8; 20], u16: [u16; 10], u32: [u32; 5] }
+#[repr(C)] #[derive(Copy, Clone)]
+pub union UInt256 { u8: [u8; 32], u16: [u16; 16], u32: [u32; 8], u64: [u64; 4] }
+#[repr(C)] #[derive(Copy, Clone)]
+pub union UInt384 { u8: [u8; 48], u16: [u16; 24], u32: [u32; 12], u64: [u64; 6] }
+#[repr(C)] #[derive(Copy, Clone)]
+pub union UInt768 { u8: [u8; 96], u16: [u16; 48], u32: [u32; 24], u64: [u64; 12] }
+#[repr(C)] #[derive(Copy, Clone)]
+pub struct MNPayload { u8: [u8; MN_ENTRY_PAYLOAD_LENGTH] }*/
+
+
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct UInt128(pub [u8; 16]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct UInt160(pub [u8; 20]);
-#[repr(C)]
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
+#[repr(C)] #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub struct UInt256(pub [u8; 32]);
-#[repr(C)]
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[repr(C)] #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct UInt384(pub [u8; 48]);
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[repr(C)] #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct UInt768(pub [u8; 96]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct MNPayload(pub [u8; MN_ENTRY_PAYLOAD_LENGTH]);
@@ -182,27 +195,10 @@ macro_rules! define_bytes_to_big_uint {
                 Ok(($uint_type(data), $byte_len))
             }
         }
-        // impl<'a> TryWrite<Endian> for $uint_type {
-        //     fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize> {
-        //         match bytes.write_with(&mut 0, self, endian) {
-        //             Ok(_data) => Ok($byte_len),
-        //             Err(_err) => Err(_err)
-        //         }
-        //     }
-        // }
         impl std::fmt::Display for $uint_type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                // for ch in &self.0 {
-                //     write!(f, "{:02x}", ch)?;
-                // }
                 write!(f, "{}", self.0.to_hex())?;
                 Ok(())
-            }
-        }
-        impl Reversable for $uint_type {
-            fn reversed(&mut self) -> Self {
-                self.0.reverse();
-                *self
             }
         }
         impl Encodable for $uint_type {
@@ -219,6 +215,29 @@ macro_rules! define_bytes_to_big_uint {
                 let mut ret = [0; $byte_len];
                 d.read_slice(&mut ret)?;
                 Ok($uint_type(ret))
+            }
+        }
+
+        impl Reversable for $uint_type {
+            fn reversed(&mut self) -> Self {
+                self.0.reverse();
+                *self
+            }
+        }
+        impl FromHex for $uint_type {
+            fn from_byte_iter<I>(iter: I) -> std::result::Result<Self, hex::Error>
+                where I: Iterator<Item=std::result::Result<u8, hashes::hex::Error>> +
+                ExactSizeIterator +
+                DoubleEndedIterator {
+                if iter.len() == $byte_len {
+                    let mut ret = [0; $byte_len];
+                    for (n, byte) in iter.enumerate() {
+                        ret[n] = byte?;
+                    }
+                    Ok($uint_type(ret))
+                } else {
+                    Err(hex::Error::InvalidLength(2 * $byte_len, 2 * iter.len()))
+                }
             }
         }
     }

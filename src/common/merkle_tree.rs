@@ -49,7 +49,9 @@ impl<'a> MerkleTree<'a> {
                 let mut buffer: Vec<u8> = vec![0u8; 64];
                 left.consensus_encode(&mut buffer).unwrap();
                 if right.is_none() { left.clone() } else { right.unwrap() }.consensus_encode(&mut buffer).unwrap();
-                Some(UInt256(sha256d::Hash::hash(&buffer).into_inner()))
+                let hash = sha256d::Hash::hash(&buffer);
+                let value = hash.into_inner();
+                Some(UInt256(value))
             })
     }
 

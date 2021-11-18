@@ -25,13 +25,14 @@ pub struct QuorumEntry<'a> {
     pub quorum_entry_hash: UInt256,
     pub verified: bool,
     pub saved: bool,
-    pub commitment_hash: Option<sha256d::Hash>,
+    pub commitment_hash: Option<UInt256>,
 }
 
 impl<'a> QuorumEntry<'a> {
     pub fn new(message: &'a [u8], data_offset: usize) -> Option<Self> {
         let length = message.len();
         let offset = &mut data_offset.clone();
+
         let version = match message.read_with::<u16>(offset, LE) {
             Ok(data) => data,
             _ => { return None; }
@@ -179,10 +180,9 @@ impl<'a> QuorumEntry<'a> {
         buffer
     }
 
-    pub fn commitment_hash(&mut self) -> sha256d::Hash {
-        if self.commitment_hash.is_none() ||
-            self.commitment_hash.unwrap().is_empty() {
-            self.commitment_hash = Some(sha256d::Hash::hash(&self.commitment_data()));
+    pub fn commitment_hash(&mut self) -> UInt256 {
+        if self.commitment_hash.is_none() {
+            self.commitment_hash = Some(UInt256(sha256d::Hash::hash(&self.commitment_data()).into_inner()));
         }
         self.commitment_hash.unwrap()
     }
@@ -232,6 +232,7 @@ impl<'a> QuorumEntry<'a> {
         true
     }
 
+    // This validation moved into external lib with bls
     // The quorumSig must validate against the quorumPublicKey and the commitmentHash. As this is a recovered threshold signature, normal signature verification can be performed, without the need of the full quorum verification vector. The commitmentHash is calculated in the same way as in the commitment phase.
     /*pub fn validate_signatures(&mut self) -> bool {
         let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(self.commitment_hash(), self.all_commitment_aggregated_signature, public_keys);

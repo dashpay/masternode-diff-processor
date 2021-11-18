@@ -1,6 +1,5 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
-use secrets::traits::AsContiguousBytes;
 use crate::common::llmq_type::LLMQType;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{merkle_root_from_hashes, Reversable, UInt256};
@@ -12,7 +11,7 @@ use crate::masternode::masternode_entry::MasternodeEntry;
 #[derive(Clone)]
 pub struct MasternodeList<'a> {
     pub block_hash: UInt256,
-    pub known_height: Option<u32>,
+    pub known_height: u32,
     pub masternode_merkle_root: Option<UInt256>,
     pub quorum_merkle_root: Option<UInt256>,
     pub masternodes: BTreeMap<UInt256, MasternodeEntry>,
@@ -26,14 +25,18 @@ impl<'a> MasternodeList<'a> {
         block_hash: UInt256,
         block_height: u32
     ) -> Self {
-        Self {
+        let mut list = Self {
             quorums,
             block_hash,
-            known_height: Some(block_height),
+            known_height: block_height,
             masternode_merkle_root: None,
             quorum_merkle_root: None,
             masternodes,
+        };
+        if let Some(hashes) = list.hashes_for_merkle_root(block_height) {
+            list.masternode_merkle_root = merkle_root_from_hashes(hashes);
         }
+        list
     }
 
     pub fn quorums_count(&self) -> u64 {
@@ -90,7 +93,7 @@ impl<'a> MasternodeList<'a> {
             hash.consensus_encode(&mut buffer).unwrap();
         }
         modifier.consensus_encode(&mut buffer).unwrap();
-        Some(UInt256(sha256::Hash::hash(buffer.as_bytes()).into_inner()))
+        Some(UInt256(sha256::Hash::hash(&buffer).into_inner()))
     }
 
     pub fn provider_tx_ordered_hashes(&self) -> Vec<UInt256> {
@@ -118,13 +121,13 @@ impl<'a> MasternodeList<'a> {
         }
     }
 
-    pub fn q_merkle_root(&mut self) -> Option<UInt256> {
+    pub fn quorum_merkle_root(&mut self) -> Option<UInt256> {
         if self.quorum_merkle_root.is_none() {
             let mut llmq_commitment_hashes = Vec::new();
             let quorums = self.quorums.clone().into_values();
             for quorums_of_type in quorums {
-                for quorum in quorums_of_type.into_values() {
-                    llmq_commitment_hashes.push(quorum.quorum_entry_hash.clone());
+                for QuorumEntry { quorum_entry_hash, .. } in quorums_of_type.into_values() {
+                    llmq_commitment_hashes.push(quorum_entry_hash);
                 }
             }
             llmq_commitment_hashes.sort();

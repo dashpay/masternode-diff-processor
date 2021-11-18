@@ -2,7 +2,6 @@ use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashMap};
 use std::time::SystemTime;
 use byte::{BytesExt, LE};
-use secrets::traits::AsContiguousBytes;
 use crate::common::block_data::BlockData;
 use crate::common::socket_address::SocketAddress;
 use crate::consensus::Encodable;
@@ -105,12 +104,10 @@ impl MasternodeEntry {
         }
         let mut min_distance = u32::MAX;
         let mut is_valid = self.is_valid;
-        for (previous_block, validity) in self.previous_validity.clone() {
-            let previous_block_height = previous_block.height;
-            let distance = previous_block_height - block_height;
+        for (BlockData { height, .. }, validity) in self.previous_validity.clone() {
+            let distance = height - block_height;
             if (1..min_distance).contains(&distance) {
                 min_distance = distance;
-                println!("Validity for proTxHash {} : Using {} instead of {} for list at block height {} (previousBlock.height {})", self.provider_registration_transaction_hash, self.previous_validity[previous_block.borrow()], is_valid, block_height, previous_block_height);
                 is_valid = validity;
             }
         }
@@ -150,11 +147,6 @@ impl MasternodeEntry {
                 .filter(|(block, _)| block.height < self.update_height)
                 .collect();
 
-            /*for (block, validity) in masternode_entry.previous_validity {
-                if block.height < self.update_height {
-                    self.previous_validity.insert(block, validity);
-                }
-            }*/
             if masternode_entry.is_valid_at(self.update_height) != self.is_valid {
                 println!("Changed validity from {} to {} on {:?}", masternode_entry.is_valid, self.is_valid, self.provider_registration_transaction_hash);
                 self.previous_validity.insert(b, masternode_entry.is_valid);
@@ -210,8 +202,8 @@ impl MasternodeEntry {
         // let hashes: HashMap<(u32, [u8; 32]), [u8; 32]> = self.previous_simplified_masternode_entry_hashes.clone();
         let mut min_distance = u32::MAX;
         let mut used_hash = self.simplified_masternode_entry_hash;
-        for (block, hash) in hashes {
-            let distance = block.height - block_height;
+        for (BlockData { height, .. }, hash) in hashes {
+            let distance = height - block_height;
             if (1..min_distance).contains(&distance) {
                 min_distance = distance;
                 used_hash = hash;
@@ -227,7 +219,7 @@ impl MasternodeEntry {
 
     pub fn new(message: MNPayload, block_height: u32) -> Option<MasternodeEntry> {
         // let length = message.len();
-        let message = message.0.as_bytes();
+        let message = message.0;
         let offset = &mut 0;
         let provider_registration_transaction_hash = match message.read_with::<UInt256>(offset, LE) {
             Ok(data) => data,
