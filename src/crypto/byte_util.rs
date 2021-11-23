@@ -6,43 +6,11 @@ use crate::consensus::encode::{Error, VarInt};
 use crate::hashes::{Hash, sha256d, hex::{FromHex, ToHex}, hex};
 
 pub trait Data {
-    // fn address_from_hash_160_data_for_chain(&self, chain: Chain) -> &str;
-    // fn base_58_check(&self) -> &str;
-    // fn base_58_string(&self) -> &str;
     fn bit_is_true_at_le_index(&self, index: u32) -> bool;
-    // fn data_at_offset_from<'a>(&self, offset: &mut usize) -> Result<&'a [u8]>;
     fn true_bits_count(&self) -> u64;
 }
 
 impl Data for [u8] {
-    /*fn address_from_hash_160_data_for_chain(&self, chain: Chain) -> &str {
-        assert!(self.len(), 20);
-        //if self.len() != 20 { None }
-        const BUFFER_LENGTH: usize = 1 + self.len() + 4;
-        let mut buf = [0u8; BUFFER_LENGTH];
-        let offset: &mut usize = &mut 0;
-        let v: u8 = if chain.is_main_net() { DASH_PUBKEY_ADDRESS } else { DASH_PUBKEY_ADDRESS_TEST };
-        buf.write(offset, v);
-        buf.write(offset, self);
-        buf.write(offset, sha256_2(&buf) as u32);
-        buf.base_58_string()
-    }
-
-    fn base_58_check(&self) -> &str {
-        let mut v = Vec::with_capacity(self.len() + 4);
-        Secret::random();
-        const LENGTH: usize = self.len() + 4;
-        Secret::<&[u8]>::random(|mut buf | {
-            let offset: &mut usize = &mut 0;
-            buf.write(offset, &self);
-            buf.write(offset, sha256d::Hash::hash(&buf) as u32);
-            buf.base_58_string()
-        })
-    }
-
-    fn base_58_string(&self) -> &str {
-        &encode_slice(&self)
-    }*/
 
     fn bit_is_true_at_le_index(&self, index: u32) -> bool {
         let offset = &mut ((index / 8) as usize);

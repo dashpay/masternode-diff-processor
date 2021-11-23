@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
 pub extern crate bitcoin_hashes as hashes;
 pub extern crate secp256k1;
 
@@ -18,257 +20,235 @@ mod util;
 mod blockdata;
 mod network;
 mod hash_types;
+mod wrapped_types;
 
-pub mod manager {
-    use std::{mem, slice};
-    use std::collections::{BTreeMap, HashMap, HashSet};
-    use byte::*;
-    use hashes::hex::ToHex;
+use std::{mem, slice};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::ffi::c_void;
+use byte::*;
+use hashes::hex::ToHex;
+use crate::common::llmq_type::LLMQType;
+use crate::common::merkle_tree::MerkleTree;
+use crate::consensus::Decodable;
+use crate::consensus::encode::VarInt;
+use crate::crypto::byte_util::{Data, MNPayload, Reversable, UInt256};
+use crate::crypto::data_ops::inplace_intersection;
+use crate::hashes::hex::FromHex;
+use crate::masternode::masternode_list::MasternodeList;
+use crate::masternode::quorum_entry::QuorumEntry;
+use crate::masternode::masternode_entry::{MasternodeEntry};
+use crate::transactions::coinbase_transaction::CoinbaseTransaction;
+use crate::wrapped_types::{AddInsightBlockingLookup, BlockHeightLookup, MasternodeListExt, MasternodeListLookup, MndiffResult, QuorumValidationData, ShouldProcessQuorumTypeCallback, ValidateQuorumCallback};
+use crate::wrapped_types::wrapper::{boxed, unwrap_masternode_list_ext, wrap_masternode_list, wrap_masternodes_map, wrap_quorums_map};
 
-    use crate::common::llmq_type::LLMQType;
-    use crate::common::merkle_tree::{MerkleTree};
-    use crate::consensus::Decodable;
-    use crate::consensus::encode::VarInt;
-    use crate::crypto::byte_util::{Data, MNPayload, Reversable, UInt256, UInt384};
-    use crate::crypto::data_ops::inplace_intersection;
-    use crate::masternode::masternode_list::MasternodeList;
-    use crate::masternode::quorum_entry::QuorumEntry;
-    use crate::masternode::masternode_entry::{MasternodeEntry};
-    use crate::transactions::coinbase_transaction::CoinbaseTransaction;
+fn failure<'a>() -> *mut MndiffResult {
+    boxed(MndiffResult::default())
+}
 
+#[no_mangle]
+pub unsafe extern "C" fn test_bhl2(callback: BlockHeightLookup, context: *mut c_void) {
+    let h = "2dca894a2b5af0bf82abf0cfba978555f41a669278b6e91ca14c0593beaf2200";
+    let block_hash = Vec::from_hex(h)
+        .unwrap()
+        .read_with::<UInt256>(&mut 0, byte::LE)
+        .unwrap();
+    println!("test_bhl: {}", block_hash);
+    let result = callback(boxed(block_hash.0), context);
+    mem::forget(callback);
+    println!("test_bhl.result: {}", result);
+}
 
-    #[repr(C)]
-    #[derive(Debug)]
-    pub struct Result<'a> {
-        pub found_coinbase: bool, //1 byte
-        pub valid_coinbase: bool, //1 byte
-        pub root_mn_list_valid: bool, //1 byte
-        pub root_quorum_list_valid: bool, //1 byte
-        pub valid_quorums: bool, //1 byte
-        pub masternode_list: BaseMasternodeList,
-        pub added_masternodes: Option<*mut BTreeMap<UInt256, MasternodeEntry>>,
-        pub modified_masternodes: Option<*mut BTreeMap<UInt256, MasternodeEntry>>,
-        pub added_quorums: Option<*mut HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>>,
-        pub needed_masternode_lists: Option<*mut HashSet<UInt256>>,
+#[no_mangle]
+pub extern "C" fn process_diff(
+    c_array: *const u8,
+    length: usize,
+    base_masternode_list: *mut MasternodeListExt,
+    masternode_list_lookup: MasternodeListLookup,
+    merkle_root: *const u8,
+    use_insight_as_backup: bool,
+    add_insight_lookup: AddInsightBlockingLookup,
+    should_process_quorum_of_type: ShouldProcessQuorumTypeCallback,
+    validate_quorum_callback: ValidateQuorumCallback,
+    block_height_lookup: BlockHeightLookup,
+    context: *mut c_void, // External Masternode Manager
+) -> *mut MndiffResult {
+    let message: &[u8] = unsafe { slice::from_raw_parts(c_array, length as usize) };
+    let merkle_root_bytes = unsafe { slice::from_raw_parts(merkle_root, 32) };
+    let base_masternode_list = unsafe { unwrap_masternode_list_ext(base_masternode_list) };
+    let desired_merkle_root = match merkle_root_bytes.read_with::<UInt256>(&mut 0, LE) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    let offset = &mut 0;
+    let _base_block_hash = match message.read_with::<UInt256>(offset, LE) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    let _base_block_hash_hex = _base_block_hash.0.to_hex();
+
+    let block_hash = match message.read_with::<UInt256>(offset, LE) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    let _block_hash_hex = block_hash.0.to_hex();
+    let block_height = unsafe { block_height_lookup(boxed(block_hash.0), context) };
+    let total_transactions = match message.read_with::<u32>(offset, LE) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    let merkle_hash_var_int = match VarInt::consensus_decode(&message[*offset..]) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    let merkle_hash_count_length = merkle_hash_var_int.len();
+    *offset += merkle_hash_count_length;
+    let merkle_hashes_count = (merkle_hash_var_int.0 as usize) * 32;
+    let merkle_hashes = &message[*offset..*offset + merkle_hashes_count];
+    *offset += merkle_hashes_count;
+    let merkle_flag_var_int = match VarInt::consensus_decode(&message[*offset..]) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    let merkle_flag_count_length = merkle_flag_var_int.len();
+    *offset += merkle_flag_count_length;
+
+    let merkle_flag_count = merkle_flag_var_int.0 as usize;
+    let merkle_flags = &message[*offset..*offset + merkle_flag_count];
+    *offset += merkle_flag_count;
+
+    let coinbase_transaction = CoinbaseTransaction::new(&message[*offset..]);
+
+    if coinbase_transaction.is_none() { return failure(); }
+    let coinbase_transaction = coinbase_transaction.unwrap();
+
+    let _block_hash_hex = block_hash.0.to_hex();
+    let _coinbase_tx_hash = coinbase_transaction.base.tx_hash.unwrap().0.to_hex();
+
+    *offset += coinbase_transaction.base.payload_offset;
+    if length - *offset < 1 { return failure(); }
+    let deleted_masternode_var_int = match VarInt::consensus_decode(&message[*offset..]) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    *offset += deleted_masternode_var_int.len();
+    let deleted_masternode_count = deleted_masternode_var_int.0.clone();
+    let mut deleted_masternode_hashes: Vec<UInt256> = Vec::new();
+    for _i in 0..deleted_masternode_count {
+        deleted_masternode_hashes.push(match message.read_with::<UInt256>(offset, LE) {
+            Ok(data) => data,
+            Err(_err) => { return failure(); }
+        });
     }
-
-    pub type BlockHeightLookup = unsafe extern "C" fn(block_hash: *const u8) -> u32;
-    pub type MasternodeListLookup = unsafe extern "C" fn(block_hash: *const u8) -> BaseMasternodeList;
-    pub type AddInsightBlockingLookup = unsafe extern "C" fn(block_hash: *const u8) -> bool;
-    pub type ShouldProcessQuorumTypeCallback = unsafe extern "C" fn(quorum_type: LLMQType) -> bool;
-    pub type ValidateOperatorCallback = unsafe extern "C" fn(public_key_signatures: Vec<UInt384>) -> bool;
-    pub type ValidateQuorumCallback = unsafe extern "C" fn(
-        items: *mut *mut [u8; 48], // 8 bytes
-        count: usize, // sizeof(pointer)
-        commitment_hash: *const u8, // *mut [u8; 32],
-        all_commitment_aggregated_signature: *const u8, //*mut [u8; 96],
-        quorum_threshold_signature: *const u8, //*mut [u8; 96],
-        quorum_public_key: *const u8, //*mut [u8; 48]
-    ) -> bool;
-
-    #[repr(C)] #[derive(Debug)]
-    pub struct BaseMasternodeList(pub Option<*mut MasternodeList<'static>>);
-
-    fn boxed<T>(obj: T) -> *mut T { Box::into_raw(Box::new(obj)) }
-
-    fn failure<'a>() -> *mut Result<'a> {
-        boxed(Result {
-            found_coinbase: false,
-            valid_coinbase: false,
-            root_mn_list_valid: false,
-            root_quorum_list_valid: false,
-            valid_quorums: false,
-            masternode_list: BaseMasternodeList(None),
-            added_masternodes: None,
-            modified_masternodes: None,
-            added_quorums: None,
-            needed_masternode_lists: None,
-        })
-    }
-
-    #[no_mangle]
-    pub extern fn process_diff(
-        c_array: *const u8,
-        length: usize,
-        base_masternode_list: BaseMasternodeList,
-        masternode_list_lookup: MasternodeListLookup,
-        merkle_root: *const u8,
-        use_insight_lookup: AddInsightBlockingLookup,
-        should_process_quorum_of_type: ShouldProcessQuorumTypeCallback,
-        validate_quorum_callback: ValidateQuorumCallback,
-        block_height_lookup: BlockHeightLookup
-    ) -> *mut Result<'static> {
-        let message: &[u8] = unsafe { slice::from_raw_parts(c_array, length as usize) };
-        let merkle_root_bytes = unsafe { slice::from_raw_parts(merkle_root, 32) };
-        let desired_merkle_root = match merkle_root_bytes.read_with::<UInt256>(&mut 0, LE) {
-            Ok(data) => data,
-            Err(_err) => { return failure(); }
-        };
-        let offset = &mut 0;
-        let _base_block_hash = match message.read_with::<UInt256>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return failure(); }
-        };
-        let _base_block_hash_hex = _base_block_hash.0.to_hex();
-
-        let block_hash = match message.read_with::<UInt256>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return failure(); }
-        };
-        let _block_hash_hex = block_hash.0.to_hex();
-        let block_height = unsafe { block_height_lookup(block_hash.0.as_ptr()) };
-        let total_transactions = match message.read_with::<u32>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return failure(); }
-        };
-        let merkle_hash_var_int = match VarInt::consensus_decode(&message[*offset..]) {
-            Ok(data) => data,
-            Err(_err) => { return failure(); }
-        };
-        let merkle_hash_count_length = merkle_hash_var_int.len();
-        *offset += merkle_hash_count_length;
-        let merkle_hashes_count = (merkle_hash_var_int.0 as usize) * 32;
-        let merkle_hashes = &message[*offset..*offset + merkle_hashes_count];
-        *offset += merkle_hashes_count;
-        let merkle_flag_var_int = match VarInt::consensus_decode(&message[*offset..]) {
-            Ok(data) => data,
-            Err(_err) => { return failure(); }
-        };
-        let merkle_flag_count_length = merkle_flag_var_int.len();
-        *offset += merkle_flag_count_length;
-
-        let merkle_flag_count = merkle_flag_var_int.0 as usize;
-        let merkle_flags = &message[*offset..*offset + merkle_flag_count];
-        *offset += merkle_flag_count;
-
-        let coinbase_transaction = CoinbaseTransaction::new(&message[*offset..]);
-
-        if coinbase_transaction.is_none() { return failure(); }
-        let coinbase_transaction = coinbase_transaction.unwrap();
-
-        let _block_hash_hex = block_hash.0.to_hex();
-        let _coinbase_tx_hash = coinbase_transaction.base.tx_hash.unwrap().0.to_hex();
-
-        *offset += coinbase_transaction.base.payload_offset;
-        if length - *offset < 1 { return failure(); }
-        let deleted_masternode_var_int = match VarInt::consensus_decode(&message[*offset..]) {
-            Ok(data) => data,
-            Err(_err) => { return failure(); }
-        };
-        *offset += deleted_masternode_var_int.len();
-        let deleted_masternode_count = deleted_masternode_var_int.0.clone();
-        let mut deleted_masternode_hashes: Vec<UInt256> = Vec::new();
-        for _i in 0..deleted_masternode_count {
-            deleted_masternode_hashes.push(match message.read_with::<UInt256>(offset, LE) {
-                Ok(data) => data,
-                Err(_err) => { return failure(); }
-            });
-        }
-        let added_masternode_var_int = match VarInt::consensus_decode(&message[*offset..]) {
-            Ok(data) => data,
-            Err(_err) => { return failure(); }
-        };
-        *offset += added_masternode_var_int.len();
-        let added_masternode_count = added_masternode_var_int.0.clone();
-        let added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = (0..added_masternode_count)
-            .into_iter()
-            .map(|_i| message.read_with::<MNPayload>(offset, LE))
-            .filter(|payload| payload.is_ok())
-            .map(|payload| MasternodeEntry::new(payload.unwrap(), block_height))
-            .filter(|entry| entry.is_some())
-            .fold(BTreeMap::new(),|mut acc, entry| {
-                let mut mn_entry = entry.unwrap();
-                acc.insert(mn_entry.provider_registration_transaction_hash.reversed(), mn_entry);
-                acc
-            });
-        let mut added_masternodes = added_or_modified_masternodes.clone();
-        let mut modified_masternode_keys: HashSet<UInt256> = HashSet::new();
-        let (has_old, old_masternodes, old_quorums) = if base_masternode_list.0.is_some() {
-            let list = unsafe { Box::from_raw(base_masternode_list.0.unwrap()) };
+    let added_masternode_var_int = match VarInt::consensus_decode(&message[*offset..]) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    *offset += added_masternode_var_int.len();
+    let added_masternode_count = added_masternode_var_int.0.clone();
+    let added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = (0..added_masternode_count)
+        .into_iter()
+        .map(|_i| message.read_with::<MNPayload>(offset, LE))
+        .filter(|payload| payload.is_ok())
+        .map(|payload| MasternodeEntry::new(payload.unwrap(), block_height))
+        .filter(|entry| entry.is_some())
+        .fold(BTreeMap::new(),|mut acc, entry| {
+            let mut mn_entry = entry.unwrap();
+            acc.insert(mn_entry.provider_registration_transaction_hash.reversed(), mn_entry);
+            acc
+        });
+    let mut added_masternodes = added_or_modified_masternodes.clone();
+    let mut modified_masternode_keys: HashSet<UInt256> = HashSet::new();
+    let (has_old, old_masternodes, old_quorums) =
+        if base_masternode_list.is_some() {
+            let list = base_masternode_list.unwrap();
             (true, list.masternodes, list.quorums)
         } else {
             (false, BTreeMap::new(), HashMap::new())
         };
-        if has_old {
-            let base_masternodes = old_masternodes.clone();
-            base_masternodes
-                .iter()
-                .for_each(|(h, _e)| { added_masternodes.remove(h); });
+    if has_old {
+        let base_masternodes = old_masternodes.clone();
+        base_masternodes
+            .iter()
+            .for_each(|(h, _e)| { added_masternodes.remove(h); });
 
-           let mut new_mn_keys: HashSet<UInt256> = added_or_modified_masternodes
-               .clone()
-               .keys()
-               .cloned()
-               .collect();
-            let mut old_mn_keys: HashSet<UInt256> = base_masternodes
-                .keys()
-                .cloned()
-                .collect();
-            modified_masternode_keys = inplace_intersection(&mut new_mn_keys, &mut old_mn_keys);
-        }
-
-        let modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = modified_masternode_keys
+        let mut new_mn_keys: HashSet<UInt256> = added_or_modified_masternodes
             .clone()
-            .into_iter()
-            .fold(BTreeMap::new(), |mut acc, hash| {
-                acc.insert(hash, added_or_modified_masternodes[&hash].clone());
-                acc
+            .keys()
+            .cloned()
+            .collect();
+        let mut old_mn_keys: HashSet<UInt256> = base_masternodes
+            .keys()
+            .cloned()
+            .collect();
+        modified_masternode_keys = inplace_intersection(&mut new_mn_keys, &mut old_mn_keys);
+    }
+
+    let modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = modified_masternode_keys
+        .clone()
+        .into_iter()
+        .fold(BTreeMap::new(), |mut acc, hash| {
+            acc.insert(hash, added_or_modified_masternodes[&hash].clone());
+            acc
         });
 
-        let mut deleted_quorums: HashMap<LLMQType, Vec<UInt256>> = HashMap::new();
-        let mut added_quorums: HashMap<LLMQType, HashMap<UInt256, QuorumEntry>> = HashMap::new();
+    let mut deleted_quorums: HashMap<LLMQType, Vec<UInt256>> = HashMap::new();
+    let mut added_quorums: HashMap<LLMQType, HashMap<UInt256, QuorumEntry>> = HashMap::new();
 
-        let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
-        let mut valid_quorums = true;
-        let mut needed_masternode_lists: HashSet<UInt256> = HashSet::new();
+    let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
+    let mut valid_quorums = true;
+    let mut needed_masternode_lists: HashSet<UInt256> = HashSet::new();
 
-        if quorums_active {
-            // deleted quorums
-            if length - *offset < 1 { return failure(); }
-            let deleted_quorums_var_int = match VarInt::consensus_decode(&message[*offset..]) {
+    if quorums_active {
+        // deleted quorums
+        if length - *offset < 1 { return failure(); }
+        let deleted_quorums_var_int = match VarInt::consensus_decode(&message[*offset..]) {
+            Ok(data) => data,
+            Err(_err) => { return failure(); }
+        };
+        *offset += deleted_quorums_var_int.len();
+        let deleted_quorums_count = deleted_quorums_var_int.0.clone();
+        for _i in 0..deleted_quorums_count {
+            let llmq_type = match message.read_with::<LLMQType>(offset, LE) {
                 Ok(data) => data,
                 Err(_err) => { return failure(); }
             };
-            *offset += deleted_quorums_var_int.len();
-            let deleted_quorums_count = deleted_quorums_var_int.0.clone();
-            for _i in 0..deleted_quorums_count {
-                let llmq_type = match message.read_with::<LLMQType>(offset, LE) {
-                    Ok(data) => data,
-                    Err(_err) => { return failure(); }
-                };
-                let llmq_hash = match message.read_with::<UInt256>(offset, LE) {
-                    Ok(data) => data,
-                    Err(_err) => { return failure(); }
-                };
-                if deleted_quorums.contains_key(&llmq_type) {
-                    deleted_quorums.get_mut(&llmq_type).unwrap().push(llmq_hash);
-                } else {
-                    deleted_quorums.insert(llmq_type, vec![llmq_hash]);
-                }
+            let llmq_hash = match message.read_with::<UInt256>(offset, LE) {
+                Ok(data) => data,
+                Err(_err) => { return failure(); }
+            };
+            if deleted_quorums.contains_key(&llmq_type) {
+                deleted_quorums.get_mut(&llmq_type).unwrap().push(llmq_hash);
+            } else {
+                deleted_quorums.insert(llmq_type, vec![llmq_hash]);
             }
+        }
 
-            // added quorums
-            if length - *offset < 1 { return failure(); }
-            let added_quorums_var_int = match VarInt::consensus_decode(&message[*offset..]) {
-                Ok(data) => data,
-                Err(_err) => { return failure(); }
-            };
-            *offset += added_quorums_var_int.len();
-            let added_quorums_count = added_quorums_var_int.0.clone();
-            for _i in 0..added_quorums_count {
-                if let Some(mut quorum_entry) = QuorumEntry::new(message, *offset) {
-                    *offset += quorum_entry.length;
-                    let entry_quorum_hash = quorum_entry.quorum_hash;
-                    let llmq_type = quorum_entry.llmq_type;
-                    if unsafe { should_process_quorum_of_type(llmq_type) } {
-                        let bmn_list = unsafe { masternode_list_lookup(entry_quorum_hash.0.as_ptr()) };
-                        if let Some(quorum_mn_list) = bmn_list.0 {
+        // added quorums
+        if length - *offset < 1 { return failure(); }
+        let added_quorums_var_int = match VarInt::consensus_decode(&message[*offset..]) {
+            Ok(data) => data,
+            Err(_err) => { return failure(); }
+        };
+        *offset += added_quorums_var_int.len();
+        let added_quorums_count = added_quorums_var_int.0.clone();
+        for _i in 0..added_quorums_count {
+            if let Some(mut quorum_entry) = QuorumEntry::new(message, *offset) {
+                *offset += quorum_entry.length;
+                let entry_quorum_hash = quorum_entry.quorum_hash;
+                let llmq_type = quorum_entry.llmq_type;
+                unsafe {
+                    if should_process_quorum_of_type(llmq_type.into(), context) {
+                        let lookup_result = masternode_list_lookup(boxed(entry_quorum_hash.0), context);
+                        let quorum_masternode_list = unwrap_masternode_list_ext(lookup_result);
+                        if quorum_masternode_list.is_some() {
+                            let quorum_masternode_list = quorum_masternode_list.unwrap();
+                            //let quorum_masternode_list = unsafe { Box::from_raw(bmn_list.list) };
                             let is_valid_payload = quorum_entry.validate_payload();
-                            let quorum_masternode_list = unsafe { Box::from_raw(quorum_mn_list) };
-                            let block_height: u32 = unsafe { block_height_lookup(quorum_masternode_list.block_hash.0.as_ptr()) };
+                            let block_height: u32 = block_height_lookup(boxed(quorum_masternode_list.block_hash.0), context);
                             let quorum_count = llmq_type.quorum_size();
                             let quorum_modifier = quorum_entry.llmq_quorum_hash();
                             let valid_masternodes = quorum_masternode_list.valid_masternodes_for(quorum_modifier, quorum_count, block_height);
+
                             let mut operator_pks: Vec<*mut [u8; 48]> = Vec::new();
                             let mut i: u32 = 0;
                             for masternode_entry in valid_masternodes {
@@ -279,29 +259,29 @@ pub mod manager {
                                 i += 1;
                             }
                             let mut pks_slice = operator_pks.into_boxed_slice();
-                            let items = pks_slice.as_mut_ptr();
-                            let items_count = pks_slice.len();
+                            let operator_public_keys = pks_slice.as_mut_ptr();
+                            let operator_public_keys_count = pks_slice.len();
                             mem::forget(pks_slice);
-                            let is_valid_signature = unsafe {
-                                validate_quorum_callback(
-                                    items,
-                                    items_count,
-                                    quorum_entry.commitment_hash().0.as_ptr(),
-                                    quorum_entry.all_commitment_aggregated_signature.0.as_ptr(),
-                                    quorum_entry.quorum_threshold_signature.0.as_ptr(),
-                                    quorum_entry.quorum_public_key.0.as_ptr()
-                                )
-                            };
+                            let is_valid_signature = validate_quorum_callback(
+                                QuorumValidationData {
+                                    items: operator_public_keys,
+                                    count: operator_public_keys_count,
+                                    commitment_hash: boxed(quorum_entry.commitment_hash().0),
+                                    all_commitment_aggregated_signature: boxed(quorum_entry.all_commitment_aggregated_signature.0),
+                                    quorum_threshold_signature: boxed(quorum_entry.quorum_threshold_signature.0),
+                                    quorum_public_key: boxed(quorum_entry.quorum_public_key.0)
+                                },
+                                context
+                            );
                             valid_quorums &= is_valid_payload && is_valid_signature;
                             if valid_quorums {
                                 quorum_entry.verified = true;
                             }
-                        } else if unsafe { block_height_lookup(entry_quorum_hash.0.as_ptr()) } != u32::MAX {
+                        } else if block_height_lookup(boxed(entry_quorum_hash.0), context) != u32::MAX {
                             needed_masternode_lists.insert(entry_quorum_hash);
-                        } else if unsafe { use_insight_lookup(entry_quorum_hash.0.as_ptr()) } {
-                            // add_insight_lookup(entry_quorum_hash);
-                            // block_until_add_insight(&entry_quorum_hash, chain);
-                            if unsafe { block_height_lookup(entry_quorum_hash.0.as_ptr()) } != u32::MAX {
+                        } else if use_insight_as_backup {
+                            add_insight_lookup(boxed(entry_quorum_hash.0), context);
+                            if block_height_lookup(boxed(entry_quorum_hash.0), context) != u32::MAX {
                                 needed_masternode_lists.insert(entry_quorum_hash);
                             } else {
                                 println!("Quorum masternode list not found and block not available");
@@ -310,134 +290,167 @@ pub mod manager {
                             println!("Quorum masternode list not found and block not available");
                         }
                     }
-
-                    added_quorums
-                        .entry(llmq_type)
-                        .or_insert(HashMap::new())
-                        .insert(entry_quorum_hash, quorum_entry);
                 }
+
+                added_quorums
+                    .entry(llmq_type)
+                    .or_insert(HashMap::new())
+                    .insert(entry_quorum_hash, quorum_entry);
             }
         }
+    }
 
-        let mut masternodes = if has_old {
-            added_masternodes.clone()
+    let mut masternodes = if has_old {
+        added_masternodes.clone()
+    } else {
+        let mut old_mnodes = old_masternodes.clone();
+        for hash in deleted_masternode_hashes {
+            old_mnodes.remove(&hash);
+        }
+        old_mnodes.extend(added_masternodes.clone());
+        old_mnodes
+    };
+    for (hash, mut modified) in modified_masternodes.clone() {
+        if let Some(old) = masternodes.get_mut(&hash) {
+            if old.update_height < modified.update_height {
+                modified.keep_info_of_previous_entry_version(old.to_owned(), block_height, block_hash);
+            }
+            masternodes.insert(hash, modified);
+        }
+    }
+    let mut quorums = old_quorums.clone();
+
+    let quorums_to_add = added_quorums
+        .clone()
+        .into_iter()
+        .filter(|(key, _entries)| !quorums.contains_key(key))
+        .collect::<HashMap<LLMQType, HashMap<UInt256, QuorumEntry>>>();
+
+    quorums.extend(quorums_to_add);
+
+    quorums.clone().into_iter().for_each(|(quorum_type, mut quorums_of_type)| {
+        if deleted_quorums.contains_key(&quorum_type) {
+            if let Some(keys_to_delete) = deleted_quorums.get(&quorum_type) {
+                keys_to_delete.iter().for_each(|key| {
+                    quorums_of_type.remove(key);
+                });
+            }
+        }
+        if added_quorums.contains_key(&quorum_type) {
+            if let Some(quorums_to_add) = added_quorums.get(&quorum_type) {
+                quorums_to_add.into_iter().for_each(|(key, entry)| {
+                    quorums_of_type.insert(*key, entry.to_owned());
+                });
+            }
+        }
+    });
+
+    let mut masternode_list = MasternodeList::new(masternodes, quorums, block_hash, block_height);
+    let root_mn_list_valid =
+        if let Some(mn_merkle_root) = masternode_list.masternode_merkle_root {
+            coinbase_transaction.merkle_root_mn_list == mn_merkle_root
         } else {
-            let mut old_mnodes = old_masternodes.clone();
-            for hash in deleted_masternode_hashes {
-                old_mnodes.remove(&hash);
-            }
-            old_mnodes.extend(added_masternodes.clone());
-            old_mnodes
+            false
         };
-        for (hash, mut modified) in modified_masternodes.clone() {
-            if let Some(old) = masternodes.get_mut(&hash) {
-                if old.update_height < modified.update_height {
-                    modified.keep_info_of_previous_entry_version(old.to_owned(), block_height, block_hash);
-                }
-                masternodes.insert(hash, modified);
+    // we need to check that the coinbase is in the transaction hashes we got back
+    let coinbase_hash = coinbase_transaction.base.tx_hash.unwrap();
+    let mut found_coinbase: bool = false;
+    let merkle_hash_offset = &mut 0;
+    for _i in 0..merkle_hashes.len() {
+        if let Ok(h) = merkle_hashes.read_with::<UInt256>(merkle_hash_offset, LE) {
+            if h == coinbase_hash {
+                found_coinbase = true;
+                break;
             }
         }
-        let mut quorums = old_quorums.clone();
+    }
+    // we also need to check that the coinbase is in the merkle block
+    let merkle_tree = MerkleTree {
+        tree_element_count: total_transactions,
+        hashes: &merkle_hashes,
+        flags: &merkle_flags,
+    };
 
-        let quorums_to_add = added_quorums
-            .clone()
-            .into_iter()
-            .filter(|(key, _entries)| !quorums.contains_key(key))
-            .collect::<HashMap<LLMQType, HashMap<UInt256, QuorumEntry>>>();
-
-        quorums.extend(quorums_to_add);
-
-        quorums.clone().into_iter().for_each(|(quorum_type, mut quorums_of_type)| {
-            if deleted_quorums.contains_key(&quorum_type) {
-                if let Some(keys_to_delete) = deleted_quorums.get(&quorum_type) {
-                    keys_to_delete.iter().for_each(|key| {
-                        quorums_of_type.remove(key);
-                    });
-                }
-            }
-            if added_quorums.contains_key(&quorum_type) {
-                if let Some(quorums_to_add) = added_quorums.get(&quorum_type) {
-                    quorums_to_add.into_iter().for_each(|(key, entry)| {
-                        quorums_of_type.insert(*key, entry.to_owned());
-                    });
-                }
-            }
-        });
-
-        let mut masternode_list = MasternodeList::new(masternodes, quorums, block_hash, block_height);
-        let root_mn_list_valid =
-            if let Some(mn_merkle_root) = masternode_list.masternode_merkle_root {
-                coinbase_transaction.merkle_root_mn_list == mn_merkle_root
-            } else {
-                false
-            };
-        // we need to check that the coinbase is in the transaction hashes we got back
-        let coinbase_hash = coinbase_transaction.base.tx_hash.unwrap();
-        let mut found_coinbase: bool = false;
-        let merkle_hash_offset = &mut 0;
-        for _i in 0..merkle_hashes.len() {
-            if let Ok(h) = merkle_hashes.read_with::<UInt256>(merkle_hash_offset, LE) {
-                if h == coinbase_hash {
-                    found_coinbase = true;
-                    break;
-                }
-            }
-        }
-        // we also need to check that the coinbase is in the merkle block
-        let merkle_tree = MerkleTree {
-            tree_element_count: total_transactions,
-            hashes: &merkle_hashes,
-            flags: &merkle_flags,
-        };
-
-        let mut root_quorum_list_valid = true;
-        if quorums_active {
-            let q_merkle_root = masternode_list.quorum_merkle_root();
-            let ct_q_merkle_root = coinbase_transaction.merkle_root_llmq_list;
-            root_quorum_list_valid =
-                q_merkle_root.is_some() &&
+    let mut root_quorum_list_valid = true;
+    if quorums_active {
+        let q_merkle_root = masternode_list.quorum_merkle_root();
+        let ct_q_merkle_root = coinbase_transaction.merkle_root_llmq_list;
+        root_quorum_list_valid =
+            q_merkle_root.is_some() &&
                 ct_q_merkle_root.is_some() &&
                 ct_q_merkle_root.unwrap() == q_merkle_root.unwrap();
-            if !root_quorum_list_valid {
-                println!("Quorum Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
-                         coinbase_transaction.height,
-                         coinbase_transaction.base.version,
-                         coinbase_transaction.merkle_root_llmq_list,
-                         masternode_list.quorum_merkle_root);
-            }
+        if !root_quorum_list_valid {
+            println!("Quorum Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
+                     coinbase_transaction.height,
+                     coinbase_transaction.base.version,
+                     coinbase_transaction.merkle_root_llmq_list,
+                     masternode_list.quorum_merkle_root);
         }
-        let masternode_list = BaseMasternodeList(Some(boxed(masternode_list)));
-        let _desired_merkle_root_hex = desired_merkle_root.0.to_hex();
-        let valid_coinbase = merkle_tree.has_root(desired_merkle_root);
-        boxed(Result {
-            found_coinbase,
-            valid_coinbase,
-            root_mn_list_valid,
-            root_quorum_list_valid,
-            valid_quorums,
-            masternode_list,
-            added_masternodes: Some(boxed(added_masternodes)),
-            modified_masternodes: Some(boxed(modified_masternodes)),
-            added_quorums: Some(boxed(added_quorums)),
-            needed_masternode_lists: Some(boxed(needed_masternode_lists)),
-        })
     }
+    let valid_coinbase = merkle_tree.has_root(desired_merkle_root);
+
+    let (added_masternodes_keys,
+        added_masternodes_values,
+        added_masternodes_count) = wrap_masternodes_map(added_masternodes);
+    let (modified_masternodes_keys,
+        modified_masternodes_values,
+        modified_masternodes_count) = wrap_masternodes_map(modified_masternodes);
+
+    let (added_quorums_keys,
+        added_quorums_values,
+        added_quorums_count) = wrap_quorums_map(added_quorums);
+
+    let needed_masternode_lists_count = needed_masternode_lists.len();
+    let mut needed_masternode_lists_vec: Vec<*mut [u8; 32]> = Vec::with_capacity(needed_masternode_lists_count);
+    needed_masternode_lists
+        .into_iter()
+        .for_each(|hash| {
+            needed_masternode_lists_vec.push(boxed(hash.0));
+        });
+    let mut needed_masternode_lists_slice = needed_masternode_lists_vec.into_boxed_slice();
+    let needed_masternode_lists = needed_masternode_lists_slice.as_mut_ptr();
+    mem::forget(needed_masternode_lists_slice);
+
+    let masternode_list = boxed(MasternodeListExt { list: boxed(wrap_masternode_list(masternode_list)), exists: true});
+
+    let result = MndiffResult {
+        found_coinbase,
+        valid_coinbase,
+        root_mn_list_valid,
+        root_quorum_list_valid,
+        valid_quorums,
+        masternode_list,
+        added_masternodes_keys,
+        added_masternodes_values,
+        added_masternodes_count,
+        modified_masternodes_keys,
+        modified_masternodes_values,
+        modified_masternodes_count,
+        added_quorums_keys,
+        added_quorums_values,
+        added_quorums_count,
+        needed_masternode_lists,
+        needed_masternode_lists_count
+    };
+    boxed(result)
 }
-
-
 
 
 #[cfg(test)]
 mod tests {
     use std::{env, fs};
+    use std::ffi::c_void;
     use std::io::Read;
+    use std::ptr::null_mut;
     use byte::{BytesExt, LE};
     use hashes::hex::FromHex;
     use crate::common::chain_type::ChainType;
     use crate::common::llmq_type::LLMQType;
     use crate::crypto::byte_util::{Reversable, UInt256};
-    use crate::manager;
-    use crate::manager::{BaseMasternodeList, BlockHeightLookup};
+    // use crate::manager;
+    use crate::{process_diff, wrapped_types};
+    use crate::wrapped_types::{MasternodeListExt, QuorumValidationData};
+    use crate::wrapped_types::wrapper::{boxed, unwrap_masternode_list_ext};
 
     const CHAIN_TYPE: ChainType = ChainType::TestNet;
     const BLOCK_HEIGHT: u32 = 122088;
@@ -450,30 +463,24 @@ mod tests {
         buffer
     }
 
-    unsafe extern "C" fn block_height_lookup(_block_hash: *const u8) -> u32 {
+    unsafe extern "C" fn block_height_lookup(_block_hash: *mut [u8; 32], context: *mut c_void) -> u32 {
         BLOCK_HEIGHT
     }
-    unsafe extern "C" fn masternode_list_lookup(_block_hash: *const u8) -> BaseMasternodeList {
-        BaseMasternodeList(None)
+    unsafe extern "C" fn masternode_list_lookup(_block_hash: *mut [u8; 32], context: *mut c_void) -> *mut wrapped_types::MasternodeListExt {
+        boxed(MasternodeListExt::default())
     }
-    unsafe extern "C" fn use_insight_lookup(_hash: *const u8) -> bool {
-        false
+    unsafe extern "C" fn use_insight_lookup(_hash: *mut [u8; 32], context: *mut c_void) {
+
     }
-    unsafe extern "C" fn should_process_quorum_of_type(llmq_type: LLMQType) -> bool {
+    unsafe extern "C" fn should_process_quorum_of_type(llmq_type: u8, context: *mut c_void) -> bool {
         llmq_type == match CHAIN_TYPE {
-            ChainType::MainNet => LLMQType::Llmqtype40060,
-            ChainType::TestNet => LLMQType::Llmqtype5060,
-            ChainType::DevNet => LLMQType::Llmqtype1060
+            ChainType::MainNet => LLMQType::Llmqtype40060.into(),
+            ChainType::TestNet => LLMQType::Llmqtype5060.into(),
+            ChainType::DevNet => LLMQType::Llmqtype1060.into()
         }
     }
-    unsafe extern "C" fn validate_quorum_callback(
-        items: *mut *mut [u8; 48],
-        count: usize,
-        commitment_hash: *const u8,
-        all_commitment_aggregated_signature: *const u8,
-        quorum_threshold_signature: *const u8,
-        quorum_public_key: *const u8
-    ) -> bool {
+    unsafe extern "C" fn validate_quorum_callback(data: QuorumValidationData, context: *mut c_void) -> bool {
+        let QuorumValidationData { items, count, commitment_hash, all_commitment_aggregated_signature, quorum_threshold_signature, quorum_public_key } = data;
         println!("validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}", items, count, commitment_hash, all_commitment_aggregated_signature, quorum_threshold_signature, quorum_public_key);
         true
     }
@@ -734,13 +741,13 @@ mod tests {
         should_be_total_transactions: u32,
         verify_string_hashes: Vec<&str>,
         verify_string_smle_hashes: Vec<&str>,
-        block_height_lookup: BlockHeightLookup,
+        block_height_lookup: wrapped_types::BlockHeightLookup,
         _chain_type: ChainType) {
 
         let bytes = Vec::from_hex(&hex_string).unwrap();
         let length = bytes.len();
         let c_array = bytes.as_ptr();
-        let base_masternode_list = BaseMasternodeList(None);
+        let base_masternode_list = boxed(MasternodeListExt {list: null_mut(), exists: false});
         let merkle_root = [0u8; 32].as_ptr();
 
         let offset = &mut 0;
@@ -752,22 +759,27 @@ mod tests {
         assert!(length - *offset >= 4);
         let total_transactions = bytes.read_with::<u32>(offset, LE).unwrap();
         assert_eq!(total_transactions, should_be_total_transactions, "Invalid transaction count");
-
-        let result = manager::process_diff(
+        let use_insight_as_backup = false;
+        let result = process_diff(
             c_array,
             length,
             base_masternode_list,
             masternode_list_lookup,
             merkle_root,
+            use_insight_as_backup,
             use_insight_lookup,
             should_process_quorum_of_type,
             validate_quorum_callback,
-            block_height_lookup
+            block_height_lookup,
+            null_mut()
         );
         println!("result: {:?}", result);
 
         let result = unsafe { Box::from_raw(result) };
-        let masternode_list = unsafe { Box::from_raw(result.masternode_list.0.unwrap()) };
+        let masternode_list = unsafe { unwrap_masternode_list_ext(result.masternode_list) }.unwrap();
+
+// /        let masternode_list = unsafe { Box::from_raw(result.masternode_list) };
+        // let masternode_list = unsafe { Box::from_raw(masternode_list) };
         let masternodes = masternode_list.masternodes.clone();
         // let mut pro_tx_hashes: Vec<UInt256> = masternodes.clone().into_keys().map(|mut h| h.reversed()).collect();
         let mut pro_tx_hashes: Vec<UInt256> = masternodes.clone().into_keys().collect();
@@ -786,12 +798,12 @@ mod tests {
         verify_hashes.sort();
         assert_eq!(verify_hashes, pro_tx_hashes, "Provider transaction hashes");
 
-        let mut simplified_masternode_list_hashes: Vec<UInt256> = pro_tx_hashes
+        let mut masternode_list_hashes: Vec<UInt256> = pro_tx_hashes
             .clone()
             .iter()
-            .map(|hash| masternodes[hash].simplified_masternode_entry_hash)
+            .map(|hash| masternodes[hash].masternode_entry_hash)
             .collect();
-        simplified_masternode_list_hashes.sort();
+        masternode_list_hashes.sort();
 
         let mut verify_smle_hashes: Vec<UInt256> = verify_string_smle_hashes
             .into_iter()
@@ -803,7 +815,7 @@ mod tests {
             .collect();
         verify_smle_hashes.sort();
 
-        assert_eq!(simplified_masternode_list_hashes, verify_smle_hashes, "SMLE transaction hashes");
+        assert_eq!(masternode_list_hashes, verify_smle_hashes, "SMLE transaction hashes");
 
         assert!(result.found_coinbase, "The coinbase was not part of provided hashes");
     }
@@ -822,23 +834,27 @@ mod tests {
         let bytes = file.as_slice();
         let length = bytes.len();
         let c_array = bytes.as_ptr();
-        let base_masternode_list = BaseMasternodeList(None);
+        let base_masternode_list = boxed(MasternodeListExt { list: null_mut(), exists: false });
         let merkle_root = [0u8; 32].as_ptr();
-        let result = manager::process_diff(
+        let use_insight_as_backup= false;
+        let result = process_diff(
             c_array,
             length,
             base_masternode_list,
             masternode_list_lookup,
             merkle_root,
+            use_insight_as_backup,
             use_insight_lookup,
             should_process_quorum_of_type,
             validate_quorum_callback,
-            block_height_lookup
+            block_height_lookup,
+            null_mut()
         );
         println!("{:?}", result);
 
         let result = unsafe { Box::from_raw(result) };
-        let masternode_list = unsafe { Box::from_raw(result.masternode_list.0.unwrap()) };
+        let masternode_list = unsafe { unwrap_masternode_list_ext(result.masternode_list) }.unwrap();
+        // let masternode_list = unsafe { Box::from_raw(result.masternode_list) };
         // let masternode_list_merkle_root = Vec::from_hex("94d0af97187af3b9311c98b1cf40c9c9849df0af55dc63b097b80d4cf6c816c5").expect("Invalid Hex String").read_with::<UInt256>(&mut 0, LE).unwrap();
         let masternode_list_merkle_root = UInt256::from_hex("94d0af97187af3b9311c98b1cf40c9c9849df0af55dc63b097b80d4cf6c816c5").unwrap();
         let obtained_mn_merkle_root = masternode_list.masternode_merkle_root.unwrap();

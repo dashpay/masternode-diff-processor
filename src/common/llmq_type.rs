@@ -2,7 +2,7 @@ use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, TryWrite};
 use crate::consensus::Encodable;
 
-#[repr(C)]
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub enum LLMQType {
     Llmqtype5060 = 1,  // every 24 blocks

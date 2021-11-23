@@ -7,7 +7,6 @@ use crate::hashes::{Hash, sha256};
 use crate::masternode::quorum_entry::QuorumEntry;
 use crate::masternode::masternode_entry::MasternodeEntry;
 
-#[repr(C)]
 #[derive(Clone)]
 pub struct MasternodeList<'a> {
     pub block_hash: UInt256,
@@ -115,7 +114,7 @@ impl<'a> MasternodeList<'a> {
                 .map(|mut hash| {
                     let h = hash.reversed();
                     let mn = &mns[&h];
-                    mn.simplified_masternode_entry_hash_at(block_height)
+                    mn.masternode_entry_hash_at(block_height)
                 })
                 .collect())
         }
@@ -135,5 +134,10 @@ impl<'a> MasternodeList<'a> {
         }
         self.quorum_merkle_root
     }
+
+    pub fn masternode_for(&self, registration_hash: UInt256) -> Option<&MasternodeEntry> {
+        self.masternodes.get(&registration_hash)
+    }
+
 
 }

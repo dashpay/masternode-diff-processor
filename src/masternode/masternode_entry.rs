@@ -1,6 +1,4 @@
-use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashMap};
-use std::time::SystemTime;
 use byte::{BytesExt, LE};
 use crate::common::block_data::BlockData;
 use crate::common::socket_address::SocketAddress;
@@ -17,19 +15,17 @@ pub struct MasternodeEntry {
     pub socket_address: SocketAddress,
     pub operator_public_key: UInt384,
     pub previous_operator_public_keys: BTreeMap<BlockData, UInt384>,
-    pub previous_simplified_masternode_entry_hashes: HashMap<BlockData, UInt256>,
+    pub previous_masternode_entry_hashes: HashMap<BlockData, UInt256>,
     pub previous_validity: HashMap<BlockData, bool>,
     pub known_confirmed_at_height: Option<u32>,
     pub update_height: u32,
     pub key_id_voting: UInt160,
     pub is_valid: bool,
-    pub simplified_masternode_entry_hash: UInt256,
-    pub platform_ping: Option<u64>,
-    pub platform_ping_date: Option<SystemTime>,
+    pub masternode_entry_hash: UInt256,
 }
 
 impl MasternodeEntry {
-    fn calculate_simplified_masternode_entry_hash(
+    fn calculate_masternode_entry_hash(
         provider_registration_transaction_hash: UInt256,
         confirmed_hash: UInt256,
         socket_address: SocketAddress,
@@ -68,11 +64,6 @@ impl MasternodeEntry {
         }
     }
 
-    pub fn set_platform_ping(&mut self, ping: Option<u64>, ping_date: Option<SystemTime>) {
-        self.platform_ping = ping;
-        self.platform_ping_date = ping_date;
-    }
-
     pub fn host(&self) -> String {
         let ip = self.socket_address.ip_address;
         let port = self.socket_address.port;
@@ -80,7 +71,7 @@ impl MasternodeEntry {
     }
 
     pub fn payload_data(&self) -> UInt256 {
-        MasternodeEntry::calculate_simplified_masternode_entry_hash(
+        MasternodeEntry::calculate_masternode_entry_hash(
             self.provider_registration_transaction_hash,
             self.confirmed_hash,
             self.socket_address,
@@ -167,20 +158,20 @@ impl MasternodeEntry {
             }
             // if for example we are getting a masternode list at block 402 when we already got the
             // masternode list at block 414 then the other sme might have
-            // previousSimplifiedMasternodeEntryHashes that is in our future we need to ignore them
+            // previous_masternode_entry_hashes that is in our future we need to ignore them
 
-            self.previous_simplified_masternode_entry_hashes = masternode_entry
+            self.previous_masternode_entry_hashes = masternode_entry
                 .clone()
-                .previous_simplified_masternode_entry_hashes
+                .previous_masternode_entry_hashes
                 .into_iter()
                 .filter(|(block, _hash)| block.height < self.update_height)
                 .collect();
 
-            let hash_for_height = masternode_entry.simplified_masternode_entry_hash_at(self.update_height);
-            if hash_for_height != self.simplified_masternode_entry_hash {
+            let hash_for_height = masternode_entry.masternode_entry_hash_at(self.update_height);
+            if hash_for_height != self.masternode_entry_hash {
                 // the hashes changed
-                println!("Changed sme hashes from {:?} to {:?} on {:?}", masternode_entry.simplified_masternode_entry_hash, self.simplified_masternode_entry_hash, self.provider_registration_transaction_hash);
-                self.previous_simplified_masternode_entry_hashes.insert(b, masternode_entry.simplified_masternode_entry_hash);
+                println!("Changed sme hashes from {:?} to {:?} on {:?}", masternode_entry.masternode_entry_hash, self.masternode_entry_hash, self.provider_registration_transaction_hash);
+                self.previous_masternode_entry_hashes.insert(b, masternode_entry.masternode_entry_hash);
             }
         }
         // if the masternodeEntry.confirmedHash is not set we do not need to do anything the
@@ -193,15 +184,14 @@ impl MasternodeEntry {
         }
     }
 
-    pub fn simplified_masternode_entry_hash_at(&self, block_height: u32) -> UInt256 {
-        if self.previous_simplified_masternode_entry_hashes.len() == 0 ||
+    pub fn masternode_entry_hash_at(&self, block_height: u32) -> UInt256 {
+        if self.previous_masternode_entry_hashes.len() == 0 ||
             block_height == u32::MAX {
-            return self.simplified_masternode_entry_hash;
+            return self.masternode_entry_hash;
         }
-        let hashes: HashMap<BlockData, UInt256> = self.previous_simplified_masternode_entry_hashes.clone();
-        // let hashes: HashMap<(u32, [u8; 32]), [u8; 32]> = self.previous_simplified_masternode_entry_hashes.clone();
+        let hashes: HashMap<BlockData, UInt256> = self.previous_masternode_entry_hashes.clone();
         let mut min_distance = u32::MAX;
-        let mut used_hash = self.simplified_masternode_entry_hash;
+        let mut used_hash = self.masternode_entry_hash;
         for (BlockData { height, .. }, hash) in hashes {
             let distance = height - block_height;
             if (1..min_distance).contains(&distance) {
@@ -257,7 +247,7 @@ impl MasternodeEntry {
             Ok(data) => data,
             Err(_err) => 0
         };
-        let simplified_masternode_entry_hash = MasternodeEntry::calculate_simplified_masternode_entry_hash(
+        let masternode_entry_hash = MasternodeEntry::calculate_masternode_entry_hash(
             provider_registration_transaction_hash,
             confirmed_hash,
             socket_address,
@@ -272,17 +262,13 @@ impl MasternodeEntry {
             socket_address,
             operator_public_key,
             previous_operator_public_keys: BTreeMap::new(),
-            previous_simplified_masternode_entry_hashes: HashMap::new(),
+            previous_masternode_entry_hashes: HashMap::new(),
             previous_validity: HashMap::new(),
             known_confirmed_at_height,
             update_height: block_height,
             key_id_voting,
             is_valid: is_valid != 0,
-            simplified_masternode_entry_hash,
-            platform_ping: None,
-            platform_ping_date: None
+            masternode_entry_hash
         })
     }
 }
-
-
