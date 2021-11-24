@@ -33,7 +33,6 @@ use crate::consensus::Decodable;
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{Data, MNPayload, Reversable, UInt256};
 use crate::crypto::data_ops::inplace_intersection;
-use crate::hashes::hex::FromHex;
 use crate::masternode::masternode_list::MasternodeList;
 use crate::masternode::quorum_entry::QuorumEntry;
 use crate::masternode::masternode_entry::{MasternodeEntry};
@@ -46,20 +45,7 @@ fn failure<'a>() -> *mut MndiffResult {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn test_bhl2(callback: BlockHeightLookup, context: *mut c_void) {
-    let h = "2dca894a2b5af0bf82abf0cfba978555f41a669278b6e91ca14c0593beaf2200";
-    let block_hash = Vec::from_hex(h)
-        .unwrap()
-        .read_with::<UInt256>(&mut 0, byte::LE)
-        .unwrap();
-    println!("test_bhl: {}", block_hash);
-    let result = callback(boxed(block_hash.0), context);
-    mem::forget(callback);
-    println!("test_bhl.result: {}", result);
-}
-
-#[no_mangle]
-pub extern "C" fn process_diff(
+pub extern "C" fn mndiff_process(
     c_array: *const u8,
     length: usize,
     base_masternode_list: *mut MasternodeListExt,
@@ -433,6 +419,54 @@ pub extern "C" fn process_diff(
     boxed(result)
 }
 
+#[no_mangle]
+pub unsafe extern fn mndiff_block_hash_destroy(block_hash: *mut [u8; 32]) {
+    let result = Box::from_raw(block_hash);
+}
+
+#[no_mangle]
+pub unsafe extern fn mndiff_quorum_validation_data_destroy(quorum_validation_data: *mut QuorumValidationData) {
+    let result = Box::from_raw(quorum_validation_data);
+    let _ = Box::from_raw(result.all_commitment_aggregated_signature);
+    let _ = Box::from_raw(result.commitment_hash);
+    let _ = Box::from_raw(result.quorum_public_key);
+    let _ = Box::from_raw(result.quorum_threshold_signature);
+    let items = Vec::from_raw_parts(result.items, result.count, result.count);
+    for &x in items.iter() {
+        let _ = Box::from_raw(x);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern fn mndiff_destroy(mndiff_result: *mut MndiffResult) {
+    let result = Box::from_raw(mndiff_result);
+    let _ = Box::from_raw(result.masternode_list);
+    let added_masternodes_keys = Vec::from_raw_parts(result.added_masternodes_keys, result.added_masternodes_count, result.added_masternodes_count);
+    let added_masternodes_values = Vec::from_raw_parts(result.added_masternodes_values, result.added_masternodes_count, result.added_masternodes_count);
+    let modified_masternodes_keys = Vec::from_raw_parts(result.modified_masternodes_keys, result.modified_masternodes_count, result.modified_masternodes_count);
+    let modified_masternodes_values = Vec::from_raw_parts(result.modified_masternodes_values, result.modified_masternodes_count, result.modified_masternodes_count);
+    let added_quorums_keys = Vec::from_raw_parts(result.added_quorums_keys, result.added_quorums_count, result.added_quorums_count);
+    let needed_masternode_lists = Vec::from_raw_parts(result.needed_masternode_lists, result.needed_masternode_lists_count, result.needed_masternode_lists_count);
+    for &x in added_masternodes_keys.iter() {
+        let _ = Box::from_raw(x);
+    }
+    for &x in added_masternodes_values.iter() {
+        let _ = Box::from_raw(x);
+    }
+    for &x in modified_masternodes_keys.iter() {
+        let _ = Box::from_raw(x);
+    }
+    for &x in modified_masternodes_values.iter() {
+        let _ = Box::from_raw(x);
+    }
+    for &x in added_quorums_keys.iter() {
+        let _ = Box::from_raw(x);
+    }
+    for &x in needed_masternode_lists.iter() {
+        let _ = Box::from_raw(x);
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -446,7 +480,7 @@ mod tests {
     use crate::common::llmq_type::LLMQType;
     use crate::crypto::byte_util::{Reversable, UInt256};
     // use crate::manager;
-    use crate::{process_diff, wrapped_types};
+    use crate::{mndiff_process, wrapped_types};
     use crate::wrapped_types::{MasternodeListExt, QuorumValidationData};
     use crate::wrapped_types::wrapper::{boxed, unwrap_masternode_list_ext};
 
@@ -760,7 +794,7 @@ mod tests {
         let total_transactions = bytes.read_with::<u32>(offset, LE).unwrap();
         assert_eq!(total_transactions, should_be_total_transactions, "Invalid transaction count");
         let use_insight_as_backup = false;
-        let result = process_diff(
+        let result = mndiff_process(
             c_array,
             length,
             base_masternode_list,
@@ -837,7 +871,7 @@ mod tests {
         let base_masternode_list = boxed(MasternodeListExt { list: null_mut(), exists: false });
         let merkle_root = [0u8; 32].as_ptr();
         let use_insight_as_backup= false;
-        let result = process_diff(
+        let result = mndiff_process(
             c_array,
             length,
             base_masternode_list,
@@ -869,3 +903,4 @@ mod tests {
         assert!(result.valid_quorums, "validQuorums not valid at height {}", BLOCK_HEIGHT);
     }
 }
+
