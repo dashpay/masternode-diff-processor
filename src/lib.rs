@@ -38,6 +38,7 @@ use crate::masternode::quorum_entry::QuorumEntry;
 use crate::masternode::masternode_entry::{MasternodeEntry};
 use crate::transactions::coinbase_transaction::CoinbaseTransaction;
 use crate::wrapped_types::{AddInsightBlockingLookup, BlockHeightLookup, MasternodeListExt, MasternodeListLookup, MndiffResult, QuorumValidationData, ShouldProcessQuorumTypeCallback, ValidateQuorumCallback};
+use crate::wrapped_types::unboxer::{unbox_any, unbox_quorum_validation_data, unbox_result};
 use crate::wrapped_types::wrapper::{boxed, unwrap_masternode_list_ext, wrap_masternode_list, wrap_masternodes_map, wrap_quorums_map};
 
 fn failure<'a>() -> *mut MndiffResult {
@@ -421,50 +422,17 @@ pub extern "C" fn mndiff_process(
 
 #[no_mangle]
 pub unsafe extern fn mndiff_block_hash_destroy(block_hash: *mut [u8; 32]) {
-    let result = Box::from_raw(block_hash);
+    unbox_any(block_hash);
 }
 
 #[no_mangle]
-pub unsafe extern fn mndiff_quorum_validation_data_destroy(quorum_validation_data: *mut QuorumValidationData) {
-    let result = Box::from_raw(quorum_validation_data);
-    let _ = Box::from_raw(result.all_commitment_aggregated_signature);
-    let _ = Box::from_raw(result.commitment_hash);
-    let _ = Box::from_raw(result.quorum_public_key);
-    let _ = Box::from_raw(result.quorum_threshold_signature);
-    let items = Vec::from_raw_parts(result.items, result.count, result.count);
-    for &x in items.iter() {
-        let _ = Box::from_raw(x);
-    }
+pub unsafe extern fn mndiff_quorum_validation_data_destroy(data: *mut QuorumValidationData) {
+    unbox_quorum_validation_data(data);
 }
 
 #[no_mangle]
-pub unsafe extern fn mndiff_destroy(mndiff_result: *mut MndiffResult) {
-    let result = Box::from_raw(mndiff_result);
-    let _ = Box::from_raw(result.masternode_list);
-    let added_masternodes_keys = Vec::from_raw_parts(result.added_masternodes_keys, result.added_masternodes_count, result.added_masternodes_count);
-    let added_masternodes_values = Vec::from_raw_parts(result.added_masternodes_values, result.added_masternodes_count, result.added_masternodes_count);
-    let modified_masternodes_keys = Vec::from_raw_parts(result.modified_masternodes_keys, result.modified_masternodes_count, result.modified_masternodes_count);
-    let modified_masternodes_values = Vec::from_raw_parts(result.modified_masternodes_values, result.modified_masternodes_count, result.modified_masternodes_count);
-    let added_quorums_keys = Vec::from_raw_parts(result.added_quorums_keys, result.added_quorums_count, result.added_quorums_count);
-    let needed_masternode_lists = Vec::from_raw_parts(result.needed_masternode_lists, result.needed_masternode_lists_count, result.needed_masternode_lists_count);
-    for &x in added_masternodes_keys.iter() {
-        let _ = Box::from_raw(x);
-    }
-    for &x in added_masternodes_values.iter() {
-        let _ = Box::from_raw(x);
-    }
-    for &x in modified_masternodes_keys.iter() {
-        let _ = Box::from_raw(x);
-    }
-    for &x in modified_masternodes_values.iter() {
-        let _ = Box::from_raw(x);
-    }
-    for &x in added_quorums_keys.iter() {
-        let _ = Box::from_raw(x);
-    }
-    for &x in needed_masternode_lists.iter() {
-        let _ = Box::from_raw(x);
-    }
+pub unsafe extern fn mndiff_destroy(result: *mut MndiffResult) {
+    unbox_result(result);
 }
 
 
@@ -479,7 +447,6 @@ mod tests {
     use crate::common::chain_type::ChainType;
     use crate::common::llmq_type::LLMQType;
     use crate::crypto::byte_util::{Reversable, UInt256};
-    // use crate::manager;
     use crate::{mndiff_process, wrapped_types};
     use crate::wrapped_types::{MasternodeListExt, QuorumValidationData};
     use crate::wrapped_types::wrapper::{boxed, unwrap_masternode_list_ext};

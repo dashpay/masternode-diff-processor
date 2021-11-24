@@ -39,50 +39,44 @@ pub struct LLMQMap {
 }
 #[repr(C)] #[derive(Clone, Debug)]
 pub struct MasternodeEntry {
-    // pub confirmed_hash: *const u8, // 32
-    pub confirmed_hash: *mut [u8; 32], // 32
-    // pub confirmed_hash_hashed_with_provider_registration_transaction_hash: *const u8, // 32
-    pub confirmed_hash_hashed_with_provider_registration_transaction_hash: *mut [u8; 32], // 32
+    pub confirmed_hash: *mut [u8; 32],
+    pub confirmed_hash_hashed_with_provider_registration_transaction_hash: *mut [u8; 32],
     pub confirmed_hash_hashed_with_provider_registration_transaction_hash_exists: bool,
     pub is_valid: bool,
-    // pub key_id_voting: *const u8, //20
-    pub key_id_voting: *mut [u8; 20], //20
+    pub key_id_voting: *mut [u8; 20],
     pub known_confirmed_at_height: u32,
     pub known_confirmed_at_height_exists: bool,
-    // pub masternode_entry_hash: *const u8, //32
-    pub masternode_entry_hash: *mut [u8; 32], //32
-    // pub operator_public_key: *const u8, //48
-    pub operator_public_key: *mut [u8; 48], //48
-    pub previous_operator_public_keys: *mut *mut OperatorPublicKey,
-    pub previous_operator_public_keys_count: usize,
+    pub masternode_entry_hash: *mut [u8; 32],
+    pub operator_public_key: *mut [u8; 48],
     pub previous_masternode_entry_hashes: *mut *mut MasternodeEntryHash,
     pub previous_masternode_entry_hashes_count: usize,
+    pub previous_operator_public_keys: *mut *mut OperatorPublicKey,
+    pub previous_operator_public_keys_count: usize,
     pub previous_validity: *mut *mut Validity,
     pub previous_validity_count: usize,
-    // pub provider_registration_transaction_hash: *const u8, // 32
-    pub provider_registration_transaction_hash: *mut [u8; 32], // 32
+    pub provider_registration_transaction_hash: *mut [u8; 32],
     pub ip_address: *mut [u8; 16],
     pub port: u16,
     pub update_height: u32,
 }
 #[repr(C)] #[derive(Clone, Debug)]
 pub struct QuorumEntry {
-    pub all_commitment_aggregated_signature: *mut [u8; 96], // 96,
-    pub commitment_hash: *mut [u8; 32], // 32
+    pub all_commitment_aggregated_signature: *mut [u8; 96],
+    pub commitment_hash: *mut [u8; 32],
     pub commitment_hash_exists: bool,
     pub length: usize,
     pub llmq_type: LLMQType,
-    pub quorum_entry_hash: *mut [u8; 32], // 32
-    pub quorum_hash: *mut [u8; 32], // 32,
-    pub quorum_public_key: *mut [u8; 48], // 48,
-    pub quorum_threshold_signature: *mut [u8; 96], // 96,
-    pub quorum_verification_vector_hash: *mut [u8; 32], // 32,
+    pub quorum_entry_hash: *mut [u8; 32],
+    pub quorum_hash: *mut [u8; 32],
+    pub quorum_public_key: *mut [u8; 48],
+    pub quorum_threshold_signature: *mut [u8; 96],
+    pub quorum_verification_vector_hash: *mut [u8; 32],
     pub saved: bool,
-    pub signers_bitset: *const u8, // ?
-    pub signers_bitset_length: usize, // ?
+    pub signers_bitset: *const u8,
+    pub signers_bitset_length: usize,
     pub signers_count: u64,
-    pub valid_members_bitset: *const u8, // ?
-    pub valid_members_bitset_length: usize, // ?
+    pub valid_members_bitset: *const u8,
+    pub valid_members_bitset_length: usize,
     pub valid_members_count: u64,
     pub verified: bool,
     pub version: u16,
@@ -94,7 +88,7 @@ pub struct VarInt {
 }
 #[repr(C)] #[derive(Clone, Debug)]
 pub struct Validity {
-    pub block_hash: *mut [u8; 32], // 32
+    pub block_hash: *mut [u8; 32],
     pub block_height: u32,
     pub is_valid: bool,
 }
@@ -610,5 +604,128 @@ pub mod wrapper {
             };
             Some(unwrapped)
         }
+    }
+}
+pub mod unboxer {
+    use crate::wrapped_types::{LLMQMap, MasternodeEntry, MasternodeList, MndiffResult, QuorumEntry, QuorumValidationData};
+    pub unsafe fn unbox_any<T>(any: *mut T) {
+        let _ = Box::from_raw(any);
+    }
+    pub unsafe fn unbox_simple_vec<T>(vec: Vec<*mut T>) {
+        for &x in vec.iter() {
+            unbox_any(x);
+        }
+    }
+    pub unsafe fn unbox_masternode_entry(x: *mut MasternodeEntry) {
+        let entry = Box::from_raw(x);
+        unbox_any(entry.confirmed_hash);
+        if entry.confirmed_hash_hashed_with_provider_registration_transaction_hash_exists {
+            unbox_any(entry.confirmed_hash_hashed_with_provider_registration_transaction_hash);
+        }
+        unbox_any(entry.key_id_voting);
+        unbox_any(entry.masternode_entry_hash);
+        unbox_any(entry.operator_public_key);
+        let previous_masternode_entry_hashes = Vec::from_raw_parts(entry.previous_masternode_entry_hashes, entry.previous_masternode_entry_hashes_count, entry.previous_masternode_entry_hashes_count);
+        for &x in previous_masternode_entry_hashes.iter() {
+            let entry = Box::from_raw(x);
+            unbox_any(entry.block_hash);
+            unbox_any(entry.hash);
+        }
+        let previous_operator_public_keys = Vec::from_raw_parts(entry.previous_operator_public_keys, entry.previous_operator_public_keys_count, entry.previous_operator_public_keys_count);
+        for &x in previous_operator_public_keys.iter() {
+            let entry = Box::from_raw(x);
+            unbox_any(entry.block_hash);
+            unbox_any(entry.key);
+        }
+        let previous_validity = Vec::from_raw_parts(entry.previous_validity, entry.previous_validity_count, entry.previous_validity_count);
+        for &x in previous_validity.iter() {
+            let entry = Box::from_raw(x);
+            unbox_any(entry.block_hash);
+        }
+        unbox_any(entry.provider_registration_transaction_hash);
+        unbox_any(entry.ip_address);
+    }
+
+    pub unsafe fn unbox_quorum_entry(x: *mut QuorumEntry) {
+        let entry = Box::from_raw(x);
+        let _ = unbox_any(entry.all_commitment_aggregated_signature);
+        let _ = unbox_any(entry.quorum_entry_hash);
+        let _ = unbox_any(entry.quorum_hash);
+        let _ = unbox_any(entry.quorum_public_key);
+        let _ = unbox_any(entry.quorum_threshold_signature);
+        let _ = unbox_any(entry.quorum_verification_vector_hash);
+        if entry.commitment_hash_exists {
+            let _ = unbox_any(entry.commitment_hash);
+        }
+    }
+
+    pub unsafe fn unbox_llmq_map(x: *mut LLMQMap) {
+        let entry = Box::from_raw(x);
+        let keys = Vec::from_raw_parts(entry.keys, entry.count, entry.count);
+        let values = Vec::from_raw_parts(entry.values, entry.count, entry.count);
+        unbox_simple_vec(keys);
+        for &x in values.iter() {
+            unbox_quorum_entry(x);
+        }
+    }
+    pub unsafe fn unbox_masternode_list(list: *mut MasternodeList) {
+        let masternode_list = Box::from_raw(list);
+        unbox_any(masternode_list.block_hash);
+        if masternode_list.masternode_merkle_root_exists {
+            unbox_any(masternode_list.masternode_merkle_root);
+        }
+        if masternode_list.quorum_merkle_root_exists {
+            unbox_any(masternode_list.quorum_merkle_root);
+        }
+        let masternodes_keys = Vec::from_raw_parts(masternode_list.masternodes_keys, masternode_list.masternodes_count, masternode_list.masternodes_count);
+        unbox_simple_vec(masternodes_keys);
+        let masternodes_values = Vec::from_raw_parts(masternode_list.masternodes_values, masternode_list.masternodes_count, masternode_list.masternodes_count);
+        unbox_masternode_vec(masternodes_values);
+        let quorums_keys = Vec::from_raw_parts(masternode_list.quorums_keys, masternode_list.quorums_count, masternode_list.quorums_count);
+        unbox_simple_vec(quorums_keys);
+        let quorums_values = Vec::from_raw_parts(masternode_list.quorums_values, masternode_list.quorums_count, masternode_list.quorums_count);
+        unbox_llmq_map_vec(quorums_values);
+    }
+
+    pub unsafe fn unbox_masternode_vec(vec: Vec<*mut MasternodeEntry>) {
+        for &x in vec.iter() {
+            unbox_masternode_entry(x);
+        }
+    }
+
+    pub unsafe fn unbox_llmq_map_vec(vec: Vec<*mut LLMQMap>) {
+        for &x in vec.iter() {
+            unbox_llmq_map(x);
+        }
+    }
+
+    pub unsafe fn unbox_quorum_validation_data(quorum_validation_data: *mut QuorumValidationData) {
+        let result = Box::from_raw(quorum_validation_data);
+        unbox_any(result.all_commitment_aggregated_signature);
+        unbox_any(result.commitment_hash);
+        unbox_any(result.quorum_public_key);
+        unbox_any(result.quorum_threshold_signature);
+        let items = Vec::from_raw_parts(result.items, result.count, result.count);
+        unbox_simple_vec(items);
+    }
+
+    pub unsafe fn unbox_result(result: *mut MndiffResult) {
+        let result = Box::from_raw(result);
+        let masternode_list_ext = Box::from_raw(result.masternode_list);
+        if masternode_list_ext.exists {
+            unbox_masternode_list(masternode_list_ext.list);
+        }
+        let added_masternodes_keys = Vec::from_raw_parts(result.added_masternodes_keys, result.added_masternodes_count, result.added_masternodes_count);
+        let added_masternodes_values = Vec::from_raw_parts(result.added_masternodes_values, result.added_masternodes_count, result.added_masternodes_count);
+        let modified_masternodes_keys = Vec::from_raw_parts(result.modified_masternodes_keys, result.modified_masternodes_count, result.modified_masternodes_count);
+        let modified_masternodes_values = Vec::from_raw_parts(result.modified_masternodes_values, result.modified_masternodes_count, result.modified_masternodes_count);
+        let added_quorums_keys = Vec::from_raw_parts(result.added_quorums_keys, result.added_quorums_count, result.added_quorums_count);
+        let needed_masternode_lists = Vec::from_raw_parts(result.needed_masternode_lists, result.needed_masternode_lists_count, result.needed_masternode_lists_count);
+        unbox_simple_vec(added_masternodes_keys);
+        unbox_masternode_vec(added_masternodes_values);
+        unbox_simple_vec(modified_masternodes_keys);
+        unbox_masternode_vec(modified_masternodes_values);
+        unbox_simple_vec(added_quorums_keys);
+        unbox_simple_vec(needed_masternode_lists);
     }
 }
