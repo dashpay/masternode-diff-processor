@@ -1,3 +1,16 @@
+#!/bin/bash
+
+# run tests
+cargo test --package masternodes-diff-processor --lib tests --verbose
+
+if [ $? -eq 0 ]
+then
+  echo "Tests: OK"
+else
+  echo "Tests: failed" >&2
+  exit 1
+fi
+
 # build iOS & MacOS binaries
 cargo +nightly lipo --release
 cargo +nightly build --target=x86_64-apple-darwin --release
