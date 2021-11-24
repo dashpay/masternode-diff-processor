@@ -143,7 +143,7 @@ pub struct QuorumValidationData {
 
 pub type AddInsightBlockingLookup = unsafe extern "C" fn(block_hash: *mut [u8; 32], context: *mut c_void);
 pub type ShouldProcessQuorumTypeCallback = unsafe extern "C" fn(quorum_type: u8, context: *mut c_void) -> bool;
-pub type ValidateQuorumCallback = unsafe extern "C" fn(data: QuorumValidationData, context: *mut c_void) -> bool;
+pub type ValidateQuorumCallback = unsafe extern "C" fn(data: *mut QuorumValidationData, context: *mut c_void) -> bool;
 
 pub type BlockHeightLookup = unsafe extern "C" fn(block_hash: *mut [u8; 32], context: *mut c_void) -> u32;
 pub type MasternodeListLookup = unsafe extern "C" fn(block_hash: *mut [u8; 32], context: *mut c_void) -> *mut MasternodeListExt;

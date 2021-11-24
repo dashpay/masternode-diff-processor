@@ -242,13 +242,11 @@ pub extern "C" fn process_diff(
                         let quorum_masternode_list = unwrap_masternode_list_ext(lookup_result);
                         if quorum_masternode_list.is_some() {
                             let quorum_masternode_list = quorum_masternode_list.unwrap();
-                            //let quorum_masternode_list = unsafe { Box::from_raw(bmn_list.list) };
                             let is_valid_payload = quorum_entry.validate_payload();
                             let block_height: u32 = block_height_lookup(boxed(quorum_masternode_list.block_hash.0), context);
                             let quorum_count = llmq_type.quorum_size();
                             let quorum_modifier = quorum_entry.llmq_quorum_hash();
                             let valid_masternodes = quorum_masternode_list.valid_masternodes_for(quorum_modifier, quorum_count, block_height);
-
                             let mut operator_pks: Vec<*mut [u8; 48]> = Vec::new();
                             let mut i: u32 = 0;
                             for masternode_entry in valid_masternodes {
@@ -263,14 +261,14 @@ pub extern "C" fn process_diff(
                             let operator_public_keys_count = pks_slice.len();
                             mem::forget(pks_slice);
                             let is_valid_signature = validate_quorum_callback(
-                                QuorumValidationData {
+                                boxed(QuorumValidationData {
                                     items: operator_public_keys,
                                     count: operator_public_keys_count,
                                     commitment_hash: boxed(quorum_entry.commitment_hash().0),
                                     all_commitment_aggregated_signature: boxed(quorum_entry.all_commitment_aggregated_signature.0),
                                     quorum_threshold_signature: boxed(quorum_entry.quorum_threshold_signature.0),
                                     quorum_public_key: boxed(quorum_entry.quorum_public_key.0)
-                                },
+                                }),
                                 context
                             );
                             valid_quorums &= is_valid_payload && is_valid_signature;
@@ -479,8 +477,10 @@ mod tests {
             ChainType::DevNet => LLMQType::Llmqtype1060.into()
         }
     }
-    unsafe extern "C" fn validate_quorum_callback(data: QuorumValidationData, context: *mut c_void) -> bool {
-        let QuorumValidationData { items, count, commitment_hash, all_commitment_aggregated_signature, quorum_threshold_signature, quorum_public_key } = data;
+    unsafe extern "C" fn validate_quorum_callback(data: *mut QuorumValidationData, context: *mut c_void) -> bool {
+        let result = Box::from_raw(data);
+        // let qvd: QuorumValidationData = Box::from_raw(data);
+        let QuorumValidationData { items, count, commitment_hash, all_commitment_aggregated_signature, quorum_threshold_signature, quorum_public_key } = *result;
         println!("validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}", items, count, commitment_hash, all_commitment_aggregated_signature, quorum_threshold_signature, quorum_public_key);
         true
     }
