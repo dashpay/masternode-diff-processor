@@ -220,7 +220,7 @@ impl MasternodeEntry {
             Err(_err) => { return None; }
         };
         let known_confirmed_at_height: Option<u32> =
-            if confirmed_hash.0.is_empty() &&
+            if !confirmed_hash.0.is_empty() &&
                 block_height != u32::MAX {
                 Some(block_height)
             } else {
