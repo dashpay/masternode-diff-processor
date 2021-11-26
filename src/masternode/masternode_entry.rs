@@ -84,8 +84,8 @@ impl MasternodeEntry {
     pub fn hash_confirmed_hash(confirmed_hash: UInt256, pro_reg_tx_hash: UInt256) -> UInt256 {
         let mut buffer: Vec<u8> = Vec::with_capacity(64);
         let offset: &mut usize = &mut 0;
-        *offset += confirmed_hash.consensus_encode(&mut buffer).unwrap();
         *offset += pro_reg_tx_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += confirmed_hash.consensus_encode(&mut buffer).unwrap();
         UInt256(sha256::Hash::hash(&buffer).into_inner())
     }
 
