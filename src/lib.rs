@@ -140,7 +140,8 @@ pub extern "C" fn mndiff_process(
         .filter(|entry| entry.is_some())
         .fold(BTreeMap::new(),|mut acc, entry| {
             let mut mn_entry = entry.unwrap();
-            acc.insert(mn_entry.provider_registration_transaction_hash.reversed(), mn_entry);
+            let hash = mn_entry.provider_registration_transaction_hash.clone().reversed();
+            acc.insert(hash, mn_entry);
             acc
         });
     let mut added_masternodes = added_or_modified_masternodes.clone();
