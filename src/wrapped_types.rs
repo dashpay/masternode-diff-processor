@@ -54,10 +54,10 @@ pub struct QuorumEntry {
     pub quorum_threshold_signature: *mut [u8; 96],
     pub quorum_verification_vector_hash: *mut [u8; 32],
     pub saved: bool,
-    pub signers_bitset: *const u8,
+    pub signers_bitset: *mut u8,
     pub signers_bitset_length: usize,
     pub signers_count: u64,
-    pub valid_members_bitset: *const u8,
+    pub valid_members_bitset: *mut u8,
     pub valid_members_bitset_length: usize,
     pub valid_members_count: u64,
     pub verified: bool,
@@ -70,21 +70,21 @@ pub struct VarInt {
 }
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct Validity {
-    pub block_hash: *mut [u8; 32],
+    pub block_hash: [u8; 32],
     pub block_height: u32,
     pub is_valid: bool,
 }
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct OperatorPublicKey {
-    pub block_hash: *mut [u8; 32], // 32
+    pub block_hash: [u8; 32],
     pub block_height: u32,
-    pub key: *mut [u8; 48], // 48
+    pub key: [u8; 48],
 }
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct MasternodeEntryHash {
-    pub block_hash: *mut [u8; 32], // 32
+    pub block_hash: [u8; 32],
     pub block_height: u32,
-    pub hash: *mut [u8; 32], // 32
+    pub hash: [u8; 32],
 }
 
 #[repr(C)] #[derive(Debug)]
@@ -236,9 +236,9 @@ pub mod wrapper {
             .into_iter()
             .for_each(|(block, key)| {
                 operator_public_keys_vec.push(boxed(OperatorPublicKey {
-                    block_hash: boxed(block.hash.0),
+                    block_hash: block.hash.0,
                     block_height: block.height,
-                    key: boxed(key.0)
+                    key: key.0
                 }))
             });
         let mut operator_public_keys_slice = operator_public_keys_vec.into_boxed_slice();
@@ -251,9 +251,9 @@ pub mod wrapper {
             .into_iter()
             .for_each(|(block, hash)| {
                 masternode_entry_hashes_vec.push(boxed(MasternodeEntryHash {
-                    block_hash: boxed(block.hash.0),
+                    block_hash: block.hash.0,
                     block_height: block.height,
-                    hash: boxed(hash.0)
+                    hash: hash.0
                 }))
             });
         let mut masternode_entry_hashes_slice = masternode_entry_hashes_vec.into_boxed_slice();
@@ -266,7 +266,7 @@ pub mod wrapper {
             .into_iter()
             .for_each(|(block, is_valid)| {
                 validity_vec.push(boxed(Validity {
-                    block_hash: boxed(block.hash.0),
+                    block_hash: block.hash.0,
                     block_height: block.height,
                     is_valid
                 }))
@@ -312,10 +312,17 @@ pub mod wrapper {
         let quorum_public_key = boxed(entry.quorum_public_key.0);
         let quorum_threshold_signature = boxed(entry.quorum_threshold_signature.0);
         let quorum_verification_vector_hash = boxed(entry.quorum_verification_vector_hash.0);
-        let signers_bitset = entry.signers_bitset.as_ptr();
+        let signers_bitset_vec: Vec<u8> = entry.signers_bitset.to_vec();
+        let mut signers_bitset_slice = signers_bitset_vec.into_boxed_slice();
+        let signers_bitset = signers_bitset_slice.as_mut_ptr();
+        mem::forget(signers_bitset_slice);
         let signers_bitset_length = entry.signers_bitset.len();
         let signers_count = entry.signers_count.0;
-        let valid_members_bitset = entry.valid_members_bitset.as_ptr();
+        // let valid_members_bitset = boxed(entry.valid_members_bitset);
+        let valid_members_vec: Vec<u8> = entry.valid_members_bitset.to_vec();
+        let mut valid_members_slice = valid_members_vec.into_boxed_slice();
+        let valid_members_bitset = valid_members_slice.as_mut_ptr();
+        mem::forget(valid_members_slice);
         let valid_members_bitset_length = entry.valid_members_bitset.len();
         let valid_members_count = entry.valid_members_count.0;
         QuorumEntry {
@@ -428,47 +435,34 @@ pub mod wrapper {
         let port = entry.port;
         let socket_address = SocketAddress { ip_address, port };
         let operator_public_key = UInt384(*entry.operator_public_key);
-        let previous_operator_public_keys_count = entry.previous_operator_public_keys_count;
-        let previous_operator_public_keys: BTreeMap<BlockData, UInt384> = if previous_operator_public_keys_count == 0 {
-            BTreeMap::new()
-        } else {
-            (0..previous_operator_public_keys_count)
-                .into_iter()
-                .fold(BTreeMap::new(), |mut acc, i| {
-                    let OperatorPublicKey { block_hash, block_height: height, key} = **entry.previous_operator_public_keys.offset(i as isize);
-                    let block = BlockData { height, hash: UInt256(*block_hash) };
-                    let public_key = UInt384(*key);
-                    acc.insert(block, public_key);
-                    acc
-                })
-        };
-        let previous_masternode_entry_hashes_count = entry.previous_masternode_entry_hashes_count;
-        let previous_masternode_entry_hashes: BTreeMap<BlockData, UInt256>= if previous_masternode_entry_hashes_count == 0 {
-            BTreeMap::new()
-        } else {
-            (0..previous_masternode_entry_hashes_count)
-                .into_iter()
-                .fold(BTreeMap::new(), |mut acc, i| {
-                    let MasternodeEntryHash { block_hash, block_height: height, hash} = **entry.previous_masternode_entry_hashes.offset(i as isize);
-                    let key = BlockData { height, hash: UInt256(*block_hash) };
-                    let value = UInt256(*hash);
-                    acc.insert(key, value);
-                    acc
-                })
-        };
-        let previous_validity_count = entry.previous_validity_count;
-        let previous_validity: BTreeMap<BlockData, bool> = if entry.previous_validity_count == 0 {
-            BTreeMap::new()
-        } else {
-            (0..previous_validity_count)
-                .into_iter()
-                .fold(BTreeMap::new(), |mut acc, i| {
-                    let Validity { block_hash, block_height: height, is_valid: value } = **entry.previous_validity.offset(i as isize);
-                    let key = BlockData { height, hash: UInt256(*block_hash) };
-                    acc.insert(key, value);
-                    acc
-                })
-        };
+        let previous_operator_public_keys: BTreeMap<BlockData, UInt384> = (0..entry.previous_operator_public_keys_count)
+            .into_iter()
+            .fold(BTreeMap::new(), |mut acc, i| {
+                let previous_operator_public_keys = *entry.previous_operator_public_keys;
+                let OperatorPublicKey { block_hash, block_height: height, key} = *previous_operator_public_keys.offset(i as isize);
+                let block = BlockData { height, hash: UInt256(block_hash) };
+                let public_key = UInt384(key);
+                acc.insert(block, public_key);
+                acc
+            });
+        let previous_masternode_entry_hashes: BTreeMap<BlockData, UInt256> = (0..entry.previous_masternode_entry_hashes_count)
+            .into_iter()
+            .fold(BTreeMap::new(), |mut acc, i| {
+                let MasternodeEntryHash { block_hash, block_height: height, hash} = *(*entry.previous_masternode_entry_hashes).offset(i as isize);
+                let key = BlockData { height, hash: UInt256(block_hash) };
+                let value = UInt256(hash);
+                acc.insert(key, value);
+                acc
+            });
+        let previous_validity: BTreeMap<BlockData, bool> = (0..entry.previous_validity_count)
+            .into_iter()
+            .fold(BTreeMap::new(), |mut acc, i| {
+                let previous_validity = *entry.previous_validity;
+                let Validity { block_hash, block_height: height, is_valid: value } = *previous_validity.offset(i as isize);
+                let key = BlockData { height, hash: UInt256(block_hash) };
+                acc.insert(key, value);
+                acc
+            });
         let update_height = entry.update_height;
         let key_id_voting = UInt160(*entry.key_id_voting);
         let known_confirmed_at_height = if entry.known_confirmed_at_height > 0 {
@@ -516,8 +510,8 @@ pub mod wrapper {
                 entry.previous_operator_public_keys_count)
                 .into_iter()
                 .fold(BTreeMap::new(),|mut acc, entry| {
-                    let key = BlockData { height: (*entry).block_height, hash: UInt256(*(*entry).block_hash) };
-                    let value = UInt384(*(*entry).key);
+                    let key = BlockData { height: (*entry).block_height, hash: UInt256((*entry).block_hash) };
+                    let value = UInt384((*entry).key);
                     acc.insert(key, value);
                     acc
                 })
@@ -533,8 +527,8 @@ pub mod wrapper {
                 .fold(BTreeMap::new(),|mut acc, entry| {
                     let value_box = (*entry).hash;
                     let key_box = (*entry).block_hash;
-                    let key = BlockData { height: (*entry).block_height, hash: UInt256(*key_box) };
-                    let value = UInt256(*value_box);
+                    let key = BlockData { height: (*entry).block_height, hash: UInt256(key_box) };
+                    let value = UInt256(value_box);
                     acc.insert(key, value);
                     acc
                 })
@@ -548,9 +542,8 @@ pub mod wrapper {
                 entry.previous_validity_count)
                 .into_iter()
                 .fold(BTreeMap::new(),|mut acc, entry| {
+                    let key = BlockData { height: (*entry).block_height, hash: UInt256((*entry).block_hash) };
                     let value = (*entry).is_valid;
-                    let key_box = (*entry).block_hash;
-                    let key = BlockData { height: (*entry).block_height, hash: UInt256(*key_box) };
                     acc.insert(key, value);
                     acc
                 })
@@ -657,23 +650,20 @@ pub mod wrapper {
         } else {
             Some(UInt256(*(*mn_list).quorum_merkle_root))
         };
-        let masternodes_count = (*mn_list).masternodes_count;
         let masternodes: BTreeMap<UInt256, masternode_entry::MasternodeEntry> =
-            (0..masternodes_count)
+            (0..(*mn_list).masternodes_count)
                 .into_iter()
                 .fold(BTreeMap::new(),|mut acc, i| {
                     let raw_key = *(*((*mn_list).masternodes_keys.offset(i as isize)));
                     let key = UInt256(raw_key);
                     let raw_value = *(*((*mn_list).masternodes_values.offset(i as isize)));
+                    // println!("unwrap_masternode_list.5.4: {}: {:?}", i, raw_value);
                     let value = unwrap_masternode_entry(raw_value);
                     acc.insert(key, value);
                     acc
                 });
-        let quorums_count = (*mn_list).quorums_count;
-        let quorums_keys = (*mn_list).quorums_keys;
-        let quorums_values = (*mn_list).quorums_values;
         let quorums: HashMap<LLMQType, HashMap<UInt256, quorum_entry::QuorumEntry>> =
-            (0..quorums_count)
+            (0..(*mn_list).quorums_count)
                 .into_iter()
                 .fold(HashMap::new(), |mut acc, i| {
                     let raw_key = *((*mn_list).quorums_keys.offset(i as isize));
@@ -726,20 +716,15 @@ pub mod unboxer {
         unbox_any(entry.operator_public_key);
         let previous_masternode_entry_hashes = Vec::from_raw_parts(entry.previous_masternode_entry_hashes, entry.previous_masternode_entry_hashes_count, entry.previous_masternode_entry_hashes_count);
         for &x in previous_masternode_entry_hashes.iter() {
-            let entry = Box::from_raw(x);
-            unbox_any(entry.block_hash);
-            unbox_any(entry.hash);
+            unbox_any(x);
         }
         let previous_operator_public_keys = Vec::from_raw_parts(entry.previous_operator_public_keys, entry.previous_operator_public_keys_count, entry.previous_operator_public_keys_count);
         for &x in previous_operator_public_keys.iter() {
-            let entry = Box::from_raw(x);
-            unbox_any(entry.block_hash);
-            unbox_any(entry.key);
+            unbox_any(x);
         }
         let previous_validity = Vec::from_raw_parts(entry.previous_validity, entry.previous_validity_count, entry.previous_validity_count);
         for &x in previous_validity.iter() {
-            let entry = Box::from_raw(x);
-            unbox_any(entry.block_hash);
+            unbox_any(x);
         }
         unbox_any(entry.provider_registration_transaction_hash);
         unbox_any(entry.ip_address);

@@ -438,7 +438,6 @@ pub extern "C" fn mndiff_process(
             let new_height = (*modified).update_height;
             if old.update_height < new_height {
                 let b = BlockData { height: block_height, hash: block_hash };
-                //(*modified).keep_info_of_previous_entry_version(old, block_height, block_hash);
                 let new_pro_reg_tx_hash = (*modified).provider_registration_transaction_hash;
                 if new_pro_reg_tx_hash == old.provider_registration_transaction_hash {
                     (*modified).previous_validity = old
@@ -449,10 +448,7 @@ pub extern "C" fn mndiff_process(
                         .collect();
                     if old.is_valid_at(new_height) != (*modified).is_valid {
                         //println!("Changed validity from {} to {} on {:?}", old.is_valid, (*modified).is_valid, new_pro_reg_tx_hash);
-                        // (*modified).previous_validity.insert(b, old.is_valid);
-                        if let Some(val) = (*modified).previous_validity.get_mut(&b) {
-                            *val = old.is_valid;
-                        }
+                        (*modified).previous_validity.insert(b.clone(), old.is_valid.clone());
                     }
                     (*modified).previous_operator_public_keys = old
                         .previous_operator_public_keys
@@ -461,25 +457,18 @@ pub extern "C" fn mndiff_process(
                         .filter(|(block, _)| block.height < new_height)
                         .collect();
                     if old.operator_public_key_at(new_height) != (*modified).operator_public_key {
-                        //println!("Changed sme operator keys from {:?} to {:?} on {:?}", old.operator_public_key, (*modified).operator_public_key, new_pro_reg_tx_hash);
-                        // (*modified).previous_operator_public_keys.insert(b, old.operator_public_key.clone());
-                        if let Some(val) = (*modified).previous_operator_public_keys.get_mut(&b) {
-                            *val = old.operator_public_key.clone();
-                        }
+                        (*modified).previous_operator_public_keys.insert(b.clone(), old.operator_public_key.clone());
                     }
-                    (*modified).previous_masternode_entry_hashes = old
+                    let old_prev_mn_entry_hashes = old
                         .previous_masternode_entry_hashes
                         .clone()
                         .into_iter()
                         .filter(|(block, _)| block.height < new_height)
                         .collect();
+                    (*modified).previous_masternode_entry_hashes = old_prev_mn_entry_hashes;
                     if old.masternode_entry_hash_at(new_height) != (*modified).masternode_entry_hash {
-                        //println!("Changed sme hashes from {:?} to {:?} on {:?}", old.masternode_entry_hash, (*modified).masternode_entry_hash, new_pro_reg_tx_hash);
-                        // (*modified).previous_masternode_entry_hashes.insert(b, old.masternode_entry_hash.clone());
-                        if let Some(val) = (*modified).previous_masternode_entry_hashes.get_mut(&b) {
-                            *val = old.masternode_entry_hash.clone();
-                        }
-
+                        println!("Changed sme hashes from: {:?} to {:?} on {:?}", old.masternode_entry_hash, (*modified).masternode_entry_hash, new_pro_reg_tx_hash);
+                        (*modified).previous_masternode_entry_hashes.insert(b.clone(), old.masternode_entry_hash.clone());
                     }
                 }
 

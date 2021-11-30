@@ -109,8 +109,11 @@ impl MasternodeEntry {
         let mut min_distance = u32::MAX;
         let mut is_valid = self.is_valid;
         for (BlockData { height, .. }, validity) in self.previous_validity.clone() {
+            if height <= block_height {
+                continue;
+            }
             let distance = height - block_height;
-            if (1..min_distance).contains(&distance) {
+            if distance < min_distance {
                 min_distance = distance;
                 is_valid = validity;
             }
@@ -124,77 +127,17 @@ impl MasternodeEntry {
         }
         let mut min_distance = u32::MAX;
         let mut used_previous_operator_public_key_at_block_hash = self.operator_public_key;
-        for (block, key) in self.previous_operator_public_keys.clone() {
-            let prev_block_height = block.height;
-            let distance = prev_block_height - block_height;
-            if (1..min_distance).contains(&distance) {
+        for (BlockData{height,..}, key) in self.previous_operator_public_keys.clone() {
+            if height <= block_height {
+                continue;
+            }
+            let distance = height - block_height;
+            if distance < min_distance {
                 min_distance = distance;
                 used_previous_operator_public_key_at_block_hash = key;
             }
         }
         used_previous_operator_public_key_at_block_hash
-    }
-
-
-    pub fn keep_info_of_previous_entry_version(&mut self, mut masternode_entry: MasternodeEntry, block_height: u32, block_hash: UInt256) {
-        let b = BlockData { height: block_height, hash: block_hash };
-        if self.provider_registration_transaction_hash == masternode_entry.provider_registration_transaction_hash {
-            // self.previous_validity = HashMap::new();
-            // if for example we are getting a masternode list at block 402 when we already got the
-            // masternode list at block 414 then the other sme might have previousValidity that is
-            // in our future we need to ignore them
-
-            self.previous_validity = masternode_entry
-                .clone()
-                .previous_validity
-                .into_iter()
-                .filter(|(block, _)| block.height < self.update_height)
-                .collect();
-
-            if masternode_entry.is_valid_at(self.update_height) != self.is_valid {
-                // println!("Changed validity from {} to {} on {:?}", masternode_entry.is_valid, self.is_valid, self.provider_registration_transaction_hash);
-                self.previous_validity.insert(b, masternode_entry.is_valid);
-            }
-            self.previous_operator_public_keys = BTreeMap::new();
-            // if for example we are getting a masternode list at block 402 when we already got the
-            // masternode list at block 414 then the other sme might have previousOperatorPublicKeys
-            // that is in our future we need to ignore them
-            for (block, key) in &masternode_entry.previous_operator_public_keys {
-                if block.height < self.update_height {
-                    self.previous_operator_public_keys.insert(*block, *key);
-                }
-            }
-            if masternode_entry.operator_public_key_at(self.update_height) != self.operator_public_key {
-                // the operator public key changed
-                // println!("Changed sme operator keys from {:?} to {:?} on {:?}", masternode_entry.operator_public_key, self.operator_public_key, self.provider_registration_transaction_hash);
-                self.previous_operator_public_keys.insert(b, masternode_entry.operator_public_key);
-            }
-            // if for example we are getting a masternode list at block 402 when we already got the
-            // masternode list at block 414 then the other sme might have
-            // previous_masternode_entry_hashes that is in our future we need to ignore them
-
-            self.previous_masternode_entry_hashes = masternode_entry
-                .clone()
-                .previous_masternode_entry_hashes
-                .into_iter()
-                .filter(|(block, _hash)| block.height < self.update_height)
-                .collect();
-
-            let hash_for_height = masternode_entry.masternode_entry_hash_at(self.update_height);
-            if hash_for_height != self.masternode_entry_hash {
-                // the hashes changed
-                //println!("Changed sme hashes from {:?} to {:?} on {:?}", masternode_entry.masternode_entry_hash, self.masternode_entry_hash, self.provider_registration_transaction_hash);
-                self.previous_masternode_entry_hashes.insert(b, masternode_entry.masternode_entry_hash);
-            }
-        }
-        // if the masternodeEntry.confirmedHash is not set we do not need to do anything the
-        // knownConfirmedHashAtHeight will be higher and if the masternodeEntry.confirmedHash is
-        // set we might need to update our knownConfirmedAtHeight
-        if !masternode_entry.confirmed_hash.0.is_empty() &&
-            masternode_entry.known_confirmed_at_height.unwrap() > block_height {
-            // we found it confirmed at a previous height
-            masternode_entry.known_confirmed_at_height = Some(block_height);
-        }
     }
 
     pub fn masternode_entry_hash_at(&self, block_height: u32) -> UInt256 {
@@ -215,27 +158,7 @@ impl MasternodeEntry {
                 println!("SME Hash for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {}", self.provider_registration_transaction_hash, hash, used_hash, block_height);
                 used_hash = hash;
             }
-
-
-            // let distance = height - block_height;
-            // if (1..min_distance).contains(&distance) {
-            //     min_distance = distance;
-            //     used_hash = hash;
-            // }
         }
-        // NSDictionary<DSBlock *, NSData *> *previousSimplifiedMasternodeEntryHashes = self.previousSimplifiedMasternodeEntryHashes;
-        // uint32_t minDistance = UINT32_MAX;
-        // UInt256 usedSimplifiedMasternodeEntryHash = self.simplifiedMasternodeEntryHash;
-        // for (DSBlock *previousBlock in previousSimplifiedMasternodeEntryHashes) {
-        //     if (previousBlock.height <= blockHeight) continue;
-        //     uint32_t distance = previousBlock.height - blockHeight;
-        //     if (distance < minDistance) {
-        //         minDistance = distance;
-                //            DSDSMNELog(@"SME Hash for proTxHash %@ : Using %@ instead of %@ for list at block height %u", uint256_hex(self.providerRegistrationTransactionHash), uint256_hex(previousSimplifiedMasternodeEntryHashes[previousBlock].UInt256), uint256_hex(usedSimplifiedMasternodeEntryHash), blockHeight);
-        //         usedSimplifiedMasternodeEntryHash = previousSimplifiedMasternodeEntryHashes[previousBlock].UInt256;
-        //     }
-        // }
-
         used_hash
     }
 
