@@ -4,11 +4,11 @@ use byte::ctx::Bytes;
 use hashes::{Hash, sha256d};
 use crate::common::llmq_type::LLMQType;
 use crate::consensus::{Decodable, Encodable, WriteExt};
-use crate::consensus::encode::{consensus_encode_with_size, VarInt};
+use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
 
 // #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct QuorumEntry<'a> {
     pub version: u16,
     pub quorum_hash: UInt256,
@@ -26,6 +26,13 @@ pub struct QuorumEntry<'a> {
     pub verified: bool,
     pub saved: bool,
     pub commitment_hash: Option<UInt256>,
+}
+impl<'a> std::fmt::Debug for QuorumEntry<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MasternodeList")
+            .field("quorum_entry_hash", &self.quorum_entry_hash)
+            .finish()
+    }
 }
 
 impl<'a> QuorumEntry<'a> {
@@ -161,8 +168,7 @@ impl<'a> QuorumEntry<'a> {
     pub fn llmq_quorum_hash(&self) -> UInt256 {
         let mut buffer: Vec<u8> = Vec::with_capacity(33);
         let offset: &mut usize = &mut 0;
-        let llmq_u8: u8 = self.llmq_type.into();
-        *offset += llmq_u8.consensus_encode(&mut buffer).unwrap();
+        *offset += VarInt(self.llmq_type as u64).consensus_encode(&mut buffer).unwrap();
         *offset += self.quorum_hash.consensus_encode(&mut buffer).unwrap();
         UInt256(sha256d::Hash::hash(&buffer).into_inner())
     }
@@ -170,24 +176,26 @@ impl<'a> QuorumEntry<'a> {
     pub fn commitment_data(&self) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
-        let llmq_u8: u8 = self.llmq_type.into();
-        *offset += llmq_u8.consensus_encode(&mut buffer).unwrap();
+        let llmq_type = VarInt(self.llmq_type as u64);
+        *offset += llmq_type.consensus_encode(&mut buffer).unwrap();
         *offset += self.quorum_hash.consensus_encode(&mut buffer).unwrap();
         *offset += self.valid_members_count.consensus_encode(&mut buffer).unwrap();
-        *offset += consensus_encode_with_size(self.valid_members_bitset, &mut buffer).unwrap();
+        buffer.emit_slice(&self.valid_members_bitset).unwrap();
+        *offset += self.valid_members_bitset.len();
         *offset += self.quorum_public_key.consensus_encode(&mut buffer).unwrap();
         *offset += self.quorum_verification_vector_hash.consensus_encode(&mut buffer).unwrap();
         buffer
     }
 
-    pub fn commitment_hash(&mut self) -> UInt256 {
+    pub fn generate_commitment_hash(&mut self) -> UInt256 {
         if self.commitment_hash.is_none() {
-            self.commitment_hash = Some(UInt256(sha256d::Hash::hash(&self.commitment_data()).into_inner()));
+            let data = self.commitment_data();
+            self.commitment_hash = Some(UInt256(sha256d::Hash::hash(&data).into_inner()));
         }
         self.commitment_hash.unwrap()
     }
 
-    pub fn validate_payload(&mut self) -> bool {
+    pub fn validate_payload(&self) -> bool {
         // The quorumHash must match the current DKG session
         // todo
         // The byte size of the signers and validMembers bitvectors must match “(quorumSize + 7) / 8”
@@ -199,54 +207,41 @@ impl<'a> QuorumEntry<'a> {
             println!("Error: The byte size of the validMembers bitvectors ({}) must match “(quorumSize + 7) / 8 ({})", self.valid_members_bitset.len(), (self.valid_members_count.0 + 7) / 8);
             return false;
         }
-
-        // No out-of-range bits should be set in byte representation of the signers and validMembers bitvectors
-        let mut signers_offset: usize = (self.signers_count.0 as usize) / 8;
-        let signers_last_byte = match self.signers_bitset.read_with::<u8>(&mut signers_offset, LE) {
+        let signers_offset: usize = (self.signers_count.0 as usize) / 8;
+        let signers_last_byte = match self.signers_bitset.read_with::<u8>(&mut signers_offset.clone(), LE) {
             Ok(data) => data,
             Err(_err) => 0
         };
-        let signers_mask = u8::MAX >> (8 - signers_offset) << (8 - signers_offset);
-        if signers_last_byte & signers_mask != 0 {
+        let signers_mask = if signers_offset > 0 && signers_offset <= 8 { u8::MAX >> (8 - signers_offset) << (8 - signers_offset) } else { 0 };
+        let signers_byte_and_mask = signers_last_byte & signers_mask;
+        if signers_byte_and_mask != 0 {
             println!("Error: No out-of-range bits should be set in byte representation of the signers bitvector");
             return false;
         }
-
-        let mut valid_members_offset = self.valid_members_count.0 as usize / 8;
-        let valid_members_last_byte: u8 = self.valid_members_bitset.read_with::<u8>(&mut valid_members_offset, LE).unwrap();
-        let valid_members_mask = u8::MAX >> (8 - valid_members_offset) << (8 - valid_members_offset);
-        if valid_members_last_byte & valid_members_mask != 0 {
+        let valid_members_offset = (self.valid_members_count.0 as usize) / 8;
+        // thread '<unnamed>' panicked at 'called `Result::unwrap()` on an `Err` value: BadOffset(50)', src/masternode/quorum_entry.rs:216:116
+        let valid_members_last_byte = match self.valid_members_bitset.read_with::<u8>(&mut valid_members_offset.clone(), LE) {
+            Ok(data) => data,
+            Err(_err) => 0
+        };
+        let valid_members_mask = if valid_members_offset > 0 && valid_members_offset <= 8 { u8::MAX >> (8 - valid_members_offset) << (8 - valid_members_offset) } else { 0 };
+        let valid_members_byte_and_mask = valid_members_last_byte & valid_members_mask;
+        if valid_members_byte_and_mask != 0 {
             println!("Error: No out-of-range bits should be set in byte representation of the validMembers bitvector");
             return false;
         }
-        let quorum_threshold = self.llmq_type.quorum_threshold();
+        let quorum_threshold = self.llmq_type.quorum_threshold() as u64;
         // The number of set bits in the signers and validMembers bitvectors must be at least >= quorumThreshold
-        if self.signers_bitset.true_bits_count() < quorum_threshold as u64 {
-            println!("Error: The number of set bits in the signers bitvector {} must be at least >= quorumThreshold {}", self.signers_bitset.true_bits_count(), quorum_threshold);
+        let signers_bitset_true_bits_count = self.signers_bitset.true_bits_count();
+        if signers_bitset_true_bits_count < quorum_threshold {
+            println!("Error: The number of set bits in the signers bitvector {} must be at least >= quorumThreshold {}", signers_bitset_true_bits_count, quorum_threshold);
             return false;
         }
-        if self.valid_members_bitset.true_bits_count() < quorum_threshold as u64 {
-            println!("Error: The number of set bits in the validMembers bitvector {} must be at least >= quorumThreshold {}", self.valid_members_bitset.true_bits_count(), quorum_threshold);
+        let valid_members_bitset_true_bits_count = self.valid_members_bitset.true_bits_count();
+        if valid_members_bitset_true_bits_count < quorum_threshold {
+            println!("Error: The number of set bits in the validMembers bitvector {} must be at least >= quorumThreshold {}", valid_members_bitset_true_bits_count, quorum_threshold);
             return false;
         }
         true
     }
-
-    // This validation moved into external lib with bls
-    // The quorumSig must validate against the quorumPublicKey and the commitmentHash. As this is a recovered threshold signature, normal signature verification can be performed, without the need of the full quorum verification vector. The commitmentHash is calculated in the same way as in the commitment phase.
-    /*pub fn validate_signatures(&mut self) -> bool {
-        let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(self.commitment_hash(), self.all_commitment_aggregated_signature, public_keys);
-        if !all_commitment_aggregated_signature_validated {
-            return false;
-        }
-        // The sig must validate against the commitmentHash and all public keys determined by the
-        // signers bitvector. This is an aggregated BLS signature verification.
-        if BLSKey::verify(self.commitment_hash(), self.quorum_threshold_signature, self.quorum_public_key) {
-            self.verified = true;
-            true
-        } else {
-            println!("Issue with quorumSignatureValidated");
-            false
-        }
-    }*/
 }

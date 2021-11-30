@@ -118,32 +118,21 @@ pub trait Reversable {
     fn reversed(&mut self) -> Self;
 }
 
-/*#[repr(C)] #[derive(Copy, Clone, Ord)]
-pub union UInt128 { u8: [u8; 16], u16: [u16; 8], u32: [u32; 4], u64: [u64; 2] }
-#[repr(C)] #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub union UInt160 { u8: [u8; 20], u16: [u16; 10], u32: [u32; 5] }
-#[repr(C)] #[derive(Copy, Clone)]
-pub union UInt256 { u8: [u8; 32], u16: [u16; 16], u32: [u32; 8], u64: [u64; 4] }
-#[repr(C)] #[derive(Copy, Clone)]
-pub union UInt384 { u8: [u8; 48], u16: [u16; 24], u32: [u32; 12], u64: [u64; 6] }
-#[repr(C)] #[derive(Copy, Clone)]
-pub union UInt768 { u8: [u8; 96], u16: [u16; 48], u32: [u32; 24], u64: [u64; 12] }
-#[repr(C)] #[derive(Copy, Clone)]
-pub struct MNPayload { u8: [u8; MN_ENTRY_PAYLOAD_LENGTH] }*/
+pub trait Zeroable {
+    fn is_zero(&self) -> bool;
+}
 
-
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt128(pub [u8; 16]);
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt160(pub [u8; 20]);
-#[repr(C)] #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt256(pub [u8; 32]);
-#[repr(C)] #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt384(pub [u8; 48]);
-#[repr(C)] #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt768(pub [u8; 96]);
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MNPayload(pub [u8; MN_ENTRY_PAYLOAD_LENGTH]);
 
 macro_rules! define_bytes_to_big_uint {
@@ -163,9 +152,27 @@ macro_rules! define_bytes_to_big_uint {
                 Ok(($uint_type(data), $byte_len))
             }
         }
+        impl std::default::Default for $uint_type {
+            fn default() -> Self {
+                let mut data: [u8; $byte_len] = [0u8; $byte_len];
+                for i in 0..$byte_len {
+                    data[i] = 0;
+                }
+                Self(data)
+            }
+        }
+
         impl std::fmt::Display for $uint_type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, "{}", self.0.to_hex())?;
+                Ok(())
+            }
+        }
+        impl std::fmt::Debug for $uint_type {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                // for i in 0..self.len() {
+                    write!(f, "{}", self.0.to_hex())?;
+                // }
                 Ok(())
             }
         }
@@ -206,6 +213,17 @@ macro_rules! define_bytes_to_big_uint {
                 } else {
                     Err(hex::Error::InvalidLength(2 * $byte_len, 2 * iter.len()))
                 }
+            }
+        }
+
+        impl Zeroable for $uint_type {
+            fn is_zero(&self) -> bool {
+                for i in 0..$byte_len {
+                    if self.0[i] == 1 {
+                        return true;
+                    }
+                }
+                false
             }
         }
     }

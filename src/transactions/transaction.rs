@@ -95,6 +95,7 @@ pub trait ITransaction {
     fn transaction_type(&self) -> TransactionType;
 }
 
+#[derive(Debug)]
 pub struct Transaction<'a> {
 
     pub inputs: Vec<TransactionInput<'a>>,

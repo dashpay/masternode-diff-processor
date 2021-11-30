@@ -7,7 +7,7 @@ use crate::transactions::transaction::Transaction;
 use crate::transactions::transaction::TransactionType::Coinbase;
 
 // #[repr(C)]
-// #[derive(Clone)]
+#[derive(Debug)]
 pub struct CoinbaseTransaction<'a> {
     pub base: Transaction<'a>,
     pub coinbase_transaction_version: u16,

@@ -376,6 +376,14 @@ impl VarInt {
     }
 }
 
+impl std::fmt::Display for VarInt {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "[val: {}, len: {}]", self.0, self.len())?;
+        Ok(())
+    }
+}
+
+
 impl Encodable for VarInt {
     #[inline]
     fn consensus_encode<S: io::Write>(&self, mut s: S) -> Result<usize, io::Error> {

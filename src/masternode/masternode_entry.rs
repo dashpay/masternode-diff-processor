@@ -1,13 +1,13 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use byte::{BytesExt, LE};
 use crate::common::block_data::BlockData;
 use crate::common::socket_address::SocketAddress;
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::{MNPayload, short_hex_string_from, UInt128, UInt160, UInt256, UInt384};
+use crate::crypto::byte_util::{MNPayload, short_hex_string_from, UInt128, UInt160, UInt256, UInt384, Zeroable};
 use crate::hashes::{Hash, sha256, sha256d};
 
 // #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct MasternodeEntry {
     pub provider_registration_transaction_hash: UInt256,
     pub confirmed_hash: UInt256,
@@ -15,13 +15,26 @@ pub struct MasternodeEntry {
     pub socket_address: SocketAddress,
     pub operator_public_key: UInt384,
     pub previous_operator_public_keys: BTreeMap<BlockData, UInt384>,
-    pub previous_masternode_entry_hashes: HashMap<BlockData, UInt256>,
-    pub previous_validity: HashMap<BlockData, bool>,
+    pub previous_masternode_entry_hashes: BTreeMap<BlockData, UInt256>,
+    pub previous_validity: BTreeMap<BlockData, bool>,
     pub known_confirmed_at_height: Option<u32>,
     pub update_height: u32,
     pub key_id_voting: UInt160,
     pub is_valid: bool,
     pub masternode_entry_hash: UInt256,
+}
+impl std::fmt::Debug for MasternodeEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MasternodeEntry")
+            .field("provider_registration_transaction_hash", &self.provider_registration_transaction_hash)
+            .field("confirmed_hash", &self.confirmed_hash)
+            .field("masternode_entry_hash", &self.masternode_entry_hash)
+            .field("operator_public_key", &self.operator_public_key)
+            .field("update_height", &self.update_height)
+            .field("known_confirmed_at_height", &self.known_confirmed_at_height)
+            .field("is_valid", &self.is_valid)
+            .finish()
+    }
 }
 
 impl MasternodeEntry {
@@ -139,7 +152,7 @@ impl MasternodeEntry {
                 .collect();
 
             if masternode_entry.is_valid_at(self.update_height) != self.is_valid {
-                println!("Changed validity from {} to {} on {:?}", masternode_entry.is_valid, self.is_valid, self.provider_registration_transaction_hash);
+                // println!("Changed validity from {} to {} on {:?}", masternode_entry.is_valid, self.is_valid, self.provider_registration_transaction_hash);
                 self.previous_validity.insert(b, masternode_entry.is_valid);
             }
             self.previous_operator_public_keys = BTreeMap::new();
@@ -153,7 +166,7 @@ impl MasternodeEntry {
             }
             if masternode_entry.operator_public_key_at(self.update_height) != self.operator_public_key {
                 // the operator public key changed
-                println!("Changed sme operator keys from {:?} to {:?} on {:?}", masternode_entry.operator_public_key, self.operator_public_key, self.provider_registration_transaction_hash);
+                // println!("Changed sme operator keys from {:?} to {:?} on {:?}", masternode_entry.operator_public_key, self.operator_public_key, self.provider_registration_transaction_hash);
                 self.previous_operator_public_keys.insert(b, masternode_entry.operator_public_key);
             }
             // if for example we are getting a masternode list at block 402 when we already got the
@@ -170,7 +183,7 @@ impl MasternodeEntry {
             let hash_for_height = masternode_entry.masternode_entry_hash_at(self.update_height);
             if hash_for_height != self.masternode_entry_hash {
                 // the hashes changed
-                println!("Changed sme hashes from {:?} to {:?} on {:?}", masternode_entry.masternode_entry_hash, self.masternode_entry_hash, self.provider_registration_transaction_hash);
+                //println!("Changed sme hashes from {:?} to {:?} on {:?}", masternode_entry.masternode_entry_hash, self.masternode_entry_hash, self.provider_registration_transaction_hash);
                 self.previous_masternode_entry_hashes.insert(b, masternode_entry.masternode_entry_hash);
             }
         }
@@ -189,16 +202,40 @@ impl MasternodeEntry {
             block_height == u32::MAX {
             return self.masternode_entry_hash;
         }
-        let hashes: HashMap<BlockData, UInt256> = self.previous_masternode_entry_hashes.clone();
+        let hashes: BTreeMap<BlockData, UInt256> = self.previous_masternode_entry_hashes.clone();
         let mut min_distance = u32::MAX;
         let mut used_hash = self.masternode_entry_hash;
         for (BlockData { height, .. }, hash) in hashes {
+            if height <= block_height {
+                continue;
+            }
             let distance = height - block_height;
-            if (1..min_distance).contains(&distance) {
+            if distance < min_distance {
                 min_distance = distance;
+                println!("SME Hash for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {}", self.provider_registration_transaction_hash, hash, used_hash, block_height);
                 used_hash = hash;
             }
+
+
+            // let distance = height - block_height;
+            // if (1..min_distance).contains(&distance) {
+            //     min_distance = distance;
+            //     used_hash = hash;
+            // }
         }
+        // NSDictionary<DSBlock *, NSData *> *previousSimplifiedMasternodeEntryHashes = self.previousSimplifiedMasternodeEntryHashes;
+        // uint32_t minDistance = UINT32_MAX;
+        // UInt256 usedSimplifiedMasternodeEntryHash = self.simplifiedMasternodeEntryHash;
+        // for (DSBlock *previousBlock in previousSimplifiedMasternodeEntryHashes) {
+        //     if (previousBlock.height <= blockHeight) continue;
+        //     uint32_t distance = previousBlock.height - blockHeight;
+        //     if (distance < minDistance) {
+        //         minDistance = distance;
+                //            DSDSMNELog(@"SME Hash for proTxHash %@ : Using %@ instead of %@ for list at block height %u", uint256_hex(self.providerRegistrationTransactionHash), uint256_hex(previousSimplifiedMasternodeEntryHashes[previousBlock].UInt256), uint256_hex(usedSimplifiedMasternodeEntryHash), blockHeight);
+        //         usedSimplifiedMasternodeEntryHash = previousSimplifiedMasternodeEntryHashes[previousBlock].UInt256;
+        //     }
+        // }
+
         used_hash
     }
 
@@ -220,7 +257,7 @@ impl MasternodeEntry {
             Err(_err) => { return None; }
         };
         let known_confirmed_at_height: Option<u32> =
-            if !confirmed_hash.0.is_empty() &&
+            if !confirmed_hash.is_zero() &&
                 block_height != u32::MAX {
                 Some(block_height)
             } else {
@@ -262,8 +299,8 @@ impl MasternodeEntry {
             socket_address,
             operator_public_key,
             previous_operator_public_keys: BTreeMap::new(),
-            previous_masternode_entry_hashes: HashMap::new(),
-            previous_validity: HashMap::new(),
+            previous_masternode_entry_hashes: BTreeMap::new(),
+            previous_validity: BTreeMap::new(),
             known_confirmed_at_height,
             update_height: block_height,
             key_id_voting,
