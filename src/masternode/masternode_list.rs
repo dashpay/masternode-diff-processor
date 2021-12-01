@@ -24,12 +24,11 @@ impl<'a> std::fmt::Debug for MasternodeList<'a> {
             .field("known_height", &self.known_height)
             .field("masternode_merkle_root", &self.masternode_merkle_root)
             .field("quorum_merkle_root", &self.quorum_merkle_root)
-            .field("masternodes", &self.masternodes)
-            // .field("quorums", &self.quorums)
+            .field("masternodes", &self.masternodes.len())
+            .field("quorums", &self.quorums.len())
             .finish()
     }
 }
-
 
 impl<'a> MasternodeList<'a> {
     pub fn new(
@@ -47,19 +46,7 @@ impl<'a> MasternodeList<'a> {
             quorum_merkle_root: None,
             masternodes,
         };
-
-        // println!("LIST. masternodes: [");
-        // for (data, entry) in list.masternodes.clone() {
-        //     println!("{:?}:\n\t{:?},\n\t{:?}", data, entry.provider_registration_transaction_hash, entry.masternode_entry_hash);
-        // }
-        // println!("]");
-
         if let Some(hashes) = list.hashes_for_merkle_root(block_height) {
-            // println!("LIST.MN. hashes_for_merkle_root: [");
-            // for data in hashes.clone() {
-            //     println!("{:?},", data);
-            // }
-            // println!("]");
             list.masternode_merkle_root = merkle_root_from_hashes(hashes);
         }
         if quorums_active {
@@ -78,7 +65,6 @@ impl<'a> MasternodeList<'a> {
     }
 
     pub fn valid_masternodes_for(&self, quorum_modifier: UInt256, quorum_count: u32, block_height: u32) -> Vec<MasternodeEntry> {
-        //println!("valid_masternodes_for {:?}, {:?}, {:?}", quorum_modifier, quorum_count, block_height);
         let mut score_dictionary: BTreeMap<UInt256, MasternodeEntry> = self.masternodes.clone().into_iter().filter_map(|(_, entry)| {
             let score = MasternodeList::masternode_score(entry.clone(), quorum_modifier, block_height);
             if score.is_some() && !score.unwrap().0.is_empty() {
@@ -118,33 +104,29 @@ impl<'a> MasternodeList<'a> {
     }
 
     pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<UInt256>> {
-        //println!("hashes_for_merkle_root {} {:?}", block_height, pro_tx_hashes);
         if block_height == u32::MAX {
             println!("Block height lookup queried an unknown block {:?}", self.block_hash);
             None
         } else {
-            // let mut pro_tx_hashes: Vec<UInt256> = self.masternodes.clone().into_keys().map(|mut h|h.reversed()).collect();
-            // let pro_tx_hashes: Vec<UInt256> = self.provider_tx_ordered_hashes();
             let mut pro_tx_hashes: Vec<UInt256> = self.masternodes.clone().into_keys().collect();
-            pro_tx_hashes.sort_by(|&h1, &h2| {
-                return h1.clone().reversed().cmp(&h2.clone().reversed());
-            });
+            pro_tx_hashes
+                .sort_by(|&h1, &h2|
+                    h1.clone()
+                        .reversed()
+                        .cmp(&h2.clone()
+                            .reversed()));
             let mns = self.masternodes.clone();
-            // println!("LIST.MN. hashes_for_merkle_root: [");
             let entry_hashes = pro_tx_hashes
                 .clone()
                 .into_iter()
                 .map(|hash| {
-                    //let h = hash.clone().reversed();
                     let h = hash.clone();
                     let map = mns.clone();
                     let mn = &map[&h];
                     let entry_hash = mn.masternode_entry_hash_at(block_height);
-                    // println!("{:?}:{:?}", h, entry_hash);
                     entry_hash
                 })
                 .collect();
-            // println!("]");
             Some(entry_hashes)
         }
     }
@@ -162,13 +144,10 @@ impl<'a> MasternodeList<'a> {
                 acc
             });
         llmq_commitment_hashes.sort();
-        // println!("hashes_for_quorum_merkle_root: hashes: {:?}", llmq_commitment_hashes);
         llmq_commitment_hashes
     }
 
     pub fn masternode_for(&self, registration_hash: UInt256) -> Option<&MasternodeEntry> {
         self.masternodes.get(&registration_hash)
     }
-
-
 }

@@ -25,164 +25,30 @@ use std::{mem, slice};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::c_void;
 use byte::*;
-use hashes::hex::{FromHex, ToHex};
+use hashes::hex::ToHex;
 use crate::common::block_data::BlockData;
 use crate::common::llmq_type::LLMQType;
 use crate::common::merkle_tree::MerkleTree;
-use crate::common::socket_address::SocketAddress;
 use crate::consensus::Decodable;
 use crate::consensus::encode::VarInt;
-use crate::crypto::byte_util::{Data, MNPayload, Reversable, UInt128, UInt256, UInt384, Zeroable};
+use crate::crypto::byte_util::{Data, MNPayload, Reversable, UInt256, Zeroable};
 use crate::crypto::data_ops::inplace_intersection;
 use crate::masternode::masternode_list::MasternodeList;
 use crate::masternode::quorum_entry::QuorumEntry;
 use crate::masternode::masternode_entry::{MasternodeEntry};
 use crate::transactions::coinbase_transaction::CoinbaseTransaction;
 use crate::wrapped_types::{AddInsightBlockingLookup, BlockHeightLookup, MasternodeListDestroy, MasternodeListLookup, MndiffResult, QuorumValidationData, ShouldProcessQuorumTypeCallback, ValidateQuorumCallback};
-use crate::wrapped_types::unboxer::{unbox_any, unbox_masternode_list, unbox_quorum_validation_data, unbox_result};
+use crate::wrapped_types::unboxer::{unbox_any, unbox_quorum_validation_data, unbox_result};
 use crate::wrapped_types::wrapper::{boxed, unwrap_masternode_list, wrap_masternode_list, wrap_masternodes_map, wrap_quorums_map};
 
 fn failure<'a>() -> *mut MndiffResult {
     boxed(MndiffResult::default())
 }
 
-#[repr(C)] #[derive(Clone, Copy, Debug)]
-pub struct TestStruct {
-    pub hash: *mut [u8; 32],
-    pub height: u32,
-    pub keys: *mut *mut [u8; 32],
-    pub keys_count: usize,
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn mndiff_test_struct_create(data: *const TestStruct) -> *mut TestStruct {
-    let (hash, height, hashes) = if data.is_null() {(
-        UInt256::from_hex("00000000000000063cea204f55fbb2eb56816eacf6134bf338fb6f7d19586e68").unwrap(),
-        120002 as u32,
-        {let vec: Vec<UInt256> =
-        (1..3)
-            .into_iter()
-            .map(|i| UInt256([i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, i, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
-            .collect();
-            vec
-        }
-    )} else {(
-        UInt256(*(*data).hash.clone()),
-        (*data).height + 1,
-        {
-            let cc: Vec<UInt256> = (0..(*data).keys_count).into_iter().map(|i| {
-                let key = *((*data).keys.offset(i as isize));
-                UInt256(*key).reversed()
-            }).collect();
-            cc
-        }
-    )};
-    let keys: Vec<*mut [u8; 32]> = hashes
-        .clone()
-        .into_iter()
-        .map(|hash| boxed(hash.0))
-        .collect();
-    let mut keys_slice = keys.into_boxed_slice();
-    let keys_mut_ptr = keys_slice.as_mut_ptr();
-    let keys_count = keys_slice.len();
-    mem::forget(keys_slice);
-    let boxed_hash = boxed(hash.0);
-    let result = TestStruct {
-        hash: boxed_hash,
-        height,
-        keys: keys_mut_ptr,
-        keys_count
-    };
-    let boxed = boxed(result);
-    boxed
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn mndiff_test_struct_destroy(data: *mut TestStruct) {
-    let unboxed = Box::from_raw(data);
-    let _hash = Box::from_raw(unboxed.hash);
-    let vec = Vec::from_raw_parts(unboxed.keys, unboxed.keys_count, unboxed.keys_count);
-    for &x in vec.iter() {
-        let unboxed_x = Box::from_raw(x);
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn mndiff_test_memory_leaks(base_masternode_list: *const wrapped_types::MasternodeList) -> *mut wrapped_types::MasternodeList {
-    let block_hash = Vec::from_hex("00000000000000063cea204f55fbb2eb56816eacf6134bf338fb6f7d19586e68").expect("Invalid Hex String").read_with::<UInt256>(&mut 0, LE).unwrap();
-    let exists = !base_masternode_list.is_null();
-    let base_masternode_list = if exists {
-        unsafe { Some(unwrap_masternode_list(base_masternode_list)) }
-    } else {
-        None
-    };
-    let masternodes = (1..3).into_iter().fold(BTreeMap::new(),|mut acc, index| {
-        let mn_entry = create_masternode_entry(index);
-        let hash = mn_entry.provider_registration_transaction_hash.clone().reversed();
-        acc.insert(hash, mn_entry);
-        acc
-    });
-    let quorums: HashMap<LLMQType, HashMap<UInt256, QuorumEntry>> = HashMap::new();
-    let masternode_list = MasternodeList::new(masternodes, quorums, block_hash, 1095072, false);
-    let masternode_list_new = wrap_masternode_list(masternode_list);
-    boxed(masternode_list_new)
-}
-fn create_masternode_entry(i: u8) -> MasternodeEntry {
-    MasternodeEntry {
-        provider_registration_transaction_hash: UInt256([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,i,i,i,i,i,i,i,i]),
-        confirmed_hash: Default::default(),
-        confirmed_hash_hashed_with_provider_registration_transaction_hash: None,
-        socket_address: SocketAddress { ip_address: UInt128([0,0,0,0,0,0,0,0,i,i,i,i,i,i,i,i]), port: 9999 },
-        operator_public_key: Default::default(),
-        previous_operator_public_keys: BTreeMap::new(),
-        previous_masternode_entry_hashes: BTreeMap::new(),
-        previous_validity: BTreeMap::new(),
-        known_confirmed_at_height: Some(50),
-        update_height: 100,
-        key_id_voting: Default::default(),
-        is_valid: true,
-        masternode_entry_hash: Default::default()
-    }
-}
-
-fn create_quorum_entry<'a>(index: u8) -> QuorumEntry<'a> {
-    let quorum_hash = UInt256::from_hex("48801a3465532e165e7359b45631d7e40beec3a88ae18c144b62f61b94010000").unwrap();
-    let quorum_public_key = UInt384::from_hex("103425b2fd21494e7116766182efecb7479da2572bb1f226936152d615625b100477538261beaa87ff4442822b85d75e").unwrap();
-    let quorum_entry_hash = UInt256::default();
-    let verified = true;
-    let version = 1;
-    let llmq_type = LLMQType::Llmqtype1060;
-    let quorum_entry = QuorumEntry {
-        version,
-        quorum_hash,
-        quorum_public_key,
-        quorum_threshold_signature: Default::default(),
-        quorum_verification_vector_hash: Default::default(),
-        all_commitment_aggregated_signature: Default::default(),
-        signers_count: VarInt(0),
-        llmq_type,
-        valid_members_count: VarInt(0),
-        signers_bitset: &[],
-        valid_members_bitset: &[],
-        length: 0,
-        quorum_entry_hash,
-        verified,
-        saved: true,
-        commitment_hash: Some(UInt256([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,index]))
-    };
-    quorum_entry
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn mndiff_test_memory_leaks_destroy(masternode_list: *mut wrapped_types::MasternodeList) {
-    let masternode_list = Box::from_raw(masternode_list);
-    unbox_masternode_list(masternode_list);
-}
-
 #[no_mangle]
 pub extern "C" fn mndiff_process(
     message_arr: *const u8,
-    length: usize,
+    message_length: usize,
     base_masternode_list: *const wrapped_types::MasternodeList,
     masternode_list_lookup: MasternodeListLookup,
     masternode_list_destroy: MasternodeListDestroy,
@@ -192,16 +58,15 @@ pub extern "C" fn mndiff_process(
     should_process_quorum_of_type: ShouldProcessQuorumTypeCallback,
     validate_quorum_callback: ValidateQuorumCallback,
     block_height_lookup: BlockHeightLookup,
-    context: *const c_void, // External Masternode Manager
+    context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut MndiffResult {
-    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, length as usize) };
+    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let merkle_root_bytes = unsafe { slice::from_raw_parts(merkle_root, 32) };
     let base_masternode_list = if !base_masternode_list.is_null() {
         unsafe { Some(unwrap_masternode_list(base_masternode_list)) }
     } else {
         None
     };
-    println!("mndiff_process: {:?}", context);
     let desired_merkle_root = match merkle_root_bytes.read_with::<UInt256>(&mut 0, LE) {
         Ok(data) => data,
         Err(_err) => { return failure(); }
@@ -247,7 +112,7 @@ pub extern "C" fn mndiff_process(
     let _coinbase_tx_hash = coinbase_transaction.base.tx_hash.unwrap().0.to_hex();
 
     *offset += coinbase_transaction.base.payload_offset;
-    if length - *offset < 1 { return failure(); }
+    if message_length - *offset < 1 { return failure(); }
     let deleted_masternode_var_int = match VarInt::consensus_decode(&message[*offset..]) {
         Ok(data) => data,
         Err(_err) => { return failure(); }
@@ -325,7 +190,7 @@ pub extern "C" fn mndiff_process(
 
     if quorums_active {
         // deleted quorums
-        if length - *offset < 1 { return failure(); }
+        if message_length - *offset < 1 { return failure(); }
         let deleted_quorums_var_int = match VarInt::consensus_decode(&message[*offset..]) {
             Ok(data) => data,
             Err(_err) => { return failure(); }
@@ -349,7 +214,7 @@ pub extern "C" fn mndiff_process(
         }
 
         // added quorums
-        if length - *offset < 1 { return failure(); }
+        if message_length - *offset < 1 { return failure(); }
         let added_quorums_var_int = match VarInt::consensus_decode(&message[*offset..]) {
             Ok(data) => data,
             Err(_err) => { return failure(); }
@@ -467,7 +332,7 @@ pub extern "C" fn mndiff_process(
                         .collect();
                     (*modified).previous_masternode_entry_hashes = old_prev_mn_entry_hashes;
                     if (*old).masternode_entry_hash_at(new_height) != (*modified).masternode_entry_hash {
-                        println!("Changed sme hashes from: {:?} to {:?} on {:?}", (*old).masternode_entry_hash, (*modified).masternode_entry_hash, new_pro_reg_tx_hash);
+                        println!("Changed sme hashes from: {:?} to {:?} on {:?} at {}", (*old).masternode_entry_hash, (*modified).masternode_entry_hash, new_pro_reg_tx_hash, b.height);
                         let key = b.clone();
                         let value = (*old).masternode_entry_hash.clone();
                         (*modified).previous_masternode_entry_hashes.insert(key, value);

@@ -6,7 +6,6 @@ use crate::consensus::Encodable;
 use crate::crypto::byte_util::{MNPayload, short_hex_string_from, UInt128, UInt160, UInt256, UInt384, Zeroable};
 use crate::hashes::{Hash, sha256, sha256d};
 
-// #[repr(C)]
 #[derive(Clone)]
 pub struct MasternodeEntry {
     pub provider_registration_transaction_hash: UInt256,
@@ -145,15 +144,6 @@ impl MasternodeEntry {
         let hashes: BTreeMap<BlockData, UInt256> = self.previous_masternode_entry_hashes.clone();
         let mut min_distance = u32::MAX;
         let mut used_hash = self.masternode_entry_hash.clone();
-        if hashes.len() > 1 {
-            let mut i: i32 = 0;
-            println!("masternode_entry_hash_at ({}): {:?} [", hashes.len(), self.provider_registration_transaction_hash);
-            for (BlockData { height, .. }, hash) in hashes.clone() {
-                println!("[{}]:{:p} {}:{:?}", i, &hash, height, hash);
-                i += 1;
-            }
-            println!("]");
-        }
         for (BlockData { height, .. }, hash) in hashes {
             if height <= block_height {
                 continue;

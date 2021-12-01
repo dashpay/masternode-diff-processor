@@ -7,7 +7,6 @@ use crate::consensus::{Decodable, Encodable, WriteExt};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
 
-// #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct QuorumEntry<'a> {
     pub version: u16,
@@ -39,7 +38,6 @@ impl<'a> QuorumEntry<'a> {
     pub fn new(message: &'a [u8], data_offset: usize) -> Option<Self> {
         let length = message.len();
         let offset = &mut data_offset.clone();
-
         let version = match message.read_with::<u16>(offset, LE) {
             Ok(data) => data,
             _ => { return None; }
@@ -52,27 +50,22 @@ impl<'a> QuorumEntry<'a> {
             Ok(data) => data,
             _ => { return None; }
         };
-
         let signers_count = match VarInt::consensus_decode(&message[*offset..]) {
             Ok(data) => data,
             Err(_err) => { return None; }
         };
         *offset += signers_count.len();
-
         let signers_buffer_length: usize = ((signers_count.0 as usize) + 7) / 8;
         if length - *offset < signers_buffer_length { return None; }
         let signers_bitset: &[u8] = message.read_with(offset, Bytes::Len(signers_buffer_length)).unwrap();
-
         let valid_members_count = match VarInt::consensus_decode(&message[*offset..]) {
             Ok(data) => data,
             Err(_err) => { return None; }
         };
         *offset += valid_members_count.len();
-
         let valid_members_count_buffer_length: usize = ((valid_members_count.0 as usize) + 7) / 8;
         if length - *offset < valid_members_count_buffer_length { return None; }
         let valid_members_bitset: &[u8] = message.read_with(offset, Bytes::Len(valid_members_count_buffer_length)).unwrap();
-
         let quorum_public_key = match message.read_with::<UInt384>(offset, LE) {
             Ok(data) => data,
             Err(_err) => { return None; }
@@ -89,8 +82,6 @@ impl<'a> QuorumEntry<'a> {
             Ok(data) => data,
             Err(_err) => { return None; }
         };
-
-
         let llmq_type: LLMQType = llmq_type.into();
         let q_data = &QuorumEntry::generate_data(
             version, llmq_type, quorum_hash,
@@ -100,7 +91,6 @@ impl<'a> QuorumEntry<'a> {
             all_commitment_aggregated_signature);
         let quorum_entry_hash = UInt256(sha256d::Hash::hash(q_data).into_inner());
         let length = *offset - data_offset;
-        //LLMQType::try_from(llmq_type)
         Some(QuorumEntry {
             version,
             quorum_hash,
@@ -143,13 +133,10 @@ impl<'a> QuorumEntry<'a> {
         *offset += signers_count.consensus_encode(&mut buffer).unwrap();
         buffer.emit_slice(&signers_bitset).unwrap();
         *offset += signers_bitset.len();
-
         *offset += valid_members_count.consensus_encode(&mut buffer).unwrap();
         buffer.emit_slice(&valid_members_bitset).unwrap();
         *offset += valid_members_bitset.len();
-
         *offset += quorum_public_key.consensus_encode(&mut buffer).unwrap();
-
         *offset += quorum_verification_vector_hash.consensus_encode(&mut buffer).unwrap();
         *offset += quorum_threshold_signature.consensus_encode(&mut buffer).unwrap();
         *offset += all_commitment_aggregated_signature.consensus_encode(&mut buffer).unwrap();
