@@ -132,7 +132,6 @@ pub extern "C" fn mndiff_process(
     };
     *offset += added_masternode_var_int.len();
     let added_masternode_count = added_masternode_var_int.0.clone();
-    // println!("LIST. masternodes: [");
     let added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = (0..added_masternode_count)
         .into_iter()
         .map(|_i| message.read_with::<MNPayload>(offset, LE))
@@ -260,7 +259,6 @@ pub extern "C" fn mndiff_process(
                             )
                         };
                         valid_quorums &= is_valid_payload && is_valid_signature;
-                        // println!("process_quorum: {:?}, sig: {}, payload: {}, valid: {}", quorum_entry, is_valid_signature, is_valid_payload, valid_quorums);
                         if valid_quorums {
                             quorum_entry.verified = true;
                         }
@@ -284,14 +282,8 @@ pub extern "C" fn mndiff_process(
     let mut masternodes = if has_old {
         let mut old_mnodes = old_masternodes.clone();
         for hash in deleted_masternode_hashes {
-            // println!("delete mnode {:?}:{:?}", &hash.clone().reversed(), old_mnodes[&hash.clone().reversed()].masternode_entry_hash);
             old_mnodes.remove(&hash.clone().reversed());
         }
-        // println!("LIST. old_masternodes: [");
-        // for (data, entry) in old_mnodes.clone() {
-        //     println!("{:?}:\n\t{:?},\n\t{:?}", data, entry.provider_registration_transaction_hash, entry.masternode_entry_hash);
-        // }
-        // println!("]");
         old_mnodes.extend(added_masternodes.clone());
         old_mnodes
     } else {
@@ -312,7 +304,6 @@ pub extern "C" fn mndiff_process(
                         .filter(|(block, _)| block.height < new_height)
                         .collect();
                     if (*old).is_valid_at(new_height) != (*modified).is_valid {
-                        //println!("Changed validity from {} to {} on {:?}", old.is_valid, (*modified).is_valid, new_pro_reg_tx_hash);
                         (*modified).previous_validity.insert(b.clone(), (*old).is_valid.clone());
                     }
                     (*modified).previous_operator_public_keys = (*old)
@@ -332,10 +323,7 @@ pub extern "C" fn mndiff_process(
                         .collect();
                     (*modified).previous_masternode_entry_hashes = old_prev_mn_entry_hashes;
                     if (*old).masternode_entry_hash_at(new_height) != (*modified).masternode_entry_hash {
-                        println!("Changed sme hashes from: {:?} to {:?} on {:?} at {}", (*old).masternode_entry_hash, (*modified).masternode_entry_hash, new_pro_reg_tx_hash, b.height);
-                        let key = b.clone();
-                        let value = (*old).masternode_entry_hash.clone();
-                        (*modified).previous_masternode_entry_hashes.insert(key, value);
+                        (*modified).previous_masternode_entry_hashes.insert(b.clone(), (*old).masternode_entry_hash.clone());
                     }
                 }
 
@@ -345,18 +333,10 @@ pub extern "C" fn mndiff_process(
                     (*old).known_confirmed_at_height = Some(block_height);
                 }
             }
-            // println!("insert modified {:?}:{:?}", hash.clone(), (*modified).clone().masternode_entry_hash);
-            /*if let Some(node) = masternodes.get_mut(hash) {
-                *node = (*modified).clone();
-            }*/
-            //modified;
-            let key = (*hash).clone();
-            let value = (*modified).clone();
-            masternodes.insert(key, value);
+            masternodes.insert((*hash).clone(), (*modified).clone());
         }
     });
 
-    // println!("QQ: old_quorums: {:?}", old_quorums);
     let mut quorums = old_quorums.clone();
 
     let quorums_to_add = added_quorums
@@ -364,7 +344,6 @@ pub extern "C" fn mndiff_process(
         .into_iter()
         .filter(|(key, _entries)| !quorums.contains_key(key))
         .collect::<HashMap<LLMQType, HashMap<UInt256, QuorumEntry>>>();
-    // println!("QQ: quorums_to_add: {:?}", old_quorums);
 
     quorums.extend(quorums_to_add);
 
@@ -381,7 +360,6 @@ pub extern "C" fn mndiff_process(
         }
     });
     let masternode_list = MasternodeList::new(masternodes, quorums, block_hash, block_height, quorums_active);
-    // println!("new {:?}", masternode_list);
 
     let root_mn_list_valid =
         if let Some(mn_merkle_root) = masternode_list.masternode_merkle_root {
@@ -526,7 +504,6 @@ mod tests {
     }
     unsafe extern "C" fn validate_quorum_callback(data: *mut QuorumValidationData, _context: *const c_void) -> bool {
         let result = Box::from_raw(data);
-        // let qvd: QuorumValidationData = Box::from_raw(data);
         let QuorumValidationData { items, count, commitment_hash, all_commitment_aggregated_signature, quorum_threshold_signature, quorum_public_key } = *result;
         println!("validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}", items, count, commitment_hash, all_commitment_aggregated_signature, quorum_threshold_signature, quorum_public_key);
         true
@@ -825,14 +802,9 @@ mod tests {
 
         let result = unsafe { Box::from_raw(result) };
         let masternode_list = unsafe { unwrap_boxed_masternode_list(*Box::from_raw(result.masternode_list)) };
-
-// /        let masternode_list = unsafe { Box::from_raw(result.masternode_list) };
-        // let masternode_list = unsafe { Box::from_raw(masternode_list) };
         let masternodes = masternode_list.masternodes.clone();
-        // let mut pro_tx_hashes: Vec<UInt256> = masternodes.clone().into_keys().map(|mut h| h.reversed()).collect();
         let mut pro_tx_hashes: Vec<UInt256> = masternodes.clone().into_keys().collect();
         pro_tx_hashes.sort();
-        //let pro_tx_hashes_str: Vec<String> = pro_tx_hashes.clone().into_iter().map(|h| h.0.to_hex()).collect();
         let mut verify_hashes: Vec<UInt256> = verify_string_hashes
             .into_iter()
             .map(|h|
@@ -878,7 +850,6 @@ mod tests {
         let filepath = format!("{}/../../../src/{}", path.display(), "ML_at_122088.dat");
         println!("{:?}", filepath);
         let file = get_file_as_byte_vec(&filepath);
-        // let file = get_file_as_byte_vec(&"../src/ML_at_122088.dat".to_string());
         let bytes = file.as_slice();
         let length = bytes.len();
         let c_array = bytes.as_ptr();
@@ -903,12 +874,9 @@ mod tests {
 
         let result = unsafe { Box::from_raw(result) };
         let masternode_list = unsafe { unwrap_boxed_masternode_list(*Box::from_raw(result.masternode_list)) };
-        // let masternode_list = unsafe { Box::from_raw(result.masternode_list) };
-        // let masternode_list_merkle_root = Vec::from_hex("94d0af97187af3b9311c98b1cf40c9c9849df0af55dc63b097b80d4cf6c816c5").expect("Invalid Hex String").read_with::<UInt256>(&mut 0, LE).unwrap();
         let masternode_list_merkle_root = UInt256::from_hex("94d0af97187af3b9311c98b1cf40c9c9849df0af55dc63b097b80d4cf6c816c5").unwrap();
         let obtained_mn_merkle_root = masternode_list.masternode_merkle_root.unwrap();
         let equal = masternode_list_merkle_root == obtained_mn_merkle_root;
-        // let block_height: u32 = chain.height_for(block_hash);
         assert!(equal, "MNList merkle root should be valid");
         assert!(result.found_coinbase, "Did not find coinbase at height {}", BLOCK_HEIGHT);
         // turned off on purpose as we don't have the coinbase block
