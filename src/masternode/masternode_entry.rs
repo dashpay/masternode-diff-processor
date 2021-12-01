@@ -27,12 +27,9 @@ impl std::fmt::Debug for MasternodeEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MasternodeEntry")
             .field("provider_registration_transaction_hash", &self.provider_registration_transaction_hash)
-            .field("confirmed_hash", &self.confirmed_hash)
-            .field("masternode_entry_hash", &self.masternode_entry_hash)
-            .field("operator_public_key", &self.operator_public_key)
             .field("update_height", &self.update_height)
-            .field("known_confirmed_at_height", &self.known_confirmed_at_height)
-            .field("is_valid", &self.is_valid)
+            .field("masternode_entry_hash", &self.masternode_entry_hash)
+            .field("previous_masternode_entry_hashes", &self.previous_masternode_entry_hashes)
             .finish()
     }
 }

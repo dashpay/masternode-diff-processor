@@ -80,7 +80,7 @@ impl<'a> MasternodeList<'a> {
     pub fn valid_masternodes_for(&self, quorum_modifier: UInt256, quorum_count: u32, block_height: u32) -> Vec<MasternodeEntry> {
         //println!("valid_masternodes_for {:?}, {:?}, {:?}", quorum_modifier, quorum_count, block_height);
         let mut score_dictionary: BTreeMap<UInt256, MasternodeEntry> = self.masternodes.clone().into_iter().filter_map(|(_, entry)| {
-            let score = self.masternode_score(entry.clone(), quorum_modifier, block_height);
+            let score = MasternodeList::masternode_score(entry.clone(), quorum_modifier, block_height);
             if score.is_some() && !score.unwrap().0.is_empty() {
                 Some((score.unwrap(), entry))
             } else {
@@ -105,7 +105,7 @@ impl<'a> MasternodeList<'a> {
         masternodes
     }
 
-    pub fn masternode_score(&self, masternode_entry: MasternodeEntry, modifier: UInt256, block_height: u32) -> Option<UInt256> {
+    pub fn masternode_score(masternode_entry: MasternodeEntry, modifier: UInt256, block_height: u32) -> Option<UInt256> {
         if masternode_entry.confirmed_hash_at(block_height).is_none() {
             return None;
         }
