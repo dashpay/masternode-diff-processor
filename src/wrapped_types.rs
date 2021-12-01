@@ -164,6 +164,7 @@ pub mod wrapper {
     pub fn boxed<T>(obj: T) -> *mut T { Box::into_raw(Box::new(obj)) }
 
     pub fn wrap_masternode_list(list: masternode_list::MasternodeList) -> wrapped_types::MasternodeList {
+        println!("wrap_masternode_list {:p}", &list);
         let block_hash = boxed(list.block_hash.0);
         let known_height = list.known_height;
         let quorum_merkle_root = if list.quorum_merkle_root.is_none() {
@@ -244,6 +245,16 @@ pub mod wrapper {
         let mut operator_public_keys_slice = operator_public_keys_vec.into_boxed_slice();
         let previous_operator_public_keys = operator_public_keys_slice.as_mut_ptr();
         mem::forget(operator_public_keys_slice);
+
+        if entry.previous_masternode_entry_hashes.len() > 1 {
+            println!("wrap_masternode_entry BIG {:p} [", &entry);
+            let mut i: i32 = 0;
+            for (BlockData {height, hash}, h) in entry.previous_masternode_entry_hashes.clone() {
+                println!("[{}]:{:p} {}:{:?}", i, &h, height, h);
+                i += 1;
+            }
+            println!("]");
+        }
 
         let previous_masternode_entry_hashes_count = entry.previous_masternode_entry_hashes.len();
         let mut masternode_entry_hashes_vec: Vec<*mut MasternodeEntryHash> = Vec::with_capacity(previous_masternode_entry_hashes_count);
@@ -448,6 +459,7 @@ pub mod wrapper {
         let previous_masternode_entry_hashes: BTreeMap<BlockData, UInt256> = (0..entry.previous_masternode_entry_hashes_count)
             .into_iter()
             .fold(BTreeMap::new(), |mut acc, i| {
+                // let MasternodeEntryHash { block_hash, block_height: height, hash} = *(*entry.previous_masternode_entry_hashes).offset(i as isize);
                 let MasternodeEntryHash { block_hash, block_height: height, hash} = *(*entry.previous_masternode_entry_hashes).offset(i as isize);
                 let key = BlockData { height, hash: UInt256(block_hash) };
                 let value = UInt256(hash);
@@ -575,6 +587,7 @@ pub mod wrapper {
     }
 
     pub unsafe fn unwrap_boxed_masternode_list<'a>(mn_list: MasternodeList) -> crate::masternode::masternode_list::MasternodeList<'a> {
+        println!("unwrap_boxed_masternode_list {:p}", &mn_list);
         let block_hash = UInt256(*mn_list.block_hash);
         let known_height = mn_list.known_height;
         let masternode_merkle_root = if mn_list.masternode_merkle_root.is_null() {
@@ -638,6 +651,7 @@ pub mod wrapper {
     }
 
     pub unsafe fn unwrap_masternode_list<'a>(mn_list: *const MasternodeList) -> crate::masternode::masternode_list::MasternodeList<'a> {
+        println!("unwrap_masternode_list {:p}", &mn_list);
         let block_hash = UInt256(*(*mn_list).block_hash);
         let known_height = (*mn_list).known_height;
         let masternode_merkle_root = if (*mn_list).masternode_merkle_root.is_null() {

@@ -79,60 +79,30 @@ impl<'a> MasternodeList<'a> {
 
     pub fn valid_masternodes_for(&self, quorum_modifier: UInt256, quorum_count: u32, block_height: u32) -> Vec<MasternodeEntry> {
         //println!("valid_masternodes_for {:?}, {:?}, {:?}", quorum_modifier, quorum_count, block_height);
-        let score_dictionary = self.score_dictionary_for_quorum_modifier(quorum_modifier, block_height);
-
-        // into_keys perform sorting like below
-        /*NSArray *scores = [[score_dictionary allKeys] sortedArrayUsingComparator:^NSComparisonResult(id _Nonnull obj1, id _Nonnull obj2) {
-            UInt256 hash1 = *(UInt256 *)((NSData *)obj1).bytes;
-            UInt256 hash2 = *(UInt256 *)((NSData *)obj2).bytes;
-            return uint256_sup(hash1, hash2) ? NSOrderedAscending : NSOrderedDescending;
-        }];*/
-        // println!("SCORE_DICTIONARY: [");
-        // for (h, mn)  in score_dictionary.clone() {
-        //     println!("{:?}:\n\t{:?}\n\t{:?}\n\t{:?}", h, mn.provider_registration_transaction_hash, mn.masternode_entry_hash, mn.operator_public_key);
-        // }
-        // println!("]");
-
-        let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
-        scores.sort_by(|&s1, &s2| {
-            return s2.clone().reversed().cmp(&s1.clone().reversed());
-        });
-        // println!("SCORES: [");
-        // for h  in scores.clone() {
-        //     println!("{:?}", h);
-        // }
-        // println!("]");
-        let mut masternodes: Vec<MasternodeEntry> = Vec::new();
-        let masternodes_in_list_count = self.masternodes.len();
-        let count = min(masternodes_in_list_count, scores.len());
-        for i in 0..count {
-            let score = scores.get(i).unwrap();
-            let masternode = &score_dictionary[score];
-            if masternode.is_valid_at(block_height) {
-                masternodes.push(masternode.clone());
-            }
-            if masternodes.len() == quorum_count as usize {
-                break;
-            }
-        }
-        // println!("VALID_MASTERNODES: [");
-        // for mn  in masternodes.clone() {
-        //     println!("{:?}\n\t{:?}\n\t{:?}", mn.provider_registration_transaction_hash, mn.masternode_entry_hash, mn.operator_public_key);
-        // }
-        // println!("]");
-        masternodes
-    }
-
-    pub fn score_dictionary_for_quorum_modifier(&self, quorum_modifier: UInt256, block_height: u32) -> BTreeMap<UInt256, MasternodeEntry> {
-        self.masternodes.clone().into_iter().filter_map(|(_, entry)| {
+        let mut score_dictionary: BTreeMap<UInt256, MasternodeEntry> = self.masternodes.clone().into_iter().filter_map(|(_, entry)| {
             let score = self.masternode_score(entry.clone(), quorum_modifier, block_height);
             if score.is_some() && !score.unwrap().0.is_empty() {
                 Some((score.unwrap(), entry))
             } else {
                 None
             }
-        }).collect()
-
+        }).collect();
+        let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
+        scores.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
+        let mut masternodes: Vec<MasternodeEntry> = Vec::new();
+        let masternodes_in_list_count = self.masternodes.len();
+        let count = min(masternodes_in_list_count, scores.len());
+        for i in 0..count {
+            if let Some(masternode) = score_dictionary.get_mut(&scores[i]) {
+                if (*masternode).is_valid_at(block_height) {
+                    masternodes.push((*masternode).clone());
+                }
+            }
+            if masternodes.len() == quorum_count as usize {
+                break;
+            }
+        }
+        masternodes
     }
 
     pub fn masternode_score(&self, masternode_entry: MasternodeEntry, modifier: UInt256, block_height: u32) -> Option<UInt256> {
@@ -160,7 +130,7 @@ impl<'a> MasternodeList<'a> {
                 return h1.clone().reversed().cmp(&h2.clone().reversed());
             });
             let mns = self.masternodes.clone();
-            //println!("LIST.MN. hashes_for_merkle_root: [");
+            // println!("LIST.MN. hashes_for_merkle_root: [");
             let entry_hashes = pro_tx_hashes
                 .clone()
                 .into_iter()

@@ -365,7 +365,7 @@ pub extern "C" fn mndiff_process(
                 if should_process_quorum {
                     let lookup_result = unsafe { masternode_list_lookup(boxed(entry_quorum_hash.0), context) };
                     if !lookup_result.is_null() {
-                        let quorum_masternode_list = unsafe { unwrap_masternode_list(lookup_result) };
+                        let quorum_masternode_list = unsafe { unwrap_masternode_list(lookup_result.clone()) };
                         unsafe { masternode_list_destroy(lookup_result); }
                         let is_valid_payload = quorum_entry.validate_payload();
                         let block_height: u32 = unsafe { block_height_lookup(boxed(quorum_masternode_list.block_hash.0), context) };
@@ -436,37 +436,37 @@ pub extern "C" fn mndiff_process(
     modified_masternodes.iter_mut().for_each(|(hash, modified)| {
         if let Some(mut old) = masternodes.get_mut(hash) {
             let new_height = (*modified).update_height;
-            if old.update_height < new_height {
+            if (*old).update_height < new_height {
                 let b = BlockData { height: block_height, hash: block_hash };
                 let new_pro_reg_tx_hash = (*modified).provider_registration_transaction_hash;
-                if new_pro_reg_tx_hash == old.provider_registration_transaction_hash {
-                    (*modified).previous_validity = old
+                if new_pro_reg_tx_hash == (*old).provider_registration_transaction_hash {
+                    (*modified).previous_validity = (*old)
                         .previous_validity
                         .clone()
                         .into_iter()
                         .filter(|(block, _)| block.height < new_height)
                         .collect();
-                    if old.is_valid_at(new_height) != (*modified).is_valid {
+                    if (*old).is_valid_at(new_height) != (*modified).is_valid {
                         //println!("Changed validity from {} to {} on {:?}", old.is_valid, (*modified).is_valid, new_pro_reg_tx_hash);
-                        (*modified).previous_validity.insert(b.clone(), old.is_valid.clone());
+                        (*modified).previous_validity.insert(b.clone(), (*old).is_valid.clone());
                     }
-                    (*modified).previous_operator_public_keys = old
+                    (*modified).previous_operator_public_keys = (*old)
                         .previous_operator_public_keys
                         .clone()
                         .into_iter()
                         .filter(|(block, _)| block.height < new_height)
                         .collect();
-                    if old.operator_public_key_at(new_height) != (*modified).operator_public_key {
-                        (*modified).previous_operator_public_keys.insert(b.clone(), old.operator_public_key.clone());
+                    if (*old).operator_public_key_at(new_height) != (*modified).operator_public_key {
+                        (*modified).previous_operator_public_keys.insert(b.clone(), (*old).operator_public_key.clone());
                     }
-                    let old_prev_mn_entry_hashes = old
+                    let old_prev_mn_entry_hashes = (*old)
                         .previous_masternode_entry_hashes
                         .clone()
                         .into_iter()
                         .filter(|(block, _)| (*block).height < new_height)
                         .collect();
                     (*modified).previous_masternode_entry_hashes = old_prev_mn_entry_hashes;
-                    if old.masternode_entry_hash_at(new_height) != (*modified).masternode_entry_hash {
+                    if (*old).masternode_entry_hash_at(new_height) != (*modified).masternode_entry_hash {
                         println!("Changed sme hashes from: {:?} to {:?} on {:?}", (*old).masternode_entry_hash, (*modified).masternode_entry_hash, new_pro_reg_tx_hash);
                         let key = b.clone();
                         let value = (*old).masternode_entry_hash.clone();
@@ -474,10 +474,10 @@ pub extern "C" fn mndiff_process(
                     }
                 }
 
-                if !old.confirmed_hash.is_zero() &&
-                    old.known_confirmed_at_height.is_some() &&
-                    old.known_confirmed_at_height.unwrap() > block_height {
-                    old.known_confirmed_at_height = Some(block_height);
+                if !(*old).confirmed_hash.is_zero() &&
+                    (*old).known_confirmed_at_height.is_some() &&
+                    (*old).known_confirmed_at_height.unwrap() > block_height {
+                    (*old).known_confirmed_at_height = Some(block_height);
                 }
             }
             // println!("insert modified {:?}:{:?}", hash.clone(), (*modified).clone().masternode_entry_hash);

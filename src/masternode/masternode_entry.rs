@@ -143,11 +143,20 @@ impl MasternodeEntry {
     pub fn masternode_entry_hash_at(&self, block_height: u32) -> UInt256 {
         if self.previous_masternode_entry_hashes.len() == 0 ||
             block_height == u32::MAX {
-            return self.masternode_entry_hash;
+            return self.masternode_entry_hash.clone();
         }
         let hashes: BTreeMap<BlockData, UInt256> = self.previous_masternode_entry_hashes.clone();
         let mut min_distance = u32::MAX;
-        let mut used_hash = self.masternode_entry_hash;
+        let mut used_hash = self.masternode_entry_hash.clone();
+        if hashes.len() > 1 {
+            let mut i: i32 = 0;
+            println!("masternode_entry_hash_at ({}): {:?} [", hashes.len(), self.provider_registration_transaction_hash);
+            for (BlockData { height, .. }, hash) in hashes.clone() {
+                println!("[{}]:{:p} {}:{:?}", i, &hash, height, hash);
+                i += 1;
+            }
+            println!("]");
+        }
         for (BlockData { height, .. }, hash) in hashes {
             if height <= block_height {
                 continue;
@@ -155,7 +164,7 @@ impl MasternodeEntry {
             let distance = height - block_height;
             if distance < min_distance {
                 min_distance = distance;
-                println!("SME Hash for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {}", self.provider_registration_transaction_hash, hash, used_hash, block_height);
+                //println!("SME Hash for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {}", self.provider_registration_transaction_hash, hash, used_hash, block_height);
                 used_hash = hash;
             }
         }
