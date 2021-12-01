@@ -374,7 +374,7 @@ pub extern "C" fn mndiff_process(
                         let valid_masternodes = quorum_masternode_list.valid_masternodes_for(quorum_modifier, quorum_count, block_height);
                         let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
                             .into_iter()
-                            .filter(|&i|quorum_entry.signers_bitset.bit_is_true_at_le_index(i as u32))
+                            .filter(|&i| quorum_entry.signers_bitset.bit_is_true_at_le_index(i as u32))
                             .map(|i| boxed(valid_masternodes[i].operator_public_key_at(block_height).0))
                             .collect();
                         let mut pks_slice = operator_pks.into_boxed_slice();
@@ -463,12 +463,14 @@ pub extern "C" fn mndiff_process(
                         .previous_masternode_entry_hashes
                         .clone()
                         .into_iter()
-                        .filter(|(block, _)| block.height < new_height)
+                        .filter(|(block, _)| (*block).height < new_height)
                         .collect();
                     (*modified).previous_masternode_entry_hashes = old_prev_mn_entry_hashes;
                     if old.masternode_entry_hash_at(new_height) != (*modified).masternode_entry_hash {
-                        println!("Changed sme hashes from: {:?} to {:?} on {:?}", old.masternode_entry_hash, (*modified).masternode_entry_hash, new_pro_reg_tx_hash);
-                        (*modified).previous_masternode_entry_hashes.insert(b.clone(), old.masternode_entry_hash.clone());
+                        println!("Changed sme hashes from: {:?} to {:?} on {:?}", (*old).masternode_entry_hash, (*modified).masternode_entry_hash, new_pro_reg_tx_hash);
+                        let key = b.clone();
+                        let value = (*old).masternode_entry_hash.clone();
+                        (*modified).previous_masternode_entry_hashes.insert(key, value);
                     }
                 }
 
@@ -479,11 +481,13 @@ pub extern "C" fn mndiff_process(
                 }
             }
             // println!("insert modified {:?}:{:?}", hash.clone(), (*modified).clone().masternode_entry_hash);
-            if let Some(node) = masternodes.get_mut(hash) {
+            /*if let Some(node) = masternodes.get_mut(hash) {
                 *node = (*modified).clone();
-            }
+            }*/
             //modified;
-            //masternodes.insert(hash.clone(), modified.clone());
+            let key = (*hash).clone();
+            let value = (*modified).clone();
+            masternodes.insert(key, value);
         }
     });
 
