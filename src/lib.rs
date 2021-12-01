@@ -321,7 +321,7 @@ pub extern "C" fn mndiff_process(
 
     let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
     let mut valid_quorums = true;
-    let mut needed_masternode_lists: HashSet<UInt256> = HashSet::new();
+    let mut needed_masternode_lists: Vec<*mut [u8; 32]> = Vec::new();
 
     if quorums_active {
         // deleted quorums
@@ -359,11 +359,11 @@ pub extern "C" fn mndiff_process(
         for _i in 0..added_quorums_count {
             if let Some(mut quorum_entry) = QuorumEntry::new(message, *offset) {
                 *offset += quorum_entry.length;
-                let entry_quorum_hash = quorum_entry.quorum_hash;
+                let quorum_hash = quorum_entry.quorum_hash;
                 let llmq_type = quorum_entry.llmq_type;
                 let should_process_quorum = unsafe { should_process_quorum_of_type(llmq_type.into(), context) };
                 if should_process_quorum {
-                    let lookup_result = unsafe { masternode_list_lookup(boxed(entry_quorum_hash.0), context) };
+                    let lookup_result = unsafe { masternode_list_lookup(boxed(quorum_hash.0), context) };
                     if !lookup_result.is_null() {
                         let quorum_masternode_list = unsafe { unwrap_masternode_list(lookup_result.clone()) };
                         unsafe { masternode_list_destroy(lookup_result); }
@@ -401,17 +401,17 @@ pub extern "C" fn mndiff_process(
                         }
                     } else {
                         if use_insight_as_backup {
-                            unsafe { add_insight_lookup(boxed(entry_quorum_hash.0), context) };
+                            unsafe { add_insight_lookup(boxed(quorum_hash.0), context) };
                         }
-                        if unsafe { block_height_lookup(boxed(entry_quorum_hash.0), context) != u32::MAX } {
-                            needed_masternode_lists.insert(entry_quorum_hash);
+                        if unsafe { block_height_lookup(boxed(quorum_hash.0), context) != u32::MAX } {
+                            needed_masternode_lists.push(boxed(quorum_hash.0));
                         }
                     }
                 }
                 added_quorums
                     .entry(llmq_type)
                     .or_insert(HashMap::new())
-                    .insert(entry_quorum_hash, quorum_entry);
+                    .insert(quorum_hash, quorum_entry);
             }
         }
     }
@@ -564,25 +564,16 @@ pub extern "C" fn mndiff_process(
     }
     let valid_coinbase = merkle_tree.has_root(desired_merkle_root);
 
-    let (added_masternodes_keys,
-        added_masternodes_values,
+    let (added_masternodes_values,
         added_masternodes_count) = wrap_masternodes_map(added_masternodes);
-    let (modified_masternodes_keys,
-        modified_masternodes_values,
+    let (modified_masternodes_values,
         modified_masternodes_count) = wrap_masternodes_map(modified_masternodes);
 
-    let (added_quorums_keys,
-        added_quorums_values,
-        added_quorums_count) = wrap_quorums_map(added_quorums);
+    let (added_quorum_type_maps,
+        added_quorum_type_maps_count) = wrap_quorums_map(added_quorums);
 
     let needed_masternode_lists_count = needed_masternode_lists.len();
-    let mut needed_masternode_lists_vec: Vec<*mut [u8; 32]> = Vec::with_capacity(needed_masternode_lists_count);
-    needed_masternode_lists
-        .into_iter()
-        .for_each(|hash| {
-            needed_masternode_lists_vec.push(boxed(hash.0));
-        });
-    let mut needed_masternode_lists_slice = needed_masternode_lists_vec.into_boxed_slice();
+    let mut needed_masternode_lists_slice = needed_masternode_lists.into_boxed_slice();
     let needed_masternode_lists = needed_masternode_lists_slice.as_mut_ptr();
     mem::forget(needed_masternode_lists_slice);
 
@@ -595,15 +586,12 @@ pub extern "C" fn mndiff_process(
         root_quorum_list_valid,
         valid_quorums,
         masternode_list,
-        added_masternodes_keys,
-        added_masternodes_values,
+        added_masternodes: added_masternodes_values,
         added_masternodes_count,
-        modified_masternodes_keys,
-        modified_masternodes_values,
+        modified_masternodes: modified_masternodes_values,
         modified_masternodes_count,
-        added_quorums_keys,
-        added_quorums_values,
-        added_quorums_count,
+        added_quorum_type_maps,
+        added_quorum_type_maps_count,
         needed_masternode_lists,
         needed_masternode_lists_count
     };
