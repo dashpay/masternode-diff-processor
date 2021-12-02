@@ -87,11 +87,11 @@ pub struct MasternodeEntryHash {
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct MndiffResult {
-    pub found_coinbase: bool, //1 byte
-    pub valid_coinbase: bool, //1 byte
-    pub root_mn_list_valid: bool, //1 byte
-    pub root_quorum_list_valid: bool, //1 byte
-    pub valid_quorums: bool, //1 byte
+    pub has_found_coinbase: bool, //1 byte
+    pub has_valid_coinbase: bool, //1 byte
+    pub has_valid_mn_list_root: bool, //1 byte
+    pub has_valid_quorum_list_root: bool, //1 byte
+    pub has_valid_quorums: bool, //1 byte
     pub masternode_list: *mut MasternodeList,
     pub added_masternodes: *mut *mut MasternodeEntry,
     pub added_masternodes_count: usize,
@@ -123,11 +123,11 @@ pub type MasternodeListDestroy = unsafe extern "C" fn(*const MasternodeList);
 impl Default for MndiffResult {
     fn default() -> Self {
         MndiffResult {
-            found_coinbase: false,
-            valid_coinbase: false,
-            root_mn_list_valid: false,
-            root_quorum_list_valid: false,
-            valid_quorums: false,
+            has_found_coinbase: false,
+            has_valid_coinbase: false,
+            has_valid_mn_list_root: false,
+            has_valid_quorum_list_root: false,
+            has_valid_quorums: false,
             masternode_list: null_mut(),
             added_masternodes: null_mut(),
             added_masternodes_count: 0,
@@ -189,9 +189,7 @@ pub mod wrapper {
         map.into_iter().for_each(|(hash, entry)| {
             quorums_for_type_values_vec.push(boxed(wrap_quorum_entry(entry)));
         });
-        let mut quorums_for_type_values_slice = quorums_for_type_values_vec.into_boxed_slice();
-        let values = quorums_for_type_values_slice.as_mut_ptr();
-        mem::forget(quorums_for_type_values_slice);
+        let values = boxed_vec(quorums_for_type_values_vec);
         LLMQMap { llmq_type, values, count }
     }
     pub fn wrap_masternode_entry(entry: crate::masternode::masternode_entry::MasternodeEntry) -> MasternodeEntry {
@@ -210,6 +208,7 @@ pub mod wrapper {
         };
         let masternode_entry_hash = boxed(entry.masternode_entry_hash.0);
         let operator_public_key = boxed(entry.operator_public_key.0);
+
         let previous_operator_public_keys_count = entry.previous_operator_public_keys.len();
         let mut operator_public_keys_vec: Vec<OperatorPublicKey> = Vec::with_capacity(previous_operator_public_keys_count);
         entry.previous_operator_public_keys
@@ -221,9 +220,8 @@ pub mod wrapper {
                     key: key.0
                 })
             });
-        let mut operator_public_keys_slice = operator_public_keys_vec.into_boxed_slice();
-        let previous_operator_public_keys = operator_public_keys_slice.as_mut_ptr();
-        mem::forget(operator_public_keys_slice);
+        let previous_operator_public_keys = boxed_vec(operator_public_keys_vec);
+
         let previous_masternode_entry_hashes_count = entry.previous_masternode_entry_hashes.len();
         let mut masternode_entry_hashes_vec: Vec<MasternodeEntryHash> = Vec::with_capacity(previous_masternode_entry_hashes_count);
         entry.previous_masternode_entry_hashes
@@ -235,8 +233,8 @@ pub mod wrapper {
                     hash: hash.0
                 });
             });
-        let previous_masternode_entry_hashes = masternode_entry_hashes_vec.as_mut_ptr();
-        mem::forget(masternode_entry_hashes_vec);
+        let previous_masternode_entry_hashes = boxed_vec(masternode_entry_hashes_vec);
+
         let previous_validity_count = entry.previous_validity.len();
         let mut validity_vec: Vec<Validity> = Vec::with_capacity(previous_validity_count);
         entry.previous_validity
@@ -248,9 +246,8 @@ pub mod wrapper {
                     is_valid
                 });
             });
-        let mut validity_slice = validity_vec.into_boxed_slice();
-        let previous_validity = validity_slice.as_mut_ptr();
-        mem::forget(validity_slice);
+        let previous_validity = boxed_vec(validity_vec);
+
         let provider_registration_transaction_hash = boxed(entry.provider_registration_transaction_hash.0);
         let SocketAddress { ip_address: ip, port } = entry.socket_address;
         let ip_address = boxed(ip.0);
@@ -282,14 +279,6 @@ pub mod wrapper {
         } else {
             boxed(entry.commitment_hash.unwrap().0)
         };
-        let signers_bitset_vec: Vec<u8> = entry.signers_bitset.to_vec();
-        let mut signers_bitset_slice = signers_bitset_vec.into_boxed_slice();
-        let signers_bitset = signers_bitset_slice.as_mut_ptr();
-        mem::forget(signers_bitset_slice);
-        let valid_members_vec: Vec<u8> = entry.valid_members_bitset.to_vec();
-        let mut valid_members_slice = valid_members_vec.into_boxed_slice();
-        let valid_members_bitset = valid_members_slice.as_mut_ptr();
-        mem::forget(valid_members_slice);
         QuorumEntry {
             all_commitment_aggregated_signature: boxed(entry.all_commitment_aggregated_signature.0),
             commitment_hash,
@@ -301,10 +290,10 @@ pub mod wrapper {
             quorum_threshold_signature: boxed(entry.quorum_threshold_signature.0),
             quorum_verification_vector_hash: boxed(entry.quorum_verification_vector_hash.0),
             saved: entry.saved,
-            signers_bitset,
+            signers_bitset: boxed_vec(entry.signers_bitset.to_vec()),
             signers_bitset_length: entry.signers_bitset.len(),
             signers_count: entry.signers_count.0,
-            valid_members_bitset,
+            valid_members_bitset: boxed_vec(entry.valid_members_bitset.to_vec()),
             valid_members_count: entry.valid_members_count.0,
             verified: entry.verified,
             version: entry.version,
@@ -314,25 +303,27 @@ pub mod wrapper {
 
     pub fn wrap_masternodes_map(map: BTreeMap<UInt256, crate::masternode::masternode_entry::MasternodeEntry>) -> (*mut *mut MasternodeEntry, usize) {
         let count = map.len();
-        let mut values_vec: Vec<*mut MasternodeEntry> = Vec::with_capacity(count);
+        let mut vec: Vec<*mut MasternodeEntry> = Vec::with_capacity(count);
         map.into_iter().for_each(|(hash, entry)| {
-            values_vec.push(boxed(wrap_masternode_entry(entry)));
+            vec.push(boxed(wrap_masternode_entry(entry)));
         });
-        let mut values_slice = values_vec.into_boxed_slice();
-        let values = values_slice.as_mut_ptr();
-        mem::forget(values_slice);
-        (values, count)
+        (boxed_vec(vec), count)
     }
+
     pub fn wrap_quorums_map(quorums: HashMap<LLMQType, HashMap<UInt256, crate::masternode::quorum_entry::QuorumEntry>>) -> (*mut *mut LLMQMap, usize) {
-        let quorums_count = quorums.len();
-        let mut quorums_values_vec: Vec<*mut LLMQMap> = Vec::with_capacity(quorums_count);
+        let count = quorums.len();
+        let mut vec: Vec<*mut LLMQMap> = Vec::with_capacity(count);
         quorums.into_iter().for_each(|(llmq_type, map)| {
-            quorums_values_vec.push(boxed(wrap_llmq_map(llmq_type.into(), map)));
+            vec.push(boxed(wrap_llmq_map(llmq_type.into(), map)));
         });
-        let mut quorums_values_slice = quorums_values_vec.into_boxed_slice();
-        let quorums_values = quorums_values_slice.as_mut_ptr();
-        mem::forget(quorums_values_slice);
-        (quorums_values, quorums_count)
+        (boxed_vec(vec), count)
+    }
+
+    pub fn boxed_vec<T>(vec: Vec<T>) -> *mut T {
+        let mut slice = vec.into_boxed_slice();
+        let ptr = slice.as_mut_ptr();
+        mem::forget(slice);
+        ptr
     }
 
     pub unsafe fn unwrap_quorum_entry<'a>(entry: wrapped_types::QuorumEntry) -> quorum_entry::QuorumEntry<'a> {
@@ -440,7 +431,7 @@ pub mod wrapper {
             masternode_entry_hash
         }
     }
-
+/*
     pub unsafe fn unwrap_boxed_masternode_list<'a>(mn_list: MasternodeList) -> crate::masternode::masternode_list::MasternodeList<'a> {
         let block_hash = UInt256(*mn_list.block_hash);
         let known_height = mn_list.known_height;
@@ -460,8 +451,8 @@ pub mod wrapper {
             (0..masternodes_count)
                 .into_iter()
                 .fold(BTreeMap::new(),|mut acc, i| {
-                    let raw_value = masternodes_values[i];
-                    let value = unwrap_masternode_entry(*raw_value);
+                    let raw_value = *masternodes_values[i];
+                    let value = unwrap_masternode_entry(raw_value);
                     let key = value.provider_registration_transaction_hash.clone().reversed();
                     acc.insert(key, value);
                     acc
@@ -473,15 +464,15 @@ pub mod wrapper {
                 .into_iter()
                 .fold(HashMap::new(), |mut acc, i| {
                     let llmq_map = *quorums_values[i];
-                    let qk = llmq_map.llmq_type;
+                    let key = LLMQType::from(llmq_map.llmq_type);
                     let count = llmq_map.count;
                     let values = Vec::from_raw_parts(llmq_map.values, count, count);
-                    let key = LLMQType::from(qk);
                     let value: HashMap<UInt256, quorum_entry::QuorumEntry> =
                         (0..count)
                             .into_iter()
                             .fold(HashMap::new(), |mut acc, j| {
-                                let value = unwrap_quorum_entry(*values[j]);
+                                let raw_value = *values[j];
+                                let value = unwrap_quorum_entry(raw_value);
                                 let key = value.quorum_hash.clone();
                                 acc.insert(key, value);
                                 acc
@@ -499,39 +490,38 @@ pub mod wrapper {
         };
         unwrapped
     }
-
-    pub unsafe fn unwrap_masternode_list<'a>(mn_list: *const MasternodeList) -> crate::masternode::masternode_list::MasternodeList<'a> {
-        let block_hash = UInt256(*(*mn_list).block_hash);
-        let known_height = (*mn_list).known_height;
-        let masternode_merkle_root = if (*mn_list).masternode_merkle_root.is_null() {
+*/
+    pub unsafe fn unwrap_masternode_list<'a>(mn_list: MasternodeList) -> crate::masternode::masternode_list::MasternodeList<'a> {
+        let block_hash = UInt256(*mn_list.block_hash);
+        let known_height = mn_list.known_height;
+        let masternode_merkle_root = if mn_list.masternode_merkle_root.is_null() {
             None
         } else {
-            Some(UInt256(*(*mn_list).masternode_merkle_root))
+            Some(UInt256(*mn_list.masternode_merkle_root))
         };
-        let quorum_merkle_root = if (*mn_list).quorum_merkle_root.is_null() {
+        let quorum_merkle_root = if mn_list.quorum_merkle_root.is_null() {
             None
         } else {
-            Some(UInt256(*(*mn_list).quorum_merkle_root))
+            Some(UInt256(*mn_list.quorum_merkle_root))
         };
         let masternodes: BTreeMap<UInt256, masternode_entry::MasternodeEntry> =
-            (0..(*mn_list).masternodes_count)
+            (0..mn_list.masternodes_count)
                 .into_iter()
                 .fold(BTreeMap::new(),|mut acc, i| {
-                    let raw_value = *(*((*mn_list).masternodes.offset(i as isize)));
+                    let raw_value = *(*(mn_list.masternodes.offset(i as isize)));
                     let value = unwrap_masternode_entry(raw_value);
                     let key = value.provider_registration_transaction_hash.clone().reversed();
                     acc.insert(key, value);
                     acc
                 });
         let quorums: HashMap<LLMQType, HashMap<UInt256, quorum_entry::QuorumEntry>> =
-            (0..(*mn_list).quorum_type_maps_count)
+            (0..mn_list.quorum_type_maps_count)
                 .into_iter()
                 .fold(HashMap::new(), |mut acc, i| {
-                    let llmq_map = *(*((*mn_list).quorum_type_maps.offset(i as isize)));
+                    let llmq_map = *(*(mn_list.quorum_type_maps.offset(i as isize)));
                     let key = LLMQType::from(llmq_map.llmq_type);
-                    let count = llmq_map.count;
                     let value: HashMap<UInt256, quorum_entry::QuorumEntry> =
-                        (0..count)
+                        (0..llmq_map.count)
                             .into_iter()
                             .fold(HashMap::new(), |mut acc, j| {
                                 let raw_value = *(*(llmq_map.values.offset(j as isize)));
@@ -645,11 +635,13 @@ pub mod unboxer {
         let result = Box::from_raw(result);
         let masternode_list = Box::from_raw(result.masternode_list);
         unbox_masternode_list(masternode_list);
-        let added_masternodes_values = Vec::from_raw_parts(result.added_masternodes, result.added_masternodes_count, result.added_masternodes_count);
-        let modified_masternodes_values = Vec::from_raw_parts(result.modified_masternodes, result.modified_masternodes_count, result.modified_masternodes_count);
+        let added_masternodes = Vec::from_raw_parts(result.added_masternodes, result.added_masternodes_count, result.added_masternodes_count);
+        let modified_masternodes = Vec::from_raw_parts(result.modified_masternodes, result.modified_masternodes_count, result.modified_masternodes_count);
         let needed_masternode_lists = Vec::from_raw_parts(result.needed_masternode_lists, result.needed_masternode_lists_count, result.needed_masternode_lists_count);
-        unbox_masternode_vec(added_masternodes_values);
-        unbox_masternode_vec(modified_masternodes_values);
         unbox_simple_vec(needed_masternode_lists);
+        unbox_masternode_vec(added_masternodes);
+        unbox_masternode_vec(modified_masternodes);
+        let added_quorums = Vec::from_raw_parts(result.added_quorum_type_maps, result.added_quorum_type_maps_count, result.added_quorum_type_maps_count);
+        unbox_llmq_map_vec(added_quorums);
     }
 }
