@@ -19,13 +19,14 @@ mod util;
 mod blockdata;
 mod network;
 mod hash_types;
-mod wrapped_types;
+mod ffi;
 
 use std::slice;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::c_void;
 use byte::*;
 use hashes::hex::ToHex;
+use ffi::wrapped_types;
 use crate::common::block_data::BlockData;
 use crate::common::llmq_type::LLMQType;
 use crate::common::merkle_tree::MerkleTree;
@@ -35,11 +36,13 @@ use crate::crypto::byte_util::{Data, MNPayload, Reversable, UInt256, Zeroable};
 use crate::crypto::data_ops::inplace_intersection;
 use crate::masternode::masternode_list::MasternodeList;
 use crate::masternode::quorum_entry::QuorumEntry;
-use crate::masternode::masternode_entry::{MasternodeEntry};
+use crate::masternode::masternode_entry::MasternodeEntry;
 use crate::transactions::coinbase_transaction::CoinbaseTransaction;
-use crate::wrapped_types::{AddInsightBlockingLookup, BlockHeightLookup, MasternodeListDestroy, MasternodeListLookup, MndiffResult, QuorumValidationData, ShouldProcessQuorumTypeCallback, ValidateQuorumCallback};
-use crate::wrapped_types::unboxer::{unbox_any, unbox_quorum_validation_data, unbox_result};
-use crate::wrapped_types::wrapper::{boxed, unwrap_masternode_list, wrap_masternode_list, wrap_masternodes_map, wrap_quorums_map, boxed_vec};
+use ffi::wrapped_types::{AddInsightBlockingLookup, BlockHeightLookup, MasternodeListDestroy, MasternodeListLookup, MndiffResult, QuorumValidationData, ShouldProcessQuorumTypeCallback, ValidateQuorumCallback};
+use crate::ffi::boxer::{boxed, boxed_vec};
+use crate::ffi::from::FromFFI;
+use crate::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
+use crate::ffi::unboxer::{unbox_any, unbox_quorum_validation_data, unbox_result};
 
 fn failure<'a>() -> *mut MndiffResult {
     boxed(MndiffResult::default())
@@ -63,7 +66,7 @@ pub extern "C" fn mndiff_process(
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let merkle_root_bytes = unsafe { slice::from_raw_parts(merkle_root, 32) };
     let base_masternode_list = if !base_masternode_list.is_null() {
-        unsafe { Some(unwrap_masternode_list(*base_masternode_list)) }
+        unsafe { Some((*base_masternode_list).decode()) }
     } else {
         None
     };
@@ -228,7 +231,7 @@ pub extern "C" fn mndiff_process(
                 if should_process_quorum {
                     let lookup_result = unsafe { masternode_list_lookup(boxed(quorum_hash.0), context) };
                     if !lookup_result.is_null() {
-                        let quorum_masternode_list = unsafe { unwrap_masternode_list(*lookup_result) };
+                        let quorum_masternode_list = unsafe { (*lookup_result).decode() };
                         unsafe { masternode_list_destroy(lookup_result); }
                         let block_height: u32 = unsafe { block_height_lookup(boxed(quorum_masternode_list.block_hash.0), context) };
                         let valid_masternodes = quorum_masternode_list.valid_masternodes_for(quorum_entry.llmq_quorum_hash(), llmq_type.quorum_size(), block_height);
@@ -400,18 +403,17 @@ pub extern "C" fn mndiff_process(
     }
     let has_valid_coinbase = merkle_tree.has_root(desired_merkle_root);
 
-    let (added_masternodes,
-        added_masternodes_count) = wrap_masternodes_map(added_masternodes);
-    let (modified_masternodes,
-        modified_masternodes_count) = wrap_masternodes_map(modified_masternodes);
-
-    let (added_quorum_type_maps,
-        added_quorum_type_maps_count) = wrap_quorums_map(added_quorums);
+    let added_masternodes_count = added_masternodes.len();
+    let added_masternodes = encode_masternodes_map(&added_masternodes);
+    let modified_masternodes_count = modified_masternodes.len();
+    let modified_masternodes = encode_masternodes_map(&modified_masternodes);
+    let added_quorum_type_maps_count = added_quorums.len();
+    let added_quorum_type_maps = encode_quorums_map(&added_quorums);
 
     let needed_masternode_lists_count = needed_masternode_lists.len();
     let needed_masternode_lists = boxed_vec(needed_masternode_lists);
 
-    let masternode_list = boxed(wrap_masternode_list(masternode_list));
+    let masternode_list = boxed(masternode_list.encode());
 
     let result = MndiffResult {
         has_found_coinbase,
@@ -459,9 +461,11 @@ mod tests {
     use crate::common::chain_type::ChainType;
     use crate::common::llmq_type::LLMQType;
     use crate::crypto::byte_util::{Reversable, UInt256};
-    use crate::{mndiff_process, wrapped_types};
-    use crate::wrapped_types::QuorumValidationData;
-    use crate::wrapped_types::wrapper::unwrap_masternode_list;
+    use crate::ffi::from::FromFFI;
+    use crate::ffi::unboxer::unbox_any;
+    use crate::mndiff_process;
+    use crate::ffi::wrapped_types;
+    use crate::ffi::wrapped_types::QuorumValidationData;
 
     const CHAIN_TYPE: ChainType = ChainType::TestNet;
     const BLOCK_HEIGHT: u32 = 122088;
@@ -494,7 +498,7 @@ mod tests {
         }
     }
     unsafe extern "C" fn validate_quorum_callback(data: *mut QuorumValidationData, _context: *const c_void) -> bool {
-        let result = Box::from_raw(data);
+        let result = unbox_any(data);
         let QuorumValidationData { items, count, commitment_hash, all_commitment_aggregated_signature, quorum_threshold_signature, quorum_public_key } = *result;
         println!("validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}", items, count, commitment_hash, all_commitment_aggregated_signature, quorum_threshold_signature, quorum_public_key);
         true
@@ -791,8 +795,8 @@ mod tests {
         );
         println!("result: {:?}", result);
 
-        let result = unsafe { Box::from_raw(result) };
-        let masternode_list = unsafe { unwrap_masternode_list(*Box::from_raw(result.masternode_list)) };
+        let result = unsafe { unbox_any(result) };
+        let masternode_list = unsafe { (*unbox_any(result.masternode_list)).decode() };
         let masternodes = masternode_list.masternodes.clone();
         let mut pro_tx_hashes: Vec<UInt256> = masternodes.clone().into_keys().collect();
         pro_tx_hashes.sort();
@@ -863,8 +867,8 @@ mod tests {
         );
         println!("{:?}", result);
 
-        let result = unsafe { Box::from_raw(result) };
-        let masternode_list = unsafe { unwrap_masternode_list(*Box::from_raw(result.masternode_list)) };
+        let result = unsafe { unbox_any(result) };
+        let masternode_list = unsafe { (*unbox_any(result.masternode_list)).decode() };
         let masternode_list_merkle_root = UInt256::from_hex("94d0af97187af3b9311c98b1cf40c9c9849df0af55dc63b097b80d4cf6c816c5").unwrap();
         let obtained_mn_merkle_root = masternode_list.masternode_merkle_root.unwrap();
         let equal = masternode_list_merkle_root == obtained_mn_merkle_root;
