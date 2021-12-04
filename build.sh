@@ -3,6 +3,7 @@
 # run tests
 cargo test --package masternodes-diff-processor --lib tests --verbose
 
+# shellcheck disable=SC2181
 if [ $? -eq 0 ]
 then
   echo "Tests: OK"
