@@ -259,11 +259,17 @@ pub extern "C" fn mndiff_process(
                             quorum_entry.verified = true;
                         }
                     } else {
-                        if use_insight_as_backup {
-                            unsafe { add_insight_lookup(boxed(quorum_hash.0), context) };
-                        }
                         if unsafe { block_height_lookup(boxed(quorum_hash.0), context) != u32::MAX } {
                             needed_masternode_lists.push(boxed(quorum_hash.0));
+                        } else {
+                            if use_insight_as_backup {
+                                println!("use_insight_as_backup.1: {:?}", quorum_hash);
+                                unsafe { add_insight_lookup(boxed(quorum_hash.0), context) };
+                                println!("use_insight_as_backup.2: {:?}", quorum_hash);
+                                if unsafe { block_height_lookup(boxed(quorum_hash.0), context) != u32::MAX } {
+                                    needed_masternode_lists.push(boxed(quorum_hash.0));
+                                }
+                            }
                         }
                     }
                 }
@@ -380,8 +386,8 @@ pub extern "C" fn mndiff_process(
     // we also need to check that the coinbase is in the merkle block
     let merkle_tree = MerkleTree {
         tree_element_count: total_transactions,
-        hashes: &merkle_hashes,
-        flags: &merkle_flags,
+        hashes: merkle_hashes,
+        flags: merkle_flags,
     };
 
     let mut has_valid_quorum_list_root = true;
@@ -457,13 +463,13 @@ mod tests {
     use std::io::Read;
     use std::ptr::null_mut;
     use byte::{BytesExt, LE};
-    use hashes::hex::FromHex;
+    use hashes::hex::{FromHex, ToHex};
     use crate::common::chain_type::ChainType;
     use crate::common::llmq_type::LLMQType;
     use crate::crypto::byte_util::{Reversable, UInt256};
     use crate::ffi::from::FromFFI;
     use crate::ffi::unboxer::unbox_any;
-    use crate::mndiff_process;
+    use crate::{MerkleTree, mndiff_process};
     use crate::ffi::wrapped_types;
     use crate::ffi::wrapped_types::QuorumValidationData;
 
@@ -879,6 +885,23 @@ mod tests {
         assert!(result.has_valid_mn_list_root, "rootMNListValid not valid at height {}", BLOCK_HEIGHT);
         assert!(result.has_valid_quorum_list_root, "rootQuorumListValid not valid at height {}", BLOCK_HEIGHT);
         assert!(result.has_valid_quorums, "validQuorums not valid at height {}", BLOCK_HEIGHT);
+    }
+
+    #[test]
+    fn test_multiple_merkle_hashes() {
+        let merkle_hashes = Vec::from_hex("78175171f830d9ea3e67170dfdec6bd805d31b22b19eaf783355adae06faa3539762500f0eca01a59f0e198522a0752f96be9032803fb21311a992089b9472bd1361a2db43a580e40f81bd5e17eabae8eebb02e9a651ae348d88d51ca824df19").unwrap();
+        let merkle_flags = Vec::from_hex("07").unwrap();
+        let desired_merkle_root = UInt256::from_hex("bd6a344573ba1d6faf24f021324fa3360562404536246503c4cba372f94bfa4a").unwrap();
+        let total_transactions = 4;
+        let merkle_tree = MerkleTree {
+            tree_element_count: total_transactions,
+            hashes: merkle_hashes.as_slice(),
+            flags: merkle_flags.as_slice(),
+        };
+
+        let has_valid_coinbase = merkle_tree.has_root(desired_merkle_root);
+        println!("merkle_tree: {:?} {:?} {}, has_valid_coinbase: {} {:?}", merkle_hashes.to_hex(), merkle_flags.to_hex(), total_transactions, has_valid_coinbase, desired_merkle_root);
+        assert!(has_valid_coinbase, "Invalid coinbase here");
     }
 }
 

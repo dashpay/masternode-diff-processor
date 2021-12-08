@@ -46,7 +46,7 @@ impl<'a> MerkleTree<'a> {
             0,
             |hash, _flag | hash,
             |left, right| {
-                let mut buffer: Vec<u8> = vec![0u8; 64];
+                let mut buffer: Vec<u8> = Vec::with_capacity(64);
                 left.consensus_encode(&mut buffer).unwrap();
                 if right.is_none() { left.clone() } else { right.unwrap() }.consensus_encode(&mut buffer).unwrap();
                 let hash = sha256d::Hash::hash(&buffer);
@@ -68,7 +68,7 @@ impl<'a> MerkleTree<'a> {
         let flag = self.flags[(*flag_idx / 8) as usize] & (1 << (*flag_idx % 8)) != 0;
         *flag_idx += 1;
         if !flag || depth == ceil_log2(self.tree_element_count as i32) {
-            let off = &mut ((*hash_idx*32) as usize);
+            let off = &mut (32*(*hash_idx) as usize);
             let hash = match self.hashes.read_with::<UInt256>(off, LE) {
                 Ok(data) => data,
                 Err(_err) => { return None; }
