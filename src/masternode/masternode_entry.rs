@@ -48,7 +48,7 @@ impl MasternodeEntry {
         *offset += provider_registration_transaction_hash.consensus_encode(&mut buffer).unwrap();
         *offset += confirmed_hash.consensus_encode(&mut buffer).unwrap();
         *offset += socket_address.ip_address.consensus_encode(&mut buffer).unwrap();
-        *offset += socket_address.port.consensus_encode(&mut buffer).unwrap();
+        *offset += socket_address.port.swap_bytes().consensus_encode(&mut buffer).unwrap();
         *offset += operator_public_key.consensus_encode(&mut buffer).unwrap();
         *offset += key_id_voting.consensus_encode(&mut buffer).unwrap();
         *offset += is_valid.consensus_encode(&mut buffer).unwrap();
@@ -187,7 +187,7 @@ impl MasternodeEntry {
             Err(_err) => { return None; }
         };
         let port = match message.read_with::<u16>(offset, LE) {
-            Ok(data) => data,
+            Ok(data) => data.swap_bytes(),
             Err(_err) => { return None; }
         };
         let socket_address = SocketAddress { ip_address, port };
