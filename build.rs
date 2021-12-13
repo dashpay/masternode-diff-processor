@@ -7,7 +7,7 @@ fn main() {
     let mut config: cbindgen::Config = Default::default();
     config.language = cbindgen::Language::C;
     match cbindgen::generate_with_config(&crate_dir, config) {
-        Result::Ok(bindings) => bindings.write_to_file("target/mndiff.h"),
+        Result::Ok(bindings) => bindings.write_to_file("target/dash_mndiff.h"),
         Result::Err(err) => {
             eprintln!("Error generating: {}", err);
             false
