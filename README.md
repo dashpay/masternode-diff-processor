@@ -4,11 +4,7 @@ WORK IN PROGRESS!
 # TODO
 1. Create integration with BLS signatures
 2. Now it will be necessary to figure out what to do with the external libraries used, keeping in mind our policy regarding this.
-3. Check for memory leaks
-4. Write additional integration tests
+3. Increase code coverage
 
-
-Prepare:
-Install libsodium before build
 Run tests: 
-cargo test --package masternodes-diff-processor --lib tests
+cargo test --package dash_mndiff --lib tests

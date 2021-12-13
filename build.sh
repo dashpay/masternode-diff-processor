@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # run tests
-cargo test --package masternodes-diff-processor --lib tests --verbose
+cargo test --package dash_mndiff --lib tests --verbose
 
 # shellcheck disable=SC2181
 if [ $? -eq 0 ]
