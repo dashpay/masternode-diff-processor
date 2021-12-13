@@ -8,6 +8,7 @@ use crate::crypto::byte_util::{Reversable, UInt128, UInt160, UInt256, UInt384, U
 use crate::ffi::to::ToFFI;
 use crate::ffi::wrapped_types;
 use crate::masternode::{masternode_entry, masternode_list, quorum_entry};
+use crate::masternode::quorum_entry::QUORUM_DEFAULT_VERSION;
 
 pub trait FromFFI<'a> {
     type Item: ToFFI<'a>;
@@ -148,6 +149,7 @@ impl<'a> FromFFI<'a> for wrapped_types::QuorumEntry {
     unsafe fn decode(&self) -> Self::Item {
         let version = self.version;
         let quorum_hash = UInt256(*self.quorum_hash);
+        let quorum_index = if self.version == QUORUM_DEFAULT_VERSION { None } else { Some(self.quorum_index) };
         let quorum_public_key = UInt384(*self.quorum_public_key);
         let quorum_threshold_signature = UInt768(*self.quorum_threshold_signature);
         let quorum_verification_vector_hash = UInt256(*self.quorum_verification_vector_hash);
@@ -169,6 +171,7 @@ impl<'a> FromFFI<'a> for wrapped_types::QuorumEntry {
         quorum_entry::QuorumEntry {
             version,
             quorum_hash,
+            quorum_index,
             quorum_public_key,
             quorum_threshold_signature,
             quorum_verification_vector_hash,

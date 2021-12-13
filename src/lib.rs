@@ -498,9 +498,9 @@ mod tests {
     }
     unsafe extern "C" fn should_process_quorum_of_type(llmq_type: u8, _context: *const c_void) -> bool {
         llmq_type == match CHAIN_TYPE {
-            ChainType::MainNet => LLMQType::Llmqtype40060.into(),
-            ChainType::TestNet => LLMQType::Llmqtype5060.into(),
-            ChainType::DevNet => LLMQType::Llmqtype1060.into()
+            ChainType::MainNet => LLMQType::Llmqtype400_60.into(),
+            ChainType::TestNet => LLMQType::Llmqtype50_60.into(),
+            ChainType::DevNet => LLMQType::Llmqtype10_60.into()
         }
     }
     unsafe extern "C" fn validate_quorum_callback(data: *mut QuorumValidationData, _context: *const c_void) -> bool {
@@ -885,6 +885,11 @@ mod tests {
         assert!(result.has_valid_mn_list_root, "rootMNListValid not valid at height {}", BLOCK_HEIGHT);
         assert!(result.has_valid_quorum_list_root, "rootQuorumListValid not valid at height {}", BLOCK_HEIGHT);
         assert!(result.has_valid_quorums, "validQuorums not valid at height {}", BLOCK_HEIGHT);
+    }
+
+    #[test]
+    fn test_quorum_rotation() {
+
     }
 
     #[test]

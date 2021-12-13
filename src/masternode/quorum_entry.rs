@@ -7,10 +7,14 @@ use crate::consensus::{Decodable, Encodable, WriteExt};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
 
+pub const QUORUM_DEFAULT_VERSION: u16 = 1;
+pub const QUORUM_INDEXED_VERSION: u16 = 2;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct QuorumEntry<'a> {
     pub version: u16,
     pub quorum_hash: UInt256,
+    pub quorum_index: Option<u32>,
     pub quorum_public_key: UInt384,
     pub quorum_threshold_signature: UInt768,
     pub quorum_verification_vector_hash: UInt256,
@@ -49,6 +53,14 @@ impl<'a> QuorumEntry<'a> {
         let quorum_hash = match message.read_with::<UInt256>(offset, LE) {
             Ok(data) => data,
             _ => { return None; }
+        };
+        let quorum_index = match version {
+            QUORUM_DEFAULT_VERSION => None,
+            QUORUM_INDEXED_VERSION => match message.read_with::<u32>(offset, LE) {
+                Ok(data) => Some(data),
+                _ => { return None; }
+            },
+            _ => None,
         };
         let signers_count = match VarInt::consensus_decode(&message[*offset..]) {
             Ok(data) => data,
@@ -94,6 +106,7 @@ impl<'a> QuorumEntry<'a> {
         Some(QuorumEntry {
             version,
             quorum_hash,
+            quorum_index,
             quorum_public_key,
             quorum_threshold_signature,
             quorum_verification_vector_hash,

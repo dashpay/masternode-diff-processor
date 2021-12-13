@@ -139,6 +139,7 @@ impl<'a> ToFFI<'a> for quorum_entry::QuorumEntry<'a> {
             llmq_type: self.llmq_type,
             quorum_entry_hash,
             quorum_hash,
+            quorum_index: if self.quorum_index.is_none() { 0 } else { self.quorum_index.unwrap() },
             quorum_public_key,
             quorum_threshold_signature,
             quorum_verification_vector_hash,

@@ -51,6 +51,7 @@ pub struct QuorumEntry {
     pub llmq_type: LLMQType,
     pub quorum_entry_hash: *mut [u8; 32],
     pub quorum_hash: *mut [u8; 32],
+    pub quorum_index: u32,
     pub quorum_public_key: *mut [u8; 48],
     pub quorum_threshold_signature: *mut [u8; 96],
     pub quorum_verification_vector_hash: *mut [u8; 32],
