@@ -37,7 +37,7 @@ cbindgen = "0.20.0"
 
 [lib]
 name = "mndiff"
-crate-type = ["staticlib", "cdylib"]
+#crate-type = ["staticlib", "cdylib"]
 
 [profile.release]
 lto = "thin"
