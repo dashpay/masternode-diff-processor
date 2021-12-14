@@ -9,17 +9,17 @@ use std::io;
 use core2::io;
 
 #[macro_use]
-mod internal_macros;
-mod common;
-mod consensus;
-mod crypto;
-mod masternode;
-mod transactions;
-mod util;
-mod blockdata;
-mod network;
-mod hash_types;
-mod ffi;
+pub mod internal_macros;
+pub mod common;
+pub mod consensus;
+pub mod crypto;
+pub mod masternode;
+pub mod transactions;
+pub mod util;
+pub mod blockdata;
+pub mod network;
+pub mod hash_types;
+pub mod ffi;
 
 use std::slice;
 use std::collections::{BTreeMap, HashMap, HashSet};
