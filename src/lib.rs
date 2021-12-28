@@ -291,44 +291,12 @@ pub extern "C" fn mndiff_process(
     } else {
         added_masternodes.clone()
     };
-
     modified_masternodes.iter_mut().for_each(|(hash, modified)| {
         if let Some(mut old) = masternodes.get_mut(hash) {
-            let new_height = (*modified).update_height;
-            if (*old).update_height < new_height {
-                let b = BlockData { height: block_height, hash: block_hash };
-                let new_pro_reg_tx_hash = (*modified).provider_registration_transaction_hash;
-                if new_pro_reg_tx_hash == (*old).provider_registration_transaction_hash {
-                    (*modified).previous_validity = (*old)
-                        .previous_validity
-                        .clone()
-                        .into_iter()
-                        .filter(|(block, _)| block.height < new_height)
-                        .collect();
-                    if (*old).is_valid_at(new_height) != (*modified).is_valid {
-                        (*modified).previous_validity.insert(b.clone(), (*old).is_valid.clone());
-                    }
-                    (*modified).previous_operator_public_keys = (*old)
-                        .previous_operator_public_keys
-                        .clone()
-                        .into_iter()
-                        .filter(|(block, _)| block.height < new_height)
-                        .collect();
-                    if (*old).operator_public_key_at(new_height) != (*modified).operator_public_key {
-                        (*modified).previous_operator_public_keys.insert(b.clone(), (*old).operator_public_key.clone());
-                    }
-                    let old_prev_mn_entry_hashes = (*old)
-                        .previous_masternode_entry_hashes
-                        .clone()
-                        .into_iter()
-                        .filter(|(block, _)| (*block).height < new_height)
-                        .collect();
-                    (*modified).previous_masternode_entry_hashes = old_prev_mn_entry_hashes;
-                    if (*old).masternode_entry_hash_at(new_height) != (*modified).masternode_entry_hash {
-                        (*modified).previous_masternode_entry_hashes.insert(b.clone(), (*old).masternode_entry_hash.clone());
-                    }
+            if (*old).update_height < (*modified).update_height {
+                if (*modified).provider_registration_transaction_hash == (*old).provider_registration_transaction_hash {
+                    (*modified).update_with_previous_entry(old, BlockData { height: block_height, hash: block_hash });
                 }
-
                 if !(*old).confirmed_hash.is_zero() &&
                     (*old).known_confirmed_at_height.is_some() &&
                     (*old).known_confirmed_at_height.unwrap() > block_height {

@@ -163,6 +163,37 @@ impl MasternodeEntry {
         short_hex_string_from(&self.provider_registration_transaction_hash.0)
     }
 
+    pub fn update_with_previous_entry(&mut self, entry: &mut MasternodeEntry, block: BlockData) {
+        self.previous_validity = (*entry)
+            .previous_validity
+            .clone()
+            .into_iter()
+            .filter(|(block, _)| block.height < self.update_height)
+            .collect();
+        if (*entry).is_valid_at(self.update_height) != self.is_valid {
+            self.previous_validity.insert(block.clone(), (*entry).is_valid.clone());
+        }
+        self.previous_operator_public_keys = (*entry)
+            .previous_operator_public_keys
+            .clone()
+            .into_iter()
+            .filter(|(block, _)| block.height < self.update_height)
+            .collect();
+        if (*entry).operator_public_key_at(self.update_height) != self.operator_public_key {
+            self.previous_operator_public_keys.insert(block.clone(), (*entry).operator_public_key.clone());
+        }
+        let old_prev_mn_entry_hashes = (*entry)
+            .previous_masternode_entry_hashes
+            .clone()
+            .into_iter()
+            .filter(|(block, _)| (*block).height < self.update_height)
+            .collect();
+        self.previous_masternode_entry_hashes = old_prev_mn_entry_hashes;
+        if (*entry).masternode_entry_hash_at(self.update_height) != self.masternode_entry_hash {
+            self.previous_masternode_entry_hashes.insert(block.clone(), (*entry).masternode_entry_hash.clone());
+        }
+    }
+
     pub fn new(message: MNPayload, block_height: u32) -> Option<MasternodeEntry> {
         // let length = message.len();
         let message = message.0;
