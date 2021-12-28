@@ -1,5 +1,6 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
+use crate::CoinbaseTransaction;
 use crate::common::llmq_type::LLMQType;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{merkle_root_from_hashes, Reversable, UInt256};
@@ -149,5 +150,32 @@ impl<'a> MasternodeList<'a> {
 
     pub fn masternode_for(&self, registration_hash: UInt256) -> Option<&MasternodeEntry> {
         self.masternodes.get(&registration_hash)
+    }
+
+    pub fn has_valid_mn_list_root(&self, tx: &CoinbaseTransaction) -> bool {
+        if let Some(mn_merkle_root) = self.masternode_merkle_root {
+            println!("rootMNListValid: {:?} == {:?}", mn_merkle_root, tx.merkle_root_mn_list);
+            tx.merkle_root_mn_list == mn_merkle_root
+        } else {
+            false
+        }
+    }
+
+    pub fn has_valid_llmq_list_root(&self, tx: &CoinbaseTransaction) -> bool {
+        let q_merkle_root = self.quorum_merkle_root;
+        let ct_q_merkle_root = tx.merkle_root_llmq_list;
+        println!("rootQuorumListValid: {:?} == {:?}", q_merkle_root, ct_q_merkle_root);
+        let has_valid_quorum_list_root =
+            q_merkle_root.is_some() &&
+                ct_q_merkle_root.is_some() &&
+                ct_q_merkle_root.unwrap() == q_merkle_root.unwrap();
+        if !has_valid_quorum_list_root {
+            println!("Quorum Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
+                     tx.height,
+                     tx.base.version,
+                     tx.merkle_root_llmq_list,
+                     self.quorum_merkle_root);
+        }
+        has_valid_quorum_list_root
     }
 }

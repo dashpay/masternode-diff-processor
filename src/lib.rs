@@ -331,39 +331,16 @@ pub extern "C" fn mndiff_process(
     });
     let masternode_list = MasternodeList::new(masternodes, quorums, block_hash, block_height, quorums_active);
 
-    let has_valid_mn_list_root =
-        if let Some(mn_merkle_root) = masternode_list.masternode_merkle_root {
-            println!("rootMNListValid: {:?} == {:?}", mn_merkle_root, coinbase_transaction.merkle_root_mn_list);
-            coinbase_transaction.merkle_root_mn_list == mn_merkle_root
-        } else {
-            false
-        };
     // we need to check that the coinbase is in the transaction hashes we got back
     // we also need to check that the coinbase is in the merkle block
+    let has_valid_mn_list_root = masternode_list.has_valid_mn_list_root(&coinbase_transaction);
     let has_found_coinbase = coinbase_transaction.has_found_coinbase(merkle_hashes);
     let merkle_tree = MerkleTree {
         tree_element_count: total_transactions,
         hashes: merkle_hashes,
         flags: merkle_flags,
     };
-
-    let mut has_valid_quorum_list_root = true;
-    if quorums_active {
-        let q_merkle_root = masternode_list.quorum_merkle_root;
-        let ct_q_merkle_root = coinbase_transaction.merkle_root_llmq_list;
-        println!("rootQuorumListValid: {:?} == {:?}", q_merkle_root, ct_q_merkle_root);
-        has_valid_quorum_list_root =
-            q_merkle_root.is_some() &&
-                ct_q_merkle_root.is_some() &&
-                ct_q_merkle_root.unwrap() == q_merkle_root.unwrap();
-        if !has_valid_quorum_list_root {
-            println!("Quorum Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
-                     coinbase_transaction.height,
-                     coinbase_transaction.base.version,
-                     coinbase_transaction.merkle_root_llmq_list,
-                     masternode_list.quorum_merkle_root);
-        }
-    }
+    let has_valid_quorum_list_root = !quorums_active || masternode_list.has_valid_llmq_list_root(&coinbase_transaction);
     let has_valid_coinbase = merkle_tree.has_root(desired_merkle_root);
 
     let added_masternodes_count = added_masternodes.len();
