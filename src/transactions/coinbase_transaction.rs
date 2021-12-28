@@ -86,4 +86,19 @@ impl<'a> CoinbaseTransaction<'a> {
         *offset += payload.consensus_encode(&mut buffer).unwrap();
         buffer
     }
+
+    pub fn has_found_coinbase(&self, hashes: &[u8]) -> bool {
+        if let Some(coinbase_hash) = self.base.tx_hash {
+            let offset = &mut 0;
+            for _i in 0..hashes.len() {
+                if let Ok(h) = hashes.read_with::<UInt256>(offset, LE) {
+                    println!("finding coinbase: {:?} == {:?}", coinbase_hash, h);
+                    if h == coinbase_hash {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
 }

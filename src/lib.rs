@@ -339,19 +339,8 @@ pub extern "C" fn mndiff_process(
             false
         };
     // we need to check that the coinbase is in the transaction hashes we got back
-    let coinbase_hash = coinbase_transaction.base.tx_hash.unwrap();
-    let mut has_found_coinbase: bool = false;
-    let merkle_hash_offset = &mut 0;
-    for _i in 0..merkle_hashes.len() {
-        if let Ok(h) = merkle_hashes.read_with::<UInt256>(merkle_hash_offset, LE) {
-            println!("finding coinbase: {:?} == {:?}", coinbase_hash, h);
-            if h == coinbase_hash {
-                has_found_coinbase = true;
-                break;
-            }
-        }
-    }
     // we also need to check that the coinbase is in the merkle block
+    let has_found_coinbase = coinbase_transaction.has_found_coinbase(merkle_hashes);
     let merkle_tree = MerkleTree {
         tree_element_count: total_transactions,
         hashes: merkle_hashes,
