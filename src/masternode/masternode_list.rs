@@ -1,10 +1,7 @@
-use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
 use crate::CoinbaseTransaction;
 use crate::common::llmq_type::LLMQType;
-use crate::consensus::Encodable;
 use crate::crypto::byte_util::{merkle_root_from_hashes, Reversable, UInt256};
-use crate::hashes::{Hash, sha256};
 use crate::masternode::quorum_entry::QuorumEntry;
 use crate::masternode::masternode_entry::MasternodeEntry;
 
@@ -63,45 +60,6 @@ impl<'a> MasternodeList<'a> {
             count += entry.len() as u64;
         }
         count
-    }
-
-    pub fn valid_masternodes_for(&self, quorum_modifier: UInt256, quorum_count: u32, block_height: u32) -> Vec<MasternodeEntry> {
-        let mut score_dictionary: BTreeMap<UInt256, MasternodeEntry> = self.masternodes.clone().into_iter().filter_map(|(_, entry)| {
-            let score = MasternodeList::masternode_score(entry.clone(), quorum_modifier, block_height);
-            if score.is_some() && !score.unwrap().0.is_empty() {
-                Some((score.unwrap(), entry))
-            } else {
-                None
-            }
-        }).collect();
-        let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
-        scores.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
-        let mut masternodes: Vec<MasternodeEntry> = Vec::new();
-        let masternodes_in_list_count = self.masternodes.len();
-        let count = min(masternodes_in_list_count, scores.len());
-        for i in 0..count {
-            if let Some(masternode) = score_dictionary.get_mut(&scores[i]) {
-                if (*masternode).is_valid_at(block_height) {
-                    masternodes.push((*masternode).clone());
-                }
-            }
-            if masternodes.len() == quorum_count as usize {
-                break;
-            }
-        }
-        masternodes
-    }
-
-    pub fn masternode_score(masternode_entry: MasternodeEntry, modifier: UInt256, block_height: u32) -> Option<UInt256> {
-        if masternode_entry.confirmed_hash_at(block_height).is_none() {
-            return None;
-        }
-        let mut buffer: Vec<u8> = Vec::new();
-        if let Some(hash) = masternode_entry.confirmed_hash_hashed_with_provider_registration_transaction_hash_at(block_height) {
-            hash.consensus_encode(&mut buffer).unwrap();
-        }
-        modifier.consensus_encode(&mut buffer).unwrap();
-        Some(UInt256(sha256::Hash::hash(&buffer).into_inner()))
     }
 
     pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<UInt256>> {
