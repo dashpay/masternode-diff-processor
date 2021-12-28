@@ -78,122 +78,40 @@ pub extern "C" fn mndiff_process(
     };
     let (old_masternodes, old_quorums) = get_old_masternodes_and_quorums(base_masternode_list);
 
-    // Using List Diff
     let block_height= list_diff.block_height;
     let block_hash = list_diff.block_hash;
     let coinbase_transaction = list_diff.coinbase_transaction;
     let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
-
-    // Current masternodes
-    let added_or_modified_masternodes = list_diff.added_or_modified_masternodes;
-    let mut added_masternodes = added_or_modified_masternodes.clone();
-    let mut modified_masternode_keys: HashSet<UInt256> = HashSet::new();
-    if old_masternodes.len() > 0 {
-        let base_masternodes = old_masternodes.clone();
-        base_masternodes
-            .iter()
-            .for_each(|(h, _e)| { added_masternodes.remove(h); });
-        let mut new_mn_keys: HashSet<UInt256> = added_or_modified_masternodes
-            .keys()
-            .cloned()
-            .collect();
-        let mut old_mn_keys: HashSet<UInt256> = base_masternodes
-            .keys()
-            .cloned()
-            .collect();
-        modified_masternode_keys = inplace_intersection(&mut new_mn_keys, &mut old_mn_keys);
-    }
-    let mut modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = modified_masternode_keys
-        .clone()
-        .into_iter()
-        .fold(BTreeMap::new(), |mut acc, hash| {
-            acc.insert(hash, added_or_modified_masternodes[&hash].clone());
-            acc
-        });
-    let deleted_masternode_hashes = list_diff.deleted_masternode_hashes;
-    let mut masternodes = if old_masternodes.len() > 0 {
-        let mut old_mnodes = old_masternodes.clone();
-        for hash in deleted_masternode_hashes {
-            old_mnodes.remove(&hash.clone().reversed());
-        }
-        old_mnodes.extend(added_masternodes.clone());
-        old_mnodes
-    } else {
-        added_masternodes.clone()
-    };
-    modified_masternodes.iter_mut().for_each(|(hash, modified)| {
-        if let Some(mut old) = masternodes.get_mut(hash) {
-            if (*old).update_height < (*modified).update_height {
-                if (*modified).provider_registration_transaction_hash == (*old).provider_registration_transaction_hash {
-                    (*modified).update_with_previous_entry(old, BlockData { height: block_height, hash: block_hash });
-                }
-                if !(*old).confirmed_hash.is_zero() &&
-                    (*old).known_confirmed_at_height.is_some() &&
-                    (*old).known_confirmed_at_height.unwrap() > block_height {
-                    (*old).known_confirmed_at_height = Some(block_height);
-                }
-            }
-            masternodes.insert((*hash).clone(), (*modified).clone());
-        }
-    });
-    //
-    let has_valid_quorums = true;
-    let mut needed_masternode_lists: Vec<*mut [u8; 32]> = Vec::new();
-
     let deleted_quorums = list_diff.deleted_quorums;
     let added_quorums = list_diff.added_quorums;
 
-    // Current quorums
-    added_quorums.iter()
-        .filter(|(&llmq_type, _)| unsafe { should_process_quorum_of_type(llmq_type.into(), context) })
-        .for_each(|(&llmq_type, quorums_of_type)| {
-            (*quorums_of_type).iter().for_each(|(&quorum_hash, quorum_entry)| {
-                let lookup_result = unsafe { masternode_list_lookup(boxed(quorum_hash.0), context) };
-                if !lookup_result.is_null() {
-                    let quorum_masternode_list = unsafe { (*lookup_result).decode() };
-                    unsafe { masternode_list_destroy(lookup_result); }
-                    validate_quorum(llmq_type,
-                                    *quorum_entry,
-                                    has_valid_quorums,
-                                    quorum_masternode_list,
-                                    block_height_lookup,
-                                    validate_quorum_callback,
-                                    context);
+    let (added_masternodes,
+        modified_masternodes,
+        masternodes) = classify_masternodes(
+        old_masternodes,
+        list_diff.added_or_modified_masternodes,
+        list_diff.deleted_masternode_hashes,
+        block_height,
+        block_hash
+    );
 
-                } else {
-                    if unsafe { block_height_lookup(boxed(quorum_hash.0), context) != u32::MAX } {
-                        needed_masternode_lists.push(boxed(quorum_hash.0));
-                    } else {
-                        if use_insight_as_backup {
-                            unsafe { add_insight_lookup(boxed(quorum_hash.0), context) };
-                            if unsafe { block_height_lookup(boxed(quorum_hash.0), context) != u32::MAX } {
-                                needed_masternode_lists.push(boxed(quorum_hash.0));
-                            }
-                        }
-                    }
-                }
-            });
-    });
-    let mut quorums = old_quorums.clone();
-    quorums.extend(added_quorums
-        .clone()
-        .into_iter()
-        .filter(|(key, _entries)| !quorums.contains_key(key))
-        .collect::<HashMap<LLMQType, HashMap<UInt256, QuorumEntry>>>());
-    quorums.iter_mut().for_each(|(quorum_type, quorums_map)| {
-        if let Some(keys_to_delete) = deleted_quorums.get(quorum_type) {
-            keys_to_delete.into_iter().for_each(|key| {
-                (*quorums_map).remove(key);
-            });
-        }
-        if let Some(keys_to_add) = added_quorums.get(quorum_type) {
-            keys_to_add.clone().into_iter().for_each(|(key, entry)| {
-                (*quorums_map).insert(key, entry);
-            });
-        }
-    });
+    let (added_quorums,
+        quorums,
+        has_valid_quorums,
+        needed_masternode_lists) = classify_quorums(
+        old_quorums,
+        added_quorums,
+        deleted_quorums,
+        masternode_list_lookup,
+        masternode_list_destroy,
+        use_insight_as_backup,
+        add_insight_lookup,
+        should_process_quorum_of_type,
+        validate_quorum_callback,
+        block_height_lookup,
+        context
+    );
 
-    // Current masternode list
     let masternode_list = MasternodeList::new(masternodes, quorums, block_hash, block_height, quorums_active);
     // we need to check that the coinbase is in the transaction hashes we got back and is in the merkle block
     let has_valid_mn_list_root = masternode_list.has_valid_mn_list_root(&coinbase_transaction);
@@ -252,7 +170,6 @@ pub unsafe extern fn mndiff_quorum_validation_data_destroy(data: *mut QuorumVali
 pub unsafe extern fn mndiff_destroy(result: *mut MndiffResult) {
     unbox_result(result);
 }
-
 fn get_old_masternodes_and_quorums<'a>(base_masternode_list: *const wrapped_types::MasternodeList)
     -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>) {
     if !base_masternode_list.is_null() {
@@ -264,6 +181,140 @@ fn get_old_masternodes_and_quorums<'a>(base_masternode_list: *const wrapped_type
     }
     (BTreeMap::new(), HashMap::new())
 }
+
+// fn get_classified_masternodes(old_masternodes: BTreeMap<UInt256, MasternodeEntry>, list_diff: &MNListDiff)
+fn classify_masternodes(old_masternodes: BTreeMap<UInt256, MasternodeEntry>,
+                              added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
+                              deleted_masternode_hashes: Vec<UInt256>,
+                              block_height: u32,
+                              block_hash: UInt256
+
+
+)
+    -> (BTreeMap<UInt256, MasternodeEntry>, BTreeMap<UInt256, MasternodeEntry>, BTreeMap<UInt256, MasternodeEntry>) {
+    let added_or_modified_masternodes = added_or_modified_masternodes;
+    let deleted_masternode_hashes = deleted_masternode_hashes;
+    let mut added_masternodes = added_or_modified_masternodes.clone();
+    let mut modified_masternode_keys: HashSet<UInt256> = HashSet::new();
+    if old_masternodes.len() > 0 {
+        let base_masternodes = old_masternodes.clone();
+        base_masternodes
+            .iter()
+            .for_each(|(h, _e)| { added_masternodes.remove(h); });
+        let mut new_mn_keys: HashSet<UInt256> = added_or_modified_masternodes
+            .keys()
+            .cloned()
+            .collect();
+        let mut old_mn_keys: HashSet<UInt256> = base_masternodes
+            .keys()
+            .cloned()
+            .collect();
+        modified_masternode_keys = inplace_intersection(&mut new_mn_keys, &mut old_mn_keys);
+    }
+    let mut modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = modified_masternode_keys
+        .clone()
+        .into_iter()
+        .fold(BTreeMap::new(), |mut acc, hash| {
+            acc.insert(hash, added_or_modified_masternodes[&hash].clone());
+            acc
+        });
+    let mut masternodes = if old_masternodes.len() > 0 {
+        let mut old_mnodes = old_masternodes.clone();
+        for hash in deleted_masternode_hashes {
+            old_mnodes.remove(&hash.clone().reversed());
+        }
+        old_mnodes.extend(added_masternodes.clone());
+        old_mnodes
+    } else {
+        added_masternodes.clone()
+    };
+    modified_masternodes.iter_mut().for_each(|(hash, modified)| {
+        if let Some(mut old) = masternodes.get_mut(hash) {
+            if (*old).update_height < (*modified).update_height {
+                if (*modified).provider_registration_transaction_hash == (*old).provider_registration_transaction_hash {
+                    (*modified).update_with_previous_entry(old, BlockData { height: block_height, hash: block_hash });
+                }
+                if !(*old).confirmed_hash.is_zero() &&
+                    (*old).known_confirmed_at_height.is_some() &&
+                    (*old).known_confirmed_at_height.unwrap() > block_height {
+                    (*old).known_confirmed_at_height = Some(block_height);
+                }
+            }
+            masternodes.insert((*hash).clone(), (*modified).clone());
+        }
+    });
+    (added_masternodes, modified_masternodes, masternodes)
+}
+
+fn classify_quorums<'a>(old_quorums: HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>,
+                        added_quorums: HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>,
+                        deleted_quorums: HashMap<LLMQType, Vec<UInt256>>,
+                        masternode_list_lookup: MasternodeListLookup,
+                        masternode_list_destroy: MasternodeListDestroy,
+                        use_insight_as_backup: bool,
+                        add_insight_lookup: AddInsightBlockingLookup,
+                        should_process_quorum_of_type: ShouldProcessQuorumTypeCallback,
+                        validate_quorum_callback: ValidateQuorumCallback,
+                        block_height_lookup: BlockHeightLookup,
+                        context: *const c_void)
+    -> (HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>,
+        HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>,
+        bool,
+        Vec<*mut [u8; 32]>
+    ) {
+    let has_valid_quorums = true;
+    let mut needed_masternode_lists: Vec<*mut [u8; 32]> = Vec::new();
+    added_quorums.iter()
+        .filter(|(&llmq_type, _)| unsafe { should_process_quorum_of_type(llmq_type.into(), context) })
+        .for_each(|(&llmq_type, quorums_of_type)| {
+            (*quorums_of_type).iter().for_each(|(&quorum_hash, quorum_entry)| {
+                let lookup_result = unsafe { masternode_list_lookup(boxed(quorum_hash.0), context) };
+                if !lookup_result.is_null() {
+                    let quorum_masternode_list = unsafe { (*lookup_result).decode() };
+                    unsafe { masternode_list_destroy(lookup_result); }
+                    validate_quorum(llmq_type,
+                                    *quorum_entry,
+                                    has_valid_quorums,
+                                    quorum_masternode_list,
+                                    block_height_lookup,
+                                    validate_quorum_callback,
+                                    context);
+
+                } else {
+                    if unsafe { block_height_lookup(boxed(quorum_hash.0), context) != u32::MAX } {
+                        needed_masternode_lists.push(boxed(quorum_hash.0));
+                    } else {
+                        if use_insight_as_backup {
+                            unsafe { add_insight_lookup(boxed(quorum_hash.0), context) };
+                            if unsafe { block_height_lookup(boxed(quorum_hash.0), context) != u32::MAX } {
+                                needed_masternode_lists.push(boxed(quorum_hash.0));
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    let mut quorums = old_quorums.clone();
+    quorums.extend(added_quorums
+        .clone()
+        .into_iter()
+        .filter(|(key, _entries)| !quorums.contains_key(key))
+        .collect::<HashMap<LLMQType, HashMap<UInt256, QuorumEntry>>>());
+    quorums.iter_mut().for_each(|(quorum_type, quorums_map)| {
+        if let Some(keys_to_delete) = deleted_quorums.get(quorum_type) {
+            keys_to_delete.into_iter().for_each(|key| {
+                (*quorums_map).remove(key);
+            });
+        }
+        if let Some(keys_to_add) = added_quorums.get(quorum_type) {
+            keys_to_add.clone().into_iter().for_each(|(key, entry)| {
+                (*quorums_map).insert(key, entry);
+            });
+        }
+    });
+    (added_quorums, quorums, has_valid_quorums, needed_masternode_lists)
+}
+
 fn validate_quorum(llmq_type: LLMQType,
                    mut quorum: QuorumEntry,
                    mut has_valid_quorums: bool,
