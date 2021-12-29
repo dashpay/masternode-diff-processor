@@ -72,18 +72,17 @@ pub extern "C" fn mndiff_process(
         Ok(data) => data,
         Err(_err) => { return failure(); }
     };
+    let (old_masternodes, old_quorums) = get_old_masternodes_and_quorums(base_masternode_list);
+
+
     let list_diff = match MNListDiff::new(message, message_length, |h| unsafe { block_height_lookup(boxed(h.0), context) }) {
         Some(data) => data,
         None => { return failure(); }
     };
-    let (old_masternodes, old_quorums) = get_old_masternodes_and_quorums(base_masternode_list);
-
-    let block_height= list_diff.block_height;
+    let block_height = list_diff.block_height;
     let block_hash = list_diff.block_hash;
     let coinbase_transaction = list_diff.coinbase_transaction;
     let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
-    let deleted_quorums = list_diff.deleted_quorums;
-    let added_quorums = list_diff.added_quorums;
 
     let (added_masternodes,
         modified_masternodes,
@@ -100,8 +99,8 @@ pub extern "C" fn mndiff_process(
         has_valid_quorums,
         needed_masternode_lists) = classify_quorums(
         old_quorums,
-        added_quorums,
-        deleted_quorums,
+        list_diff.added_quorums,
+        list_diff.deleted_quorums,
         masternode_list_lookup,
         masternode_list_destroy,
         use_insight_as_backup,
@@ -170,6 +169,41 @@ pub unsafe extern fn mndiff_quorum_validation_data_destroy(data: *mut QuorumVali
 pub unsafe extern fn mndiff_destroy(result: *mut MndiffResult) {
     unbox_result(result);
 }
+fn read_quorum_index_and_height(message: &[u8], offset: &mut usize) -> Option<(u32, u32)> {
+    let index = match message.read_with::<u32>(offset, LE) {
+        Ok(data) => data,
+        Err(_err) => { return None; }
+    };
+    let height = match message.read_with::<u32>(offset, LE) {
+        Ok(data) => data,
+        Err(_err) => { return None; }
+    };
+    Some((index, height))
+}
+
+fn read_mn_diff_list<'a, F: Fn(UInt256) -> u32>(message: &'a [u8], offset: &mut usize, bh_lookup: F) -> Option<MNListDiff<'a>> {
+    let size = match VarInt::consensus_decode(&message[*offset..]) {
+        Ok(data) => data,
+        Err(_err) => { return None; }
+    };
+    let size_length = size.len();
+    let list_diff = match MNListDiff::new(&message[*offset..], size_length, bh_lookup) {
+        Some(data) => data,
+        None => { return None; }
+    };
+    *offset += size_length;
+    Some(list_diff)
+}
+
+fn read_quorum_snapshot<'a>(message: &'a [u8], offset: &mut usize) -> Option<QuorumSnapshot<'a>> {
+    let snapshot = match QuorumSnapshot::new(&message[*offset..]) {
+        Some(data) => data,
+        None => { return None; }
+    };
+    *offset += snapshot.length();
+    Some(snapshot)
+}
+
 fn get_old_masternodes_and_quorums<'a>(base_masternode_list: *const wrapped_types::MasternodeList)
     -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>) {
     if !base_masternode_list.is_null() {
@@ -182,16 +216,14 @@ fn get_old_masternodes_and_quorums<'a>(base_masternode_list: *const wrapped_type
     (BTreeMap::new(), HashMap::new())
 }
 
-// fn get_classified_masternodes(old_masternodes: BTreeMap<UInt256, MasternodeEntry>, list_diff: &MNListDiff)
 fn classify_masternodes(old_masternodes: BTreeMap<UInt256, MasternodeEntry>,
-                              added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
-                              deleted_masternode_hashes: Vec<UInt256>,
-                              block_height: u32,
-                              block_hash: UInt256
-
-
-)
-    -> (BTreeMap<UInt256, MasternodeEntry>, BTreeMap<UInt256, MasternodeEntry>, BTreeMap<UInt256, MasternodeEntry>) {
+                        added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
+                        deleted_masternode_hashes: Vec<UInt256>,
+                        block_height: u32,
+                        block_hash: UInt256)
+    -> (BTreeMap<UInt256, MasternodeEntry>,
+        BTreeMap<UInt256, MasternodeEntry>,
+        BTreeMap<UInt256, MasternodeEntry>) {
     let added_or_modified_masternodes = added_or_modified_masternodes;
     let deleted_masternode_hashes = deleted_masternode_hashes;
     let mut added_masternodes = added_or_modified_masternodes.clone();
