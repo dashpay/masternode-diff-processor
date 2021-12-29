@@ -169,6 +169,118 @@ pub unsafe extern fn mndiff_quorum_validation_data_destroy(data: *mut QuorumVali
 pub unsafe extern fn mndiff_destroy(result: *mut MndiffResult) {
     unbox_result(result);
 }
+
+#[no_mangle]
+pub extern "C" fn qrinfo_process(
+    message_arr: *const u8,
+    message_length: usize,
+    merkle_root: *const u8,
+    base_block_hashes_number: u32,
+    base_masternode_list: *const wrapped_types::MasternodeList,
+    masternode_list_lookup: MasternodeListLookup,
+    masternode_list_destroy: MasternodeListDestroy,
+    use_insight_as_backup: bool,
+    add_insight_lookup: AddInsightBlockingLookup,
+    should_process_quorum_of_type: ShouldProcessQuorumTypeCallback,
+    validate_quorum_callback: ValidateQuorumCallback,
+    block_height_lookup: BlockHeightLookup,
+    context: *const c_void, // External Masternode Manager Diff Message Context ()
+) -> *mut MndiffResult {
+    // Current message format:
+    // obj.creationHeight,
+    // obj.mnListDiffTip,
+    // obj.mnListDiffH,
+    // obj.mnListDiffH_C,
+    // obj.mnListDiffH_2C,
+    // obj.mnListDiffH_3C,
+    // obj.activeQuorumMembersH_C,
+    // obj.activeQuorumMembersH_2C,
+    // obj.activeQuorumMembersH_3C,
+    // obj.mnSkipListModeH_C,
+    // obj.mnSkipListH_C,
+    // obj.mnSkipListModeH_2C,
+    // obj.mnSkipListH_2C,
+    // obj.mnSkipListModeH_3C,
+    // obj.mnSkipListH_3C
+    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
+    let merkle_root_bytes = unsafe { slice::from_raw_parts(merkle_root, 32) };
+    let desired_merkle_root = match merkle_root_bytes.read_with::<UInt256>(&mut 0, LE) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    let (old_masternodes,
+        old_quorums) = get_old_masternodes_and_quorums(base_masternode_list);
+
+    // The creation height of the LLMQ active at height h
+    let offset = &mut 0;
+    let creation_height = match message.read_with::<u32>(offset, LE) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    let bh_lookup = |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) };
+    let diffs_count = (base_block_hashes_number + 1) as usize;
+    // 0: tip, 1: at height, 2: at height - c ... where `c`: block length of a cycle
+    // let mut diffs: Vec<MNListDiff> = Vec::with_capacity(diffs_count);
+    let mut mn_lists: Vec<MasternodeList> = Vec::with_capacity(diffs_count);
+    for i in 0..diffs_count {
+        let list_diff = match read_mn_diff_list(message, offset, bh_lookup) {
+            Some(data) => data,
+            None => { return failure(); }
+        };
+        let block_height = list_diff.block_height;
+        let block_hash = list_diff.block_hash;
+        let coinbase_transaction = list_diff.coinbase_transaction;
+        let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
+        let (added_masternodes,
+            modified_masternodes,
+            masternodes) = classify_masternodes(
+            if i == 0 { old_masternodes.clone() } else { mn_lists[i-1].masternodes.clone() },
+            list_diff.added_or_modified_masternodes,
+            list_diff.deleted_masternode_hashes,
+            block_height,
+            block_hash
+        );
+        let quorums = HashMap::new();
+        let masternode_list = MasternodeList::new(masternodes, quorums, block_hash, block_height, quorums_active);
+        mn_lists.push(masternode_list);
+    }
+
+    let snapshots_count = (base_block_hashes_number - 1) as usize;
+    // Quorum Snapshot at (height - c) where `c`: block length of a cycle
+    let mut snapshots: Vec<QuorumSnapshot> = Vec::with_capacity(snapshots_count);
+    for _i in 0..snapshots_count {
+        if let Some(snapshot) = read_quorum_snapshot(message, offset) {
+            snapshots.push(snapshot);
+        } else {
+            return failure();
+        }
+    }
+
+    // Contains the list of (quorumIndex, height) for quorums that failed to form at height h.
+    // Ordered by oldest to newest
+    // let heights_list = ...;
+
+    /*let list_add_diff = match read_mn_diff_list(message, offset, bh_lookup) {
+        Some(data) => data,
+        None => { return failure(); }
+    };
+    let snapshot_list_size = match VarInt::consensus_decode(&message[*offset..]) {
+        Ok(data) => data,
+        Err(_err) => { return failure(); }
+    };
+    *offset += snapshot_list_size.len();
+    let mut snapshot_list: Vec<QuorumSnapshot> = Vec::with_capacity(snapshot_list_size.0 as usize);
+    for _i in 0..snapshot_list_size.0 {
+        if let Some(snapshot) = read_quorum_snapshot(message, offset) {
+            snapshot_list.push(snapshot);
+        } else {
+            return failure();
+        }
+    }*/
+
+    failure()
+}
+
 fn read_quorum_index_and_height(message: &[u8], offset: &mut usize) -> Option<(u32, u32)> {
     let index = match message.read_with::<u32>(offset, LE) {
         Ok(data) => data,
