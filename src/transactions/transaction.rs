@@ -73,7 +73,7 @@ impl TransactionType {
 }
 
 // #[repr(C)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct TransactionInput<'a> {
     pub input_hash: UInt256,
     pub index: u32,
@@ -83,7 +83,7 @@ pub struct TransactionInput<'a> {
 }
 
 // #[repr(C)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct TransactionOutput<'a> {
     pub amount: u64,
     pub script: Option<&'a [u8]>,
