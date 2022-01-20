@@ -9,10 +9,104 @@ use crate::ffi::to::ToFFI;
 use crate::ffi::wrapped_types;
 use crate::masternode::{masternode_entry, masternode_list, quorum_entry};
 use crate::masternode::quorum_entry::QUORUM_DEFAULT_VERSION;
+use crate::transactions::{coinbase_transaction, transaction};
 
 pub trait FromFFI<'a> {
     type Item: ToFFI<'a>;
     unsafe fn decode(&self) -> Self::Item;
+}
+impl<'a> FromFFI<'a> for wrapped_types::TransactionInput {
+    type Item = transaction::TransactionInput<'a>;
+
+    unsafe fn decode(&self) -> Self::Item {
+        let input_hash = UInt256(*self.input_hash);
+        let script_length = self.script_length;
+        let script = if self.script.is_null() || script_length == 0 {
+            None
+        } else {
+            Some(slice::from_raw_parts(self.script, script_length))
+        };
+        let signature_length = self.signature_length;
+        let signature = if self.signature.is_null() || signature_length == 0 {
+            None
+        } else {
+            Some(slice::from_raw_parts(self.signature, signature_length))
+        };
+        Self::Item {
+            input_hash,
+            index: self.index,
+            script,
+            signature,
+            sequence: self.sequence
+        }
+    }
+}
+
+impl<'a> FromFFI<'a> for wrapped_types::TransactionOutput {
+    type Item = transaction::TransactionOutput<'a>;
+
+    unsafe fn decode(&self) -> Self::Item {
+        let script_length = self.script_length;
+        let script = if self.script.is_null() || script_length == 0 {
+            None
+        } else {
+            Some(slice::from_raw_parts(self.script, script_length))
+        };
+        let address_length = self.address_length;
+        let address = if self.address.is_null() || address_length == 0 {
+            None
+        } else {
+            Some(slice::from_raw_parts(self.address, address_length))
+        };
+
+        Self::Item {
+            amount: self.amount,
+            script,
+            address
+        }
+    }
+}
+impl<'a> FromFFI<'a> for wrapped_types::Transaction {
+    type Item = transaction::Transaction<'a>;
+
+    unsafe fn decode(&self) -> Self::Item {
+        let inputs = (0..self.inputs_count)
+            .into_iter()
+            .map(|i| (*(*(self.inputs.offset(i as isize)))).decode())
+            .collect();
+        let outputs = (0..self.outputs_count)
+            .into_iter()
+            .map(|i| (*(*(self.outputs.offset(i as isize)))).decode())
+            .collect();
+        Self::Item {
+            inputs,
+            outputs,
+            lock_time: self.lock_time,
+            version: self.version,
+            tx_hash: None,
+            tx_type: self.tx_type,
+            payload_offset: self.payload_offset,
+            block_height: self.block_height
+        }
+    }
+}
+impl<'a> FromFFI<'a> for wrapped_types::CoinbaseTransaction {
+    type Item = coinbase_transaction::CoinbaseTransaction<'a>;
+
+    unsafe fn decode(&self) -> Self::Item {
+        let merkle_root_llmq_list = if self.merkle_root_llmq_list.is_null() {
+            None
+        } else {
+            Some(UInt256(*self.merkle_root_llmq_list))
+        };
+        Self::Item {
+            base: (*self.base).decode(),
+            coinbase_transaction_version: self.coinbase_transaction_version,
+            height: self.height,
+            merkle_root_mn_list: UInt256(*self.merkle_root_mn_list),
+            merkle_root_llmq_list
+        }
+    }
 }
 
 impl<'a> FromFFI<'a> for wrapped_types::MasternodeList {

@@ -9,10 +9,120 @@ use crate::ffi::from::FromFFI;
 use crate::ffi::wrapped_types;
 use crate::ffi::wrapped_types::{LLMQMap, MasternodeEntryHash, OperatorPublicKey, Validity};
 use crate::masternode::{masternode_entry, masternode_list, quorum_entry};
+use crate::transactions::{coinbase_transaction, transaction};
 
 pub trait ToFFI<'a> {
     type Item: FromFFI<'a>;
     fn encode(&self) -> Self::Item;
+}
+impl<'a> ToFFI<'a> for transaction::TransactionInput<'a> {
+    type Item = wrapped_types::TransactionInput;
+
+    fn encode(&self) -> Self::Item {
+        let (script, script_length) = if self.script.is_none() {
+            (null_mut(), 0)
+        } else {
+            let s = self.script.unwrap();
+            (boxed_vec(s.to_vec()), s.len())
+        };
+        let (signature, signature_length) = if self.signature.is_none() {
+            (null_mut(), 0)
+        } else {
+            let s = self.signature.unwrap();
+            (boxed_vec(s.to_vec()), s.len())
+        };
+        Self::Item {
+            input_hash: boxed(self.input_hash.0),
+            index: self.index,
+            script,
+            script_length,
+            signature,
+            signature_length,
+            sequence: self.sequence
+        }
+    }
+}
+
+impl<'a> ToFFI<'a> for transaction::TransactionOutput<'a> {
+    type Item = wrapped_types::TransactionOutput;
+
+    fn encode(&self) -> Self::Item {
+        let (script, script_length) = if self.script.is_none() {
+            (null_mut(), 0)
+        } else {
+            let s = self.script.unwrap();
+            (boxed_vec(s.to_vec()), s.len())
+        };
+        let (address, address_length) = if self.address.is_none() {
+            (null_mut(), 0)
+        } else {
+            let s = self.address.unwrap();
+            (boxed_vec(s.to_vec()), s.len())
+        };
+        Self::Item {
+            amount: self.amount,
+            script,
+            script_length,
+            address,
+            address_length
+        }
+    }
+}
+
+impl<'a> ToFFI<'a> for transaction::Transaction<'a> {
+    type Item = wrapped_types::Transaction;
+
+    fn encode(&self) -> Self::Item {
+        let tx_hash = if self.tx_hash.is_none() {
+            null_mut()
+        } else {
+            boxed(self.tx_hash.unwrap().0)
+        };
+        // let mut inputs_vec: Vec<*mut wrapped_types::TransactionInput> = Vec::with_capacity(self.inputs.len());
+        // self.inputs.iter().for_each(|&input| {
+        //     inputs_vec.push(boxed(input.encode()));
+        // });
+        let inputs_vec: Vec<*mut wrapped_types::TransactionInput> = self.inputs
+            .iter()
+            .map(|&input| boxed(input.encode()))
+            .collect();
+        let inputs = boxed_vec(inputs_vec);
+        let outputs_vec = self.outputs
+            .iter()
+            .map(|&output| boxed(output.encode()))
+            .collect();
+        let outputs = boxed_vec(outputs_vec);
+        wrapped_types::Transaction {
+            inputs,
+            inputs_count: self.inputs.len(),
+            outputs,
+            outputs_count: self.outputs.len(),
+            lock_time: self.lock_time,
+            version: self.version,
+            tx_hash,
+            tx_type: self.tx_type,
+            payload_offset: self.payload_offset,
+            block_height: self.block_height
+        }
+    }
+}
+impl<'a> ToFFI<'a> for coinbase_transaction::CoinbaseTransaction<'a> {
+    type Item = wrapped_types::CoinbaseTransaction;
+
+    fn encode(&self) -> Self::Item {
+        let merkle_root_llmq_list = if self.merkle_root_llmq_list.is_none() {
+            null_mut()
+        } else {
+            boxed(self.merkle_root_llmq_list.unwrap().0)
+        };
+        wrapped_types::CoinbaseTransaction {
+            base: boxed(self.base.encode()),
+            coinbase_transaction_version: self.coinbase_transaction_version,
+            height: self.height,
+            merkle_root_mn_list: boxed(self.merkle_root_mn_list.0),
+            merkle_root_llmq_list
+        }
+    }
 }
 
 impl<'a> ToFFI<'a> for masternode_list::MasternodeList<'a> {
