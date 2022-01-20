@@ -87,7 +87,7 @@ pub struct TransactionInput<'a> {
 pub struct TransactionOutput<'a> {
     pub amount: u64,
     pub script: Option<&'a [u8]>,
-    pub address: Option<&'a str>,
+    pub address: Option<&'a [u8]>,
 }
 pub trait ITransaction {
     fn payload_data(&self) -> Vec<u8>;
