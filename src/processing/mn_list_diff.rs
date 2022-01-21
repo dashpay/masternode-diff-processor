@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
 use byte::{BytesExt, LE};
-use byte::ctx::Bytes;
 use crate::{CoinbaseTransaction, LLMQType, MasternodeEntry, MNPayload, QuorumEntry, Reversable, UInt256, VarInt};
 use crate::consensus::Decodable;
 
@@ -164,57 +163,4 @@ impl<'a> MNListDiff<'a> {
             block_height
         })
     }
-}
-
-pub struct QuorumSnapshot<'a> {
-    // The bitset of nodes already in quarters at the start of cycle at height n
-    // (masternodeListSize + 7)/8
-    pub quorum_member_list: &'a [u8],
-    //  Mode of the skip list
-    pub skip_list_mode: u8,
-    // Size of the skip list
-    pub skip_list_size: u16,
-    // Skiplist at height n
-    pub skip_list: Vec<u16>,
-}
-
-impl<'a> QuorumSnapshot<'a> {
-
-    pub fn length(&self) -> usize {
-        self.quorum_member_list.len() + 1 + 2 + self.skip_list.len() * 2
-    }
-
-    pub fn new(message: &'a [u8]) -> Option<Self> {
-        let offset = &mut 0;
-        let quorum_member_list_size_var_int = match VarInt::consensus_decode(&message[*offset..]) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        *offset += quorum_member_list_size_var_int.len();
-        let quorum_member_list_size = quorum_member_list_size_var_int.0 as usize;
-        let quorum_member_list_length = (quorum_member_list_size + 7) / 8;
-        let quorum_member_list: &[u8] = message.read_with(offset, Bytes::Len(quorum_member_list_length)).unwrap();
-        let skip_list_mode = match message.read_with::<u8>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let skip_list_size = match message.read_with::<u16>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let mut skip_list: Vec<u16> = Vec::with_capacity(skip_list_size as usize);
-        for _i in 0..skip_list_size {
-            skip_list.push(match message.read_with::<u16>(offset, LE) {
-                Ok(data) => data,
-                Err(_err) => { return None; }
-            });
-        }
-        Some(Self {
-            quorum_member_list,
-            skip_list_mode,
-            skip_list_size,
-            skip_list
-        })
-    }
-
 }
