@@ -1,6 +1,7 @@
 use byte::{BytesExt, check_len, LE, Result, TryRead, TryWrite};
 use byte::ctx::{Bytes, Endian};
 use std::fmt::Write;
+use std::slice;
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
 use crate::consensus::encode::{Error, VarInt};
 use crate::hashes::{Hash, sha256d, hex::{FromHex, ToHex}, hex};
@@ -122,6 +123,10 @@ pub trait Zeroable {
     fn is_zero(&self) -> bool;
 }
 
+pub trait ConstDecodable<T> {
+    fn from_const(bytes: *const u8) -> Option<T>;
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt128(pub [u8; 16]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -228,6 +233,18 @@ macro_rules! define_bytes_to_big_uint {
         }
     }
 }
+
+impl ConstDecodable<UInt256> for UInt256 {
+    fn from_const(bytes: *const u8) -> Option<UInt256> {
+        let safe_bytes = unsafe { slice::from_raw_parts(bytes, 32) };
+        match safe_bytes.read_with::<UInt256>(&mut 0, LE) {
+            Ok(data) => Some(data),
+            Err(_err) => None
+        }
+    }
+}
+
+
 
 define_bytes_to_big_uint!(UInt128, 16);
 define_bytes_to_big_uint!(UInt160, 20);
