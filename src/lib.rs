@@ -44,7 +44,7 @@ use ffi::wrapped_types::{AddInsightBlockingLookup, BlockHeightLookup, Masternode
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;
 use crate::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
-use crate::ffi::unboxer::{unbox_any, unbox_quorum_validation_data, unbox_result};
+use crate::ffi::unboxer::{unbox_any, unbox_qrinfo, unbox_quorum_validation_data, unbox_result};
 use crate::processing::mn_list_diff::{MNListDiff};
 use crate::processing::quorum_snapshot::QuorumSnapshot;
 
@@ -211,6 +211,11 @@ pub extern "C" fn qrinfo_process(
 
 
     boxed(qr_info.encode())
+}
+
+#[no_mangle]
+pub unsafe extern fn qrinfo_destroy(result: *mut wrapped_types::QuorumRotationInfo) {
+    unbox_qrinfo(result);
 }
 
 
