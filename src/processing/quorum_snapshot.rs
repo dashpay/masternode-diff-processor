@@ -42,16 +42,17 @@ impl<'a> TryRead<'a, Endian> for QuorumSnapshotSkipMode {
     }
 }
 
-pub struct QuorumSnapshot {
+#[derive(Clone, Debug)]
+pub struct QuorumSnapshot<'a> {
     // The bitset of nodes already in quarters at the start of cycle at height n
     // (masternodeListSize + 7)/8
-    pub member_list: Vec<u8>,
+    pub member_list: &'a [u8],
     // Skiplist at height n
     pub skip_list: Vec<u32>,
     //  Mode of the skip list
     pub skip_list_mode: QuorumSnapshotSkipMode,
 }
-impl<'a> TryRead<'a, Endian> for QuorumSnapshot {
+impl<'a> TryRead<'a, Endian> for QuorumSnapshot<'a> {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
         let member_list_size_var_int = match VarInt::consensus_decode(&bytes[*offset..]) {
@@ -88,7 +89,7 @@ impl<'a> TryRead<'a, Endian> for QuorumSnapshot {
     }
 }
 
-impl QuorumSnapshot {
+impl<'a> QuorumSnapshot<'a> {
     pub fn length(&self) -> usize {
         self.member_list.len() + 1 + 2 + self.skip_list.len() * 2
     }
