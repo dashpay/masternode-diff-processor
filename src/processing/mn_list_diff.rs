@@ -3,6 +3,7 @@ use byte::{BytesExt, LE};
 use crate::{CoinbaseTransaction, LLMQType, MasternodeEntry, MNPayload, QuorumEntry, Reversable, UInt256, VarInt};
 use crate::consensus::Decodable;
 
+#[derive(Debug)]
 pub struct MNListDiff<'a> {
     pub base_block_hash: UInt256,
     pub block_hash: UInt256,
