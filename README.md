@@ -21,6 +21,6 @@ In 'masternodes-diff-processor':
 In 'DashSync' when building example app:
 1) In Podfile put 'DashSharedCore' pod which is 'dash-shared-core' looking at right above 'DashSync' pod import
 2) Perform 'pod cache clean DashSharedCore' if neccessary 
-3) Run 'pod install'
+3) Run 'pod update'
 
 
