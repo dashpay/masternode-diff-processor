@@ -9,6 +9,7 @@ use crate::ffi::to::ToFFI;
 use crate::ffi::wrapped_types;
 use crate::masternode::{masternode_entry, masternode_list, quorum_entry};
 use crate::masternode::quorum_entry::QUORUM_DEFAULT_VERSION;
+use crate::processing::{mn_list_diff, quorum_rotation_info, quorum_snapshot};
 use crate::transactions::{coinbase_transaction, transaction};
 
 pub trait FromFFI<'a> {
@@ -250,8 +251,8 @@ impl<'a> FromFFI<'a> for wrapped_types::QuorumEntry {
         let all_commitment_aggregated_signature = UInt768(*self.all_commitment_aggregated_signature);
         let llmq_type = self.llmq_type;
         let signers_count = encode::VarInt(self.signers_count);
-        let valid_members_count = encode::VarInt(self.valid_members_count);
         let signers_bitset = slice::from_raw_parts(self.signers_bitset, self.signers_bitset_length);
+        let valid_members_count = encode::VarInt(self.valid_members_count);
         let valid_members_bitset = slice::from_raw_parts(self.valid_members_bitset, self.valid_members_bitset_length);
         let length = self.length;
         let quorum_entry_hash = UInt256(*self.quorum_entry_hash);
@@ -280,6 +281,146 @@ impl<'a> FromFFI<'a> for wrapped_types::QuorumEntry {
             verified,
             saved,
             commitment_hash
+        }
+    }
+}
+
+impl<'a> FromFFI<'a> for wrapped_types::MNListDiff {
+    type Item = mn_list_diff::MNListDiff<'a>;
+
+    unsafe fn decode(&self) -> Self::Item {
+        let merkle_hashes_count = self.merkle_hashes_count;
+        let merkle_hashes = slice::from_raw_parts(self.merkle_hashes, merkle_hashes_count);
+        let merkle_flags_count = self.merkle_flags_count;
+        let merkle_flags = slice::from_raw_parts(self.merkle_flags, merkle_flags_count);
+
+        let deleted_masternode_hashes = (0..self.deleted_masternode_hashes_count)
+            .into_iter()
+            .map(|i| {
+                let hash = *self.deleted_masternode_hashes.offset(i as isize);
+                UInt256(*hash)
+            })
+            .collect();
+
+
+        let added_or_modified_masternodes: BTreeMap<UInt256, masternode_entry::MasternodeEntry> =
+            (0..self.added_or_modified_masternodes_count)
+                .into_iter()
+                .fold(BTreeMap::new(),|mut acc, i| {
+                    let raw_value = *(*(self.added_or_modified_masternodes.offset(i as isize)));
+                    let value = raw_value.decode();
+                    let key = value.provider_registration_transaction_hash.clone().reversed();
+                    acc.insert(key, value);
+                    acc
+                });
+
+        let deleted_quorums: HashMap<LLMQType, Vec<UInt256>> =
+            (0..self.deleted_quorums_count)
+                .into_iter()
+                .fold(HashMap::new(), |mut acc, i| {
+                    let obj = *(*(self.deleted_quorums.offset(i as isize)));
+                    let key = LLMQType::from(obj.llmq_type);
+                    let llmq_hash = UInt256(*obj.llmq_hash);
+                    if acc.contains_key(&key) {
+                        acc.get_mut(&key).unwrap().push(llmq_hash);
+                    } else {
+                        acc.insert(key, vec![llmq_hash]);
+                    }
+                    acc
+                });
+        let added_quorums: HashMap<LLMQType, HashMap<UInt256, quorum_entry::QuorumEntry>> =
+            (0..self.added_quorums_count)
+                .into_iter()
+                .fold(HashMap::new(), |mut acc, i| {
+                    let quorum_entry = *(*(self.added_quorums.offset(i as isize)));
+                    let entry = quorum_entry.decode();
+                    acc
+                        .entry(entry.llmq_type)
+                        .or_insert(HashMap::new())
+                        .insert(entry.quorum_hash, entry);
+                    acc
+                });
+        mn_list_diff::MNListDiff {
+            base_block_hash: UInt256(*self.base_block_hash),
+            block_hash: UInt256(*self.block_hash),
+            total_transactions: self.total_transactions,
+            merkle_hashes,
+            merkle_hashes_count,
+            merkle_flags,
+            merkle_flags_count,
+            coinbase_transaction: (*self.coinbase_transaction).decode(),
+            deleted_masternode_hashes,
+            added_or_modified_masternodes,
+            deleted_quorums,
+            added_quorums,
+            length: self.length,
+            block_height: self.block_height
+        }
+    }
+}
+impl<'a> FromFFI<'a> for wrapped_types::QuorumSnapshot {
+    type Item = quorum_snapshot::QuorumSnapshot<'a>;
+
+    unsafe fn decode(&self) -> Self::Item {
+        let member_list = slice::from_raw_parts(self.member_list, self.member_list_length);
+        let skip_list = (0..self.skip_list_length)
+            .into_iter()
+            .map(|i| *(self.skip_list.offset(i as isize)))
+            .collect();
+        let skip_list_mode = self.skip_list_mode;
+        Self::Item {
+            member_list,
+            skip_list,
+            skip_list_mode
+        }
+    }
+}
+
+impl<'a> FromFFI<'a> for wrapped_types::QuorumRotationInfo {
+    type Item = quorum_rotation_info::QuorumRotationInfo<'a>;
+
+    unsafe fn decode(&self) -> Self::Item {
+        let snapshot_at_h_c = (*self.snapshot_at_h_c).decode();
+        let snapshot_at_h_2c = (*self.snapshot_at_h_2c).decode();
+        let snapshot_at_h_3c = (*self.snapshot_at_h_3c).decode();
+        let list_diff_tip = (*self.list_diff_tip).decode();
+        let list_diff_at_h = (*self.list_diff_at_h).decode();
+        let list_diff_at_h_c = (*self.list_diff_at_h_c).decode();
+        let list_diff_at_h_2c = (*self.list_diff_at_h_2c).decode();
+        let list_diff_at_h_3c = (*self.list_diff_at_h_3c).decode();
+        let extra_share = self.extra_share;
+        let (snapshot_at_h_4c, list_diff_at_h_4c) = if extra_share {
+            (Some((*self.snapshot_at_h_4c).decode()), Some((*self.list_diff_at_h_4c).decode()))
+        } else {
+            (None, None)
+        };
+        let block_hash_list = (0..self.block_hash_list_num)
+            .into_iter()
+            .map(|i| UInt256(*(*(self.block_hash_list.offset(i as isize)))))
+            .collect();
+        let snapshot_list = (0..self.snapshot_list_num)
+            .into_iter()
+            .map(|i| (*(*(self.snapshot_list.offset(i as isize)))).decode())
+            .collect();
+        let mn_list_diff_list = (0..self.mn_list_diff_list_num)
+            .into_iter()
+            .map(|i| (*(*(self.mn_list_diff_list.offset(i as isize)))).decode())
+            .collect();
+        Self::Item {
+            snapshot_at_h_c,
+            snapshot_at_h_2c,
+            snapshot_at_h_3c,
+            list_diff_tip,
+            list_diff_at_h,
+            list_diff_at_h_c,
+            list_diff_at_h_2c,
+            list_diff_at_h_3c,
+            extra_share,
+            snapshot_at_h_4c,
+            list_diff_at_h_4c,
+            block_hash_list,
+            snapshot_list,
+            mn_list_diff_list,
         }
     }
 }

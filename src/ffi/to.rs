@@ -9,7 +9,9 @@ use crate::ffi::from::FromFFI;
 use crate::ffi::wrapped_types;
 use crate::ffi::wrapped_types::{LLMQMap, MasternodeEntryHash, OperatorPublicKey, Validity};
 use crate::masternode::{masternode_entry, masternode_list, quorum_entry};
+use crate::processing::{mn_list_diff, quorum_rotation_info, quorum_snapshot};
 use crate::transactions::{coinbase_transaction, transaction};
+use crate::wrapped_types::LLMQTypedHash;
 
 pub trait ToFFI<'a> {
     type Item: FromFFI<'a>;
@@ -262,6 +264,144 @@ impl<'a> ToFFI<'a> for quorum_entry::QuorumEntry<'a> {
             valid_members_count: self.valid_members_count.0,
             verified: self.verified,
             version: self.version,
+        }
+    }
+}
+
+impl<'a> ToFFI<'a> for mn_list_diff::MNListDiff<'a> {
+    type Item = wrapped_types::MNListDiff;
+
+    fn encode(&self) -> Self::Item {
+        let base_block_hash = boxed(self.base_block_hash.0);
+        let block_hash = boxed(self.block_hash.0);
+        let total_transactions = self.total_transactions;
+        let merkle_hashes = boxed_vec(self.merkle_hashes.to_vec());
+        let merkle_hashes_count = self.merkle_hashes.len();
+        let merkle_flags = boxed_vec(self.merkle_flags.to_vec());
+        let merkle_flags_count = self.merkle_flags.len();
+        let coinbase_transaction = boxed(self.coinbase_transaction.encode());
+        let deleted_masternode_hashes_count = self.deleted_masternode_hashes.len();
+        let deleted_masternode_hashes_vec: Vec<*mut [u8; 32]> = (0..deleted_masternode_hashes_count)
+            .into_iter()
+            .map(|i| boxed(self.deleted_masternode_hashes[i].0))
+            .collect();
+        let deleted_masternode_hashes = boxed_vec(deleted_masternode_hashes_vec);
+        let mut deleted_quorums_vec: Vec<*mut LLMQTypedHash> = Vec::new();
+        self.deleted_quorums.clone().into_iter().for_each(|(llmq_type, hashes)| {
+            hashes.iter().for_each(|&hash| {
+                let llmq_hash = boxed(hash.0);
+                let llmq_type = llmq_type.into();
+                deleted_quorums_vec.push(boxed(LLMQTypedHash { llmq_hash, llmq_type }));
+            });
+        });
+        let deleted_quorums_count = deleted_quorums_vec.len();
+        let deleted_quorums = boxed_vec(deleted_quorums_vec);
+        let added_or_modified_masternodes_count = self.added_or_modified_masternodes.len();
+        let added_or_modified_masternodes = encode_masternodes_map(&self.added_or_modified_masternodes);
+        let mut added_quorums_vec: Vec<*mut wrapped_types::QuorumEntry> = Vec::new();
+        self.added_quorums.clone().into_iter().for_each(|(llmq_type, map)| {
+            map.iter().for_each(|(&hash, &entry)| {
+                added_quorums_vec.push(boxed(entry.encode()));
+            });
+        });
+        let added_quorums_count = added_quorums_vec.len();
+        let added_quorums = boxed_vec(added_quorums_vec);
+        Self::Item {
+            base_block_hash,
+            block_hash,
+            total_transactions,
+            merkle_hashes,
+            merkle_hashes_count,
+            merkle_flags,
+            merkle_flags_count,
+            coinbase_transaction,
+            deleted_masternode_hashes_count,
+            deleted_masternode_hashes,
+            added_or_modified_masternodes_count,
+            added_or_modified_masternodes,
+            deleted_quorums_count,
+            deleted_quorums,
+            added_quorums_count,
+            added_quorums,
+            length: self.length,
+            block_height: self.block_height
+        }
+    }
+}
+impl<'a> ToFFI<'a> for quorum_snapshot::QuorumSnapshot<'a> {
+    type Item = wrapped_types::QuorumSnapshot;
+
+    fn encode(&self) -> Self::Item {
+        let member_list_length = self.member_list.len();
+        let member_list = boxed_vec(self.member_list.to_vec());
+        let skip_list_length = self.skip_list.len();
+        let skip_list = boxed_vec(self.skip_list.to_vec());
+        let skip_list_mode = self.skip_list_mode;
+        Self::Item {
+            member_list_length,
+            member_list,
+            skip_list_length,
+            skip_list,
+            skip_list_mode
+        }
+    }
+}
+
+impl<'a> ToFFI<'a> for quorum_rotation_info::QuorumRotationInfo<'a> {
+    type Item = wrapped_types::QuorumRotationInfo;
+
+    fn encode(&self) -> Self::Item {
+        let snapshot_at_h_c = boxed(self.snapshot_at_h_c.encode());
+        let snapshot_at_h_2c = boxed(self.snapshot_at_h_2c.encode());
+        let snapshot_at_h_3c = boxed(self.snapshot_at_h_3c.encode());
+        let list_diff_tip = boxed(self.list_diff_tip.encode());
+        let list_diff_at_h = boxed(self.list_diff_at_h.encode());
+        let list_diff_at_h_c = boxed(self.list_diff_at_h_c.encode());
+        let list_diff_at_h_2c = boxed(self.list_diff_at_h_2c.encode());
+        let list_diff_at_h_3c = boxed(self.list_diff_at_h_3c.encode());
+        let extra_share = self.extra_share;
+        let (snapshot_at_h_4c, list_diff_at_h_4c) = if extra_share {
+            (boxed(self.snapshot_at_h_4c.as_ref().unwrap().encode()),
+             boxed(self.list_diff_at_h_4c.as_ref().unwrap().encode()))
+        } else {
+            (null_mut(), null_mut())
+        };
+        let block_hash_list_num = self.block_hash_list.len();
+        let block_hash_list = boxed_vec(
+            (0..block_hash_list_num)
+                .into_iter()
+                .map(|i| boxed(self.block_hash_list[i].0))
+                .collect());
+        let snapshot_list_num = self.snapshot_list.len();
+        let snapshot_list = boxed_vec(
+            (0..snapshot_list_num)
+                .into_iter()
+                .map(|i| boxed(self.snapshot_list[i].encode()))
+                .collect());
+        let mn_list_diff_list_num = self.mn_list_diff_list.len();
+        let mn_list_diff_list = boxed_vec(
+            (0..mn_list_diff_list_num)
+                .into_iter()
+                .map(|i| boxed(self.mn_list_diff_list[i].encode()))
+                .collect());
+        Self::Item {
+            snapshot_at_h_c,
+            snapshot_at_h_2c,
+            snapshot_at_h_3c,
+            list_diff_tip,
+            list_diff_at_h,
+            list_diff_at_h_c,
+            list_diff_at_h_2c,
+            list_diff_at_h_3c,
+            extra_share,
+            snapshot_at_h_4c,
+            list_diff_at_h_4c,
+            block_hash_list_num: block_hash_list_num as u32,
+            block_hash_list,
+            snapshot_list_num: snapshot_list_num as u32,
+            snapshot_list,
+            mn_list_diff_list_num: mn_list_diff_list_num as u32,
+            mn_list_diff_list
         }
     }
 }
