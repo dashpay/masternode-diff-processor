@@ -1,7 +1,6 @@
 use hashes::{sha256d};
-use byte::{BytesExt, LE};
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::UInt256;
+use crate::crypto::byte_util::{BytesDecodable, UInt256};
 use crate::hashes::Hash;
 
 #[inline]
@@ -48,7 +47,7 @@ impl<'a> MerkleTree<'a> {
             |left, right| {
                 let mut buffer: Vec<u8> = Vec::with_capacity(64);
                 left.consensus_encode(&mut buffer).unwrap();
-                if right.is_none() { left.clone() } else { right.unwrap() }.consensus_encode(&mut buffer).unwrap();
+                right.unwrap_or(left.clone()).consensus_encode(&mut buffer).unwrap();
                 let hash = sha256d::Hash::hash(&buffer);
                 let value = hash.into_inner();
                 Some(UInt256(value))
@@ -69,10 +68,7 @@ impl<'a> MerkleTree<'a> {
         *flag_idx += 1;
         if !flag || depth == ceil_log2(self.tree_element_count as i32) {
             let off = &mut (32*(*hash_idx) as usize);
-            let hash = match self.hashes.read_with::<UInt256>(off, LE) {
-                Ok(data) => data,
-                Err(_err) => { return None; }
-            };
+            let hash = UInt256::from_bytes(self.hashes, off)?;
             *hash_idx += 1;
             return leaf(Some(hash), flag);
         }

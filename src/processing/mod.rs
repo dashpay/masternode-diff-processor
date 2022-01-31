@@ -1,4 +1,5 @@
 pub mod mn_list_diff;
-pub mod quorum_rotation_info;
-pub mod quorum_snapshot;
+pub mod llmq_rotation_info;
+pub mod llmq_snapshot;
+pub mod manager;
 

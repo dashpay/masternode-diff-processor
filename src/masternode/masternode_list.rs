@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use crate::CoinbaseTransaction;
 use crate::common::llmq_type::LLMQType;
 use crate::crypto::byte_util::{merkle_root_from_hashes, Reversable, UInt256};
-use crate::masternode::quorum_entry::QuorumEntry;
+use crate::masternode::llmq_entry::LLMQEntry;
 use crate::masternode::masternode_entry::MasternodeEntry;
 
 #[derive(Clone)]
@@ -10,9 +10,9 @@ pub struct MasternodeList<'a> {
     pub block_hash: UInt256,
     pub known_height: u32,
     pub masternode_merkle_root: Option<UInt256>,
-    pub quorum_merkle_root: Option<UInt256>,
+    pub llmq_merkle_root: Option<UInt256>,
     pub masternodes: BTreeMap<UInt256, MasternodeEntry>,
-    pub quorums: HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>,
+    pub quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
 }
 
 impl<'a> std::fmt::Debug for MasternodeList<'a> {
@@ -21,7 +21,7 @@ impl<'a> std::fmt::Debug for MasternodeList<'a> {
             .field("block_hash", &self.block_hash)
             .field("known_height", &self.known_height)
             .field("masternode_merkle_root", &self.masternode_merkle_root)
-            .field("quorum_merkle_root", &self.quorum_merkle_root)
+            .field("quorum_merkle_root", &self.llmq_merkle_root)
             .field("masternodes", &self.masternodes.len())
             .field("quorums", &self.quorums.len())
             .finish()
@@ -31,7 +31,7 @@ impl<'a> std::fmt::Debug for MasternodeList<'a> {
 impl<'a> MasternodeList<'a> {
     pub fn new(
         masternodes: BTreeMap<UInt256, MasternodeEntry>,
-        quorums: HashMap<LLMQType, HashMap<UInt256, QuorumEntry<'a>>>,
+        quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
         block_hash: UInt256,
         block_height: u32,
         quorums_active: bool
@@ -41,7 +41,7 @@ impl<'a> MasternodeList<'a> {
             block_hash,
             known_height: block_height,
             masternode_merkle_root: None,
-            quorum_merkle_root: None,
+            llmq_merkle_root: None,
             masternodes,
         };
         if let Some(hashes) = list.hashes_for_merkle_root(block_height) {
@@ -49,7 +49,7 @@ impl<'a> MasternodeList<'a> {
         }
         if quorums_active {
             let hashes = list.hashes_for_quorum_merkle_root();
-            list.quorum_merkle_root = merkle_root_from_hashes(hashes);
+            list.llmq_merkle_root = merkle_root_from_hashes(hashes);
         }
         list
     }
@@ -97,7 +97,7 @@ impl<'a> MasternodeList<'a> {
             .fold(Vec::new(), |mut acc, q_map| {
                 let quorum_hashes: Vec<UInt256> = q_map
                     .into_values()
-                    .map(|entry| entry.quorum_entry_hash)
+                    .map(|entry| entry.entry_hash)
                     .collect();
                 acc.extend(quorum_hashes);
                 acc
@@ -111,6 +111,8 @@ impl<'a> MasternodeList<'a> {
     }
 
     pub fn has_valid_mn_list_root(&self, tx: &CoinbaseTransaction) -> bool {
+        // we need to check that the coinbase is in the transaction hashes we got back
+        // and is in the merkle block
         if let Some(mn_merkle_root) = self.masternode_merkle_root {
             println!("rootMNListValid: {:?} == {:?}", mn_merkle_root, tx.merkle_root_mn_list);
             tx.merkle_root_mn_list == mn_merkle_root
@@ -120,19 +122,19 @@ impl<'a> MasternodeList<'a> {
     }
 
     pub fn has_valid_llmq_list_root(&self, tx: &CoinbaseTransaction) -> bool {
-        let q_merkle_root = self.quorum_merkle_root;
+        let q_merkle_root = self.llmq_merkle_root;
         let ct_q_merkle_root = tx.merkle_root_llmq_list;
-        println!("rootQuorumListValid: {:?} == {:?}", q_merkle_root, ct_q_merkle_root);
+        println!("LLMQ list root valid: {:?} == {:?}", q_merkle_root, ct_q_merkle_root);
         let has_valid_quorum_list_root =
             q_merkle_root.is_some() &&
                 ct_q_merkle_root.is_some() &&
                 ct_q_merkle_root.unwrap() == q_merkle_root.unwrap();
         if !has_valid_quorum_list_root {
-            println!("Quorum Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
+            println!("LLMQ Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
                      tx.height,
                      tx.base.version,
                      tx.merkle_root_llmq_list,
-                     self.quorum_merkle_root);
+                     self.llmq_merkle_root);
         }
         has_valid_quorum_list_root
     }

@@ -1,12 +1,12 @@
-use byte::{BytesExt, LE};
-use crate::consensus::{Decodable, Encodable};
+use byte::{BytesExt, LE, TryRead};
+use byte::ctx::Endian;
+use crate::consensus::Encodable;
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::UInt256;
 use crate::hashes::{Hash, sha256d};
 use crate::transactions::transaction::Transaction;
 use crate::transactions::transaction::TransactionType::Coinbase;
 
-// #[repr(C)]
 #[derive(Debug)]
 pub struct CoinbaseTransaction<'a> {
     pub base: Transaction<'a>,
@@ -16,50 +16,36 @@ pub struct CoinbaseTransaction<'a> {
     pub merkle_root_llmq_list: Option<UInt256>,
 }
 
-impl<'a> CoinbaseTransaction<'a> {
-    pub fn new(message: &'a [u8]) -> Option<Self> {
-        if let Some(mut base) = Transaction::new(message) {
-            base.tx_type = Coinbase;
-            let offset = &mut base.payload_offset;
-            let extra_payload_size = match VarInt::consensus_decode(&message[*offset..]) {
-                Ok(data) => data,
-                Err(_err) => { return None; }
+impl<'a> TryRead<'a, Endian> for CoinbaseTransaction<'a> {
+    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
+        let offset = &mut 0;
+        let mut base = bytes.read_with::<Transaction>(offset, endian)?;
+        let extra_payload_size = bytes.read_with::<VarInt>(offset, endian)?;
+        let coinbase_transaction_version = bytes.read_with::<u16>(offset, endian)?;
+        let height = bytes.read_with::<u32>(offset, endian)?;
+        let merkle_root_mn_list = bytes.read_with::<UInt256>(offset, endian)?;
+        let merkle_root_llmq_list =
+            if coinbase_transaction_version == 2 {
+                let root = bytes.read_with::<UInt256>(offset, endian)?;
+                Some(root)
+            } else {
+                None
             };
-            *offset += extra_payload_size.len();
-            let coinbase_transaction_version = match message.read_with::<u16>(offset, LE) {
-                Ok(data) => data,
-                Err(_err) => { return None; }
-            };
-            let height = match message.read_with::<u32>(offset, LE) {
-                Ok(data) => data,
-                Err(_err) => { return None; }
-            };
-            let merkle_root_mn_list = match message.read_with::<UInt256>(offset, LE) {
-                Ok(data) => data,
-                Err(_err) => { return None; }
-            };
-            let merkle_root_llmq_list: Option<UInt256> =
-                if coinbase_transaction_version == 2 {
-                    match message.read_with::<UInt256>(offset, LE) {
-                        Ok(data) => Some(data),
-                        Err(_err) => { return None; }
-                    }
-                } else { None };
-
-            base.payload_offset = offset.clone();
-
-            let mut tx = Self {
-                base,
-                coinbase_transaction_version,
-                height,
-                merkle_root_mn_list,
-                merkle_root_llmq_list
-            };
-            tx.base.tx_hash = Some(UInt256(sha256d::Hash::hash(&tx.to_data()).into_inner()));
-            return Some(tx);
-        }
-        None
+        base.tx_type = Coinbase;
+        base.payload_offset = *offset;
+        let mut tx = Self {
+            base,
+            coinbase_transaction_version,
+            height,
+            merkle_root_mn_list,
+            merkle_root_llmq_list
+        };
+        tx.base.tx_hash = Some(UInt256(sha256d::Hash::hash(&tx.to_data()).into_inner()));
+        Ok((tx, *offset))
     }
+}
+
+impl<'a> CoinbaseTransaction<'a> {
 
     fn payload_data(&self) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();

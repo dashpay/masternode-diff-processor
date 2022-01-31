@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
-use byte::{BytesExt, LE};
+use byte::ctx::Endian;
+use byte::{BytesExt, TryRead};
 use crate::common::block_data::BlockData;
 use crate::common::socket_address::SocketAddress;
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::{MNPayload, short_hex_string_from, UInt128, UInt160, UInt256, UInt384, Zeroable};
+use crate::crypto::byte_util::{short_hex_string_from, UInt128, UInt160, UInt256, UInt384, Zeroable};
 use crate::hashes::{Hash, sha256, sha256d};
 
 #[derive(Clone)]
@@ -30,6 +31,43 @@ impl std::fmt::Debug for MasternodeEntry {
             .field("masternode_entry_hash", &self.masternode_entry_hash)
             .field("previous_masternode_entry_hashes", &self.previous_masternode_entry_hashes)
             .finish()
+    }
+}
+impl<'a> TryRead<'a, Endian> for MasternodeEntry {
+    fn try_read(bytes: &'a [u8], ctx: Endian) -> byte::Result<(Self, usize)> {
+        let offset = &mut 0;
+        // assert_eq!(bytes.l, MN_ENTRY_PAYLOAD_LENGTH);
+        let provider_registration_transaction_hash = bytes.read_with::<UInt256>(offset, byte::LE)?;
+        let confirmed_hash = bytes.read_with::<UInt256>(offset, byte::LE)?;
+        let ip_address = bytes.read_with::<UInt128>(offset, byte::LE)?;
+        let port = bytes.read_with::<u16>(offset, byte::LE)?;
+        let socket_address = SocketAddress { ip_address, port };
+        let operator_public_key = bytes.read_with::<UInt384>(offset, byte::LE)?;
+        let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
+        let is_valid = bytes.read_with::<u8>(offset, byte::LE).unwrap_or(0);
+        let masternode_entry_hash = MasternodeEntry::calculate_masternode_entry_hash(
+            provider_registration_transaction_hash,
+            confirmed_hash,
+            socket_address,
+            operator_public_key,
+            key_id_voting,
+            is_valid
+        );
+        Ok((Self {
+            provider_registration_transaction_hash,
+            confirmed_hash,
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: None,
+            socket_address,
+            operator_public_key,
+            previous_operator_public_keys: BTreeMap::new(),
+            previous_masternode_entry_hashes: BTreeMap::new(),
+            previous_validity: BTreeMap::new(),
+            known_confirmed_at_height: None,
+            update_height: 0,
+            key_id_voting,
+            is_valid: is_valid != 0,
+            masternode_entry_hash
+        }, *offset))
     }
 }
 
@@ -194,68 +232,10 @@ impl MasternodeEntry {
         }
     }
 
-    pub fn new(message: MNPayload, block_height: u32) -> Option<MasternodeEntry> {
-        // let length = message.len();
-        let message = message.0;
-        let offset = &mut 0;
-        let provider_registration_transaction_hash = match message.read_with::<UInt256>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let confirmed_hash = match message.read_with::<UInt256>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let known_confirmed_at_height: Option<u32> =
-            if !confirmed_hash.is_zero() &&
-                block_height != u32::MAX {
-                Some(block_height)
-            } else {
-                None
-            };
-        let ip_address = match message.read_with::<UInt128>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let port = match message.read_with::<u16>(offset, LE) {
-            Ok(data) => data.swap_bytes(),
-            Err(_err) => { return None; }
-        };
-        let socket_address = SocketAddress { ip_address, port };
-        let operator_public_key = match message.read_with::<UInt384>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let key_id_voting = match message.read_with::<UInt160>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let is_valid = match message.read_with::<u8>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => 0
-        };
-        let masternode_entry_hash = MasternodeEntry::calculate_masternode_entry_hash(
-            provider_registration_transaction_hash,
-            confirmed_hash,
-            socket_address,
-            operator_public_key,
-            key_id_voting,
-            is_valid
-        );
-        Some(MasternodeEntry {
-            provider_registration_transaction_hash,
-            confirmed_hash,
-            confirmed_hash_hashed_with_provider_registration_transaction_hash: None,
-            socket_address,
-            operator_public_key,
-            previous_operator_public_keys: BTreeMap::new(),
-            previous_masternode_entry_hashes: BTreeMap::new(),
-            previous_validity: BTreeMap::new(),
-            known_confirmed_at_height,
-            update_height: block_height,
-            key_id_voting,
-            is_valid: is_valid != 0,
-            masternode_entry_hash
-        })
+    pub fn update_with_block_height(&mut self, block_height: u32) {
+        self.update_height = block_height;
+        if !self.confirmed_hash.is_zero() && block_height != u32::MAX {
+            self.known_confirmed_at_height = Some(block_height);
+        }
     }
 }

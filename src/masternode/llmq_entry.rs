@@ -1,23 +1,23 @@
 use std::convert::Into;
-use byte::{BytesExt, LE};
-use byte::ctx::Bytes;
+use byte::{BytesExt, LE, TryRead};
+use byte::ctx::{Bytes, Endian};
 use hashes::{Hash, sha256d};
 use crate::common::llmq_type::LLMQType;
-use crate::consensus::{Decodable, Encodable, WriteExt};
+use crate::consensus::{Encodable, WriteExt};
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
 
-pub const QUORUM_DEFAULT_VERSION: u16 = 1;
-pub const QUORUM_INDEXED_VERSION: u16 = 2;
+pub const LLMQ_DEFAULT_VERSION: u16 = 1;
+pub const LLMQ_INDEXED_VERSION: u16 = 2;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct QuorumEntry<'a> {
+pub struct LLMQEntry<'a> {
     pub version: u16,
-    pub quorum_hash: UInt256,
-    pub quorum_index: Option<u32>,
-    pub quorum_public_key: UInt384,
-    pub quorum_threshold_signature: UInt768,
-    pub quorum_verification_vector_hash: UInt256,
+    pub llmq_hash: UInt256,
+    pub index: Option<u32>,
+    pub public_key: UInt384,
+    pub threshold_signature: UInt768,
+    pub verification_vector_hash: UInt256,
     pub all_commitment_aggregated_signature: UInt768,
     pub signers_count: VarInt,
     pub llmq_type: LLMQType,
@@ -25,116 +25,89 @@ pub struct QuorumEntry<'a> {
     pub signers_bitset: &'a [u8],
     pub valid_members_bitset: &'a [u8],
     pub length: usize,
-    pub quorum_entry_hash: UInt256,
+    pub entry_hash: UInt256,
     pub verified: bool,
     pub saved: bool,
     pub commitment_hash: Option<UInt256>,
 }
-impl<'a> std::fmt::Debug for QuorumEntry<'a> {
+impl<'a> std::fmt::Debug for LLMQEntry<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MasternodeList")
-            .field("quorum_entry_hash", &self.quorum_entry_hash)
+        f.debug_struct("LLMQEntry")
+            .field("entry_hash", &self.entry_hash)
             .finish()
     }
 }
 
-impl<'a> QuorumEntry<'a> {
-    pub fn new(message: &'a [u8], data_offset: usize) -> Option<Self> {
-        let length = message.len();
-        let offset = &mut data_offset.clone();
-        let version = match message.read_with::<u16>(offset, LE) {
-            Ok(data) => data,
-            _ => { return None; }
-        };
-        let llmq_type = match message.read_with::<u8>(offset, LE) {
-            Ok(data) => data,
-            _ => { return None; }
-        };
-        let quorum_hash = match message.read_with::<UInt256>(offset, LE) {
-            Ok(data) => data,
-            _ => { return None; }
-        };
-        let quorum_index = match version {
-            QUORUM_DEFAULT_VERSION => None,
-            QUORUM_INDEXED_VERSION => match message.read_with::<u32>(offset, LE) {
-                Ok(data) => Some(data),
-                _ => { return None; }
-            },
+impl<'a> TryRead<'a, Endian> for LLMQEntry<'a> {
+    fn try_read(bytes: &'a [u8], ctx: Endian) -> byte::Result<(Self, usize)> {
+        let offset = &mut 0;
+        let version = bytes.read_with::<u16>(offset, LE)?;
+        let llmq_type = bytes.read_with::<u8>(offset, LE)?;
+        let llmq_hash = bytes.read_with::<UInt256>(offset, LE)?;
+        let index = match version {
+            LLMQ_DEFAULT_VERSION => None,
+            LLMQ_INDEXED_VERSION => {
+                let index = bytes.read_with::<u32>(offset, LE)?;
+                Some(index)
+            } ,
             _ => None,
         };
-        let signers_count = match VarInt::consensus_decode(&message[*offset..]) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        *offset += signers_count.len();
+        let signers_count = bytes.read_with::<VarInt>(offset, LE)?;
         let signers_buffer_length: usize = ((signers_count.0 as usize) + 7) / 8;
-        if length - *offset < signers_buffer_length { return None; }
-        let signers_bitset: &[u8] = message.read_with(offset, Bytes::Len(signers_buffer_length)).unwrap();
-        let valid_members_count = match VarInt::consensus_decode(&message[*offset..]) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        *offset += valid_members_count.len();
+        let signers_bitset: &[u8] = bytes.read_with(offset, Bytes::Len(signers_buffer_length))?;
+        let valid_members_count = bytes.read_with::<VarInt>(offset, LE)?;
         let valid_members_count_buffer_length: usize = ((valid_members_count.0 as usize) + 7) / 8;
-        if length - *offset < valid_members_count_buffer_length { return None; }
-        let valid_members_bitset: &[u8] = message.read_with(offset, Bytes::Len(valid_members_count_buffer_length)).unwrap();
-        let quorum_public_key = match message.read_with::<UInt384>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let quorum_verification_vector_hash = match message.read_with::<UInt256>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let quorum_threshold_signature = match message.read_with::<UInt768>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let all_commitment_aggregated_signature = match message.read_with::<UInt768>(offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
+        let valid_members_bitset: &[u8] = bytes.read_with(offset, Bytes::Len(valid_members_count_buffer_length))?;
+
+        let public_key = bytes.read_with::<UInt384>(offset, LE)?;
+        let verification_vector_hash = bytes.read_with::<UInt256>(offset, LE)?;
+        let threshold_signature = bytes.read_with::<UInt768>(offset, LE)?;
+        let all_commitment_aggregated_signature = bytes.read_with::<UInt768>(offset, LE)?;
         let llmq_type: LLMQType = llmq_type.into();
-        let q_data = &QuorumEntry::generate_data(
-            version, llmq_type, quorum_hash,
+
+        let q_data = &LLMQEntry::generate_data(
+            version, llmq_type, llmq_hash,
             signers_count.clone(), &signers_bitset,
             valid_members_count.clone(), &valid_members_bitset,
-            quorum_public_key, quorum_verification_vector_hash, quorum_threshold_signature,
+            public_key, verification_vector_hash, threshold_signature,
             all_commitment_aggregated_signature);
-        let quorum_entry_hash = UInt256(sha256d::Hash::hash(q_data).into_inner());
-        let length = *offset - data_offset;
-        Some(QuorumEntry {
+        let entry_hash = UInt256(sha256d::Hash::hash(q_data).into_inner());
+
+        Ok((LLMQEntry {
             version,
-            quorum_hash,
-            quorum_index,
-            quorum_public_key,
-            quorum_threshold_signature,
-            quorum_verification_vector_hash,
+            llmq_hash,
+            index,
+            public_key,
+            threshold_signature,
+            verification_vector_hash,
             all_commitment_aggregated_signature,
-            signers_count: signers_count.clone(),
+            signers_count,
             llmq_type,
-            valid_members_count: valid_members_count.clone(),
+            valid_members_count,
             signers_bitset,
             valid_members_bitset,
-            length,
-            quorum_entry_hash,
+            length: *offset,
+            entry_hash,
             verified: false,
             saved: false,
             commitment_hash: None
-        })
+        }, *offset))
     }
+}
+
+impl<'a> LLMQEntry<'a> {
 
     pub fn generate_data(
         version: u16,
         llmq_type: LLMQType,
-        quorum_hash: UInt256,
+        llmq_hash: UInt256,
         signers_count: VarInt,
         signers_bitset: &[u8],
         valid_members_count: VarInt,
         valid_members_bitset: &[u8],
-        quorum_public_key: UInt384,
-        quorum_verification_vector_hash: UInt256,
-        quorum_threshold_signature: UInt768,
+        public_key: UInt384,
+        verification_vector_hash: UInt256,
+        threshold_signature: UInt768,
         all_commitment_aggregated_signature: UInt768
     ) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
@@ -142,34 +115,34 @@ impl<'a> QuorumEntry<'a> {
         let llmq_u8: u8 = llmq_type.into();
         *offset += version.consensus_encode(&mut buffer).unwrap();
         *offset += llmq_u8.consensus_encode(&mut buffer).unwrap();
-        *offset += quorum_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += llmq_hash.consensus_encode(&mut buffer).unwrap();
         *offset += signers_count.consensus_encode(&mut buffer).unwrap();
         buffer.emit_slice(&signers_bitset).unwrap();
         *offset += signers_bitset.len();
         *offset += valid_members_count.consensus_encode(&mut buffer).unwrap();
         buffer.emit_slice(&valid_members_bitset).unwrap();
         *offset += valid_members_bitset.len();
-        *offset += quorum_public_key.consensus_encode(&mut buffer).unwrap();
-        *offset += quorum_verification_vector_hash.consensus_encode(&mut buffer).unwrap();
-        *offset += quorum_threshold_signature.consensus_encode(&mut buffer).unwrap();
+        *offset += public_key.consensus_encode(&mut buffer).unwrap();
+        *offset += verification_vector_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += threshold_signature.consensus_encode(&mut buffer).unwrap();
         *offset += all_commitment_aggregated_signature.consensus_encode(&mut buffer).unwrap();
         buffer
     }
 
     pub fn to_data(&self) -> Vec<u8> {
-        QuorumEntry::generate_data(
-            self.version, self.llmq_type, self.quorum_hash,
+        LLMQEntry::generate_data(
+            self.version, self.llmq_type, self.llmq_hash,
             self.signers_count, self.signers_bitset,
             self.valid_members_count, self.valid_members_bitset,
-            self.quorum_public_key, self.quorum_verification_vector_hash,
-            self.quorum_threshold_signature, self.all_commitment_aggregated_signature)
+            self.public_key, self.verification_vector_hash,
+            self.threshold_signature, self.all_commitment_aggregated_signature)
     }
 
     pub fn llmq_quorum_hash(&self) -> UInt256 {
         let mut buffer: Vec<u8> = Vec::with_capacity(33);
         let offset: &mut usize = &mut 0;
         *offset += VarInt(self.llmq_type as u64).consensus_encode(&mut buffer).unwrap();
-        *offset += self.quorum_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += self.llmq_hash.consensus_encode(&mut buffer).unwrap();
         UInt256(sha256d::Hash::hash(&buffer).into_inner())
     }
 
@@ -178,12 +151,12 @@ impl<'a> QuorumEntry<'a> {
         let offset: &mut usize = &mut 0;
         let llmq_type = VarInt(self.llmq_type as u64);
         *offset += llmq_type.consensus_encode(&mut buffer).unwrap();
-        *offset += self.quorum_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += self.llmq_hash.consensus_encode(&mut buffer).unwrap();
         *offset += self.valid_members_count.consensus_encode(&mut buffer).unwrap();
         buffer.emit_slice(&self.valid_members_bitset).unwrap();
         *offset += self.valid_members_bitset.len();
-        *offset += self.quorum_public_key.consensus_encode(&mut buffer).unwrap();
-        *offset += self.quorum_verification_vector_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += self.public_key.consensus_encode(&mut buffer).unwrap();
+        *offset += self.verification_vector_hash.consensus_encode(&mut buffer).unwrap();
         buffer
     }
 
@@ -219,7 +192,7 @@ impl<'a> QuorumEntry<'a> {
             return false;
         }
         let valid_members_offset = (self.valid_members_count.0 as usize) / 8;
-        // thread '<unnamed>' panicked at 'called `Result::unwrap()` on an `Err` value: BadOffset(50)', src/masternode/quorum_entry.rs:216:116
+        // thread '<unnamed>' panicked at 'called `Result::unwrap()` on an `Err` value: BadOffset(50)', src/masternode/llmq_entry:216:116
         let valid_members_last_byte = match self.valid_members_bitset.read_with::<u8>(&mut valid_members_offset.clone(), LE) {
             Ok(data) => data,
             Err(_err) => 0
@@ -230,7 +203,7 @@ impl<'a> QuorumEntry<'a> {
             println!("Error: No out-of-range bits should be set in byte representation of the validMembers bitvector");
             return false;
         }
-        let quorum_threshold = self.llmq_type.quorum_threshold() as u64;
+        let quorum_threshold = self.llmq_type.threshold() as u64;
         // The number of set bits in the signers and validMembers bitvectors must be at least >= quorumThreshold
         let signers_bitset_true_bits_count = self.signers_bitset.true_bits_count();
         if signers_bitset_true_bits_count < quorum_threshold {

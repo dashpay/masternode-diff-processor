@@ -1,10 +1,12 @@
 use byte::{BytesExt, check_len, LE, Result, TryRead, TryWrite};
 use byte::ctx::{Bytes, Endian};
 use std::fmt::Write;
-use std::slice;
+use std::{mem, slice};
+use crate::{CoinbaseTransaction, MasternodeEntry, LLMQEntry};
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
-use crate::consensus::encode::{Error, VarInt};
+use crate::consensus::encode::VarInt;
 use crate::hashes::{Hash, sha256d, hex::{FromHex, ToHex}, hex};
+use crate::transactions::transaction::{Transaction, TransactionInput, TransactionOutput};
 
 pub trait Data {
     fn bit_is_true_at_le_index(&self, index: u32) -> bool;
@@ -48,22 +50,14 @@ pub fn hex_with_data(data: &[u8]) -> String {
     s
 }
 
+
 #[inline]
-pub fn data_at_offset_from<'a>(buffer: &'a [u8], offset: &mut usize) -> Result<&'a [u8]> {
-    let var_int: VarInt = match VarInt::consensus_decode(&buffer[*offset..]) {
-        Ok(data) => data,
-        Err(_error) => {
-            return byte::Result::Err(byte::Error::Incomplete);
-        }
-    };
-    let var_int_value = var_int.0 as usize;
-    let var_int_length = var_int.len();
-    *offset += var_int_length;
-    let data: &[u8] = match buffer.read_with(offset, Bytes::Len(var_int_value)) {
-        Ok(data) => data,
-        Err(error) => { return byte::Result::Err(error); }
-    };
-    Ok(data)
+pub fn data_at_offset_from<'a>(buffer: &'a [u8], offset: &mut usize) -> Option<&'a [u8]> {
+    let var_int: VarInt = VarInt::from_bytes(buffer, offset)?;
+    match buffer.read_with(offset, Bytes::Len(var_int.0 as usize)) {
+        Ok(data) => Some(data),
+        Err(error) => None
+    }
 }
 
 pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
@@ -123,8 +117,11 @@ pub trait Zeroable {
     fn is_zero(&self) -> bool;
 }
 
-pub trait ConstDecodable<T> {
+pub trait ConstDecodable<'a, T: TryRead<'a, Endian>> {
     fn from_const(bytes: *const u8) -> Option<T>;
+}
+pub trait BytesDecodable<'a, T: TryRead<'a, Endian>> {
+    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<T>;
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -136,11 +133,52 @@ pub struct UInt256(pub [u8; 32]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt384(pub [u8; 48]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UInt768(pub [u8; 96]);
+pub struct UInt512(pub [u8; 64]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MNPayload(pub [u8; MN_ENTRY_PAYLOAD_LENGTH]);
+pub struct UInt768(pub [u8; 96]);
 
-macro_rules! define_bytes_to_big_uint {
+macro_rules! impl_bytes_decodable {
+    ($var_type: ident) => {
+        impl<'a> BytesDecodable<'a, $var_type> for $var_type {
+            fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
+                match bytes.read_with(offset, LE) {
+                    Ok(data) => Some(data),
+                    Err(_err) => None
+                }
+            }
+        }
+    }
+}
+macro_rules! impl_bytes_decodable_lt {
+    ($var_type: ident) => {
+        impl<'a> BytesDecodable<'a, $var_type<'a>> for $var_type<'a> {
+            fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
+                match bytes.read_with(offset, LE) {
+                    Ok(data) => Some(data),
+                    Err(_err) => None
+                }
+            }
+        }
+    }
+}
+
+macro_rules! impl_decodable {
+    ($var_type: ident, $byte_len: expr) => {
+        impl_bytes_decodable!($var_type);
+
+        impl<'a> ConstDecodable<'a, $var_type> for $var_type {
+            fn from_const(bytes: *const u8) -> Option<Self> {
+                let safe_bytes = unsafe { slice::from_raw_parts(bytes, $byte_len) };
+                match safe_bytes.read_with::<Self>(&mut 0, LE) {
+                    Ok(data) => Some(data),
+                    Err(_err) => None
+                }
+            }
+        }
+    }
+}
+
+macro_rules! define_try_read_to_big_uint {
     ($uint_type: ident, $byte_len: expr) => {
         impl<'a> TryRead<'a, Endian> for $uint_type {
             fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
@@ -148,15 +186,18 @@ macro_rules! define_bytes_to_big_uint {
                 let mut data: [u8; $byte_len] = [0u8; $byte_len];
                 for _i in 0..$byte_len {
                     let index = offset.clone();
-                    let chunk = match bytes.read_with::<u8>(offset, endian) {
-                        Ok(data) => data,
-                        Err(_err) => { return Err(_err); }
-                    };
+                    let chunk = bytes.read_with::<u8>(offset, endian)?;
                     data[index] = chunk;
                 }
                 Ok(($uint_type(data), $byte_len))
             }
         }
+    }
+}
+
+macro_rules! define_bytes_to_big_uint {
+    ($uint_type: ident, $byte_len: expr) => {
+        define_try_read_to_big_uint!($uint_type, $byte_len);
         impl std::default::Default for $uint_type {
             fn default() -> Self {
                 let mut data: [u8; $byte_len] = [0u8; $byte_len];
@@ -191,7 +232,7 @@ macro_rules! define_bytes_to_big_uint {
 
         impl Decodable for $uint_type {
             #[inline]
-            fn consensus_decode<D: std::io::Read>(mut d: D) -> std::result::Result<Self, Error> {
+            fn consensus_decode<D: std::io::Read>(mut d: D) -> std::result::Result<Self, crate::consensus::encode::Error> {
                 let mut ret = [0; $byte_len];
                 d.read_slice(&mut ret)?;
                 Ok($uint_type(ret))
@@ -231,24 +272,70 @@ macro_rules! define_bytes_to_big_uint {
                 false
             }
         }
+        impl_decodable!($uint_type, $byte_len);
     }
 }
 
-impl ConstDecodable<UInt256> for UInt256 {
-    fn from_const(bytes: *const u8) -> Option<UInt256> {
-        let safe_bytes = unsafe { slice::from_raw_parts(bytes, 32) };
-        match safe_bytes.read_with::<UInt256>(&mut 0, LE) {
-            Ok(data) => Some(data),
-            Err(_err) => None
-        }
-    }
-}
-
+impl_decodable!(u8, 1);
+impl_decodable!(u16, 2);
+impl_decodable!(u32, 4);
+impl_decodable!(u64, 8);
+impl_decodable!(usize, mem::size_of::<usize>());
+impl_decodable!(i8, 1);
+impl_decodable!(i16, 2);
+impl_decodable!(i32, 4);
+impl_decodable!(i64, 8);
+impl_decodable!(isize, mem::size_of::<isize>());
 
 
 define_bytes_to_big_uint!(UInt128, 16);
 define_bytes_to_big_uint!(UInt160, 20);
 define_bytes_to_big_uint!(UInt256, 32);
 define_bytes_to_big_uint!(UInt384, 48);
+define_bytes_to_big_uint!(UInt512, 64);
 define_bytes_to_big_uint!(UInt768, 96);
-define_bytes_to_big_uint!(MNPayload, MN_ENTRY_PAYLOAD_LENGTH);
+
+impl<'a> TryRead<'a, Endian> for VarInt {
+    fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+        match VarInt::consensus_decode(bytes) {
+            Ok(data) => Ok((data, data.len())),
+            Err(err) => Err(byte::Error::BadInput { err: "Error: VarInt" })
+        }
+    }
+}
+
+impl_bytes_decodable!(VarInt);
+impl_bytes_decodable!(MasternodeEntry);
+
+impl_bytes_decodable_lt!(TransactionInput);
+impl_bytes_decodable_lt!(TransactionOutput);
+impl_bytes_decodable_lt!(Transaction);
+impl_bytes_decodable_lt!(CoinbaseTransaction);
+impl_bytes_decodable_lt!(LLMQEntry);
+
+/// A variable-length bytes
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
+pub struct VarBytes<'a>(pub VarInt, pub &'a [u8]);
+
+impl<'a> TryRead<'a, Endian> for VarBytes<'a> {
+    fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
+        let offset = &mut 0;
+        let var_int = match VarInt::consensus_decode(bytes) {
+            Ok(data) => data,
+            Err(err) => { return Err(byte::Error::BadInput {err: "Error: VarInt::try_read"}); }
+        };
+        *offset += var_int.len();
+        let payload_length = var_int.0 as usize;
+        let var_bytes = VarBytes(var_int, bytes.read_with(offset, Bytes::Len(payload_length))?);
+        Ok((var_bytes, payload_length))
+    }
+}
+impl<'a> BytesDecodable<'a, VarBytes<'a>> for VarBytes<'a> {
+    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
+        let var_int: VarInt = VarInt::from_bytes(bytes, offset)?;
+        match bytes.read_with(offset, Bytes::Len(var_int.0 as usize)) {
+            Ok(data) => Some(VarBytes(var_int, data)),
+            Err(_err) => None
+        }
+    }
+}
