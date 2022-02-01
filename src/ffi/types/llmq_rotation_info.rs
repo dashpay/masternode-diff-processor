@@ -1,7 +1,9 @@
+use std::ffi::c_void;
 use std::ptr::null_mut;
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
-use crate::boxed;
+use crate::{BlockHeightLookup, boxed, processing, ToFFI, UInt256};
+use crate::crypto::byte_util::BytesDecodable;
 use crate::ffi::types::mn_list_diff::MNListDiff;
 use crate::ffi::types::llmq_snapshot::LLMQSnapshot;
 
@@ -50,44 +52,46 @@ impl Default for LLMQRotationInfo {
     }
 }
 
-// impl LLMQRotationInfo {
-//     fn new<'a>(
-//         bytes: &'a [u8],
-//         merkle_root: UInt256,
-//         masternode_list_lookup: MasternodeListLookup,
-//         masternode_list_destroy: MasternodeListDestroy,
-//         use_insight_as_backup: bool,
-//         add_insight_lookup: AddInsightBlockingLookup,
-//         should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-//         validate_llmq_callback: ValidateLLMQCallback,
-//         block_height_lookup: BlockHeightLookup,
-//         context: *const c_void, // External Masternode Manager Diff Message Context ()
-//     ) -> Option<LLMQRotationInfo> {
-//         let offset = &mut 0;
-//         let snapshot_at_h_c = boxed(LLMQSnapshot::from_bytes(bytes, offset)?);
-//         let snapshot_at_h_2c = boxed(LLMQSnapshot::from_bytes(bytes, offset)?);
-//         let snapshot_at_h_3c = boxed(LLMQSnapshot::from_bytes(bytes, offset)?);
-//         let mn_list_diff_tip = boxed(bytes.read_with::<MNListDiff>(offset, LE)?);
-//         let mn_list_diff_at_h = boxed(bytes.read_with::<MNListDiff>(offset, LE)?);
-//         let mn_list_diff_at_h_c = boxed(bytes.read_with::<MNListDiff>(offset, LE)?);
-//         let mn_list_diff_at_h_2c = boxed(bytes.read_with::<MNListDiff>(offset, LE)?);
-//         let mn_list_diff_at_h_3c = boxed(bytes.read_with::<MNListDiff>(offset, LE)?);
-//
-//         Some(Self {
-//             snapshot_at_h_c: ,
-//             snapshot_at_h_2c,
-//             snapshot_at_h_3c,
-//             snapshot_at_h_4c: (),
-//             mn_list_diff_tip: (),
-//             mn_list_diff_at_h: (),
-//             mn_list_diff_at_h_c: (),
-//             mn_list_diff_at_h_2c: (),
-//             mn_list_diff_at_h_3c: (),
-//             mn_list_diff_at_h_4c: (),
-//             extra_share: false
-//         })
-//     }
-// }
+impl LLMQRotationInfo {
+    pub fn new(
+        message: &[u8],
+        block_height_lookup: BlockHeightLookup,
+        context: *const c_void, // External Masternode Manager Diff Message Context ()
+    ) -> Option<LLMQRotationInfo> {
+        let bh_lookup = |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) };
+        let offset = &mut 0;
+        let snapshot_at_h_c = boxed(LLMQSnapshot::from_bytes(message, offset)?);
+        let snapshot_at_h_2c = boxed(LLMQSnapshot::from_bytes(message, offset)?);
+        let snapshot_at_h_3c = boxed(LLMQSnapshot::from_bytes(message, offset)?);
+        let mn_list_diff_tip = boxed(processing::MNListDiff::new(message, offset, bh_lookup)?.encode());
+        let mn_list_diff_at_h = boxed(processing::MNListDiff::new(message, offset, bh_lookup)?.encode());
+        let mn_list_diff_at_h_c = boxed(processing::MNListDiff::new(message, offset, bh_lookup)?.encode());
+        let mn_list_diff_at_h_2c = boxed(processing::MNListDiff::new(message, offset, bh_lookup)?.encode());
+        let mn_list_diff_at_h_3c = boxed(processing::MNListDiff::new(message, offset, bh_lookup)?.encode());
+        let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
+
+        let (snapshot_at_h_4c,
+            mn_list_diff_at_h_4c) = if extra_share {
+            (boxed(LLMQSnapshot::from_bytes(message, offset)?),
+             boxed(processing::MNListDiff::new(message, offset, bh_lookup)?.encode()))
+        } else {
+            (null_mut(), null_mut())
+        };
+        Some(Self {
+            snapshot_at_h_c,
+            snapshot_at_h_2c,
+            snapshot_at_h_3c,
+            snapshot_at_h_4c,
+            mn_list_diff_tip,
+            mn_list_diff_at_h,
+            mn_list_diff_at_h_c,
+            mn_list_diff_at_h_2c,
+            mn_list_diff_at_h_3c,
+            mn_list_diff_at_h_4c,
+            extra_share: false
+        })
+    }
+}
 
 impl<'a> TryRead<'a, Endian> for LLMQRotationInfo {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {

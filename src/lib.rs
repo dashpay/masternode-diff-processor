@@ -24,7 +24,6 @@ mod processing;
 
 use std::slice;
 use std::ffi::c_void;
-use byte::*;
 use crate::common::block_data::BlockData;
 use crate::common::llmq_type::LLMQType;
 use crate::common::merkle_tree::MerkleTree;
@@ -107,12 +106,12 @@ pub unsafe extern fn mndiff_destroy(result: *mut MNListDiffResult) {
 pub extern "C" fn llmq_rotation_info_read(
     message_arr: *const u8,
     message_length: usize,
+    block_height_lookup: BlockHeightLookup,
+    context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut ffi::types::LLMQRotationInfo {
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
-    boxed(match message.read_with::<ffi::types::LLMQRotationInfo>(&mut 0, LE) {
-        Ok(data) => data,
-        Err(_err) => ffi::types::LLMQRotationInfo::default()
-    })
+    boxed(ffi::types::LLMQRotationInfo::new(message, block_height_lookup, context)
+        .unwrap_or(ffi::types::LLMQRotationInfo::default()))
 }
 #[no_mangle]
 pub extern "C" fn llmq_rotation_info_process(
