@@ -3,7 +3,6 @@ use std::ptr::null_mut;
 use crate::{AddInsightBlockingLookup, BlockHeightLookup, boxed, boxed_vec, ffi, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ToFFI, UInt256, ValidateLLMQCallback};
 use crate::masternode::masternode_list;
 use crate::processing::manager;
-use crate::processing::manager::lookup_masternodes_and_quorums_for;
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct MNListDiffResult {
@@ -41,7 +40,7 @@ impl MNListDiffResult {
         let block_hash = list_diff.block_hash;
         let (base_masternodes,
             base_quorums) =
-            lookup_masternodes_and_quorums_for(
+            manager::lookup_masternodes_and_quorums_for(
                 block_hash,
                 masternode_list_lookup,
                 masternode_list_destroy,
