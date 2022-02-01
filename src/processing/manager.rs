@@ -4,16 +4,31 @@ use std::ffi::c_void;
 use hashes::{Hash, sha256};
 use crate::{AddInsightBlockingLookup, BlockData, BlockHeightLookup, boxed, boxed_vec, Data, Encodable, ffi, FromFFI, inplace_intersection, LLMQType, MasternodeEntry, MasternodeList, MasternodeListDestroy, MasternodeListLookup, LLMQEntry, Reversable, ShouldProcessLLMQTypeCallback, UInt256, ValidateLLMQCallback, Zeroable};
 
+pub fn lookup_masternode_list<'a>(
+    block_hash: UInt256,
+    masternode_list_lookup: MasternodeListLookup,
+    masternode_list_destroy: MasternodeListDestroy,
+    context: *const c_void,
+) -> Option<MasternodeList<'a>> {
+    let lookup_result = unsafe { masternode_list_lookup(boxed(block_hash.0), context) };
+    if !lookup_result.is_null() {
+        let list = unsafe { (*lookup_result).decode() };
+        unsafe { masternode_list_destroy(lookup_result); }
+        Some(list)
+    } else {
+        None
+    }
+}
+
 pub fn lookup_masternodes_and_quorums_for<'a>(
     block_hash: UInt256,
     masternode_list_lookup: MasternodeListLookup,
     masternode_list_destroy: MasternodeListDestroy,
     context: *const c_void,
 ) -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>) {
-    let lookup_result = unsafe { masternode_list_lookup(boxed(block_hash.0), context) };
-    if !lookup_result.is_null() {
-        let list = unsafe { (*lookup_result).decode() };
-        unsafe { masternode_list_destroy(lookup_result); }
+    let list = lookup_masternode_list(block_hash, masternode_list_lookup, masternode_list_destroy, context);
+    if list.is_some() {
+        let list = list.unwrap();
         (list.masternodes, list.quorums)
     } else {
         (BTreeMap::new(), HashMap::new())
@@ -105,14 +120,12 @@ pub fn classify_quorums<'a>(base_quorums: HashMap<LLMQType, HashMap<UInt256, LLM
         .filter(|(&llmq_type, _)| unsafe { should_process_llmq_of_type(llmq_type.into(), context) })
         .for_each(|(&llmq_type, llmqs_of_type)| {
             (*llmqs_of_type).iter().for_each(|(&llmq_hash, &llmq)| {
-                let lookup_result = unsafe { masternode_list_lookup(boxed(llmq_hash.0), context) };
-                if !lookup_result.is_null() {
-                    let llmq_masternode_list = unsafe { (*lookup_result).decode() };
-                    unsafe { masternode_list_destroy(lookup_result); }
+                let llmq_masternode_list = lookup_masternode_list(llmq_hash, masternode_list_lookup, masternode_list_destroy, context);
+                if llmq_masternode_list.is_some() {
                     validate_quorum(llmq_type,
                                     llmq,
                                     has_valid_quorums,
-                                    llmq_masternode_list,
+                                    llmq_masternode_list.unwrap(),
                                     bh_lookup,
                                     validate_llmq_callback,
                                     context);
