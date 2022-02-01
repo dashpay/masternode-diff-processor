@@ -1,7 +1,7 @@
 use std::ptr::null_mut;
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
-use crate::{boxed, boxed_vec, UInt256};
+use crate::{boxed, UInt256};
 use crate::ffi::types::mn_list_diff::MNListDiff;
 use crate::ffi::types::llmq_snapshot::LLMQSnapshot;
 
@@ -18,12 +18,12 @@ pub struct LLMQRotationInfo {
     pub mn_list_diff_at_h_3c: *mut MNListDiff,
     pub mn_list_diff_at_h_4c: *mut MNListDiff, // exist only if extra_share is true
     pub extra_share: bool,
-    pub block_hash_list_num: u32,
+    /*pub block_hash_list_num: u32,
     pub block_hash_list: *mut *mut [u8; 32],
     pub snapshot_list_num: u32,
     pub snapshot_list: *mut *mut LLMQSnapshot,
     pub mn_list_diff_list_num: u32,
-    pub mn_list_diff_list: *mut *mut MNListDiff,
+    pub mn_list_diff_list: *mut *mut MNListDiff,*/
 }
 
 impl Default for LLMQRotationInfo {
@@ -40,12 +40,12 @@ impl Default for LLMQRotationInfo {
             extra_share: false,
             snapshot_at_h_4c: null_mut(),
             mn_list_diff_at_h_4c: null_mut(),
-            block_hash_list_num: 0,
+            /*block_hash_list_num: 0,
             block_hash_list: null_mut(),
             snapshot_list_num: 0,
             snapshot_list: null_mut(),
             mn_list_diff_list_num: 0,
-            mn_list_diff_list: null_mut()
+            mn_list_diff_list: null_mut()*/
         }
     }
 }
@@ -69,7 +69,7 @@ impl<'a> TryRead<'a, Endian> for LLMQRotationInfo {
         } else {
             (null_mut(), null_mut())
         };
-        let block_hash_list_num = bytes.read_with::<u32>(offset, LE)?;
+        /*let block_hash_list_num = bytes.read_with::<u32>(offset, LE)?;
         let mut block_hash_list_vec: Vec<*mut [u8; 32]> = Vec::with_capacity(block_hash_list_num as usize);
         for _i in 0..block_hash_list_num {
             block_hash_list_vec.push(boxed(bytes.read_with::<UInt256>(offset, LE)?.0));
@@ -83,7 +83,7 @@ impl<'a> TryRead<'a, Endian> for LLMQRotationInfo {
         let mut mn_list_diff_list_vec: Vec<*mut MNListDiff> = Vec::with_capacity(mn_list_diff_list_num as usize);
         for _i in 0..mn_list_diff_list_num {
             mn_list_diff_list_vec.push(boxed(bytes.read_with::<MNListDiff>(offset, LE)?));
-        }
+        }*/
         Ok((Self {
             snapshot_at_h_c,
             snapshot_at_h_2c,
@@ -96,12 +96,12 @@ impl<'a> TryRead<'a, Endian> for LLMQRotationInfo {
             extra_share,
             snapshot_at_h_4c,
             mn_list_diff_at_h_4c,
-            block_hash_list_num,
+            /*block_hash_list_num,
             block_hash_list: boxed_vec(block_hash_list_vec),
             snapshot_list_num,
             snapshot_list: boxed_vec(snapshot_list_vec),
             mn_list_diff_list_num,
-            mn_list_diff_list: boxed_vec(mn_list_diff_list_vec)
+            mn_list_diff_list: boxed_vec(mn_list_diff_list_vec)*/
         }, *offset))
 
     }

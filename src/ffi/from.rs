@@ -149,10 +149,10 @@ impl<'a> FromFFI<'a> for ffi::types::MasternodeEntry {
                     acc.insert(key, value);
                     acc
                 }),
-            previous_masternode_entry_hashes: (0..self.previous_masternode_entry_hashes_count)
+            previous_entry_hashes: (0..self.previous_entry_hashes_count)
                 .into_iter()
                 .fold(BTreeMap::new(), |mut acc, i| {
-                    let obj = *self.previous_masternode_entry_hashes.offset(i as isize);
+                    let obj = *self.previous_entry_hashes.offset(i as isize);
                     let key = BlockData { height: obj.block_height, hash: UInt256(obj.block_hash) };
                     let value = UInt256(obj.hash);
                     acc.insert(key, value);
@@ -171,7 +171,7 @@ impl<'a> FromFFI<'a> for ffi::types::MasternodeEntry {
             update_height: self.update_height,
             key_id_voting: UInt160(*self.key_id_voting),
             is_valid: self.is_valid,
-            masternode_entry_hash: UInt256(*self.masternode_entry_hash)
+            entry_hash: UInt256(*self.entry_hash)
         }
     }
 }
@@ -290,7 +290,7 @@ impl<'a> FromFFI<'a> for ffi::types::LLMQRotationInfo {
             extra_share,
             snapshot_at_h_4c,
             mn_list_diff_at_h_4c,
-            block_hash_list: (0..self.block_hash_list_num)
+            /*block_hash_list: (0..self.block_hash_list_num)
                 .into_iter()
                 .map(|i| UInt256(*(*(self.block_hash_list.offset(i as isize)))))
                 .collect(),
@@ -301,7 +301,7 @@ impl<'a> FromFFI<'a> for ffi::types::LLMQRotationInfo {
             mn_list_diff_list: (0..self.mn_list_diff_list_num)
                 .into_iter()
                 .map(|i| (*(*(self.mn_list_diff_list.offset(i as isize)))).decode())
-                .collect(),
+                .collect(),*/
         }
     }
 }

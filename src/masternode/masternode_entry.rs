@@ -15,21 +15,21 @@ pub struct MasternodeEntry {
     pub socket_address: SocketAddress,
     pub operator_public_key: UInt384,
     pub previous_operator_public_keys: BTreeMap<BlockData, UInt384>,
-    pub previous_masternode_entry_hashes: BTreeMap<BlockData, UInt256>,
+    pub previous_entry_hashes: BTreeMap<BlockData, UInt256>,
     pub previous_validity: BTreeMap<BlockData, bool>,
     pub known_confirmed_at_height: Option<u32>,
     pub update_height: u32,
     pub key_id_voting: UInt160,
     pub is_valid: bool,
-    pub masternode_entry_hash: UInt256,
+    pub entry_hash: UInt256,
 }
 impl std::fmt::Debug for MasternodeEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MasternodeEntry")
             .field("provider_registration_transaction_hash", &self.provider_registration_transaction_hash)
             .field("update_height", &self.update_height)
-            .field("masternode_entry_hash", &self.masternode_entry_hash)
-            .field("previous_masternode_entry_hashes", &self.previous_masternode_entry_hashes)
+            .field("entry_hash", &self.entry_hash)
+            .field("previous_entry_hashes", &self.previous_entry_hashes)
             .finish()
     }
 }
@@ -45,7 +45,7 @@ impl<'a> TryRead<'a, Endian> for MasternodeEntry {
         let operator_public_key = bytes.read_with::<UInt384>(offset, byte::LE)?;
         let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
         let is_valid = bytes.read_with::<u8>(offset, byte::LE).unwrap_or(0);
-        let masternode_entry_hash = MasternodeEntry::calculate_masternode_entry_hash(
+        let entry_hash = MasternodeEntry::calculate_entry_hash(
             provider_registration_transaction_hash,
             confirmed_hash,
             socket_address,
@@ -60,19 +60,19 @@ impl<'a> TryRead<'a, Endian> for MasternodeEntry {
             socket_address,
             operator_public_key,
             previous_operator_public_keys: BTreeMap::new(),
-            previous_masternode_entry_hashes: BTreeMap::new(),
+            previous_entry_hashes: BTreeMap::new(),
             previous_validity: BTreeMap::new(),
             known_confirmed_at_height: None,
             update_height: 0,
             key_id_voting,
             is_valid: is_valid != 0,
-            masternode_entry_hash
+            entry_hash
         }, *offset))
     }
 }
 
 impl MasternodeEntry {
-    fn calculate_masternode_entry_hash(
+    fn calculate_entry_hash(
         provider_registration_transaction_hash: UInt256,
         confirmed_hash: UInt256,
         socket_address: SocketAddress,
@@ -118,7 +118,7 @@ impl MasternodeEntry {
     }
 
     pub fn payload_data(&self) -> UInt256 {
-        MasternodeEntry::calculate_masternode_entry_hash(
+        MasternodeEntry::calculate_entry_hash(
             self.provider_registration_transaction_hash,
             self.confirmed_hash,
             self.socket_address,
@@ -174,14 +174,14 @@ impl MasternodeEntry {
         used_previous_operator_public_key_at_block_hash
     }
 
-    pub fn masternode_entry_hash_at(&self, block_height: u32) -> UInt256 {
-        if self.previous_masternode_entry_hashes.len() == 0 ||
+    pub fn entry_hash_at(&self, block_height: u32) -> UInt256 {
+        if self.previous_entry_hashes.len() == 0 ||
             block_height == u32::MAX {
-            return self.masternode_entry_hash.clone();
+            return self.entry_hash.clone();
         }
-        let hashes: BTreeMap<BlockData, UInt256> = self.previous_masternode_entry_hashes.clone();
+        let hashes: BTreeMap<BlockData, UInt256> = self.previous_entry_hashes.clone();
         let mut min_distance = u32::MAX;
-        let mut used_hash = self.masternode_entry_hash.clone();
+        let mut used_hash = self.entry_hash.clone();
         for (BlockData { height, .. }, hash) in hashes {
             if height <= block_height {
                 continue;
@@ -221,14 +221,14 @@ impl MasternodeEntry {
             self.previous_operator_public_keys.insert(block.clone(), (*entry).operator_public_key.clone());
         }
         let old_prev_mn_entry_hashes = (*entry)
-            .previous_masternode_entry_hashes
+            .previous_entry_hashes
             .clone()
             .into_iter()
             .filter(|(block, _)| (*block).height < self.update_height)
             .collect();
-        self.previous_masternode_entry_hashes = old_prev_mn_entry_hashes;
-        if (*entry).masternode_entry_hash_at(self.update_height) != self.masternode_entry_hash {
-            self.previous_masternode_entry_hashes.insert(block.clone(), (*entry).masternode_entry_hash.clone());
+        self.previous_entry_hashes = old_prev_mn_entry_hashes;
+        if (*entry).entry_hash_at(self.update_height) != self.entry_hash {
+            self.previous_entry_hashes.insert(block.clone(), (*entry).entry_hash.clone());
         }
     }
 

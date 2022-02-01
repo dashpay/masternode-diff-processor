@@ -148,7 +148,7 @@ pub unsafe extern fn llmq_rotation_info_destroy(result: *mut ffi::types::LLMQRot
 
 
 #[no_mangle]
-pub extern "C" fn qrinfo_process2(
+pub extern "C" fn llmq_rotation_info_process2(
     message_arr: *const u8,
     message_length: usize,
     merkle_root: *const u8,
@@ -193,7 +193,7 @@ mod tests {
     use crate::crypto::byte_util::{Reversable, UInt256};
     use crate::ffi::from::FromFFI;
     use crate::ffi::unboxer::unbox_any;
-    use crate::{BlockHeightLookup, ffi, MerkleTree, mndiff_process};
+    use crate::{BlockHeightLookup, ffi, llmq_rotation_info_process2, MerkleTree, mndiff_process};
 
     const CHAIN_TYPE: ChainType = ChainType::TestNet;
     const BLOCK_HEIGHT: u32 = 122088;
@@ -544,7 +544,7 @@ mod tests {
         let mut masternode_list_hashes: Vec<UInt256> = pro_tx_hashes
             .clone()
             .iter()
-            .map(|hash| masternodes[hash].masternode_entry_hash)
+            .map(|hash| masternodes[hash].entry_hash)
             .collect();
         masternode_list_hashes.sort();
 

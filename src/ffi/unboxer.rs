@@ -19,9 +19,9 @@ pub unsafe fn unbox_masternode_entry(x: *mut ffi::types::MasternodeEntry) {
         unbox_any(entry.confirmed_hash_hashed_with_provider_registration_transaction_hash);
     }
     unbox_any(entry.key_id_voting);
-    unbox_any(entry.masternode_entry_hash);
+    unbox_any(entry.entry_hash);
     unbox_any(entry.operator_public_key);
-    unbox_vec_ptr(entry.previous_masternode_entry_hashes, entry.previous_masternode_entry_hashes_count);
+    unbox_vec_ptr(entry.previous_entry_hashes, entry.previous_entry_hashes_count);
     unbox_vec_ptr(entry.previous_operator_public_keys, entry.previous_operator_public_keys_count);
     unbox_vec_ptr(entry.previous_validity, entry.previous_validity_count);
     unbox_any(entry.provider_registration_transaction_hash);
@@ -200,7 +200,7 @@ pub unsafe fn unbox_llmq_rotation_info(result: *mut ffi::types::LLMQRotationInfo
         unbox_llmq_snapshot(res.snapshot_at_h_4c);
         unbox_mn_list_diff(res.mn_list_diff_at_h_4c);
     }
-    unbox_vec(unbox_vec_ptr(res.block_hash_list, res.block_hash_list_num as usize));
-    unbox_snapshot_vec(unbox_vec_ptr(res.snapshot_list, res.snapshot_list_num as usize));
-    unbox_mn_list_diff_vec(unbox_vec_ptr(res.mn_list_diff_list, res.mn_list_diff_list_num as usize));
+    //unbox_vec(unbox_vec_ptr(res.block_hash_list, res.block_hash_list_num as usize));
+    //unbox_snapshot_vec(unbox_vec_ptr(res.snapshot_list, res.snapshot_list_num as usize));
+    //unbox_mn_list_diff_vec(unbox_vec_ptr(res.mn_list_diff_list, res.mn_list_diff_list_num as usize));
 }

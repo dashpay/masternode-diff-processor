@@ -144,7 +144,7 @@ impl<'a> ToFFI<'a> for masternode_entry::MasternodeEntry {
 
     fn encode(&self) -> Self::Item {
         let previous_operator_public_keys_count = self.previous_operator_public_keys.len();
-        let previous_masternode_entry_hashes_count = self.previous_masternode_entry_hashes.len();
+        let previous_entry_hashes_count = self.previous_entry_hashes.len();
         let previous_validity_count = self.previous_validity.len();
         Self::Item {
             confirmed_hash: boxed(self.confirmed_hash.0),
@@ -156,7 +156,7 @@ impl<'a> ToFFI<'a> for masternode_entry::MasternodeEntry {
             is_valid: self.is_valid,
             key_id_voting: boxed(self.key_id_voting.0),
             known_confirmed_at_height: self.known_confirmed_at_height.unwrap_or(0),
-            masternode_entry_hash: boxed(self.masternode_entry_hash.0),
+            entry_hash: boxed(self.entry_hash.0),
             operator_public_key: boxed(self.operator_public_key.0),
             previous_operator_public_keys: boxed_vec(self.previous_operator_public_keys
                 .iter()
@@ -164,12 +164,12 @@ impl<'a> ToFFI<'a> for masternode_entry::MasternodeEntry {
                     ffi::types::OperatorPublicKey { block_hash: hash.0, block_height, key: key.0 })
                 .collect()),
             previous_operator_public_keys_count,
-            previous_masternode_entry_hashes: boxed_vec(self.previous_masternode_entry_hashes
+            previous_entry_hashes: boxed_vec(self.previous_entry_hashes
                 .iter()
                 .map(|(&BlockData { hash: block_hash, height: block_height}, &hash)|
                     ffi::types::MasternodeEntryHash { block_hash: block_hash.0, block_height, hash: hash.0 })
                 .collect()),
-            previous_masternode_entry_hashes_count,
+            previous_entry_hashes_count,
             previous_validity: boxed_vec(self.previous_validity
                 .iter()
                 .map(|(&BlockData { hash, height: block_height}, &is_valid)|
@@ -302,7 +302,7 @@ impl<'a> ToFFI<'a> for llmq_rotation_info::LLMQRotationInfo<'a> {
         } else {
             (null_mut(), null_mut())
         };
-        let block_hash_list_num = self.block_hash_list.len();
+        /*let block_hash_list_num = self.block_hash_list.len();
         let block_hash_list = boxed_vec(
             (0..block_hash_list_num)
                 .into_iter()
@@ -319,7 +319,7 @@ impl<'a> ToFFI<'a> for llmq_rotation_info::LLMQRotationInfo<'a> {
             (0..mn_list_diff_list_num)
                 .into_iter()
                 .map(|i| boxed(self.mn_list_diff_list[i].encode()))
-                .collect());
+                .collect());*/
         Self::Item {
             snapshot_at_h_c,
             snapshot_at_h_2c,
@@ -332,12 +332,12 @@ impl<'a> ToFFI<'a> for llmq_rotation_info::LLMQRotationInfo<'a> {
             extra_share,
             snapshot_at_h_4c,
             mn_list_diff_at_h_4c,
-            block_hash_list_num: block_hash_list_num as u32,
+            /*block_hash_list_num: block_hash_list_num as u32,
             block_hash_list,
             snapshot_list_num: snapshot_list_num as u32,
             snapshot_list,
             mn_list_diff_list_num: mn_list_diff_list_num as u32,
-            mn_list_diff_list
+            mn_list_diff_list*/
         }
     }
 }
