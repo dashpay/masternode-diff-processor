@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use byte::BytesExt;
 use byte::ctx::Bytes;
 use crate::{CoinbaseTransaction, LLMQType, MasternodeEntry, LLMQEntry, Reversable, UInt256, VarInt};
-use crate::crypto::byte_util::{BytesDecodable, MN_ENTRY_PAYLOAD_LENGTH, VarBytes};
+use crate::crypto::byte_util::{BytesDecodable, VarBytes};
 
 #[derive(Debug)]
 pub struct MNListDiff<'a> {
