@@ -41,7 +41,7 @@ use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;
 use crate::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
 use crate::ffi::types::{LLMQRotationInfoResult, MNListDiffResult};
-use crate::ffi::unboxer::{unbox_any, unbox_llmq_rotation_info, unbox_llmq_validation_data, unbox_result};
+use crate::ffi::unboxer::{unbox_any, unbox_llmq_rotation_info, unbox_llmq_rotation_info_result, unbox_llmq_validation_data, unbox_result};
 use crate::processing::mn_list_diff::{MNListDiff};
 use crate::processing::llmq_snapshot::LLMQSnapshot;
 
@@ -142,12 +142,6 @@ pub extern "C" fn llmq_rotation_info_process(
 }
 
 #[no_mangle]
-pub unsafe extern fn llmq_rotation_info_destroy(result: *mut ffi::types::LLMQRotationInfo) {
-    unbox_llmq_rotation_info(result);
-}
-
-
-#[no_mangle]
 pub extern "C" fn llmq_rotation_info_process2(
     message_arr: *const u8,
     message_length: usize,
@@ -174,8 +168,19 @@ pub extern "C" fn llmq_rotation_info_process2(
                                          validate_llmq_callback, block_height_lookup, context);
 
     boxed(result.unwrap_or(LLMQRotationInfoResult::default()))
-
 }
+
+#[no_mangle]
+pub unsafe extern fn llmq_rotation_info_destroy(result: *mut ffi::types::LLMQRotationInfo) {
+    unbox_llmq_rotation_info(result);
+}
+
+#[no_mangle]
+pub unsafe extern fn llmq_rotation_info_result_destroy(result: *mut ffi::types::LLMQRotationInfoResult) {
+    unbox_llmq_rotation_info_result(result);
+}
+
+
 
 #[cfg(test)]
 mod tests {

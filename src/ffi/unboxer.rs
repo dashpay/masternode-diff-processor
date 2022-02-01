@@ -204,3 +204,16 @@ pub unsafe fn unbox_llmq_rotation_info(result: *mut ffi::types::LLMQRotationInfo
     //unbox_snapshot_vec(unbox_vec_ptr(res.snapshot_list, res.snapshot_list_num as usize));
     //unbox_mn_list_diff_vec(unbox_vec_ptr(res.mn_list_diff_list, res.mn_list_diff_list_num as usize));
 }
+pub unsafe fn unbox_llmq_rotation_info_result(result: *mut ffi::types::LLMQRotationInfoResult) {
+    let res = unbox_any(result);
+    unbox_result(res.result_at_tip);
+    unbox_result(res.result_at_h);
+    unbox_result(res.result_at_h_c);
+    unbox_result(res.result_at_h_2c);
+    unbox_result(res.result_at_h_3c);
+    unbox_result(res.result_at_h_4c);
+    unbox_llmq_snapshot(res.snapshot_at_h_c);
+    unbox_llmq_snapshot(res.snapshot_at_h_2c);
+    unbox_llmq_snapshot(res.snapshot_at_h_3c);
+    unbox_llmq_snapshot(res.snapshot_at_h_4c);
+}
