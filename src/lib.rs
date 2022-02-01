@@ -116,7 +116,6 @@ pub extern "C" fn llmq_rotation_info_read(
 pub extern "C" fn llmq_rotation_info_process(
     info: *mut ffi::types::LLMQRotationInfo,
     merkle_root: *const u8,
-    base_masternode_list: *const ffi::types::MasternodeList,
     masternode_list_lookup: MasternodeListLookup,
     masternode_list_destroy: MasternodeListDestroy,
     use_insight_as_backup: bool,
@@ -132,7 +131,7 @@ pub extern "C" fn llmq_rotation_info_process(
         None => { return qr_failure(); }
     };
     boxed(ffi::types::LLMQRotationInfoResult::new(
-        llmq_rotation_info, base_masternode_list,
+        llmq_rotation_info,
         masternode_list_lookup, masternode_list_destroy,
         desired_merkle_root, use_insight_as_backup,
         add_insight_lookup, should_process_llmq_of_type,
@@ -144,7 +143,6 @@ pub extern "C" fn llmq_rotation_info_process2(
     message_arr: *const u8,
     message_length: usize,
     merkle_root: *const u8,
-    base_masternode_list: *const ffi::types::MasternodeList,
     masternode_list_lookup: MasternodeListLookup,
     masternode_list_destroy: MasternodeListDestroy,
     use_insight_as_backup: bool,
@@ -159,7 +157,7 @@ pub extern "C" fn llmq_rotation_info_process2(
         Some(data) => data,
         None => { return qr_failure(); }
     };
-    let result = LLMQRotationInfoResult::from_message(message, desired_merkle_root, base_masternode_list,
+    let result = LLMQRotationInfoResult::from_message(message, desired_merkle_root,
                                          masternode_list_lookup, masternode_list_destroy,
                                          use_insight_as_backup,
                                          add_insight_lookup, should_process_llmq_of_type,
@@ -638,7 +636,6 @@ mod tests {
         let bytes = file.as_slice();
         let length = bytes.len();
         let c_array = bytes.as_ptr();
-        let base_masternode_list = null_mut();
         let merkle_root = [0u8; 32].as_ptr();
         let use_insight_as_backup= false;
         let h = 5078;
@@ -646,7 +643,6 @@ mod tests {
             c_array,
             length,
             merkle_root,
-            base_masternode_list,
             masternode_list_lookup,
             masternode_list_destroy,
             use_insight_as_backup,

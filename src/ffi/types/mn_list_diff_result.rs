@@ -25,7 +25,6 @@ pub struct MNListDiffResult {
 impl MNListDiffResult {
     pub fn from_diff(
         list_diff: crate::processing::mn_list_diff::MNListDiff,
-        // base_masternode_list: *const ffi::types::MasternodeList,
         masternode_list_lookup: MasternodeListLookup,
         masternode_list_destroy: MasternodeListDestroy,
         merkle_root: UInt256,

@@ -12,9 +12,9 @@ pub fn lookup_masternodes_and_quorums_for<'a>(
 ) -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>) {
     let lookup_result = unsafe { masternode_list_lookup(boxed(block_hash.0), context) };
     if !lookup_result.is_null() {
-        let base_masternode_list = unsafe { (*lookup_result).decode() };
+        let list = unsafe { (*lookup_result).decode() };
         unsafe { masternode_list_destroy(lookup_result); }
-        (base_masternode_list.masternodes, base_masternode_list.quorums)
+        (list.masternodes, list.quorums)
     } else {
         (BTreeMap::new(), HashMap::new())
     }

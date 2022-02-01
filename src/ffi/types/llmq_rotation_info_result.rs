@@ -25,7 +25,6 @@ impl LLMQRotationInfoResult {
     pub fn from_message(
         message: &[u8],
         merkle_root: UInt256,
-        base_masternode_list: *const ffi::types::MasternodeList,
         masternode_list_lookup: MasternodeListLookup,
         masternode_list_destroy: MasternodeListDestroy,
         use_insight_as_backup: bool,
@@ -116,7 +115,6 @@ impl LLMQRotationInfoResult {
 
     pub fn new(
         info: ffi::types::LLMQRotationInfo,
-        base_masternode_list: *const ffi::types::MasternodeList,
         masternode_list_lookup: MasternodeListLookup,
         masternode_list_destroy: MasternodeListDestroy,
         merkle_root: UInt256,
