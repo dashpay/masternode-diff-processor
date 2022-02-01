@@ -610,11 +610,6 @@ mod tests {
     }
 
     #[test]
-    fn test_quorum_rotation() {
-
-    }
-
-    #[test]
     fn test_multiple_merkle_hashes() {
         let merkle_hashes = Vec::from_hex("78175171f830d9ea3e67170dfdec6bd805d31b22b19eaf783355adae06faa3539762500f0eca01a59f0e198522a0752f96be9032803fb21311a992089b9472bd1361a2db43a580e40f81bd5e17eabae8eebb02e9a651ae348d88d51ca824df19").unwrap();
         let merkle_flags = Vec::from_hex("07").unwrap();
@@ -630,5 +625,49 @@ mod tests {
         println!("merkle_tree: {:?} {:?} {}, has_valid_coinbase: {} {:?}", merkle_hashes.to_hex(), merkle_flags.to_hex(), total_transactions, has_valid_coinbase, desired_merkle_root);
         assert!(has_valid_coinbase, "Invalid coinbase here");
     }
+
+    #[test]
+    fn test_llmq_rotation() {
+        let executable = env::current_exe().unwrap();
+        let path = match executable.parent() {
+            Some(name) => name,
+            _ => panic!()
+        };
+        let filepath = format!("{}/../../../src/{}", path.display(), "qrinfo--1-5078.dat");
+        println!("{:?}", filepath);
+        let file = get_file_as_byte_vec(&filepath);
+        let bytes = file.as_slice();
+        let length = bytes.len();
+        let c_array = bytes.as_ptr();
+        let base_masternode_list = null_mut();
+        let merkle_root = [0u8; 32].as_ptr();
+        let use_insight_as_backup= false;
+        let h = 5078;
+        let result = llmq_rotation_info_process2(
+            c_array,
+            length,
+            merkle_root,
+            base_masternode_list,
+            masternode_list_lookup,
+            masternode_list_destroy,
+            use_insight_as_backup,
+            use_insight_lookup,
+            should_process_quorum_of_type,
+            validate_quorum_callback,
+            block_height_lookup,
+            null_mut()
+        );
+        println!("{:?}", result);
+        let result = unsafe { unbox_any(result) };
+        let result_at_h = unsafe { *unbox_any(result.result_at_h) };
+
+        assert!(result_at_h.has_found_coinbase, "Did not find coinbase at height {}", h);
+        // turned off on purpose as we don't have the coinbase block
+        // assert!(result.valid_coinbase, "Coinbase not valid at height {}", h);
+        assert!(result_at_h.has_valid_mn_list_root, "mn list root not valid at height {}", h);
+        assert!(result_at_h.has_valid_llmq_list_root, "LLMQ list root not valid at height {}", h);
+        assert!(result_at_h.has_valid_quorums, "validQuorums not valid at height {}", h);
+    }
+
 }
 
