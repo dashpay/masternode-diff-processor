@@ -57,7 +57,6 @@ impl LLMQRotationInfoResult {
 
         let result_at_tip = boxed(ffi::types::MNListDiffResult::from_diff(
             diff_tip,
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -65,7 +64,6 @@ impl LLMQRotationInfoResult {
         ));
         let result_at_h = boxed(ffi::types::MNListDiffResult::from_diff(
             diff_h,
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -73,7 +71,6 @@ impl LLMQRotationInfoResult {
         ));
         let result_at_h_c = boxed(ffi::types::MNListDiffResult::from_diff(
             diff_h_c,
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -81,7 +78,6 @@ impl LLMQRotationInfoResult {
         ));
         let result_at_h_2c = boxed(ffi::types::MNListDiffResult::from_diff(
             diff_h_2c,
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -89,7 +85,6 @@ impl LLMQRotationInfoResult {
         ));
         let result_at_h_3c = boxed(ffi::types::MNListDiffResult::from_diff(
             diff_h_3c,
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -97,7 +92,6 @@ impl LLMQRotationInfoResult {
         ));
         let result_at_h_4c = if extra_share { boxed(ffi::types::MNListDiffResult::from_diff(
             diff_h_4c.unwrap(),
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -137,7 +131,6 @@ impl LLMQRotationInfoResult {
         let extra_share = info.extra_share;
         let result_at_tip = boxed(ffi::types::MNListDiffResult::from_diff(
             unsafe { (*(info.mn_list_diff_tip)).decode() },
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -145,7 +138,6 @@ impl LLMQRotationInfoResult {
         ));
         let result_at_h = boxed(ffi::types::MNListDiffResult::from_diff(
             unsafe { (*(info.mn_list_diff_at_h)).decode() },
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -153,7 +145,6 @@ impl LLMQRotationInfoResult {
         ));
         let result_at_h_c = boxed(ffi::types::MNListDiffResult::from_diff(
             unsafe { (*(info.mn_list_diff_at_h_c)).decode() },
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -161,7 +152,6 @@ impl LLMQRotationInfoResult {
         ));
         let result_at_h_2c = boxed(ffi::types::MNListDiffResult::from_diff(
             unsafe { (*(info.mn_list_diff_at_h_2c)).decode() },
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -169,7 +159,6 @@ impl LLMQRotationInfoResult {
         ));
         let result_at_h_3c = boxed(ffi::types::MNListDiffResult::from_diff(
             unsafe { (*(info.mn_list_diff_at_h_3c)).decode() },
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,
@@ -178,7 +167,6 @@ impl LLMQRotationInfoResult {
 
         let result_at_h_4c = if extra_share { boxed(ffi::types::MNListDiffResult::from_diff(
             unsafe { (*(info.mn_list_diff_at_h_4c)).decode() },
-            base_masternode_list,
             masternode_list_lookup, masternode_list_destroy,
             merkle_root, use_insight_as_backup, add_insight_lookup,
             should_process_llmq_of_type, validate_llmq_callback,

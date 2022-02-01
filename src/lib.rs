@@ -55,7 +55,6 @@ fn qr_failure() -> *mut ffi::types::LLMQRotationInfoResult {
 pub extern "C" fn mndiff_process(
     message_arr: *const u8,
     message_length: usize,
-    base_masternode_list: *const ffi::types::MasternodeList,
     masternode_list_lookup: MasternodeListLookup,
     masternode_list_destroy: MasternodeListDestroy,
     merkle_root: *const u8,
@@ -77,7 +76,7 @@ pub extern "C" fn mndiff_process(
         None => { return failure(); }
     };
     let result = MNListDiffResult::from_diff(
-        list_diff, base_masternode_list,
+        list_diff,
         masternode_list_lookup, masternode_list_destroy,
         desired_merkle_root, use_insight_as_backup, add_insight_lookup,
         should_process_llmq_of_type, validate_llmq_callback,
@@ -498,7 +497,6 @@ mod tests {
         let bytes = Vec::from_hex(&hex_string).unwrap();
         let length = bytes.len();
         let c_array = bytes.as_ptr();
-        let base_masternode_list = null_mut();
         let merkle_root = [0u8; 32].as_ptr();
 
         let offset = &mut 0;
@@ -514,7 +512,6 @@ mod tests {
         let result = mndiff_process(
             c_array,
             length,
-            base_masternode_list,
             masternode_list_lookup,
             masternode_list_destroy,
             merkle_root,
@@ -580,13 +577,11 @@ mod tests {
         let bytes = file.as_slice();
         let length = bytes.len();
         let c_array = bytes.as_ptr();
-        let base_masternode_list = null_mut();
         let merkle_root = [0u8; 32].as_ptr();
         let use_insight_as_backup= false;
         let result = mndiff_process(
             c_array,
             length,
-            base_masternode_list,
             masternode_list_lookup,
             masternode_list_destroy,
             merkle_root,

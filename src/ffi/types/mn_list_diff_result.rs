@@ -3,6 +3,7 @@ use std::ptr::null_mut;
 use crate::{AddInsightBlockingLookup, BlockHeightLookup, boxed, boxed_vec, ffi, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ToFFI, UInt256, ValidateLLMQCallback};
 use crate::masternode::masternode_list;
 use crate::processing::manager;
+use crate::processing::manager::lookup_masternodes_and_quorums_for;
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct MNListDiffResult {
@@ -25,7 +26,7 @@ pub struct MNListDiffResult {
 impl MNListDiffResult {
     pub fn from_diff(
         list_diff: crate::processing::mn_list_diff::MNListDiff,
-        base_masternode_list: *const ffi::types::MasternodeList,
+        // base_masternode_list: *const ffi::types::MasternodeList,
         masternode_list_lookup: MasternodeListLookup,
         masternode_list_destroy: MasternodeListDestroy,
         merkle_root: UInt256,
@@ -37,10 +38,15 @@ impl MNListDiffResult {
         context: *const c_void, // External Masternode Manager Diff Message Context ()
     ) -> Self {
         let bh_lookup = |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) };
-        let (base_masternodes,
-            base_quorums) = manager::get_base_masternodes_and_quorums(base_masternode_list);
-        let block_height = list_diff.block_height;
         let block_hash = list_diff.block_hash;
+        let (base_masternodes,
+            base_quorums) =
+            lookup_masternodes_and_quorums_for(
+                block_hash,
+                masternode_list_lookup,
+                masternode_list_destroy,
+                context);
+        let block_height = list_diff.block_height;
         let coinbase_transaction = list_diff.coinbase_transaction;
         let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
         let (added_masternodes,

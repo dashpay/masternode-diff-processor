@@ -4,13 +4,20 @@ use std::ffi::c_void;
 use hashes::{Hash, sha256};
 use crate::{AddInsightBlockingLookup, BlockData, BlockHeightLookup, boxed, boxed_vec, Data, Encodable, ffi, FromFFI, inplace_intersection, LLMQType, MasternodeEntry, MasternodeList, MasternodeListDestroy, MasternodeListLookup, LLMQEntry, Reversable, ShouldProcessLLMQTypeCallback, UInt256, ValidateLLMQCallback, Zeroable};
 
-pub fn get_base_masternodes_and_quorums<'a>(base_masternode_list: *const ffi::types::MasternodeList)
-                                            -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>) {
-    if !base_masternode_list.is_null() {
-        let list = unsafe { (*base_masternode_list).decode() };
-        return (list.masternodes, list.quorums);
+pub fn lookup_masternodes_and_quorums_for<'a>(
+    block_hash: UInt256,
+    masternode_list_lookup: MasternodeListLookup,
+    masternode_list_destroy: MasternodeListDestroy,
+    context: *const c_void,
+) -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>) {
+    let lookup_result = unsafe { masternode_list_lookup(boxed(block_hash.0), context) };
+    if !lookup_result.is_null() {
+        let base_masternode_list = unsafe { (*lookup_result).decode() };
+        unsafe { masternode_list_destroy(lookup_result); }
+        (base_masternode_list.masternodes, base_masternode_list.quorums)
+    } else {
+        (BTreeMap::new(), HashMap::new())
     }
-    (BTreeMap::new(), HashMap::new())
 }
 
 pub fn classify_masternodes(base_masternodes: BTreeMap<UInt256, MasternodeEntry>,
