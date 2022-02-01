@@ -40,7 +40,7 @@ use ffi::wrapped_types::{AddInsightBlockingLookup, BlockHeightLookup, Masternode
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;
 use crate::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
-use crate::ffi::types::MNListDiffResult;
+use crate::ffi::types::{LLMQRotationInfoResult, MNListDiffResult};
 use crate::ffi::unboxer::{unbox_any, unbox_llmq_rotation_info, unbox_llmq_validation_data, unbox_result};
 use crate::processing::mn_list_diff::{MNListDiff};
 use crate::processing::llmq_snapshot::LLMQSnapshot;
@@ -73,7 +73,7 @@ pub extern "C" fn mndiff_process(
         None => { return failure(); }
     };
     let bh_lookup = |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) };
-    let list_diff = match MNListDiff::new(message, message_length, bh_lookup) {
+    let list_diff = match MNListDiff::new(message, &mut 0, bh_lookup) {
         Some(data) => data,
         None => { return failure(); }
     };
@@ -167,16 +167,13 @@ pub extern "C" fn llmq_rotation_info_process2(
         Some(data) => data,
         None => { return qr_failure(); }
     };
-    let llmq_rotation_info = match message.read_with::<ffi::types::LLMQRotationInfo>(&mut 0, LE) {
-        Ok(data) => data,
-        Err(_err) => { return qr_failure() }
-    };
-    boxed(ffi::types::LLMQRotationInfoResult::new(
-        llmq_rotation_info, base_masternode_list,
-        masternode_list_lookup, masternode_list_destroy,
-        desired_merkle_root, use_insight_as_backup,
-        add_insight_lookup, should_process_llmq_of_type,
-        validate_llmq_callback, block_height_lookup, context))
+    let result = LLMQRotationInfoResult::from_message(message, desired_merkle_root, base_masternode_list,
+                                         masternode_list_lookup, masternode_list_destroy,
+                                         use_insight_as_backup,
+                                         add_insight_lookup, should_process_llmq_of_type,
+                                         validate_llmq_callback, block_height_lookup, context);
+
+    boxed(result.unwrap_or(LLMQRotationInfoResult::default()))
 
 }
 
@@ -208,6 +205,9 @@ mod tests {
 
     unsafe extern "C" fn block_height_lookup(_block_hash: *mut [u8; 32], _context: *const c_void) -> u32 {
         BLOCK_HEIGHT
+    }
+    unsafe extern "C" fn block_height_lookup_5078(_block_hash: *mut [u8; 32], _context: *const c_void) -> u32 {
+        5078
     }
     unsafe extern "C" fn masternode_list_lookup(_block_hash: *mut [u8; 32], _context: *const c_void) -> *const ffi::types::MasternodeList {
         null_mut()
@@ -654,7 +654,7 @@ mod tests {
             use_insight_lookup,
             should_process_quorum_of_type,
             validate_quorum_callback,
-            block_height_lookup,
+            block_height_lookup_5078,
             null_mut()
         );
         println!("{:?}", result);

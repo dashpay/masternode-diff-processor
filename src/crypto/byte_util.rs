@@ -5,6 +5,7 @@ use std::{mem, slice};
 use crate::{CoinbaseTransaction, MasternodeEntry, LLMQEntry};
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
 use crate::consensus::encode::VarInt;
+use crate::ffi::types::LLMQSnapshot;
 use crate::hashes::{Hash, sha256d, hex::{FromHex, ToHex}, hex};
 use crate::transactions::transaction::{Transaction, TransactionInput, TransactionOutput};
 
@@ -306,6 +307,7 @@ impl<'a> TryRead<'a, Endian> for VarInt {
 
 impl_bytes_decodable!(VarInt);
 impl_bytes_decodable!(MasternodeEntry);
+impl_bytes_decodable!(LLMQSnapshot);
 
 impl_bytes_decodable_lt!(TransactionInput);
 impl_bytes_decodable_lt!(TransactionOutput);

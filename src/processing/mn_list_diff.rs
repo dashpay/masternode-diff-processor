@@ -30,8 +30,7 @@ pub struct MNListDiff<'a> {
 
 
 impl<'a> MNListDiff<'a> {
-    pub fn new<F: Fn(UInt256) -> u32>(message: &'a [u8], message_length: usize, block_height_lookup: F) -> Option<Self> {
-        let offset = &mut 0;
+    pub fn new<F: Fn(UInt256) -> u32>(message: &'a [u8], offset: &mut usize, block_height_lookup: F) -> Option<Self> {
         let base_block_hash = UInt256::from_bytes(message, offset)?;
         let block_hash = UInt256::from_bytes(message, offset)?;
         let block_height= block_height_lookup(block_hash);
@@ -52,7 +51,7 @@ impl<'a> MNListDiff<'a> {
         let added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = (0..added_masternode_count)
             .into_iter()
             .filter_map(|_i| {
-                assert_eq!(message.len(), MN_ENTRY_PAYLOAD_LENGTH);
+                // assert_eq!(message.len(), MN_ENTRY_PAYLOAD_LENGTH);
                 let mut entry = MasternodeEntry::from_bytes(message, offset)?;
                 entry.update_with_block_height(block_height);
                 Some(entry)
