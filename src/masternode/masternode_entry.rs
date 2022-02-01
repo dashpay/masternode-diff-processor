@@ -189,7 +189,7 @@ impl MasternodeEntry {
             let distance = height - block_height;
             if distance < min_distance {
                 min_distance = distance;
-                //println!("SME Hash for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {}", self.provider_registration_transaction_hash, hash, used_hash, block_height);
+                println!("SME Hash for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {}", self.provider_registration_transaction_hash, hash, used_hash, block_height);
                 used_hash = hash;
             }
         }

@@ -21,7 +21,7 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
         let height = bytes.read_with::<u32>(offset, LE)?;
         let merkle_root_mn_list = boxed(bytes.read_with::<UInt256>(offset, LE)?.0);
         let merkle_root_llmq_list =
-            if coinbase_transaction_version == 2 {
+            if coinbase_transaction_version >= 2 {
                 boxed(bytes.read_with::<UInt256>(offset, LE)?.0)
             } else {
                 null_mut()

@@ -21,7 +21,7 @@ impl<'a> std::fmt::Debug for MasternodeList<'a> {
             .field("block_hash", &self.block_hash)
             .field("known_height", &self.known_height)
             .field("masternode_merkle_root", &self.masternode_merkle_root)
-            .field("quorum_merkle_root", &self.llmq_merkle_root)
+            .field("llmq_merkle_root", &self.llmq_merkle_root)
             .field("masternodes", &self.masternodes.len())
             .field("quorums", &self.quorums.len())
             .finish()
