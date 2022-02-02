@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::c_void;
 use hashes::{Hash, sha256};
 use crate::{AddInsightBlockingLookup, BlockData, BlockHeightLookup, boxed, boxed_vec, Data, Encodable, ffi, FromFFI, inplace_intersection, MasternodeEntry, MasternodeList, MasternodeListDestroy, MasternodeListLookup, LLMQEntry, Reversable, ShouldProcessLLMQTypeCallback, UInt256, ValidateLLMQCallback, Zeroable};
+use crate::crypto::byte_util::hex_with_data;
 
 pub fn lookup_masternode_list<'a>(
     block_hash: UInt256,
@@ -10,9 +11,11 @@ pub fn lookup_masternode_list<'a>(
     masternode_list_destroy: MasternodeListDestroy,
     context: *const c_void,
 ) -> Option<MasternodeList<'a>> {
+    println!("lookup_masternode_list <-: {:?}", hex_with_data(block_hash.0.as_slice()));
     let lookup_result = unsafe { masternode_list_lookup(boxed(block_hash.0), context) };
     if !lookup_result.is_null() {
         let list = unsafe { (*lookup_result).decode() };
+        println!("lookup_masternode_list ->: {:?}", list);
         unsafe { masternode_list_destroy(lookup_result); }
         Some(list)
     } else {

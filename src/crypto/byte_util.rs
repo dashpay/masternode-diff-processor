@@ -319,17 +319,20 @@ impl_bytes_decodable_lt!(LLMQEntry);
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub struct VarBytes<'a>(pub VarInt, pub &'a [u8]);
 
+impl<'a> VarBytes<'a> {
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.0.len() + self.1.len()
+    }
+}
+
 impl<'a> TryRead<'a, Endian> for VarBytes<'a> {
     fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
         let offset = &mut 0;
-        let var_int = match VarInt::consensus_decode(bytes) {
-            Ok(data) => data,
-            Err(err) => { return Err(byte::Error::BadInput {err: "Error: VarInt::try_read"}); }
-        };
-        *offset += var_int.len();
-        let payload_length = var_int.0 as usize;
-        let var_bytes = VarBytes(var_int, bytes.read_with(offset, Bytes::Len(payload_length))?);
-        Ok((var_bytes, payload_length))
+        let var_int = bytes.read_with::<VarInt>(offset, LE)?;
+        let payload = bytes.read_with(offset, Bytes::Len(var_int.0 as usize))?;
+        let var_bytes = VarBytes(var_int, payload);
+        Ok((var_bytes, var_bytes.len()))
     }
 }
 impl<'a> BytesDecodable<'a, VarBytes<'a>> for VarBytes<'a> {

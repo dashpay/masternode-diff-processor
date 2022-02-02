@@ -18,8 +18,6 @@ pub struct MNListDiffResult {
     pub modified_masternodes_count: usize,
     pub added_quorums: *mut *mut ffi::types::LLMQEntry,
     pub added_quorums_count: usize,
-    // pub added_llmq_type_maps: *mut *mut ffi::types::LLMQMap,
-    // pub added_llmq_type_maps_count: usize,
     pub needed_masternode_lists:  *mut *mut [u8; 32], // [u8; 32]
     pub needed_masternode_lists_count: usize,
 }
