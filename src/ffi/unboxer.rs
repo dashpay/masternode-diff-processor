@@ -62,7 +62,8 @@ pub unsafe fn unbox_masternode_list(masternode_list: Box<ffi::types::MasternodeL
         unbox_any(masternode_list.llmq_merkle_root);
     }
     unbox_masternode_vec(unbox_vec_ptr(masternode_list.masternodes, masternode_list.masternodes_count));
-    unbox_llmq_map_vec(unbox_vec_ptr(masternode_list.llmq_type_maps, masternode_list.llmq_type_maps_count));
+    unbox_llmq_vec(unbox_vec_ptr(masternode_list.quorums, masternode_list.quorums_count));
+    //unbox_llmq_map_vec(unbox_vec_ptr(masternode_list.llmq_type_maps, masternode_list.llmq_type_maps_count));
 }
 
 pub unsafe fn unbox_masternode_vec(vec: Vec<*mut ffi::types::MasternodeEntry>) {
@@ -169,7 +170,7 @@ pub unsafe fn unbox_result(result: *mut ffi::types::MNListDiffResult) {
     unbox_vec(unbox_vec_ptr(res.needed_masternode_lists, res.needed_masternode_lists_count));
     unbox_masternode_vec(unbox_vec_ptr(res.added_masternodes, res.added_masternodes_count));
     unbox_masternode_vec(unbox_vec_ptr(res.modified_masternodes, res.modified_masternodes_count));
-    unbox_llmq_map_vec(unbox_vec_ptr(res.added_llmq_type_maps, res.added_llmq_type_maps_count));
+    unbox_llmq_vec(unbox_vec_ptr(res.added_quorums, res.added_quorums_count));
 }
 pub unsafe fn unbox_mn_list_diff(result: *mut ffi::types::MNListDiff) {
     let list_diff = unbox_any(result);
@@ -181,7 +182,8 @@ pub unsafe fn unbox_mn_list_diff(result: *mut ffi::types::MNListDiff) {
 
     unbox_vec(unbox_vec_ptr(list_diff.deleted_masternode_hashes, list_diff.deleted_masternode_hashes_count));
     unbox_masternode_vec(unbox_vec_ptr(list_diff.added_or_modified_masternodes, list_diff.added_or_modified_masternodes_count));
-    unbox_llmq_hash_vec(unbox_vec_ptr(list_diff.deleted_quorums, list_diff.deleted_quorums_count));
+    // unbox_llmq_hash_vec(unbox_vec_ptr(list_diff.deleted_quorums, list_diff.deleted_quorums_count));
+    unbox_vec(unbox_vec_ptr(list_diff.deleted_quorums, list_diff.deleted_quorums_count));
 
     unbox_llmq_vec(unbox_vec_ptr(list_diff.added_quorums, list_diff.added_quorums_count));
 }

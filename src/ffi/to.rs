@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ptr::null_mut;
 use crate::common::block_data::BlockData;
-use crate::common::llmq_type::LLMQType;
 use crate::crypto::byte_util::UInt256;
 use crate::ffi;
 use crate::ffi::boxer::{boxed, boxed_vec};
@@ -133,8 +132,8 @@ impl<'a> ToFFI<'a> for masternode_list::MasternodeList<'a> {
             },
             masternodes: encode_masternodes_map(&self.masternodes),
             masternodes_count: self.masternodes.len(),
-            llmq_type_maps: encode_quorums_map(&self.quorums),
-            llmq_type_maps_count: self.quorums.len()
+            quorums: encode_quorums_map(&self.quorums),
+            quorums_count: self.quorums.len(),
         }
     }
 }
@@ -224,21 +223,21 @@ impl<'a> ToFFI<'a> for mn_list_diff::MNListDiff<'a> {
         let deleted_quorums_vec = self.deleted_quorums
             .clone()
             .into_iter()
-            .fold(Vec::new(), |mut acc, (llmq_type, hashes)| {
-                hashes
-                    .iter()
-                    .for_each(|&hash| acc.push(boxed(ffi::types::LLMQTypedHash { llmq_hash: boxed(hash.0), llmq_type: llmq_type.into() })));
-                acc
-            });
+            .map(|hash| boxed(hash.0))
+            .collect::<Vec<*mut [u8; 32]>>();
+        // let deleted_quorums_vec = self.deleted_quorums
+        //     .clone()
+        //     .into_iter()
+        //     .fold(Vec::new(), |mut acc, (llmq_type, hashes)| {
+        //         hashes
+        //             .iter()
+        //             .for_each(|&hash| acc.push(boxed(ffi::types::LLMQTypedHash { llmq_hash: boxed(hash.0), llmq_type: llmq_type.into() })));
+        //         acc
+        //     });
         let added_quorums_vec = self.added_quorums
-            .clone()
-            .into_iter()
-            .fold(Vec::new(), |mut acc, (_, map)| {
-                map
-                    .iter()
-                    .for_each(|(_, &entry)| acc.push(boxed(entry.encode())));
-                acc
-            });
+            .values()
+            .map(|entry| boxed(entry.encode()))
+            .collect::<Vec<*mut ffi::types::LLMQEntry>>();
         Self::Item {
             base_block_hash: boxed(self.base_block_hash.0),
             block_hash: boxed(self.block_hash.0),
@@ -342,18 +341,25 @@ impl<'a> ToFFI<'a> for llmq_rotation_info::LLMQRotationInfo<'a> {
     }
 }
 
-pub fn encode_quorums_map(quorums: &HashMap<LLMQType, HashMap<UInt256, llmq_entry::LLMQEntry>>) -> *mut *mut ffi::types::LLMQMap {
+// pub fn encode_quorums_map(quorums: &HashMap<LLMQType, HashMap<UInt256, llmq_entry::LLMQEntry>>) -> *mut *mut ffi::types::LLMQMap {
+//     boxed_vec(quorums
+//         .iter()
+//         .map(|(&llmq_type, map)|
+//             boxed(ffi::types::LLMQMap {
+//                 llmq_type: llmq_type.into(),
+//                 values: boxed_vec((*map)
+//                     .iter()
+//                     .map(|(_, &entry)| boxed(entry.encode()))
+//                     .collect()),
+//                 count: (*map).len()
+//             }))
+//         .collect())
+// }
+
+pub fn encode_quorums_map(quorums: &HashMap<UInt256, llmq_entry::LLMQEntry>) -> *mut *mut ffi::types::LLMQEntry {
     boxed_vec(quorums
         .iter()
-        .map(|(&llmq_type, map)|
-            boxed(ffi::types::LLMQMap {
-                llmq_type: llmq_type.into(),
-                values: boxed_vec((*map)
-                    .iter()
-                    .map(|(_, &entry)| boxed(entry.encode()))
-                    .collect()),
-                count: (*map).len()
-            }))
+        .map(|(_, entry)| boxed((*entry).encode()))
         .collect())
 }
 

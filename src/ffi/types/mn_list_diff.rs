@@ -3,7 +3,6 @@ use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, LE, TryRead};
 use crate::{boxed, boxed_vec, LLMQType, UInt256};
 use crate::ffi::types::coinbase_transaction::CoinbaseTransaction;
-use crate::ffi::types::llmq_typed_hash::LLMQTypedHash;
 use crate::ffi::types::masternode_entry::MasternodeEntry;
 use crate::ffi::types::llmq_entry::LLMQEntry;
 
@@ -28,7 +27,7 @@ pub struct MNListDiff {
     pub added_or_modified_masternodes: *mut *mut MasternodeEntry,
 
     pub deleted_quorums_count: usize,
-    pub deleted_quorums: *mut *mut LLMQTypedHash,
+    pub deleted_quorums: *mut *mut [u8; 32],
 
     pub added_quorums_count: usize,
     pub added_quorums: *mut *mut LLMQEntry,
@@ -65,11 +64,11 @@ impl<'a> TryRead<'a, Endian> for MNListDiff {
             added_quorums, added_quorums_count) =
             if quorums_active {
                 let deleted_count = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?.0 as usize;
-                let mut deleted_vec: Vec<*mut LLMQTypedHash> = Vec::with_capacity(deleted_count);
+                let mut deleted_vec: Vec<*mut [u8; 32]> = Vec::with_capacity(deleted_count);
                 for _i in 0..deleted_count {
-                    let llmq_type = bytes.read_with::<LLMQType>(offset, LE)?.into();
+                    let _llmq_type = bytes.read_with::<LLMQType>(offset, LE)?;
                     let llmq_hash = boxed(bytes.read_with::<UInt256>(offset, LE)?.0);
-                    deleted_vec.push(boxed(LLMQTypedHash { llmq_type, llmq_hash }));
+                    deleted_vec.push(llmq_hash);
                 }
                 let added_count = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?.0 as usize;
                 let mut added_vec: Vec<*mut LLMQEntry> = Vec::with_capacity(added_count);

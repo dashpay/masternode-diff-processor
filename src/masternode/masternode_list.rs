@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
 use crate::CoinbaseTransaction;
-use crate::common::llmq_type::LLMQType;
 use crate::crypto::byte_util::{merkle_root_from_hashes, Reversable, UInt256};
 use crate::masternode::llmq_entry::LLMQEntry;
 use crate::masternode::masternode_entry::MasternodeEntry;
@@ -12,7 +11,8 @@ pub struct MasternodeList<'a> {
     pub masternode_merkle_root: Option<UInt256>,
     pub llmq_merkle_root: Option<UInt256>,
     pub masternodes: BTreeMap<UInt256, MasternodeEntry>,
-    pub quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
+    pub quorums: HashMap<UInt256, LLMQEntry<'a>>,
+    // pub quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
 }
 
 impl<'a> std::fmt::Debug for MasternodeList<'a> {
@@ -31,7 +31,7 @@ impl<'a> std::fmt::Debug for MasternodeList<'a> {
 impl<'a> MasternodeList<'a> {
     pub fn new(
         masternodes: BTreeMap<UInt256, MasternodeEntry>,
-        quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
+        quorums: HashMap<UInt256, LLMQEntry<'a>>,
         block_hash: UInt256,
         block_height: u32,
         quorums_active: bool
@@ -54,14 +54,6 @@ impl<'a> MasternodeList<'a> {
         list
     }
 
-    pub fn quorums_count(&self) -> u64 {
-        let mut count: u64 = 0;
-        for entry in self.quorums.values() {
-            count += entry.len() as u64;
-        }
-        count
-    }
-
     pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<UInt256>> {
         if block_height == u32::MAX {
             println!("Block height lookup queried an unknown block {:?}", self.block_hash);
@@ -72,8 +64,7 @@ impl<'a> MasternodeList<'a> {
                 .sort_by(|&h1, &h2|
                     h1.clone()
                         .reversed()
-                        .cmp(&h2.clone()
-                            .reversed()));
+                        .cmp(&h2.clone().reversed()));
             let mns = self.masternodes.clone();
             let entry_hashes = pro_tx_hashes
                 .clone()
@@ -91,17 +82,22 @@ impl<'a> MasternodeList<'a> {
     }
 
     fn hashes_for_quorum_merkle_root(&self) -> Vec<UInt256> {
+        // let mut llmq_commitment_hashes: Vec<UInt256> = self.quorums
+        //     .clone()
+        //     .into_values()
+        //     .fold(Vec::new(), |mut acc, q_map| {
+        //         let quorum_hashes: Vec<UInt256> = q_map
+        //             .into_values()
+        //             .map(|entry| entry.entry_hash)
+        //             .collect();
+        //         acc.extend(quorum_hashes);
+        //         acc
+        //     });
         let mut llmq_commitment_hashes: Vec<UInt256> = self.quorums
             .clone()
             .into_values()
-            .fold(Vec::new(), |mut acc, q_map| {
-                let quorum_hashes: Vec<UInt256> = q_map
-                    .into_values()
-                    .map(|entry| entry.entry_hash)
-                    .collect();
-                acc.extend(quorum_hashes);
-                acc
-            });
+            .map(|entry| entry.entry_hash)
+            .collect();
         llmq_commitment_hashes.sort();
         llmq_commitment_hashes
     }

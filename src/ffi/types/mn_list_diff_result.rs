@@ -16,8 +16,10 @@ pub struct MNListDiffResult {
     pub added_masternodes_count: usize,
     pub modified_masternodes: *mut *mut ffi::types::MasternodeEntry,
     pub modified_masternodes_count: usize,
-    pub added_llmq_type_maps: *mut *mut ffi::types::LLMQMap,
-    pub added_llmq_type_maps_count: usize,
+    pub added_quorums: *mut *mut ffi::types::LLMQEntry,
+    pub added_quorums_count: usize,
+    // pub added_llmq_type_maps: *mut *mut ffi::types::LLMQMap,
+    // pub added_llmq_type_maps_count: usize,
     pub needed_masternode_lists:  *mut *mut [u8; 32], // [u8; 32]
     pub needed_masternode_lists_count: usize,
 }
@@ -92,8 +94,8 @@ impl MNListDiffResult {
             added_masternodes_count: added_masternodes.len(),
             modified_masternodes: crate::encode_masternodes_map(&modified_masternodes),
             modified_masternodes_count: modified_masternodes.len(),
-            added_llmq_type_maps: crate::encode_quorums_map(&added_quorums),
-            added_llmq_type_maps_count: added_quorums.len(),
+            added_quorums: crate::encode_quorums_map(&added_quorums),
+            added_quorums_count: added_quorums.len(),
             needed_masternode_lists: boxed_vec(needed_masternode_lists),
             needed_masternode_lists_count
         }
@@ -113,8 +115,8 @@ impl Default for MNListDiffResult {
             added_masternodes_count: 0,
             modified_masternodes: null_mut(),
             modified_masternodes_count: 0,
-            added_llmq_type_maps: null_mut(),
-            added_llmq_type_maps_count: 0,
+            added_quorums: null_mut(),
+            added_quorums_count: 0,
             needed_masternode_lists: null_mut(),
             needed_masternode_lists_count: 0
         }
