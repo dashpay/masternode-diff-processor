@@ -2,7 +2,7 @@ use std::ptr::null_mut;
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
 use crate::boxed_vec;
-use crate::crypto::byte_util::data_at_offset_from;
+use crate::crypto::byte_util::VarBytes;
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct TransactionOutput {
@@ -16,14 +16,11 @@ impl<'a> TryRead<'a, Endian> for TransactionOutput {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
         let amount = bytes.read_with::<u64>(offset, LE)?;
-        let (script, script_length) = match data_at_offset_from(bytes, offset) {
-            Some(data) => (boxed_vec(data.to_vec()), data.len()),
-            None => { return Err(byte::Error::BadInput { err: "Error: parse script" }); }
-        };
+        let script = bytes.read_with::<VarBytes>(offset, LE)?;
         Ok((Self {
             amount,
-            script,
-            script_length,
+            script: boxed_vec(script.1.to_vec()),
+            script_length: script.1.len(),
             address: null_mut(),
             address_length: 0
         }, *offset))

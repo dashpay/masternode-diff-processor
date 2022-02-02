@@ -52,15 +52,6 @@ pub fn hex_with_data(data: &[u8]) -> String {
 }
 
 
-#[inline]
-pub fn data_at_offset_from<'a>(buffer: &'a [u8], offset: &mut usize) -> Option<&'a [u8]> {
-    let var_int: VarInt = VarInt::from_bytes(buffer, offset)?;
-    match buffer.read_with(offset, Bytes::Len(var_int.0 as usize)) {
-        Ok(data) => Some(data),
-        Err(error) => None
-    }
-}
-
 pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
     let length = hashes.len();
     let mut level = hashes.clone();
@@ -336,6 +327,7 @@ impl<'a> TryRead<'a, Endian> for VarBytes<'a> {
     }
 }
 impl<'a> BytesDecodable<'a, VarBytes<'a>> for VarBytes<'a> {
+    #[inline]
     fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
         let var_int: VarInt = VarInt::from_bytes(bytes, offset)?;
         match bytes.read_with(offset, Bytes::Len(var_int.0 as usize)) {

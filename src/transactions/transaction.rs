@@ -3,7 +3,7 @@ use byte::{BytesExt, LE, TryRead};
 use hashes::Hash;
 use crate::consensus::Encodable;
 use crate::consensus::encode::{consensus_encode_with_size, VarInt};
-use crate::crypto::byte_util::{data_at_offset_from, UInt256};
+use crate::crypto::byte_util::{UInt256, VarBytes};
 use crate::hashes::{sha256d};
 use crate::hashes::_export::_core::fmt::Debug;
 use crate::transactions::transaction::TransactionType::Classic;
@@ -77,7 +77,10 @@ impl<'a> TryRead<'a, Endian> for TransactionInput<'a> {
         let offset = &mut 0;
         let input_hash = bytes.read_with::<UInt256>(offset, LE)?;
         let index = bytes.read_with::<u32>(offset, LE)?;
-        let signature = data_at_offset_from(bytes, offset);
+        let signature = match bytes.read_with::<VarBytes>(offset, LE) {
+            Ok(data) => Some(data.1),
+            Err(_err) => None
+        };
         let sequence = bytes.read_with::<u32>(offset, LE)?;
         let input = TransactionInput {
             input_hash,
@@ -101,7 +104,10 @@ impl<'a> TryRead<'a, Endian> for TransactionOutput<'a> {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
         let amount = bytes.read_with::<u64>(offset, LE)?;
-        let script = data_at_offset_from(bytes, offset);
+        let script = match bytes.read_with::<VarBytes>(offset, LE) {
+            Ok(data) => Some(data.1),
+            Err(_err) => None
+        };
         let output = TransactionOutput { amount, script, address: None };
         Ok((output, *offset))
     }

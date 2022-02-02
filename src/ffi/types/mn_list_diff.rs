@@ -2,6 +2,7 @@ use std::ptr::null_mut;
 use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, LE, TryRead};
 use crate::{boxed, boxed_vec, LLMQType, UInt256};
+use crate::crypto::byte_util::VarBytes;
 use crate::ffi::types::coinbase_transaction::CoinbaseTransaction;
 use crate::ffi::types::masternode_entry::MasternodeEntry;
 use crate::ffi::types::llmq_entry::LLMQEntry;
@@ -44,8 +45,7 @@ impl<'a> TryRead<'a, Endian> for MNListDiff {
         let total_transactions = bytes.read_with::<u32>(offset, LE)?;
         let merkle_hashes_count = 32 * bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?.0 as usize;
         let merkle_hashes: &[u8] = bytes.read_with(offset, Bytes::Len(merkle_hashes_count))?;
-        let merkle_flags_count = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?.0 as usize;
-        let merkle_flags: &[u8] = bytes.read_with(offset, Bytes::Len(merkle_flags_count))?;
+        let merkle_flags_bytes = bytes.read_with::<VarBytes>(offset, LE)?;
         let coinbase_transaction = bytes.read_with::<CoinbaseTransaction>(offset, LE)?;
         let deleted_masternode_hashes_count = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?.0 as usize;
         let mut deleted_masternode_hashes_vec: Vec<*mut [u8; 32]> = Vec::with_capacity(deleted_masternode_hashes_count as usize);
@@ -85,8 +85,8 @@ impl<'a> TryRead<'a, Endian> for MNListDiff {
             total_transactions,
             merkle_hashes: boxed_vec(merkle_hashes.to_vec()),
             merkle_hashes_count,
-            merkle_flags: boxed_vec(merkle_flags.to_vec()),
-            merkle_flags_count,
+            merkle_flags: boxed_vec(merkle_flags_bytes.1.to_vec()),
+            merkle_flags_count: merkle_flags_bytes.0.0 as usize,
             coinbase_transaction: boxed(coinbase_transaction),
             deleted_masternode_hashes_count,
             deleted_masternode_hashes,

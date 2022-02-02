@@ -2,7 +2,7 @@ use std::ptr::null_mut;
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
 use crate::{boxed, boxed_vec, UInt256};
-use crate::crypto::byte_util::data_at_offset_from;
+use crate::crypto::byte_util::VarBytes;
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct TransactionInput {
@@ -19,9 +19,9 @@ impl<'a> TryRead<'a, Endian> for TransactionInput {
         let offset = &mut 0;
         let input_hash = bytes.read_with::<UInt256>(offset, LE)?;
         let index = bytes.read_with::<u32>(offset, LE)?;
-        let (signature, signature_length) = match data_at_offset_from(bytes, offset) {
-            Some(data) => (boxed_vec(data.to_vec()), data.len()),
-            None => (null_mut(), 0)
+        let (signature, signature_length) = match bytes.read_with::<VarBytes>(offset, LE) {
+            Ok(bytes) => (boxed_vec(bytes.1.to_vec()), bytes.1.len()),
+            Err(_err) => (null_mut(), 0)
         };
         let sequence = bytes.read_with::<u32>(offset, LE)?;
         Ok((Self {
