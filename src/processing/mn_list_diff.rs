@@ -69,12 +69,7 @@ impl<'a> MNListDiff<'a> {
             let deleted_quorums_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..deleted_quorums_count {
                 let _llmq_type = LLMQType::from_bytes(message, offset)?;
-                let llmq_hash = UInt256::from_bytes(message, offset)?;
-                deleted_quorums.push(llmq_hash);
-                // deleted_quorums
-                //     .entry(llmq_type)
-                //     .or_insert(Vec::new())
-                //     .push(llmq_hash);
+                deleted_quorums.push(UInt256::from_bytes(message, offset)?);
             }
             let added_quorums_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..added_quorums_count {

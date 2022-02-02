@@ -75,7 +75,7 @@ pub extern "C" fn mndiff_process(
         Some(data) => data,
         None => { return failure(); }
     };
-    println!("list_diff: {:?}", list_diff);
+    //println!("list_diff: {:?}", list_diff);
     let result = MNListDiffResult::from_diff(
         list_diff,
         masternode_list_lookup, masternode_list_destroy,
