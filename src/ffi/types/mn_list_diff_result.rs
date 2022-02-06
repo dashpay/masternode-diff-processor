@@ -98,6 +98,11 @@ impl MNListDiffResult {
             needed_masternode_lists_count
         }
     }
+
+    pub fn is_valid(&self) -> bool {
+        self.has_found_coinbase && self.has_valid_quorums && self.has_valid_mn_list_root && self.has_valid_llmq_list_root
+    }
+
 }
 
 impl Default for MNListDiffResult {
