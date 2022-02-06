@@ -46,7 +46,7 @@ pub fn hex_with_data(data: &[u8]) -> String {
     let mut s = String::with_capacity(2 * n);
     let mut iter = data.iter();
     while let Some(a) = iter.next() {
-        write!(s, "{:02X}", a).unwrap();
+        write!(s, "{:02x}", a).unwrap();
     }
     s
 }
