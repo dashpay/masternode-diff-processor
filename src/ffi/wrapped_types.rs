@@ -1,6 +1,5 @@
 use std::ffi::c_void;
-use crate::ffi::types::masternode_list::MasternodeList;
-use crate::ffi::types::llmq_validation_data::LLMQValidationData;
+use crate::ffi::types::{LLMQValidationData, MasternodeList};
 
 pub type AddInsightBlockingLookup = unsafe extern "C" fn(block_hash: *mut [u8; 32], context: *const c_void);
 pub type ShouldProcessLLMQTypeCallback = unsafe extern "C" fn(llmq_type: u8, context: *const c_void) -> bool;
