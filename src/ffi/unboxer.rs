@@ -46,13 +46,6 @@ pub unsafe fn unbox_llmq_entry(x: *mut ffi::types::LLMQEntry) {
     unbox_any(valid_members_bitset as *mut [u8]);
 }
 
-pub unsafe fn unbox_llmq_map(x: *mut ffi::types::LLMQMap) {
-    let entry = unbox_any(x);
-    let values = unbox_vec_ptr(entry.values, entry.count);
-    for &x in values.iter() {
-        unbox_llmq_entry(x);
-    }
-}
 pub unsafe fn unbox_masternode_list(masternode_list: Box<ffi::types::MasternodeList>) {
     unbox_any(masternode_list.block_hash);
     if !masternode_list.masternode_merkle_root.is_null() {
@@ -75,23 +68,6 @@ pub unsafe fn unbox_llmq_vec(vec: Vec<*mut ffi::types::LLMQEntry>) {
     for &x in vec.iter() {
         unbox_llmq_entry(x);
     }
-}
-
-pub unsafe fn unbox_llmq_map_vec(vec: Vec<*mut ffi::types::LLMQMap>) {
-    for &x in vec.iter() {
-        unbox_llmq_map(x);
-    }
-}
-
-pub unsafe fn unbox_llmq_hash_vec(vec: Vec<*mut ffi::types::LLMQTypedHash>) {
-    for &x in vec.iter() {
-        unbox_llmq_typed_hash(x);
-    }
-}
-
-pub unsafe fn unbox_llmq_typed_hash(typed_hash: *mut ffi::types::LLMQTypedHash) {
-    let hash = unbox_any(typed_hash);
-    unbox_any(hash.llmq_hash);
 }
 
 pub unsafe fn unbox_llmq_validation_data(llmq_validation_data: *mut ffi::types::LLMQValidationData) {
