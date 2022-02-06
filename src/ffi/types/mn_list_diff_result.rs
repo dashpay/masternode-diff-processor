@@ -6,6 +6,7 @@ use crate::processing::manager;
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct MNListDiffResult {
+    pub block_hash: *mut [u8; 32],
     pub has_found_coinbase: bool, //1 byte
     pub has_valid_coinbase: bool, //1 byte
     pub has_valid_mn_list_root: bool, //1 byte
@@ -82,6 +83,7 @@ impl MNListDiffResult {
         let has_valid_quorum_list_root = !quorums_active || masternode_list.has_valid_llmq_list_root(&coinbase_transaction);
         let needed_masternode_lists_count = needed_masternode_lists.len();
         MNListDiffResult {
+            block_hash: boxed(list_diff.block_hash.0),
             has_found_coinbase,
             has_valid_coinbase: merkle_tree.has_root(merkle_root),
             has_valid_mn_list_root,
@@ -108,6 +110,7 @@ impl MNListDiffResult {
 impl Default for MNListDiffResult {
     fn default() -> Self {
         MNListDiffResult {
+            block_hash: null_mut(),
             has_found_coinbase: false,
             has_valid_coinbase: false,
             has_valid_mn_list_root: false,
