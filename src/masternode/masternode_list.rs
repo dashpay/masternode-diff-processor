@@ -82,6 +82,7 @@ impl<'a> MasternodeList<'a> {
             .map(|entry| entry.entry_hash)
             .collect();
         llmq_commitment_hashes.sort();
+        println!("MasternodeList.llmq_hashes: {:?}", llmq_commitment_hashes);
         llmq_commitment_hashes
     }
 

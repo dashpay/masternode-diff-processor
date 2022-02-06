@@ -42,3 +42,4 @@ name = "dash_mndiff"
 [profile.release]
 lto = "thin"
 opt-level = 3
+debug = true

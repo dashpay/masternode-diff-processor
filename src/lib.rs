@@ -767,6 +767,7 @@ mod tests {
             let hex_str = s.as_str();
             //mndiff_block_hash_destroy(block_hash);
             let h = testnet_block_height_for(hex_str);
+            println!("blockHeightLookup: {}: {}", hex_str, h);
             h
         };
         let base_masternode_list_hash: *const u8 = null_mut();
