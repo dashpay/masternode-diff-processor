@@ -12,7 +12,6 @@ pub struct MasternodeList<'a> {
     pub llmq_merkle_root: Option<UInt256>,
     pub masternodes: BTreeMap<UInt256, MasternodeEntry>,
     pub quorums: HashMap<UInt256, LLMQEntry<'a>>,
-    // pub quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
 }
 
 impl<'a> std::fmt::Debug for MasternodeList<'a> {
