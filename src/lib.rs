@@ -73,7 +73,12 @@ pub extern "C" fn mndiff_process(
     };
     let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let block_height_lookup = |hash: UInt256| unsafe { block_height_lookup(boxed(hash.0), context) };
-
+    let list_diff = match MNListDiff::new(message, &mut 0, block_height_lookup) {
+        Some(data) => data,
+        None => { return failure(); }
+    };
+    println!("mndiff_process: {:?}", base_masternode_list_hash);
+    //println!("list_diff: {:?}", list_diff);
     let manager = Manager {
         block_height_lookup,
         masternode_list_lookup: |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
@@ -84,12 +89,6 @@ pub extern "C" fn mndiff_process(
         use_insight_as_backup,
         base_masternode_list_hash
     };
-
-    let list_diff = match MNListDiff::new(message, &mut 0, block_height_lookup) {
-        Some(data) => data,
-        None => { return failure(); }
-    };
-    //println!("list_diff: {:?}", list_diff);
     let result = MNListDiffResult::from_diff(list_diff, manager, desired_merkle_root);
     boxed(result)
 }
@@ -117,7 +116,13 @@ pub fn mnl_diff_process<
         Some(data) => data,
         None => { return failure(); }
     };
+
+    let list_diff = match MNListDiff::new(message, &mut 0, block_height_lookup) {
+        Some(data) => data,
+        None => { return failure(); }
+    };
     let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
+    println!("mnl_diff_process: {:?}", base_masternode_list_hash);
     let manager = Manager {
         block_height_lookup,
         masternode_list_lookup,
@@ -128,12 +133,6 @@ pub fn mnl_diff_process<
         use_insight_as_backup,
         base_masternode_list_hash
     };
-
-    let list_diff = match MNListDiff::new(message, &mut 0, block_height_lookup) {
-        Some(data) => data,
-        None => { return failure(); }
-    };
-    //println!("list_diff: {:?}", list_diff);
     let result = MNListDiffResult::from_diff(list_diff, manager, desired_merkle_root);
     boxed(result)
 }
