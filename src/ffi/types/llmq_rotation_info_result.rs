@@ -1,9 +1,8 @@
-use std::ffi::c_void;
 use std::ptr::null_mut;
 use byte::BytesExt;
-use crate::{AddInsightBlockingLookup, BlockHeightLookup, boxed, ffi, FromFFI, MasternodeListDestroy, MasternodeListLookup, processing, ShouldProcessLLMQTypeCallback, UInt256, ValidateLLMQCallback};
+use crate::{boxed, ffi, FromFFI, LLMQType, Manager, MNListDiffResult, processing, UInt256};
 use crate::crypto::byte_util::BytesDecodable;
-use crate::ffi::types::LLMQSnapshot;
+use crate::ffi::types::{LLMQSnapshot, LLMQValidationData};
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct LLMQRotationInfoResult {
@@ -22,81 +21,47 @@ pub struct LLMQRotationInfoResult {
 }
 
 impl LLMQRotationInfoResult {
-    pub fn from_message(
+    pub fn from_message<
+        MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
+        MND: Fn(*const ffi::types::MasternodeList) + Copy,
+        AIL: Fn(UInt256) + Copy,
+        BHL: Fn(UInt256) -> u32 + Copy,
+        SPL: Fn(LLMQType) -> bool + Copy,
+        VQL: Fn(LLMQValidationData) -> bool + Copy,
+    >(
         message: &[u8],
         merkle_root: UInt256,
-        masternode_list_lookup: MasternodeListLookup,
-        masternode_list_destroy: MasternodeListDestroy,
-        use_insight_as_backup: bool,
-        add_insight_lookup: AddInsightBlockingLookup,
-        should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-        validate_llmq_callback: ValidateLLMQCallback,
-        block_height_lookup: BlockHeightLookup,
-        context: *const c_void, // External Masternode Manager Diff Message Context ()
+        manager: Manager<BHL, MNL, MND, AIL, SPL, VQL>,
     ) -> Option<Self> {
-        let bh_lookup = |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) };
         let offset = &mut 0;
         let snapshot_at_h_c = boxed(LLMQSnapshot::from_bytes(message, offset)?);
         let snapshot_at_h_2c = boxed(LLMQSnapshot::from_bytes(message, offset)?);
         let snapshot_at_h_3c = boxed(LLMQSnapshot::from_bytes(message, offset)?);
-        let diff_tip = processing::MNListDiff::new(message, offset, bh_lookup)?;
-        let diff_h = processing::MNListDiff::new(message, offset, bh_lookup)?;
-        let diff_h_c = processing::MNListDiff::new(message, offset, bh_lookup)?;
-        let diff_h_2c = processing::MNListDiff::new(message, offset, bh_lookup)?;
-        let diff_h_3c = processing::MNListDiff::new(message, offset, bh_lookup)?;
+        let diff_tip = processing::MNListDiff::new(message, offset, manager.block_height_lookup)?;
+        let diff_h = processing::MNListDiff::new(message, offset, manager.block_height_lookup)?;
+        let diff_h_c = processing::MNListDiff::new(message, offset, manager.block_height_lookup)?;
+        let diff_h_2c = processing::MNListDiff::new(message, offset, manager.block_height_lookup)?;
+        let diff_h_3c = processing::MNListDiff::new(message, offset, manager.block_height_lookup)?;
         let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
 
         let (snapshot_at_h_4c,
             diff_h_4c) = if extra_share {
             (boxed(LLMQSnapshot::from_bytes(message, offset)?),
-             Some(processing::MNListDiff::new(message, offset, bh_lookup)?))
+             Some(processing::MNListDiff::new(message, offset, manager.block_height_lookup)?))
         } else {
             (null_mut(), None)
         };
 
-        let result_at_tip = boxed(ffi::types::MNListDiffResult::from_diff(
-            diff_tip,
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        ));
-        let result_at_h = boxed(ffi::types::MNListDiffResult::from_diff(
-            diff_h,
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        ));
-        let result_at_h_c = boxed(ffi::types::MNListDiffResult::from_diff(
-            diff_h_c,
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        ));
-        let result_at_h_2c = boxed(ffi::types::MNListDiffResult::from_diff(
-            diff_h_2c,
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        ));
-        let result_at_h_3c = boxed(ffi::types::MNListDiffResult::from_diff(
-            diff_h_3c,
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        ));
-        let result_at_h_4c = if extra_share { boxed(ffi::types::MNListDiffResult::from_diff(
-            diff_h_4c.unwrap(),
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        )) } else { null_mut() };
-
+        let result_at_tip = boxed(MNListDiffResult::from_diff(diff_tip, manager, merkle_root));
+        let result_at_h = boxed(MNListDiffResult::from_diff(diff_h, manager, merkle_root));
+        let result_at_h_c = boxed(MNListDiffResult::from_diff(diff_h_c, manager, merkle_root));
+        let result_at_h_2c = boxed(MNListDiffResult::from_diff(diff_h_2c, manager, merkle_root));
+        let result_at_h_3c = boxed(MNListDiffResult::from_diff(diff_h_3c, manager, merkle_root));
+        let result_at_h_4c = if extra_share {
+            boxed(MNListDiffResult::from_diff(diff_h_4c.unwrap(), manager, merkle_root))
+        } else {
+            null_mut()
+        };
 
         Some(Self {
             result_at_tip,
@@ -113,64 +78,31 @@ impl LLMQRotationInfoResult {
         })
     }
 
-    pub fn new(
+    pub fn new<
+        BHL: Fn(UInt256) -> u32 + Copy,
+        MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
+        MND: Fn(*const ffi::types::MasternodeList) + Copy,
+        AIL: Fn(UInt256) + Copy,
+        SPL: Fn(LLMQType) -> bool + Copy,
+        VQL: Fn(LLMQValidationData) -> bool + Copy,
+    >(
         info: ffi::types::LLMQRotationInfo,
-        masternode_list_lookup: MasternodeListLookup,
-        masternode_list_destroy: MasternodeListDestroy,
+        manager: Manager<BHL, MNL, MND, AIL, SPL, VQL>,
         merkle_root: UInt256,
-        use_insight_as_backup: bool,
-        add_insight_lookup: AddInsightBlockingLookup,
-        should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-        validate_llmq_callback: ValidateLLMQCallback,
-        block_height_lookup: BlockHeightLookup,
-        context: *const c_void, // External Masternode Manager Diff Message Context ()
-
     ) -> Self {
         let extra_share = info.extra_share;
-        let result_at_tip = boxed(ffi::types::MNListDiffResult::from_diff(
-            unsafe { (*(info.mn_list_diff_tip)).decode() },
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        ));
-        let result_at_h = boxed(ffi::types::MNListDiffResult::from_diff(
-            unsafe { (*(info.mn_list_diff_at_h)).decode() },
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        ));
-        let result_at_h_c = boxed(ffi::types::MNListDiffResult::from_diff(
-            unsafe { (*(info.mn_list_diff_at_h_c)).decode() },
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        ));
-        let result_at_h_2c = boxed(ffi::types::MNListDiffResult::from_diff(
-            unsafe { (*(info.mn_list_diff_at_h_2c)).decode() },
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        ));
-        let result_at_h_3c = boxed(ffi::types::MNListDiffResult::from_diff(
-            unsafe { (*(info.mn_list_diff_at_h_3c)).decode() },
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        ));
-
-        let result_at_h_4c = if extra_share { boxed(ffi::types::MNListDiffResult::from_diff(
-            unsafe { (*(info.mn_list_diff_at_h_4c)).decode() },
-            masternode_list_lookup, masternode_list_destroy,
-            merkle_root, use_insight_as_backup, add_insight_lookup,
-            should_process_llmq_of_type, validate_llmq_callback,
-            block_height_lookup, context
-        )) } else { null_mut() };
-
+        let result_at_tip = boxed(MNListDiffResult::from_diff(unsafe { (*(info.mn_list_diff_tip)).decode() }, manager, merkle_root));
+        let result_at_h = boxed(MNListDiffResult::from_diff(unsafe { (*(info.mn_list_diff_at_h)).decode() }, manager, merkle_root ));
+        let result_at_h_c = boxed(MNListDiffResult::from_diff(unsafe { (*(info.mn_list_diff_at_h_c)).decode() }, manager, merkle_root));
+        let result_at_h_2c = boxed(MNListDiffResult::from_diff(unsafe { (*(info.mn_list_diff_at_h_2c)).decode() }, manager, merkle_root));
+        let result_at_h_3c = boxed(MNListDiffResult::from_diff(unsafe { (*(info.mn_list_diff_at_h_3c)).decode() }, manager, merkle_root));
+        let result_at_h_4c = if extra_share {
+            let list_diff = unsafe { (*(info.mn_list_diff_at_h_4c)).decode() };
+            let result = MNListDiffResult::from_diff(list_diff, manager, merkle_root);
+            boxed(result)
+        } else {
+            null_mut()
+        };
         Self {
             result_at_tip,
             result_at_h,

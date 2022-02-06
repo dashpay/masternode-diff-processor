@@ -1,6 +1,6 @@
-use std::ffi::c_void;
 use std::ptr::null_mut;
-use crate::{AddInsightBlockingLookup, BlockHeightLookup, boxed, boxed_vec, ffi, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ToFFI, UInt256, ValidateLLMQCallback};
+use crate::{boxed, boxed_vec, ffi, LLMQType, Manager, ToFFI, UInt256};
+use crate::ffi::types::LLMQValidationData;
 use crate::masternode::masternode_list;
 use crate::processing::manager;
 
@@ -24,27 +24,25 @@ pub struct MNListDiffResult {
 }
 
 impl MNListDiffResult {
-    pub fn from_diff(
+    pub fn from_diff<
+        MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
+        MND: Fn(*const ffi::types::MasternodeList) + Copy,
+        AIL: Fn(UInt256) + Copy,
+        BHL: Fn(UInt256) -> u32 + Copy,
+        SPL: Fn(LLMQType) -> bool + Copy,
+        VQL: Fn(LLMQValidationData) -> bool + Copy,
+    >(
         list_diff: crate::processing::mn_list_diff::MNListDiff,
-        masternode_list_lookup: MasternodeListLookup,
-        masternode_list_destroy: MasternodeListDestroy,
+        manager: Manager<BHL, MNL, MND, AIL, SPL, VQL>,
         merkle_root: UInt256,
-        use_insight_as_backup: bool,
-        add_insight_lookup: AddInsightBlockingLookup,
-        should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-        validate_llmq_callback: ValidateLLMQCallback,
-        block_height_lookup: BlockHeightLookup,
-        context: *const c_void, // External Masternode Manager Diff Message Context ()
     ) -> Self {
-        let bh_lookup = |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) };
         let block_hash = list_diff.block_hash;
         let (base_masternodes,
             base_quorums) =
             manager::lookup_masternodes_and_quorums_for(
-                block_hash,
-                masternode_list_lookup,
-                masternode_list_destroy,
-                context);
+                manager.base_masternode_list_hash,
+                manager.masternode_list_lookup,
+                manager.masternode_list_destroy);
         let block_height = list_diff.block_height;
         let coinbase_transaction = list_diff.coinbase_transaction;
         let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
@@ -64,14 +62,7 @@ impl MNListDiffResult {
             base_quorums,
             list_diff.added_quorums,
             list_diff.deleted_quorums,
-            masternode_list_lookup,
-            masternode_list_destroy,
-            use_insight_as_backup,
-            add_insight_lookup,
-            should_process_llmq_of_type,
-            validate_llmq_callback,
-            block_height_lookup,
-            context
+            manager
         );
         let masternode_list = masternode_list::MasternodeList::new(masternodes, quorums, block_hash, block_height, quorums_active);
         let has_valid_mn_list_root = masternode_list.has_valid_mn_list_root(&coinbase_transaction);

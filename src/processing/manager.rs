@@ -1,41 +1,62 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::ffi::c_void;
 use hashes::{Hash, sha256};
-use crate::{AddInsightBlockingLookup, BlockData, BlockHeightLookup, boxed, boxed_vec, Data, Encodable, ffi, FromFFI, inplace_intersection, MasternodeEntry, MasternodeList, MasternodeListDestroy, MasternodeListLookup, LLMQEntry, Reversable, ShouldProcessLLMQTypeCallback, UInt256, ValidateLLMQCallback, Zeroable};
-use crate::crypto::byte_util::hex_with_data;
+use crate::{BlockData, boxed, boxed_vec, Data, Encodable, ffi, FromFFI, inplace_intersection, MasternodeEntry, MasternodeList, LLMQEntry, Reversable, UInt256, Zeroable, LLMQType};
+use crate::ffi::types::LLMQValidationData;
 
-pub fn lookup_masternode_list<'a>(
+#[derive(Clone, Copy, Debug)]
+pub struct Manager<
+    BHL: Fn(UInt256) -> u32 + Copy,
+    MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
+    MND: Fn(*const ffi::types::MasternodeList) + Copy,
+    AIL: Fn(UInt256) + Copy,
+    SPL: Fn(LLMQType) -> bool + Copy,
+    VQL: Fn(LLMQValidationData) -> bool + Copy,
+> {
+    pub block_height_lookup: BHL,
+    pub masternode_list_lookup: MNL,
+    pub masternode_list_destroy: MND,
+    pub add_insight_lookup: AIL,
+    pub should_process_llmq_of_type: SPL,
+    pub validate_llmq_callback: VQL,
+    pub use_insight_as_backup: bool,
+    pub base_masternode_list_hash: Option<UInt256>,
+}
+
+pub fn lookup_masternode_list<'a,
+    MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
+    MND: Fn(*const ffi::types::MasternodeList) + Copy,
+>(
     block_hash: UInt256,
-    masternode_list_lookup: MasternodeListLookup,
-    masternode_list_destroy: MasternodeListDestroy,
-    context: *const c_void,
+    masternode_list_lookup: MNL,
+    masternode_list_destroy: MND,
 ) -> Option<MasternodeList<'a>> {
-    println!("lookup_masternode_list <-: {:?}", hex_with_data(block_hash.0.as_slice()));
-    let lookup_result = unsafe { masternode_list_lookup(boxed(block_hash.0), context) };
+    //println!("lookup_masternode_list <-: {:?}", hex_with_data(block_hash.0.as_slice()));
+    let lookup_result = masternode_list_lookup(block_hash);
     if !lookup_result.is_null() {
         let list = unsafe { (*lookup_result).decode() };
         println!("lookup_masternode_list ->: {:?}", list);
-        unsafe { masternode_list_destroy(lookup_result); }
+        masternode_list_destroy(lookup_result);
         Some(list)
     } else {
         None
     }
 }
 
-pub fn lookup_masternodes_and_quorums_for<'a>(
-    block_hash: UInt256,
-    masternode_list_lookup: MasternodeListLookup,
-    masternode_list_destroy: MasternodeListDestroy,
-    context: *const c_void,
+pub fn lookup_masternodes_and_quorums_for<'a,
+    MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
+    MND: Fn(*const ffi::types::MasternodeList) + Copy,
+>(
+    block_hash: Option<UInt256>,
+    masternode_list_lookup: MNL,
+    masternode_list_destroy: MND,
 ) -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<UInt256, LLMQEntry<'a>>) {
-    let list = lookup_masternode_list(block_hash, masternode_list_lookup, masternode_list_destroy, context);
-    if list.is_some() {
-        let list = list.unwrap();
-        (list.masternodes, list.quorums)
-    } else {
-        (BTreeMap::new(), HashMap::new())
+    if let Some(block_hash) = block_hash {
+        if let Some(list) = lookup_masternode_list(block_hash, masternode_list_lookup, masternode_list_destroy) {
+            return (list.masternodes, list.quorums);
+        }
     }
+    (BTreeMap::new(), HashMap::new())
 }
 
 pub fn classify_masternodes(base_masternodes: BTreeMap<UInt256, MasternodeEntry>,
@@ -100,41 +121,43 @@ pub fn classify_masternodes(base_masternodes: BTreeMap<UInt256, MasternodeEntry>
     (added_masternodes, modified_masternodes, masternodes)
 }
 
-pub fn classify_quorums<'a>(base_quorums: HashMap<UInt256, LLMQEntry<'a>>,
-                            added_quorums: HashMap<UInt256, LLMQEntry<'a>>,
-                            deleted_quorums: Vec<UInt256>,
-                            masternode_list_lookup: MasternodeListLookup,
-                            masternode_list_destroy: MasternodeListDestroy,
-                            use_insight_as_backup: bool,
-                            add_insight_lookup: AddInsightBlockingLookup,
-                            should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-                            validate_llmq_callback: ValidateLLMQCallback,
-                            block_height_lookup: BlockHeightLookup,
-                            context: *const c_void)
-                            -> (HashMap<UInt256, LLMQEntry<'a>>,
-                                HashMap<UInt256, LLMQEntry<'a>>,
-                                bool,
-                                Vec<*mut [u8; 32]>
-                        ) {
-    let bh_lookup = |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) };
+pub fn classify_quorums<'a,
+    MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
+    MND: Fn(*const ffi::types::MasternodeList) + Copy,
+    AIL: Fn(UInt256) + Copy,
+    SPL: Fn(LLMQType) -> bool + Copy,
+    BHL: Fn(UInt256) -> u32 + Copy,
+    VQL: Fn(LLMQValidationData) -> bool + Copy,
+>(
+    base_quorums: HashMap<UInt256, LLMQEntry<'a>>,
+    added_quorums: HashMap<UInt256, LLMQEntry<'a>>,
+    deleted_quorums: Vec<UInt256>,
+    manager: Manager<BHL, MNL, MND, AIL, SPL, VQL>,
+)
+    -> (HashMap<UInt256, LLMQEntry<'a>>,
+        HashMap<UInt256, LLMQEntry<'a>>,
+        bool,
+        Vec<*mut [u8; 32]>
+    ) {
     let has_valid_quorums = true;
     let mut needed_masternode_lists: Vec<*mut [u8; 32]> = Vec::new();
     added_quorums.iter()
-        .filter(|(_, &entry)| unsafe { should_process_llmq_of_type(entry.llmq_type.into(), context) })
+        .filter(|(_, &entry)| {
+            (manager.should_process_llmq_of_type)(entry.llmq_type)
+        })
         .for_each(|(&llmq_hash, &quorum)| {
-            let llmq_masternode_list = lookup_masternode_list(llmq_hash, masternode_list_lookup, masternode_list_destroy, context);
+            let llmq_masternode_list = lookup_masternode_list(llmq_hash, manager.masternode_list_lookup, manager.masternode_list_destroy);
             if llmq_masternode_list.is_some() {
                 validate_quorum(quorum,
                                 has_valid_quorums,
                                 llmq_masternode_list.unwrap(),
-                                bh_lookup,
-                                validate_llmq_callback,
-                                context);
-            } else if bh_lookup(llmq_hash) != u32::MAX {
+                                manager.block_height_lookup,
+                                manager.validate_llmq_callback);
+            } else if (manager.block_height_lookup)(llmq_hash) != u32::MAX {
                 needed_masternode_lists.push(boxed(llmq_hash.0));
-            } else if use_insight_as_backup {
-                unsafe { add_insight_lookup(boxed(llmq_hash.0), context) };
-                if bh_lookup(llmq_hash) != u32::MAX {
+            } else if manager.use_insight_as_backup {
+                (manager.add_insight_lookup)(llmq_hash);
+                if (manager.block_height_lookup)(llmq_hash) != u32::MAX {
                     needed_masternode_lists.push(boxed(llmq_hash.0));
                 }
             }
@@ -165,8 +188,8 @@ pub fn classify_quorums<'a>(base_quorums: HashMap<UInt256, LLMQEntry<'a>>,
     //     }
     // });
 
-    deleted_quorums.into_iter().for_each(|llmq_hash| {
-        quorums.remove(&llmq_hash);
+    deleted_quorums.iter().for_each(|llmq_hash| {
+        quorums.remove(llmq_hash);
     });
     added_quorums.iter().for_each(|(&llmq_hash, &entry)| {
         quorums.insert(llmq_hash, entry);
@@ -175,13 +198,15 @@ pub fn classify_quorums<'a>(base_quorums: HashMap<UInt256, LLMQEntry<'a>>,
     (added_quorums, quorums, has_valid_quorums, needed_masternode_lists)
 }
 
-pub fn validate_quorum<F: Fn(UInt256) -> u32>(
+pub fn validate_quorum<
+    BHL: Fn(UInt256) -> u32,
+    VQL: Fn(LLMQValidationData) -> bool + Copy,
+>(
     mut quorum: LLMQEntry,
     mut has_valid_quorums: bool,
     llmq_masternode_list: MasternodeList,
-    block_height_lookup: F,
-    validate_llmq_callback: ValidateLLMQCallback,
-    context: *const c_void,
+    block_height_lookup: BHL,
+    validate_llmq_callback: VQL
 ) {
     let block_height: u32 = block_height_lookup(llmq_masternode_list.block_hash);
     let valid_masternodes = valid_masternodes_for(llmq_masternode_list.masternodes, quorum.llmq_quorum_hash(), quorum.llmq_type.size(), block_height);
@@ -191,19 +216,14 @@ pub fn validate_quorum<F: Fn(UInt256) -> u32>(
         .map(|i| boxed(valid_masternodes[i].operator_public_key_at(block_height).0))
         .collect();
     let operator_public_keys_count = operator_pks.len();
-    let is_valid_signature = unsafe {
-        validate_llmq_callback(
-            boxed(ffi::types::LLMQValidationData {
-                items: boxed_vec(operator_pks),
-                count: operator_public_keys_count,
-                commitment_hash: boxed(quorum.generate_commitment_hash().0),
-                all_commitment_aggregated_signature: boxed(quorum.all_commitment_aggregated_signature.0),
-                threshold_signature: boxed(quorum.threshold_signature.0),
-                public_key: boxed(quorum.public_key.0)
-            }),
-            context
-        )
-    };
+    let is_valid_signature = validate_llmq_callback(ffi::types::LLMQValidationData {
+        items: boxed_vec(operator_pks),
+        count: operator_public_keys_count,
+        commitment_hash: boxed(quorum.generate_commitment_hash().0),
+        all_commitment_aggregated_signature: boxed(quorum.all_commitment_aggregated_signature.0),
+        threshold_signature: boxed(quorum.threshold_signature.0),
+        public_key: boxed(quorum.public_key.0)
+    });
     has_valid_quorums &= quorum.validate_payload() && is_valid_signature;
     if has_valid_quorums {
         quorum.verified = true;

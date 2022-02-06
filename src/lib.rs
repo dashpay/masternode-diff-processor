@@ -39,10 +39,10 @@ use ffi::wrapped_types::{AddInsightBlockingLookup, BlockHeightLookup, Masternode
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;
 use crate::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
-use crate::ffi::types::{LLMQRotationInfoResult, MNListDiffResult};
+use crate::ffi::types::{LLMQRotationInfoResult, LLMQValidationData, MNListDiffResult};
 use crate::ffi::unboxer::{unbox_any, unbox_llmq_rotation_info, unbox_llmq_rotation_info_result, unbox_llmq_validation_data, unbox_result};
-use crate::processing::mn_list_diff::{MNListDiff};
-use crate::processing::llmq_snapshot::LLMQSnapshot;
+use crate::processing::{LLMQSnapshot, MNListDiff};
+use crate::processing::manager::Manager;
 
 fn failure<'a>() -> *mut ffi::types::MNListDiffResult {
     boxed(MNListDiffResult::default())
@@ -55,14 +55,15 @@ fn qr_failure() -> *mut ffi::types::LLMQRotationInfoResult {
 pub extern "C" fn mndiff_process(
     message_arr: *const u8,
     message_length: usize,
-    masternode_list_lookup: MasternodeListLookup,
-    masternode_list_destroy: MasternodeListDestroy,
+    base_masternode_list_hash: *const u8,
     merkle_root: *const u8,
     use_insight_as_backup: bool,
+    block_height_lookup: BlockHeightLookup,
+    masternode_list_lookup: MasternodeListLookup,
+    masternode_list_destroy: MasternodeListDestroy,
     add_insight_lookup: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq_callback: ValidateLLMQCallback,
-    block_height_lookup: BlockHeightLookup,
     context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut MNListDiffResult {
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
@@ -70,22 +71,72 @@ pub extern "C" fn mndiff_process(
         Some(data) => data,
         None => { return failure(); }
     };
-    let bh_lookup = |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) };
-    let list_diff = match MNListDiff::new(message, &mut 0, bh_lookup) {
+    let base_masternode_list_hash = UInt256::from_const(base_masternode_list_hash);
+    let block_height_lookup = |hash: UInt256| unsafe { block_height_lookup(boxed(hash.0), context) };
+
+    let manager = Manager {
+        block_height_lookup,
+        masternode_list_lookup: |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
+        masternode_list_destroy: |list: *const ffi::types::MasternodeList| unsafe { masternode_list_destroy(list) },
+        add_insight_lookup: |hash: UInt256| unsafe { add_insight_lookup(boxed(hash.0), context) },
+        should_process_llmq_of_type: |llmq_type: LLMQType| unsafe { should_process_llmq_of_type(llmq_type.into(), context) },
+        validate_llmq_callback: |data: LLMQValidationData| unsafe { validate_llmq_callback(boxed(data), context) },
+        use_insight_as_backup,
+        base_masternode_list_hash
+    };
+
+    let list_diff = match MNListDiff::new(message, &mut 0, block_height_lookup) {
         Some(data) => data,
         None => { return failure(); }
     };
     //println!("list_diff: {:?}", list_diff);
-    let result = MNListDiffResult::from_diff(
-        list_diff,
-        masternode_list_lookup, masternode_list_destroy,
-        desired_merkle_root, use_insight_as_backup, add_insight_lookup,
-        should_process_llmq_of_type, validate_llmq_callback,
-        block_height_lookup, context
-    );
+    let result = MNListDiffResult::from_diff(list_diff, manager, desired_merkle_root);
     boxed(result)
 }
 
+// #[no_mangle]
+pub fn mnl_diff_process<
+    BHL: Fn(UInt256) -> u32 + Copy,
+    MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
+>(
+    message_arr: *const u8,
+    message_length: usize,
+    base_masternode_list_hash: *const u8,
+    merkle_root: *const u8,
+    use_insight_as_backup: bool,
+    block_height_lookup: BHL,
+    masternode_list_lookup: MNL,
+    masternode_list_destroy: MasternodeListDestroy,
+    add_insight_lookup: AddInsightBlockingLookup,
+    should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
+    validate_llmq_callback: ValidateLLMQCallback,
+    context: *const c_void, // External Masternode Manager Diff Message Context ()
+) -> *mut MNListDiffResult {
+    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
+    let desired_merkle_root = match UInt256::from_const(merkle_root) {
+        Some(data) => data,
+        None => { return failure(); }
+    };
+    let base_masternode_list_hash = UInt256::from_const(base_masternode_list_hash);
+    let manager = Manager {
+        block_height_lookup,
+        masternode_list_lookup,
+        masternode_list_destroy: |list: *const ffi::types::MasternodeList| unsafe { masternode_list_destroy(list) },
+        add_insight_lookup: |hash: UInt256| unsafe { add_insight_lookup(boxed(hash.0), context) },
+        should_process_llmq_of_type: |llmq_type: LLMQType| unsafe { should_process_llmq_of_type(llmq_type.into(), context) },
+        validate_llmq_callback: |data: LLMQValidationData| unsafe { validate_llmq_callback(boxed(data), context) },
+        use_insight_as_backup,
+        base_masternode_list_hash
+    };
+
+    let list_diff = match MNListDiff::new(message, &mut 0, block_height_lookup) {
+        Some(data) => data,
+        None => { return failure(); }
+    };
+    //println!("list_diff: {:?}", list_diff);
+    let result = MNListDiffResult::from_diff(list_diff, manager, desired_merkle_root);
+    boxed(result)
+}
 #[no_mangle]
 pub unsafe extern fn mndiff_block_hash_destroy(block_hash: *mut [u8; 32]) {
     unbox_any(block_hash);
@@ -116,14 +167,15 @@ pub extern "C" fn llmq_rotation_info_read(
 #[no_mangle]
 pub extern "C" fn llmq_rotation_info_process(
     info: *mut ffi::types::LLMQRotationInfo,
+    base_masternode_list_hash: *const u8,
     merkle_root: *const u8,
+    use_insight_as_backup: bool,
+    block_height_lookup: BlockHeightLookup,
     masternode_list_lookup: MasternodeListLookup,
     masternode_list_destroy: MasternodeListDestroy,
-    use_insight_as_backup: bool,
     add_insight_lookup: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq_callback: ValidateLLMQCallback,
-    block_height_lookup: BlockHeightLookup,
     context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut ffi::types::LLMQRotationInfoResult {
     let llmq_rotation_info = unsafe { *info };
@@ -131,26 +183,33 @@ pub extern "C" fn llmq_rotation_info_process(
         Some(data) => data,
         None => { return qr_failure(); }
     };
-    boxed(ffi::types::LLMQRotationInfoResult::new(
-        llmq_rotation_info,
-        masternode_list_lookup, masternode_list_destroy,
-        desired_merkle_root, use_insight_as_backup,
-        add_insight_lookup, should_process_llmq_of_type,
-        validate_llmq_callback, block_height_lookup, context))
+    let base_masternode_list_hash = UInt256::from_const(base_masternode_list_hash);
+    let manager = Manager {
+        block_height_lookup: |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) },
+        masternode_list_lookup: |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
+        masternode_list_destroy: |list: *const ffi::types::MasternodeList| unsafe { masternode_list_destroy(list) },
+        add_insight_lookup: |hash: UInt256| unsafe { add_insight_lookup(boxed(hash.0), context) },
+        should_process_llmq_of_type: |llmq_type: LLMQType| unsafe { should_process_llmq_of_type(llmq_type.into(), context) },
+        validate_llmq_callback: |data: LLMQValidationData| unsafe { validate_llmq_callback(boxed(data), context) },
+        use_insight_as_backup,
+        base_masternode_list_hash
+    };
+    boxed(LLMQRotationInfoResult::new(llmq_rotation_info, manager, desired_merkle_root))
 }
 
 #[no_mangle]
 pub extern "C" fn llmq_rotation_info_process2(
     message_arr: *const u8,
     message_length: usize,
+    base_masternode_list_hash: *const u8,
     merkle_root: *const u8,
+    use_insight_as_backup: bool,
+    block_height_lookup: BlockHeightLookup,
     masternode_list_lookup: MasternodeListLookup,
     masternode_list_destroy: MasternodeListDestroy,
-    use_insight_as_backup: bool,
     add_insight_lookup: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq_callback: ValidateLLMQCallback,
-    block_height_lookup: BlockHeightLookup,
     context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut ffi::types::LLMQRotationInfoResult {
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
@@ -158,11 +217,20 @@ pub extern "C" fn llmq_rotation_info_process2(
         Some(data) => data,
         None => { return qr_failure(); }
     };
-    let result = LLMQRotationInfoResult::from_message(message, desired_merkle_root,
-                                         masternode_list_lookup, masternode_list_destroy,
-                                         use_insight_as_backup,
-                                         add_insight_lookup, should_process_llmq_of_type,
-                                         validate_llmq_callback, block_height_lookup, context);
+    let base_masternode_list_hash = UInt256::from_const(base_masternode_list_hash);
+
+    let manager = Manager {
+        block_height_lookup: |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) },
+        masternode_list_lookup: |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
+        masternode_list_destroy: |list: *const ffi::types::MasternodeList| unsafe { masternode_list_destroy(list) },
+        add_insight_lookup: |hash: UInt256| unsafe { add_insight_lookup(boxed(hash.0), context) },
+        should_process_llmq_of_type: |llmq_type: LLMQType| unsafe { should_process_llmq_of_type(llmq_type.into(), context) },
+        validate_llmq_callback: |data: LLMQValidationData| unsafe { validate_llmq_callback(boxed(data), context) },
+        use_insight_as_backup,
+        base_masternode_list_hash
+    };
+
+    let result = LLMQRotationInfoResult::from_message(message, desired_merkle_root, manager);
 
     boxed(result.unwrap_or(LLMQRotationInfoResult::default()))
 }
@@ -182,6 +250,8 @@ pub unsafe extern fn llmq_rotation_info_result_destroy(result: *mut ffi::types::
 #[cfg(test)]
 mod tests {
     use std::{env, fs};
+    use std::collections::HashMap;
+    use std::fmt::Write;
     use std::ffi::c_void;
     use std::io::Read;
     use std::ptr::null_mut;
@@ -192,10 +262,46 @@ mod tests {
     use crate::crypto::byte_util::{Reversable, UInt256};
     use crate::ffi::from::FromFFI;
     use crate::ffi::unboxer::unbox_any;
-    use crate::{BlockHeightLookup, ffi, llmq_rotation_info_process2, MerkleTree, mndiff_process};
+    use crate::{BlockHeightLookup, ffi, llmq_rotation_info_process2, MerkleTree, mndiff_process, mnl_diff_process, ToFFI};
 
     const CHAIN_TYPE: ChainType = ChainType::TestNet;
     const BLOCK_HEIGHT: u32 = 122088;
+
+
+    pub fn testnet_block_height_for(key: &str) -> u32 {
+        match key {
+            "0000000007697fd69a799bfa26576a177e817bc0e45b9fcfbf48b362b05aeff2" => 72000,
+            "0000000004c19db86b34bc9b5288b5af2aaff507e8474fa2db99e1ea03bacdfe" => 122328,
+            "000000000282ab23f92f5b517325e8da93ae470a9de3fe3aeebfcaa54cb48155" => 122352,
+            "000000000bca30e387a942d9dbcf6ad2273ab6061c50e5dc8282c6ff73cc3c99" => 122376,
+            "0000000000bee166c1c3194f50f667900319e1fd9666aef8ec4a10accfbf3df3" => 122400,
+            "000000000a7c1dfff2586d2a635dd9b8ae491aae1b6ca72bc9070d1bd0cd50bc" => 122424,
+            "00000000094f05e8cbf8c8fca55f688f4fbb6ec3624dbda9eab1039f005e64de" => 122448,
+            "000000000b6e93b1c97696e5de41fb3e9b94fab2df5654c1c2ddad636a6a85e3" => 122472,
+            "0000000003d2d2527624d1509885f0ab3d38d476d67c6fe0da7f5df8c460a675" => 122520,
+            "000000000108e218babaca583a3bc69f1273e6468e7eb27078da6374cdf14bb8" => 122544,
+            "000000000ce60869ccd9258c81307a71457581d4ce0f8e684aeda300a481d9a5" => 122568,
+            "0000000002738de17d2db957ddbdd207d66c2e8977ba8d7d8da541b67d4eb0fa" => 122592,
+            "0000000003bb193de9431c474ac0247bc20cfc2a318084329ea88fc642b554e3" => 122616,
+            "0000000002ef3d706192992b6823ed1c6221a794d1225346c97c7a3d75c88b3f" => 122640,
+            "00000000054437d43f5d12eaa4898d8b85e8521b1897674ee847f070045669ad" => 122664,
+            "0000000002ed5b13979a23330c5e219ea530ae801293df74d38c6cd6e7be78b9" => 122688,
+            "0000000003a583ca0e218394876ddce04a94274add270c24ebd21b6570b0b202" => 122712,
+            "000000000525063bee5e6935224a03d160b21965bba60320802c8f3201d0ebae" => 122736,
+            "000000000d201a317e82baaf536f889c83b62add5bd0375744ce1ee77e3d099f" => 122760,
+            "0000000006221f59fb1bc78200724447db51545cc43ffd5a78eed78106bbdb1a" => 122784,
+            "0000000015f89c20b07c7e6a5df001bd9838a1eee4d33a1468860daeab8d2ba3" => 122808,
+            "0000000006cb4b5de2a176af028d859a1499a384f8c88f243f81f01bbc729c91" => 122832,
+            "000000000821a7211313a614aa3f4379af7870a38740a770d7baffd3bb6578e9" => 122856,
+            "0000000008e87f07d3d1abbaa196d68cd4bf7b19ef0ddb0cbbcf1eb86f7aea46" => 122880,
+            "0000000009b4a670292967a9cd8da4ecad05586179a60e987a9b71b2c3ea1a58" => 122904,
+            "0000000001d975dfc73df9040e894576f27f6c252f1540b1c092c80353cdb823" => 122928,
+            "0000000003b852d8331f850491aeca3d91b43b3ef7af8208c82814c0e06cd75c" => 122952,
+            "0000000005938a06c7e88a5cd3a950655bde3ed7046e9ffad542ad5902395d2b" => 122976,
+            "000000000577855d5599ce9a89417628233a6ccf3a86b2938b191f3dfed2e63d" => 123000,
+            _ => u32::MAX
+        }
+    }
 
     fn get_file_as_byte_vec(filename: &String) -> Vec<u8> {
         let mut f = fs::File::open(&filename).expect("no file found");
@@ -203,6 +309,31 @@ mod tests {
         let mut buffer = vec![0; metadata.len() as usize];
         f.read(&mut buffer).expect("buffer overflow");
         buffer
+    }
+
+    fn message_from_file(name: String) -> Vec<u8> {
+        let executable = env::current_exe().unwrap();
+        let path = match executable.parent() {
+            Some(name) => name,
+            _ => panic!()
+        };
+        let filepath = format!("{}/../../../src/{}", path.display(), name.as_str());
+        println!("{:?}", filepath);
+        let file = get_file_as_byte_vec(&filepath);
+        file
+    }
+
+    fn assert_diff_result(result: ffi::types::MNListDiffResult) {
+        let mut masternode_list = unsafe { (*result.masternode_list).decode() };
+        let bh = testnet_block_height_for(masternode_list.block_hash.reversed().to_string().as_str());
+
+        assert!(result.has_found_coinbase, "Did not find coinbase at height {}", bh);
+        //turned off on purpose as we don't have the coinbase block
+        //assert!(result.has_valid_coinbase, "Coinbase not valid at height {}", bh);
+        assert!(result.has_valid_mn_list_root, "rootMNListValid not valid at height {}", bh);
+        assert!(result.has_valid_llmq_list_root, "rootQuorumListValid not valid at height {}", bh);
+        assert!(result.has_valid_quorums, "validQuorums not valid at height {}", bh);
+
     }
 
     unsafe extern "C" fn block_height_lookup(_block_hash: *mut [u8; 32], _context: *const c_void) -> u32 {
@@ -217,17 +348,17 @@ mod tests {
     unsafe extern "C" fn masternode_list_destroy(_masternode_list: *const ffi::types::MasternodeList) {
 
     }
-    unsafe extern "C" fn use_insight_lookup(_hash: *mut [u8; 32], _context: *const c_void) {
+    unsafe extern "C" fn add_insight_lookup(_hash: *mut [u8; 32], _context: *const c_void) {
 
     }
-    unsafe extern "C" fn should_process_quorum_of_type(llmq_type: u8, _context: *const c_void) -> bool {
+    unsafe extern "C" fn should_process_llmq_of_type(llmq_type: u8, _context: *const c_void) -> bool {
         llmq_type == match CHAIN_TYPE {
             ChainType::MainNet => LLMQType::Llmqtype400_60.into(),
             ChainType::TestNet => LLMQType::Llmqtype50_60.into(),
             ChainType::DevNet => LLMQType::Llmqtype10_60.into()
         }
     }
-    unsafe extern "C" fn validate_quorum_callback(data: *mut ffi::types::LLMQValidationData, _context: *const c_void) -> bool {
+    unsafe extern "C" fn validate_llmq_callback(data: *mut ffi::types::LLMQValidationData, _context: *const c_void) -> bool {
         let result = unbox_any(data);
         let ffi::types::LLMQValidationData { items, count, commitment_hash, all_commitment_aggregated_signature, threshold_signature, public_key } = *result;
         println!("validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}", items, count, commitment_hash, all_commitment_aggregated_signature, threshold_signature, public_key);
@@ -508,17 +639,19 @@ mod tests {
         let total_transactions = bytes.read_with::<u32>(offset, LE).unwrap();
         assert_eq!(total_transactions, should_be_total_transactions, "Invalid transaction count");
         let use_insight_as_backup = false;
+        let base_masternode_list_hash: *const u8 = null_mut();
         let result = mndiff_process(
             c_array,
             length,
-            masternode_list_lookup,
-            masternode_list_destroy,
+            base_masternode_list_hash,
             merkle_root,
             use_insight_as_backup,
-            use_insight_lookup,
-            should_process_quorum_of_type,
-            validate_quorum_callback,
             block_height_lookup,
+            masternode_list_lookup,
+            masternode_list_destroy,
+            add_insight_lookup,
+            should_process_llmq_of_type,
+            validate_llmq_callback,
             null_mut()
         );
         println!("result: {:?}", result);
@@ -565,30 +698,24 @@ mod tests {
 
     #[test]
     fn test_mnl_saving_to_disk() { // testMNLSavingToDisk
-        let executable = env::current_exe().unwrap();
-        let path = match executable.parent() {
-            Some(name) => name,
-            _ => panic!()
-        };
-        let filepath = format!("{}/../../../src/{}", path.display(), "ML_at_122088.dat");
-        println!("{:?}", filepath);
-        let file = get_file_as_byte_vec(&filepath);
-        let bytes = file.as_slice();
+        let bytes = message_from_file("ML_at_122088.dat".to_string());
         let length = bytes.len();
         let c_array = bytes.as_ptr();
         let merkle_root = [0u8; 32].as_ptr();
         let use_insight_as_backup= false;
+        let base_masternode_list_hash = null_mut();
         let result = mndiff_process(
             c_array,
             length,
-            masternode_list_lookup,
-            masternode_list_destroy,
+            base_masternode_list_hash,
             merkle_root,
             use_insight_as_backup,
-            use_insight_lookup,
-            should_process_quorum_of_type,
-            validate_quorum_callback,
             block_height_lookup,
+            masternode_list_lookup,
+            masternode_list_destroy,
+            add_insight_lookup,
+            should_process_llmq_of_type,
+            validate_llmq_callback,
             null_mut()
         );
         println!("{:?}", result);
@@ -639,18 +766,20 @@ mod tests {
         let c_array = bytes.as_ptr();
         let merkle_root = [0u8; 32].as_ptr();
         let use_insight_as_backup= false;
+        let base_masternode_list_hash = null_mut();
         let h = 5078;
         let result = llmq_rotation_info_process2(
             c_array,
             length,
+            base_masternode_list_hash,
             merkle_root,
+            use_insight_as_backup,
+            block_height_lookup_5078,
             masternode_list_lookup,
             masternode_list_destroy,
-            use_insight_as_backup,
-            use_insight_lookup,
-            should_process_quorum_of_type,
-            validate_quorum_callback,
-            block_height_lookup_5078,
+            add_insight_lookup,
+            should_process_llmq_of_type,
+            validate_llmq_callback,
             null_mut()
         );
         println!("{:?}", result);
