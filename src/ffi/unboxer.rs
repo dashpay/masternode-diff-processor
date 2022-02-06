@@ -142,6 +142,7 @@ pub unsafe fn unbox_coinbase_tx(result: *mut ffi::types::CoinbaseTransaction) {
 
 pub unsafe fn unbox_result(result: *mut ffi::types::MNListDiffResult) {
     let res = unbox_any(result);
+    unbox_any(res.block_hash);
     unbox_masternode_list(unbox_any(res.masternode_list));
     unbox_vec(unbox_vec_ptr(res.needed_masternode_lists, res.needed_masternode_lists_count));
     unbox_masternode_vec(unbox_vec_ptr(res.added_masternodes, res.added_masternodes_count));
