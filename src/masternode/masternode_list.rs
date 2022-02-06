@@ -65,34 +65,17 @@ impl<'a> MasternodeList<'a> {
                     h1.clone()
                         .reversed()
                         .cmp(&h2.clone().reversed()));
-            let mns = self.masternodes.clone();
+            let nodes = self.masternodes.clone();
             let entry_hashes = pro_tx_hashes
                 .clone()
-                .into_iter()
-                .map(|hash| {
-                    let h = hash.clone();
-                    let map = mns.clone();
-                    let mn = &map[&h];
-                    let entry_hash = mn.entry_hash_at(block_height);
-                    entry_hash
-                })
+                .iter()
+                .map(|hash| (*(&nodes[hash])).entry_hash_at(block_height))
                 .collect();
             Some(entry_hashes)
         }
     }
 
     fn hashes_for_quorum_merkle_root(&self) -> Vec<UInt256> {
-        // let mut llmq_commitment_hashes: Vec<UInt256> = self.quorums
-        //     .clone()
-        //     .into_values()
-        //     .fold(Vec::new(), |mut acc, q_map| {
-        //         let quorum_hashes: Vec<UInt256> = q_map
-        //             .into_values()
-        //             .map(|entry| entry.entry_hash)
-        //             .collect();
-        //         acc.extend(quorum_hashes);
-        //         acc
-        //     });
         let mut llmq_commitment_hashes: Vec<UInt256> = self.quorums
             .clone()
             .into_values()
