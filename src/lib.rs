@@ -71,7 +71,7 @@ pub extern "C" fn mndiff_process(
         Some(data) => data,
         None => { return failure(); }
     };
-    let base_masternode_list_hash = UInt256::from_const(base_masternode_list_hash);
+    let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let block_height_lookup = |hash: UInt256| unsafe { block_height_lookup(boxed(hash.0), context) };
 
     let manager = Manager {
@@ -117,7 +117,7 @@ pub fn mnl_diff_process<
         Some(data) => data,
         None => { return failure(); }
     };
-    let base_masternode_list_hash = UInt256::from_const(base_masternode_list_hash);
+    let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let manager = Manager {
         block_height_lookup,
         masternode_list_lookup,
@@ -183,7 +183,7 @@ pub extern "C" fn llmq_rotation_info_process(
         Some(data) => data,
         None => { return qr_failure(); }
     };
-    let base_masternode_list_hash = UInt256::from_const(base_masternode_list_hash);
+    let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let manager = Manager {
         block_height_lookup: |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) },
         masternode_list_lookup: |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
@@ -217,8 +217,7 @@ pub extern "C" fn llmq_rotation_info_process2(
         Some(data) => data,
         None => { return qr_failure(); }
     };
-    let base_masternode_list_hash = UInt256::from_const(base_masternode_list_hash);
-
+    let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let manager = Manager {
         block_height_lookup: |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) },
         masternode_list_lookup: |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
