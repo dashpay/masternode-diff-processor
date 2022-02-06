@@ -114,35 +114,9 @@ impl<'a> FromFFI<'a> for ffi::types::MasternodeList {
                 .fold(HashMap::new(), |mut acc, i| {
                     let value = (*(*(self.quorums.offset(i as isize)))).decode();
                     let key = value.llmq_hash.clone();
-                    // let value: HashMap<UInt256, llmq_entry::LLMQEntry> =
-                    //     (0..llmq_map.count)
-                    //         .into_iter()
-                    //         .fold(HashMap::new(), |mut acc, j| {
-                    //             let value = (*(*(llmq_map.values.offset(j as isize)))).decode();
-                    //             let key = value.llmq_hash.clone();
-                    //             acc.insert(key, value);
-                    //             acc
-                    //         });
                     acc.insert(key, value);
                     acc
                 })
-            // quorums: (0..self.llmq_type_maps_count)
-            //     .into_iter()
-            //     .fold(HashMap::new(), |mut acc, i| {
-            //         let llmq_map = *(*(self.llmq_type_maps.offset(i as isize)));
-            //         let key = LLMQType::from(llmq_map.llmq_type);
-            //         let value: HashMap<UInt256, llmq_entry::LLMQEntry> =
-            //             (0..llmq_map.count)
-            //                 .into_iter()
-            //                 .fold(HashMap::new(), |mut acc, j| {
-            //                     let value = (*(*(llmq_map.values.offset(j as isize)))).decode();
-            //                     let key = value.llmq_hash.clone();
-            //                     acc.insert(key, value);
-            //                     acc
-            //                 });
-            //         acc.insert(key, value);
-            //         acc
-            //     })
         }
     }
 }
@@ -300,18 +274,6 @@ impl<'a> FromFFI<'a> for ffi::types::LLMQRotationInfo {
             extra_share,
             snapshot_at_h_4c,
             mn_list_diff_at_h_4c,
-            /*block_hash_list: (0..self.block_hash_list_num)
-                .into_iter()
-                .map(|i| UInt256(*(*(self.block_hash_list.offset(i as isize)))))
-                .collect(),
-            snapshot_list: (0..self.snapshot_list_num)
-                .into_iter()
-                .map(|i| (*(*(self.snapshot_list.offset(i as isize)))).decode())
-                .collect(),
-            mn_list_diff_list: (0..self.mn_list_diff_list_num)
-                .into_iter()
-                .map(|i| (*(*(self.mn_list_diff_list.offset(i as isize)))).decode())
-                .collect(),*/
         }
     }
 }
