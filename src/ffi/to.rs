@@ -225,15 +225,6 @@ impl<'a> ToFFI<'a> for mn_list_diff::MNListDiff<'a> {
             .into_iter()
             .map(|hash| boxed(hash.0))
             .collect::<Vec<*mut [u8; 32]>>();
-        // let deleted_quorums_vec = self.deleted_quorums
-        //     .clone()
-        //     .into_iter()
-        //     .fold(Vec::new(), |mut acc, (llmq_type, hashes)| {
-        //         hashes
-        //             .iter()
-        //             .for_each(|&hash| acc.push(boxed(ffi::types::LLMQTypedHash { llmq_hash: boxed(hash.0), llmq_type: llmq_type.into() })));
-        //         acc
-        //     });
         let added_quorums_vec = self.added_quorums
             .values()
             .map(|entry| boxed(entry.encode()))
@@ -301,24 +292,6 @@ impl<'a> ToFFI<'a> for llmq_rotation_info::LLMQRotationInfo<'a> {
         } else {
             (null_mut(), null_mut())
         };
-        /*let block_hash_list_num = self.block_hash_list.len();
-        let block_hash_list = boxed_vec(
-            (0..block_hash_list_num)
-                .into_iter()
-                .map(|i| boxed(self.block_hash_list[i].0))
-                .collect());
-        let snapshot_list_num = self.snapshot_list.len();
-        let snapshot_list = boxed_vec(
-            (0..snapshot_list_num)
-                .into_iter()
-                .map(|i| boxed(self.snapshot_list[i].encode()))
-                .collect());
-        let mn_list_diff_list_num = self.mn_list_diff_list.len();
-        let mn_list_diff_list = boxed_vec(
-            (0..mn_list_diff_list_num)
-                .into_iter()
-                .map(|i| boxed(self.mn_list_diff_list[i].encode()))
-                .collect());*/
         Self::Item {
             snapshot_at_h_c,
             snapshot_at_h_2c,
@@ -331,30 +304,9 @@ impl<'a> ToFFI<'a> for llmq_rotation_info::LLMQRotationInfo<'a> {
             extra_share,
             snapshot_at_h_4c,
             mn_list_diff_at_h_4c,
-            /*block_hash_list_num: block_hash_list_num as u32,
-            block_hash_list,
-            snapshot_list_num: snapshot_list_num as u32,
-            snapshot_list,
-            mn_list_diff_list_num: mn_list_diff_list_num as u32,
-            mn_list_diff_list*/
         }
     }
 }
-
-// pub fn encode_quorums_map(quorums: &HashMap<LLMQType, HashMap<UInt256, llmq_entry::LLMQEntry>>) -> *mut *mut ffi::types::LLMQMap {
-//     boxed_vec(quorums
-//         .iter()
-//         .map(|(&llmq_type, map)|
-//             boxed(ffi::types::LLMQMap {
-//                 llmq_type: llmq_type.into(),
-//                 values: boxed_vec((*map)
-//                     .iter()
-//                     .map(|(_, &entry)| boxed(entry.encode()))
-//                     .collect()),
-//                 count: (*map).len()
-//             }))
-//         .collect())
-// }
 
 pub fn encode_quorums_map(quorums: &HashMap<UInt256, llmq_entry::LLMQEntry>) -> *mut *mut ffi::types::LLMQEntry {
     boxed_vec(quorums
