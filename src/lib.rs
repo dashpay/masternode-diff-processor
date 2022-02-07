@@ -51,49 +51,6 @@ fn qr_failure() -> *mut ffi::types::LLMQRotationInfoResult {
     boxed(ffi::types::LLMQRotationInfoResult::default())
 }
 
-#[no_mangle]
-pub extern "C" fn mndiff_process(
-    message_arr: *const u8,
-    message_length: usize,
-    base_masternode_list_hash: *const u8,
-    merkle_root: *const u8,
-    use_insight_as_backup: bool,
-    block_height_lookup: BlockHeightLookup,
-    masternode_list_lookup: MasternodeListLookup,
-    masternode_list_destroy: MasternodeListDestroy,
-    add_insight_lookup: AddInsightBlockingLookup,
-    should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-    validate_llmq_callback: ValidateLLMQCallback,
-    context: *const c_void, // External Masternode Manager Diff Message Context ()
-) -> *mut MNListDiffResult {
-    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
-    let desired_merkle_root = match UInt256::from_const(merkle_root) {
-        Some(data) => data,
-        None => { return failure(); }
-    };
-    let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
-    let block_height_lookup = |hash: UInt256| unsafe { block_height_lookup(boxed(hash.0), context) };
-    let list_diff = match MNListDiff::new(message, &mut 0, block_height_lookup) {
-        Some(data) => data,
-        None => { return failure(); }
-    };
-    println!("mndiff_process: {:?}", base_masternode_list_hash);
-    //println!("list_diff: {:?}", list_diff);
-    let manager = Manager {
-        block_height_lookup,
-        masternode_list_lookup: |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
-        masternode_list_destroy: |list: *const ffi::types::MasternodeList| unsafe { masternode_list_destroy(list) },
-        add_insight_lookup: |hash: UInt256| unsafe { add_insight_lookup(boxed(hash.0), context) },
-        should_process_llmq_of_type: |llmq_type: LLMQType| unsafe { should_process_llmq_of_type(llmq_type.into(), context) },
-        validate_llmq_callback: |data: LLMQValidationData| unsafe { validate_llmq_callback(boxed(data), context) },
-        use_insight_as_backup,
-        base_masternode_list_hash
-    };
-    let result = MNListDiffResult::from_diff(list_diff, manager, desired_merkle_root);
-    boxed(result)
-}
-
-// #[no_mangle]
 pub fn mnl_diff_process<
     BHL: Fn(UInt256) -> u32 + Copy,
     MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
@@ -116,7 +73,6 @@ pub fn mnl_diff_process<
         Some(data) => data,
         None => { return failure(); }
     };
-
     let list_diff = match MNListDiff::new(message, &mut 0, block_height_lookup) {
         Some(data) => data,
         None => { return failure(); }
@@ -136,6 +92,38 @@ pub fn mnl_diff_process<
     let result = MNListDiffResult::from_diff(list_diff, manager, desired_merkle_root);
     boxed(result)
 }
+
+#[no_mangle]
+pub extern "C" fn mndiff_process(
+    message_arr: *const u8,
+    message_length: usize,
+    base_masternode_list_hash: *const u8,
+    merkle_root: *const u8,
+    use_insight_as_backup: bool,
+    block_height_lookup: BlockHeightLookup,
+    masternode_list_lookup: MasternodeListLookup,
+    masternode_list_destroy: MasternodeListDestroy,
+    add_insight_lookup: AddInsightBlockingLookup,
+    should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
+    validate_llmq_callback: ValidateLLMQCallback,
+    context: *const c_void, // External Masternode Manager Diff Message Context ()
+) -> *mut MNListDiffResult {
+    mnl_diff_process(
+        message_arr,
+        message_length,
+        base_masternode_list_hash,
+        merkle_root,
+        use_insight_as_backup,
+        |hash: UInt256| unsafe { block_height_lookup(boxed(hash.0), context) },
+        |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
+        masternode_list_destroy,
+        add_insight_lookup,
+        should_process_llmq_of_type,
+        validate_llmq_callback,
+        context,
+    )
+}
+
 #[no_mangle]
 pub unsafe extern fn mndiff_block_hash_destroy(block_hash: *mut [u8; 32]) {
     unbox_any(block_hash);
