@@ -74,7 +74,7 @@ impl MNListDiffResult {
         let has_valid_quorum_list_root = !quorums_active || masternode_list.has_valid_llmq_list_root(&coinbase_transaction);
         let needed_masternode_lists_count = needed_masternode_lists.len();
         MNListDiffResult {
-            block_hash: boxed(list_diff.block_hash.0),
+            block_hash: boxed(list_diff.block_hash.clone().0),
             has_found_coinbase,
             has_valid_coinbase: merkle_tree.has_root(merkle_root),
             has_valid_mn_list_root,
