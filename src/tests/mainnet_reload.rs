@@ -20,6 +20,7 @@ fn test_mainnet_reload() {
         "MNL_1092456_1092480.dat".to_string(),
         "MNL_1092480_1092504.dat".to_string(),
         "MNL_1092504_1092528.dat".to_string(),
+        "MNL_1092528_1092552.dat".to_string(),
         "MNL_1092552_1092576.dat".to_string(),
         "MNL_1092576_1092600.dat".to_string(),
         "MNL_1092600_1092624.dat".to_string(),
