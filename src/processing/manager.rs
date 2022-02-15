@@ -139,9 +139,10 @@ pub fn classify_quorums<'a,
         bool,
         Vec<*mut [u8; 32]>
     ) {
+    log_quorums_map(base_quorums.clone(), "base_quorums".to_string());
+    log_quorums_map(added_quorums.clone(), "added_quorums".to_string());
     let has_valid_quorums = true;
     let mut needed_masternode_lists: Vec<*mut [u8; 32]> = Vec::new();
-    println!("classify_quorums.base_quorums: {:?}",base_quorums);
     added_quorums.iter()
         .filter(|(_, &entry)| (manager.should_process_llmq_of_type)(entry.llmq_type))
         .for_each(|(&llmq_hash, &quorum)|
@@ -164,14 +165,15 @@ pub fn classify_quorums<'a,
                     }
             }
         );
-    println!("classify_quorums.added_quorums: {:?}",added_quorums);
-    println!("classify_quorums.deleted_quorums: {:?}",deleted_quorums);
+    // println!("classify_quorums.added_quorums: {:?}", added_quorums);
+    // println!("classify_quorums.deleted_quorums: {:?}", deleted_quorums);
     let mut quorums = base_quorums.clone();
     quorums.extend(added_quorums
         .clone()
         .into_iter()
         .filter(|(key, _)| !quorums.contains_key(key))
         .collect::<HashMap<UInt256, LLMQEntry>>());
+    log_quorums_map(quorums.clone(), "quorums_after_add".to_string());
     // quorums.iter_mut().for_each(|(llmq_type, llmq_map)| {
     //     if let Some(keys_to_delete) = deleted_quorums.get(llmq_type) {
     //         keys_to_delete.into_iter().for_each(|key| {
@@ -198,8 +200,26 @@ pub fn classify_quorums<'a,
     added_quorums.iter().for_each(|(&llmq_hash, &entry)| {
         quorums.insert(llmq_hash, entry);
     });
-    println!("classify_quorums.quorums: {:?}", quorums);
+    log_quorums_map(quorums.clone(), "quorums".to_string());
     (added_quorums, quorums, has_valid_quorums, needed_masternode_lists)
+}
+
+fn log_quorums_map(q: HashMap<UInt256, LLMQEntry>, id: String) {
+    println!("{} hashes: [", id);
+    let mut bmap: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = BTreeMap::new();
+    for (qtype, map) in q.clone() {
+        bmap
+            .entry(map.llmq_type)
+            .or_insert(BTreeMap::new())
+            .insert(map.llmq_hash, map);
+    }
+    for (qtype, map) in bmap {
+        let qqtype: u8 = qtype.into();
+        for (hash, entry) in map {
+            println!("{}:{}", qqtype, hash);
+        }
+    }
+    println!("]");
 }
 
 pub fn validate_quorum<
