@@ -144,27 +144,30 @@ pub fn classify_quorums<'a,
     let has_valid_quorums = true;
     let mut needed_masternode_lists: Vec<*mut [u8; 32]> = Vec::new();
     added_quorums.iter()
-        .filter(|(_, &entry)| (manager.should_process_llmq_of_type)(entry.llmq_type))
-        .for_each(|(&llmq_hash, &quorum)|
-            match lookup_masternode_list(llmq_hash, manager.masternode_list_lookup, manager.masternode_list_destroy) {
-                Some(llmq_masternode_list) =>
-                    validate_quorum(
-                        quorum,
-                        has_valid_quorums,
-                        llmq_masternode_list,
-                        manager.block_height_lookup,
-                        manager.validate_llmq_callback),
-                None =>
-                    if (manager.block_height_lookup)(llmq_hash) != u32::MAX {
-                        needed_masternode_lists.push(boxed(llmq_hash.0));
-                    } else if manager.use_insight_as_backup {
-                        (manager.add_insight_lookup)(llmq_hash);
-                        if (manager.block_height_lookup)(llmq_hash) != u32::MAX {
-                            needed_masternode_lists.push(boxed(llmq_hash.0));
-                        }
+        .for_each(|(&llmq_type, llmqs_of_type)| {
+            if (manager.should_process_llmq_of_type)(llmq_type) {
+                (*llmqs_of_type).iter().for_each(|(&llmq_hash, &quorum)| {
+                    match lookup_masternode_list(llmq_hash, manager.masternode_list_lookup, manager.masternode_list_destroy) {
+                        Some(llmq_masternode_list) =>
+                            validate_quorum(
+                                quorum,
+                                has_valid_quorums,
+                                llmq_masternode_list,
+                                manager.block_height_lookup,
+                                manager.validate_llmq_callback),
+                        None =>
+                            if (manager.block_height_lookup)(llmq_hash) != u32::MAX {
+                                needed_masternode_lists.push(boxed(llmq_hash.0));
+                            } else if manager.use_insight_as_backup {
+                                (manager.add_insight_lookup)(llmq_hash);
+                                if (manager.block_height_lookup)(llmq_hash) != u32::MAX {
+                                    needed_masternode_lists.push(boxed(llmq_hash.0));
+                                }
+                            }
                     }
+                });
             }
-        );
+        });
     let mut quorums = base_quorums.clone();
     quorums.extend(added_quorums
         .clone()
