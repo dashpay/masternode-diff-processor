@@ -4,7 +4,7 @@ use crate::common::block_data::BlockData;
 use crate::common::socket_address::SocketAddress;
 use crate::consensus::encode;
 use crate::crypto::byte_util::{Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
-use crate::ffi;
+use crate::{ffi, LLMQType};
 use crate::ffi::to::ToFFI;
 use crate::masternode::{masternode_entry, masternode_list, llmq_entry};
 use crate::masternode::llmq_entry::LLMQ_DEFAULT_VERSION;
@@ -109,11 +109,20 @@ impl<'a> FromFFI<'a> for ffi::types::MasternodeList {
                     acc.insert(key, value);
                     acc
                 }),
-            quorums: (0..self.quorums_count)
+            quorums: (0..self.llmq_type_maps_count)
                 .into_iter()
                 .fold(HashMap::new(), |mut acc, i| {
-                    let value = (*(*(self.quorums.offset(i as isize)))).decode();
-                    let key = value.llmq_hash.clone();
+                    let llmq_map = *(*(self.llmq_type_maps.offset(i as isize)));
+                    let key = LLMQType::from(llmq_map.llmq_type);
+                    let value: HashMap<UInt256, llmq_entry::LLMQEntry> =
+                        (0..llmq_map.count)
+                            .into_iter()
+                            .fold(HashMap::new(), |mut acc, j| {
+                                let value = (*(*(llmq_map.values.offset(j as isize)))).decode();
+                                let key = value.llmq_hash.clone();
+                                acc.insert(key, value);
+                                acc
+                            });
                     acc.insert(key, value);
                     acc
                 })
@@ -219,16 +228,22 @@ impl<'a> FromFFI<'a> for ffi::types::MNListDiff {
                 }),
             deleted_quorums: (0..self.deleted_quorums_count)
                 .into_iter()
-                .fold(Vec::new(), |mut acc, i| {
-                    let llmq_hash = *(*(self.deleted_quorums.offset(i as isize)));
-                    acc.push(UInt256(llmq_hash));
+                .fold(HashMap::new(), |mut acc, i| {
+                    let obj = *(*(self.deleted_quorums.offset(i as isize)));
+                    acc
+                        .entry(LLMQType::from(obj.llmq_type))
+                        .or_insert(Vec::new())
+                        .push(UInt256(*obj.llmq_hash));
                     acc
                 }),
             added_quorums: (0..self.added_quorums_count)
                 .into_iter()
                 .fold(HashMap::new(), |mut acc, i| {
                     let entry = (*(*(self.added_quorums.offset(i as isize)))).decode();
-                    acc.insert(entry.llmq_hash, entry);
+                    acc
+                        .entry(entry.llmq_type)
+                        .or_insert(HashMap::new())
+                        .insert(entry.llmq_hash, entry);
                     acc
                 }),
             length: self.length,

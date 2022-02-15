@@ -50,7 +50,7 @@ pub fn lookup_masternodes_and_quorums_for<'a,
     block_hash: Option<UInt256>,
     masternode_list_lookup: MNL,
     masternode_list_destroy: MND,
-) -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<UInt256, LLMQEntry<'a>>) {
+) -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>) {
     if let Some(block_hash) = block_hash {
         if let Some(list) = lookup_masternode_list(block_hash, masternode_list_lookup, masternode_list_destroy) {
             return (list.masternodes, list.quorums);
@@ -129,18 +129,18 @@ pub fn classify_quorums<'a,
     BHL: Fn(UInt256) -> u32 + Copy,
     VQL: Fn(LLMQValidationData) -> bool + Copy,
 >(
-    base_quorums: HashMap<UInt256, LLMQEntry<'a>>,
-    added_quorums: HashMap<UInt256, LLMQEntry<'a>>,
-    deleted_quorums: Vec<UInt256>,
+    base_quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
+    added_quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
+    deleted_quorums: HashMap<LLMQType, Vec<UInt256>>,
     manager: Manager<BHL, MNL, MND, AIL, SPL, VQL>,
 )
-    -> (HashMap<UInt256, LLMQEntry<'a>>,
-        HashMap<UInt256, LLMQEntry<'a>>,
+    -> (HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
+        HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
         bool,
         Vec<*mut [u8; 32]>
     ) {
-    log_quorums_map(base_quorums.clone(), "base_quorums".to_string());
-    log_quorums_map(added_quorums.clone(), "added_quorums".to_string());
+    #[cfg(test)] log_quorums_map(base_quorums.clone(), "old_quorums".to_string());
+    #[cfg(test)] log_quorums_map(added_quorums.clone(), "added_quorums".to_string());
     let has_valid_quorums = true;
     let mut needed_masternode_lists: Vec<*mut [u8; 32]> = Vec::new();
     added_quorums.iter()
@@ -165,53 +165,42 @@ pub fn classify_quorums<'a,
                     }
             }
         );
-    // println!("classify_quorums.added_quorums: {:?}", added_quorums);
-    // println!("classify_quorums.deleted_quorums: {:?}", deleted_quorums);
     let mut quorums = base_quorums.clone();
     quorums.extend(added_quorums
         .clone()
         .into_iter()
-        .filter(|(key, _)| !quorums.contains_key(key))
-        .collect::<HashMap<UInt256, LLMQEntry>>());
-    log_quorums_map(quorums.clone(), "quorums_after_add".to_string());
-    // quorums.iter_mut().for_each(|(llmq_type, llmq_map)| {
-    //     if let Some(keys_to_delete) = deleted_quorums.get(llmq_type) {
-    //         keys_to_delete.into_iter().for_each(|key| {
-    //             (*llmq_map).remove(key);
-    //         });
-    //     }
-    //     if let Some(keys_to_add) = added_quorums.get(llmq_type) {
-    //         keys_to_add.clone().into_iter().for_each(|(key, entry)| {
-    //             (*llmq_map).insert(key, entry);
-    //         });
-    //     }
-    // });
-    // quorums.iter_mut().for_each(|(llmq_hash, entry)| {
-    //     if let Some(keys_to_delete) = deleted_quorums.get(&(*entry).llmq_type) {
-    //         keys_to_delete.into_iter().for_each(|key| {
-    //             quorums.remove(llmq_hash);
-    //         });
-    //     }
-    // });
+        .filter(|(key, _entries)| !quorums.contains_key(key))
+        .collect::<HashMap<LLMQType, HashMap<UInt256, LLMQEntry>>>());
+    #[cfg(test)] log_quorums_map(quorums.clone(), "quorums_after_add".to_string());
+    quorums.iter_mut().for_each(|(llmq_type, llmq_map)| {
+        if let Some(keys_to_delete) = deleted_quorums.get(llmq_type) {
+            keys_to_delete.into_iter().for_each(|key| {
+                (*llmq_map).remove(key);
+            });
+        }
+        if let Some(keys_to_add) = added_quorums.get(llmq_type) {
+            keys_to_add.clone().into_iter().for_each(|(key, entry)| {
+                (*llmq_map).insert(key, entry);
+            });
+        }
+    });
 
-    deleted_quorums.iter().for_each(|llmq_hash| {
-        quorums.remove(llmq_hash);
-    });
-    added_quorums.iter().for_each(|(&llmq_hash, &entry)| {
-        quorums.insert(llmq_hash, entry);
-    });
-    log_quorums_map(quorums.clone(), "quorums".to_string());
+    #[cfg(test)] log_quorums_map(quorums.clone(), "quorums".to_string());
     (added_quorums, quorums, has_valid_quorums, needed_masternode_lists)
 }
 
-fn log_quorums_map(q: HashMap<UInt256, LLMQEntry>, id: String) {
+
+#[cfg(test)]
+fn log_quorums_map(q: HashMap<LLMQType, HashMap<UInt256, LLMQEntry>>, id: String) {
     println!("{} hashes: [", id);
     let mut bmap: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = BTreeMap::new();
     for (qtype, map) in q.clone() {
-        bmap
-            .entry(map.llmq_type)
-            .or_insert(BTreeMap::new())
-            .insert(map.llmq_hash, map);
+        let qqtype: u8 = qtype.into();
+        let mut bhmap: BTreeMap<UInt256, LLMQEntry> = BTreeMap::new();
+        for (hash, entry) in map {
+            bhmap.insert(hash, entry);
+        }
+        bmap.insert(qtype, bhmap);
     }
     for (qtype, map) in bmap {
         let qqtype: u8 = qtype.into();

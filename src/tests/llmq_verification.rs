@@ -5,7 +5,7 @@ use crate::common::chain_type::ChainType;
 use crate::crypto::byte_util::UInt256;
 use crate::ffi::from::FromFFI;
 use crate::ffi::to::ToFFI;
-use crate::{ffi, mnl_diff_process, Reversable};
+use crate::{ffi, LLMQEntry, LLMQType, mnl_diff_process, Reversable};
 use crate::lib_tests::tests::{add_insight_lookup, assert_diff_result, block_height_for, FFIContext, masternode_list_destroy, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
 
 #[test]
@@ -68,14 +68,25 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
         assert_diff_result(chain, result_119200);
         let masternode_list_119200 = unsafe { *result_119200.masternode_list };
         let masternode_list_119200_decoded = unsafe { masternode_list_119200.decode() };
-        let added_quorums = (0..result_119200.added_quorums_count)
+        let added_quorums = (0..result_119200.added_llmq_type_maps_count)
             .into_iter()
             .fold(HashMap::new(), |mut acc, i| unsafe {
-                let entry = (*(*(result_119200.added_quorums.offset(i as isize)))).decode();
-                acc.insert(entry.llmq_hash, entry);
+                let map = *(*(result_119200.added_llmq_type_maps.offset(i as isize)));
+                let llmq_type = LLMQType::from(map.llmq_type);
+                let entry_map = (0..map.count)
+                    .into_iter()
+                    .fold(HashMap::new(), |mut hacc, j| {
+                        let raw_entry = *(*(map.values.offset(j as isize)));
+                        let entry = raw_entry.decode();
+                        hacc.insert(entry.llmq_hash, entry);
+                        hacc
+                    });
+                acc.insert(llmq_type, entry_map);
                 acc
             });
-        assert!(added_quorums.contains_key(&block_hash_119064), "There should be a quorum using 119064");
+        let hmm: HashMap<LLMQType, HashMap<UInt256, LLMQEntry>> = added_quorums.into_iter().filter(|(_, map)| map.contains_key(&block_hash_119064)).collect();
+        assert!(hmm.len() > 0, "There should be a quorum using 119064");
+        // assert!(added_quorums.contains_key(&block_hash_119064), "There should be a quorum using 119064");
         // TODO: verify with QuorumValidationData (need implement BLS before)
         //let quorum_to_verify = added_quorums[&block_hash_119064];
         //quorum_to_verify.validate_with_masternode_list(masternode_list_119064_decoded);

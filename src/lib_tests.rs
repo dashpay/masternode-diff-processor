@@ -342,16 +342,16 @@ pub mod tests {
             let result = mnl_diff_process(
                 bytes.as_ptr(),
                 bytes.len(),
-                if base_masternode_list_hash.is_some() { base_masternode_list_hash.unwrap().0.as_ptr() } else { null_mut() },
+                match base_masternode_list_hash { Some(data) => data.0.as_ptr(), None => null_mut() },
                 [0u8; 32].as_ptr(),
                 false,
                 block_height_lookup,
-                |hash| {
-                    if let Some(list) = lists.get(&hash) {
-                        &(list.encode()) as *const ffi::types::MasternodeList
-                    } else {
-                        null_mut()
-                    }
+                |hash| match lists.get(&hash) {
+                    Some(list) => {
+                        let list_encoded = list.clone().encode();
+                        &list_encoded as *const ffi::types::MasternodeList
+                    },
+                    None => null_mut()
                 },
                 masternode_list_destroy,
                 add_insight_lookup,
@@ -359,14 +359,15 @@ pub mod tests {
                 validate_llmq_callback,
                 &mut (FFIContext { chain }) as *mut _ as *mut std::ffi::c_void
             );
-            println!("result: [{:?}]", result);
             let result = unsafe { *result };
+            println!("result: [{:?}]", result);
+            println!("MNDiff: {} added, {} modified", result.added_masternodes_count, result.modified_masternodes_count);
             assert_diff_result(chain, result);
             let block_hash = UInt256(unsafe { *result.block_hash });
             let masternode_list = unsafe { *result.masternode_list };
             let masternode_list_decoded = unsafe { masternode_list.decode() };
             base_masternode_list_hash = Some(block_hash);
-            lists.insert(block_hash, masternode_list_decoded);
+            lists.insert(block_hash.clone(), masternode_list_decoded);
         }
         (true, lists)
     }

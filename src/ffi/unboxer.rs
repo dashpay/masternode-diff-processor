@@ -46,6 +46,13 @@ pub unsafe fn unbox_llmq_entry(x: *mut ffi::types::LLMQEntry) {
     unbox_any(valid_members_bitset as *mut [u8]);
 }
 
+pub unsafe fn unbox_llmq_map(x: *mut ffi::types::LLMQMap) {
+    let entry = unbox_any(x);
+    let values = unbox_vec_ptr(entry.values, entry.count);
+    for &x in values.iter() {
+        unbox_llmq_entry(x);
+    }
+}
 pub unsafe fn unbox_masternode_list(masternode_list: Box<ffi::types::MasternodeList>) {
     unbox_any(masternode_list.block_hash);
     if !masternode_list.masternode_merkle_root.is_null() {
@@ -55,8 +62,7 @@ pub unsafe fn unbox_masternode_list(masternode_list: Box<ffi::types::MasternodeL
         unbox_any(masternode_list.llmq_merkle_root);
     }
     unbox_masternode_vec(unbox_vec_ptr(masternode_list.masternodes, masternode_list.masternodes_count));
-    unbox_llmq_vec(unbox_vec_ptr(masternode_list.quorums, masternode_list.quorums_count));
-    //unbox_llmq_map_vec(unbox_vec_ptr(masternode_list.llmq_type_maps, masternode_list.llmq_type_maps_count));
+    unbox_llmq_map_vec(unbox_vec_ptr(masternode_list.llmq_type_maps, masternode_list.llmq_type_maps_count));
 }
 
 pub unsafe fn unbox_masternode_vec(vec: Vec<*mut ffi::types::MasternodeEntry>) {
@@ -68,6 +74,23 @@ pub unsafe fn unbox_llmq_vec(vec: Vec<*mut ffi::types::LLMQEntry>) {
     for &x in vec.iter() {
         unbox_llmq_entry(x);
     }
+}
+
+pub unsafe fn unbox_llmq_map_vec(vec: Vec<*mut ffi::types::LLMQMap>) {
+    for &x in vec.iter() {
+        unbox_llmq_map(x);
+    }
+}
+
+pub unsafe fn unbox_llmq_hash_vec(vec: Vec<*mut ffi::types::LLMQTypedHash>) {
+    for &x in vec.iter() {
+        unbox_llmq_typed_hash(x);
+    }
+}
+
+pub unsafe fn unbox_llmq_typed_hash(typed_hash: *mut ffi::types::LLMQTypedHash) {
+    let hash = unbox_any(typed_hash);
+    unbox_any(hash.llmq_hash);
 }
 
 pub unsafe fn unbox_llmq_validation_data(llmq_validation_data: *mut ffi::types::LLMQValidationData) {
@@ -147,7 +170,7 @@ pub unsafe fn unbox_result(result: *mut ffi::types::MNListDiffResult) {
     unbox_vec(unbox_vec_ptr(res.needed_masternode_lists, res.needed_masternode_lists_count));
     unbox_masternode_vec(unbox_vec_ptr(res.added_masternodes, res.added_masternodes_count));
     unbox_masternode_vec(unbox_vec_ptr(res.modified_masternodes, res.modified_masternodes_count));
-    unbox_llmq_vec(unbox_vec_ptr(res.added_quorums, res.added_quorums_count));
+    unbox_llmq_map_vec(unbox_vec_ptr(res.added_llmq_type_maps, res.added_llmq_type_maps_count));
 }
 pub unsafe fn unbox_mn_list_diff(result: *mut ffi::types::MNListDiff) {
     let list_diff = unbox_any(result);
@@ -159,8 +182,7 @@ pub unsafe fn unbox_mn_list_diff(result: *mut ffi::types::MNListDiff) {
 
     unbox_vec(unbox_vec_ptr(list_diff.deleted_masternode_hashes, list_diff.deleted_masternode_hashes_count));
     unbox_masternode_vec(unbox_vec_ptr(list_diff.added_or_modified_masternodes, list_diff.added_or_modified_masternodes_count));
-    // unbox_llmq_hash_vec(unbox_vec_ptr(list_diff.deleted_quorums, list_diff.deleted_quorums_count));
-    unbox_vec(unbox_vec_ptr(list_diff.deleted_quorums, list_diff.deleted_quorums_count));
+    unbox_llmq_hash_vec(unbox_vec_ptr(list_diff.deleted_quorums, list_diff.deleted_quorums_count));
 
     unbox_llmq_vec(unbox_vec_ptr(list_diff.added_quorums, list_diff.added_quorums_count));
 }

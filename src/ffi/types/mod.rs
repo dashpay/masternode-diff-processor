@@ -17,6 +17,8 @@ pub mod llmq_rotation_info;
 pub mod llmq_snapshot;
 pub mod llmq_validation_data;
 pub mod llmq_rotation_info_result;
+pub mod llmq_map;
+pub mod llmq_typed_hash;
 
 pub use self::masternode_entry::MasternodeEntry;
 pub use self::masternode_entry_hash::MasternodeEntryHash;
@@ -35,3 +37,5 @@ pub use self::mn_list_diff::MNListDiff;
 pub use self::llmq_rotation_info::LLMQRotationInfo;
 pub use self::llmq_snapshot::LLMQSnapshot;
 pub use self::llmq_rotation_info_result::LLMQRotationInfoResult;
+pub use self::llmq_map::LLMQMap;
+pub use self::llmq_typed_hash::LLMQTypedHash;

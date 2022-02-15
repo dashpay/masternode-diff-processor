@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
-use crate::CoinbaseTransaction;
+use crate::{CoinbaseTransaction, LLMQType};
 use crate::crypto::byte_util::{merkle_root_from_hashes, Reversable, UInt256};
 use crate::masternode::llmq_entry::LLMQEntry;
 use crate::masternode::masternode_entry::MasternodeEntry;
@@ -11,7 +11,7 @@ pub struct MasternodeList<'a> {
     pub masternode_merkle_root: Option<UInt256>,
     pub llmq_merkle_root: Option<UInt256>,
     pub masternodes: BTreeMap<UInt256, MasternodeEntry>,
-    pub quorums: HashMap<UInt256, LLMQEntry<'a>>,
+    pub quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
 }
 
 impl<'a> std::fmt::Debug for MasternodeList<'a> {
@@ -30,7 +30,7 @@ impl<'a> std::fmt::Debug for MasternodeList<'a> {
 impl<'a> MasternodeList<'a> {
     pub fn new(
         masternodes: BTreeMap<UInt256, MasternodeEntry>,
-        quorums: HashMap<UInt256, LLMQEntry<'a>>,
+        quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
         block_hash: UInt256,
         block_height: u32,
         quorums_active: bool
@@ -78,10 +78,16 @@ impl<'a> MasternodeList<'a> {
         let mut llmq_commitment_hashes: Vec<UInt256> = self.quorums
             .clone()
             .into_values()
-            .map(|entry| entry.entry_hash)
-            .collect();
+            .fold(Vec::new(), |mut acc, q_map| {
+                let quorum_hashes: Vec<UInt256> = q_map
+                    .into_values()
+                    .map(|entry| entry.entry_hash)
+                    .collect();
+                acc.extend(quorum_hashes);
+                acc
+            });
         llmq_commitment_hashes.sort();
-        println!("MasternodeList.llmq_hashes: {:?}", llmq_commitment_hashes);
+        //println!("MasternodeList.llmq_hashes: {:?}", llmq_commitment_hashes);
         llmq_commitment_hashes
     }
 

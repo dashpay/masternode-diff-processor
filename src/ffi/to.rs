@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::ptr::null_mut;
 use crate::common::block_data::BlockData;
 use crate::crypto::byte_util::UInt256;
-use crate::ffi;
+use crate::{ffi, LLMQType};
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;
 use crate::masternode::{masternode_entry, masternode_list, llmq_entry};
@@ -132,8 +132,8 @@ impl<'a> ToFFI<'a> for masternode_list::MasternodeList<'a> {
             },
             masternodes: encode_masternodes_map(&self.masternodes),
             masternodes_count: self.masternodes.len(),
-            quorums: encode_quorums_map(&self.quorums),
-            quorums_count: self.quorums.len(),
+            llmq_type_maps: encode_quorums_map(&self.quorums),
+            llmq_type_maps_count: self.quorums.len()
         }
     }
 }
@@ -223,12 +223,21 @@ impl<'a> ToFFI<'a> for mn_list_diff::MNListDiff<'a> {
         let deleted_quorums_vec = self.deleted_quorums
             .clone()
             .into_iter()
-            .map(|hash| boxed(hash.0))
-            .collect::<Vec<*mut [u8; 32]>>();
+            .fold(Vec::new(), |mut acc, (llmq_type, hashes)| {
+                hashes
+                    .iter()
+                    .for_each(|&hash| acc.push(boxed(ffi::types::LLMQTypedHash { llmq_hash: boxed(hash.0), llmq_type: llmq_type.into() })));
+                acc
+            });
         let added_quorums_vec = self.added_quorums
-            .values()
-            .map(|entry| boxed(entry.encode()))
-            .collect::<Vec<*mut ffi::types::LLMQEntry>>();
+            .clone()
+            .into_iter()
+            .fold(Vec::new(), |mut acc, (_, map)| {
+                map
+                    .iter()
+                    .for_each(|(_, &entry)| acc.push(boxed(entry.encode())));
+                acc
+            });
         Self::Item {
             base_block_hash: boxed(self.base_block_hash.0),
             block_hash: boxed(self.block_hash.0),
@@ -292,6 +301,24 @@ impl<'a> ToFFI<'a> for llmq_rotation_info::LLMQRotationInfo<'a> {
         } else {
             (null_mut(), null_mut())
         };
+        /*let block_hash_list_num = self.block_hash_list.len();
+        let block_hash_list = boxed_vec(
+            (0..block_hash_list_num)
+                .into_iter()
+                .map(|i| boxed(self.block_hash_list[i].0))
+                .collect());
+        let snapshot_list_num = self.snapshot_list.len();
+        let snapshot_list = boxed_vec(
+            (0..snapshot_list_num)
+                .into_iter()
+                .map(|i| boxed(self.snapshot_list[i].encode()))
+                .collect());
+        let mn_list_diff_list_num = self.mn_list_diff_list.len();
+        let mn_list_diff_list = boxed_vec(
+            (0..mn_list_diff_list_num)
+                .into_iter()
+                .map(|i| boxed(self.mn_list_diff_list[i].encode()))
+                .collect());*/
         Self::Item {
             snapshot_at_h_c,
             snapshot_at_h_2c,
@@ -304,14 +331,28 @@ impl<'a> ToFFI<'a> for llmq_rotation_info::LLMQRotationInfo<'a> {
             extra_share,
             snapshot_at_h_4c,
             mn_list_diff_at_h_4c,
+            /*block_hash_list_num: block_hash_list_num as u32,
+            block_hash_list,
+            snapshot_list_num: snapshot_list_num as u32,
+            snapshot_list,
+            mn_list_diff_list_num: mn_list_diff_list_num as u32,
+            mn_list_diff_list*/
         }
     }
 }
 
-pub fn encode_quorums_map(quorums: &HashMap<UInt256, llmq_entry::LLMQEntry>) -> *mut *mut ffi::types::LLMQEntry {
+pub fn encode_quorums_map(quorums: &HashMap<LLMQType, HashMap<UInt256, llmq_entry::LLMQEntry>>) -> *mut *mut ffi::types::LLMQMap {
     boxed_vec(quorums
         .iter()
-        .map(|(_, entry)| boxed((*entry).encode()))
+        .map(|(&llmq_type, map)|
+            boxed(ffi::types::LLMQMap {
+                llmq_type: llmq_type.into(),
+                values: boxed_vec((*map)
+                    .iter()
+                    .map(|(_, &entry)| boxed(entry.encode()))
+                    .collect()),
+                count: (*map).len()
+            }))
         .collect())
 }
 

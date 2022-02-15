@@ -8,6 +8,6 @@ pub struct MasternodeList {
     pub llmq_merkle_root: *mut [u8; 32], // nullable
     pub masternodes: *mut *mut ffi::types::MasternodeEntry,
     pub masternodes_count: usize,
-    pub quorums: *mut *mut ffi::types::LLMQEntry,
-    pub quorums_count: usize,
+    pub llmq_type_maps: *mut *mut ffi::types::LLMQMap,
+    pub llmq_type_maps_count: usize,
 }

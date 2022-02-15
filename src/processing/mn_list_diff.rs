@@ -21,8 +21,8 @@ pub struct MNListDiff<'a> {
     pub deleted_masternode_hashes: Vec<UInt256>,
     pub added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
 
-    pub deleted_quorums: Vec<UInt256>,
-    pub added_quorums: HashMap<UInt256, LLMQEntry<'a>>,
+    pub deleted_quorums: HashMap<LLMQType, Vec<UInt256>>,
+    pub added_quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
 
     pub length: usize,
     pub block_height: u32,
@@ -62,19 +62,26 @@ impl<'a> MNListDiff<'a> {
                 acc
             });
 
-        let mut deleted_quorums: Vec<UInt256> = Vec::new();
-        let mut added_quorums: HashMap<UInt256, LLMQEntry> = HashMap::new();
+        let mut deleted_quorums: HashMap<LLMQType, Vec<UInt256>> = HashMap::new();
+        let mut added_quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry>> = HashMap::new();
         let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
         if quorums_active {
             let deleted_quorums_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..deleted_quorums_count {
-                let _llmq_type = LLMQType::from_bytes(message, offset)?;
-                deleted_quorums.push(UInt256::from_bytes(message, offset)?);
+                let llmq_type = LLMQType::from_bytes(message, offset)?;
+                let llmq_hash = UInt256::from_bytes(message, offset)?;
+                deleted_quorums
+                    .entry(llmq_type)
+                    .or_insert(Vec::new())
+                    .push(llmq_hash);
             }
             let added_quorums_count = VarInt::from_bytes(message, offset)?.0;
             for _i in 0..added_quorums_count {
                 if let Some(entry) = LLMQEntry::from_bytes(message, offset) {
-                    added_quorums.insert(entry.llmq_hash, entry);
+                    added_quorums
+                        .entry(entry.llmq_type)
+                        .or_insert(HashMap::new())
+                        .insert(entry.llmq_hash, entry);
                 }
             }
         }
