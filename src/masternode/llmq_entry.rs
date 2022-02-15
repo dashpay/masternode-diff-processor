@@ -33,6 +33,7 @@ pub struct LLMQEntry<'a> {
 impl<'a> std::fmt::Debug for LLMQEntry<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LLMQEntry")
+            .field("all_commitment_aggregated_signature", &self.all_commitment_aggregated_signature)
             .field("entry_hash", &self.entry_hash)
             .finish()
     }
