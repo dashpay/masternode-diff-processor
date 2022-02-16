@@ -230,8 +230,10 @@ pub fn validate_quorum<
     let valid_masternodes = valid_masternodes_for(llmq_masternode_list.masternodes, quorum.llmq_quorum_hash(), quorum.llmq_type.size(), block_height);
     let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
         .into_iter()
-        .filter(|&i| quorum.signers_bitset.bit_is_true_at_le_index(i as u32))
-        .map(|i| boxed(valid_masternodes[i].operator_public_key_at(block_height).0))
+        .filter_map(|i| match quorum.signers_bitset.bit_is_true_at_le_index(i as u32) {
+            true => Some(boxed(valid_masternodes[i].operator_public_key_at(block_height).0)),
+            false => None
+        })
         .collect();
     let operator_public_keys_count = operator_pks.len();
     let is_valid_signature = validate_llmq_callback(ffi::types::LLMQValidationData {
