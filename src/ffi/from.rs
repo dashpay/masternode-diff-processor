@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::slice;
+use hashes::hex::ToHex;
 use crate::common::block_data::BlockData;
 use crate::common::socket_address::SocketAddress;
 use crate::consensus::encode;
@@ -179,7 +180,8 @@ impl<'a> FromFFI<'a> for ffi::types::LLMQEntry {
     type Item = llmq_entry::LLMQEntry<'a>;
 
     unsafe fn decode(&self) -> Self::Item {
-        print!("LLMQEntry.from: {:?} {:?} {}", self.entry_hash, self.signers_bitset, self.signers_bitset_length);
+        let signers_bitset = slice::from_raw_parts(self.signers_bitset, self.signers_bitset_length);
+        println!("LLMQEntry.from: {:?} {:?} {:?} {}", self.entry_hash, self.signers_bitset, self.signers_bitset_length, signers_bitset.to_hex());
         Self::Item {
             version: self.version,
             llmq_hash: UInt256(*self.llmq_hash),
@@ -191,7 +193,7 @@ impl<'a> FromFFI<'a> for ffi::types::LLMQEntry {
             signers_count: encode::VarInt(self.signers_count),
             llmq_type: self.llmq_type,
             valid_members_count: encode::VarInt(self.valid_members_count),
-            signers_bitset: slice::from_raw_parts(self.signers_bitset, self.signers_bitset_length),
+            signers_bitset,
             valid_members_bitset: slice::from_raw_parts(self.valid_members_bitset, self.valid_members_bitset_length),
             length: self.length,
             entry_hash: UInt256(*self.entry_hash),
