@@ -188,7 +188,7 @@ impl<'a> ToFFI<'a> for llmq_entry::LLMQEntry<'a> {
     type Item = ffi::types::LLMQEntry;
 
     fn encode(&self) -> Self::Item {
-        print!("LLMQEntry.to: {:?} {} {}", self.entry_hash, self.signers_bitset.to_hex(), self.signers_bitset.len());
+        println!("LLMQEntry.to: {:?} {} {}", self.entry_hash, self.signers_bitset.to_hex(), self.signers_bitset.len());
         Self::Item {
             all_commitment_aggregated_signature: boxed(self.all_commitment_aggregated_signature.0),
             commitment_hash: if self.commitment_hash.is_none() {

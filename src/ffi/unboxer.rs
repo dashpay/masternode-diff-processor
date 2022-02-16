@@ -31,7 +31,6 @@ pub unsafe fn unbox_masternode_entry(x: *mut ffi::types::MasternodeEntry) {
 pub unsafe fn unbox_llmq_entry(x: *mut ffi::types::LLMQEntry) {
     println!("unbox_llmq_entry.1: {:?}", x);
     let entry = unbox_any(x);
-    println!("unbox_llmq_entry.2: {:?}", entry);
     unbox_any(entry.all_commitment_aggregated_signature);
     if !entry.commitment_hash.is_null() {
         unbox_any(entry.commitment_hash);
