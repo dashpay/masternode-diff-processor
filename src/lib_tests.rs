@@ -361,7 +361,7 @@ pub mod tests {
             );
             let result = unsafe { *result };
             println!("result: [{:?}]", result);
-            println!("MNDiff: {} added, {} modified", result.added_masternodes_count, result.modified_masternodes_count);
+            //println!("MNDiff: {} added, {} modified", result.added_masternodes_count, result.modified_masternodes_count);
             assert_diff_result(chain, result);
             let block_hash = UInt256(unsafe { *result.block_hash });
             let masternode_list = unsafe { *result.masternode_list };

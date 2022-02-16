@@ -2,6 +2,7 @@ use std::convert::Into;
 use byte::{BytesExt, LE, TryRead};
 use byte::ctx::{Bytes, Endian};
 use hashes::{Hash, sha256d};
+use hashes::hex::ToHex;
 use crate::common::llmq_type::LLMQType;
 use crate::consensus::{Encodable, WriteExt};
 use crate::consensus::encode::VarInt;
@@ -34,7 +35,8 @@ impl<'a> std::fmt::Debug for LLMQEntry<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LLMQEntry")
             .field("entry_hash", &self.entry_hash)
-            .field("signers_bitset", &self.signers_bitset)
+            .field("signers_bitset", &self.signers_bitset.to_hex())
+            .field("signers_bitset_length", &self.signers_bitset.len())
             .field("signers_bitset_count", &self.signers_count.0)
             .finish()
     }

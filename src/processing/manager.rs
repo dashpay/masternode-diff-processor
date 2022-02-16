@@ -141,8 +141,8 @@ pub fn classify_quorums<'a,
         bool,
         Vec<*mut [u8; 32]>
     ) {
-    #[cfg(test)] log_quorums_map(base_quorums.clone(), "old_quorums".to_string());
-    #[cfg(test)] log_quorums_map(added_quorums.clone(), "added_quorums".to_string());
+    //#[cfg(test)] log_quorums_map(base_quorums.clone(), "old_quorums".to_string());
+    //#[cfg(test)] log_quorums_map(added_quorums.clone(), "added_quorums".to_string());
     let has_valid_quorums = true;
     let mut needed_masternode_lists: Vec<*mut [u8; 32]> = Vec::new();
     added_quorums.iter()
@@ -176,7 +176,7 @@ pub fn classify_quorums<'a,
         .into_iter()
         .filter(|(key, _entries)| !quorums.contains_key(key))
         .collect::<HashMap<LLMQType, HashMap<UInt256, LLMQEntry>>>());
-    #[cfg(test)] log_quorums_map(quorums.clone(), "quorums_after_add".to_string());
+    //#[cfg(test)] log_quorums_map(quorums.clone(), "quorums_after_add".to_string());
     quorums.iter_mut().for_each(|(llmq_type, llmq_map)| {
         if let Some(keys_to_delete) = deleted_quorums.get(llmq_type) {
             keys_to_delete.into_iter().for_each(|key| {
@@ -190,7 +190,7 @@ pub fn classify_quorums<'a,
         }
     });
 
-    #[cfg(test)] log_quorums_map(quorums.clone(), "quorums".to_string());
+    //#[cfg(test)] log_quorums_map(quorums.clone(), "quorums".to_string());
     (added_quorums, quorums, has_valid_quorums, needed_masternode_lists)
 }
 
@@ -273,7 +273,7 @@ pub fn valid_masternodes_for(masternodes: BTreeMap<UInt256, MasternodeEntry>, qu
             None
         }
     }).collect();
-    
+
     let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
     scores.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
     let masternodes_in_list_count = masternodes.len();
