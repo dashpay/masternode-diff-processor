@@ -227,7 +227,9 @@ pub fn validate_quorum<
     validate_llmq_callback: VQL
 ) {
     let block_height: u32 = block_height_lookup(llmq_masternode_list.block_hash);
-    let valid_masternodes = valid_masternodes_for(llmq_masternode_list.masternodes, quorum.llmq_quorum_hash(), quorum.llmq_type.size(), block_height);
+    let quorum_modifier = quorum.llmq_quorum_hash();
+    let quorum_count = quorum.llmq_type.size();
+    let valid_masternodes = valid_masternodes_for(llmq_masternode_list.masternodes, quorum_modifier, quorum_count, block_height);
     let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
         .into_iter()
         .filter_map(|i| match quorum.signers_bitset.bit_is_true_at_le_index(i as u32) {
@@ -271,20 +273,21 @@ pub fn valid_masternodes_for(masternodes: BTreeMap<UInt256, MasternodeEntry>, qu
             None
         }
     }).collect();
+    
     let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
     scores.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
-    let mut masternodes: Vec<MasternodeEntry> = Vec::new();
     let masternodes_in_list_count = masternodes.len();
+    let mut valid_masternodes: Vec<MasternodeEntry> = Vec::new();
     let count = min(masternodes_in_list_count, scores.len());
     for i in 0..count {
         if let Some(masternode) = score_dictionary.get_mut(&scores[i]) {
             if (*masternode).is_valid_at(block_height) {
-                masternodes.push((*masternode).clone());
+                valid_masternodes.push((*masternode).clone());
             }
         }
-        if masternodes.len() == quorum_count as usize {
+        if valid_masternodes.len() == quorum_count as usize {
             break;
         }
     }
-    masternodes
+    valid_masternodes
 }
