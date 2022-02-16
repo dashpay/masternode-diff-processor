@@ -179,7 +179,7 @@ impl<'a> FromFFI<'a> for ffi::types::LLMQEntry {
     type Item = llmq_entry::LLMQEntry<'a>;
 
     unsafe fn decode(&self) -> Self::Item {
-        print!("LLMQEntry.from: {:?} {} {}", self.entry_hash, self.signers_bitset, self.signers_bitset_length);
+        print!("LLMQEntry.from: {:?} {:?} {}", self.entry_hash, self.signers_bitset, self.signers_bitset_length);
         Self::Item {
             version: self.version,
             llmq_hash: UInt256(*self.llmq_hash),
