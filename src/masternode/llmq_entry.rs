@@ -19,11 +19,11 @@ pub struct LLMQEntry<'a> {
     pub threshold_signature: UInt768,
     pub verification_vector_hash: UInt256,
     pub all_commitment_aggregated_signature: UInt768,
-    pub signers_count: VarInt,
     pub llmq_type: LLMQType,
-    pub valid_members_count: VarInt,
     pub signers_bitset: &'a [u8],
+    pub signers_count: VarInt,
     pub valid_members_bitset: &'a [u8],
+    pub valid_members_count: VarInt,
     pub length: usize,
     pub entry_hash: UInt256,
     pub verified: bool,
@@ -34,6 +34,8 @@ impl<'a> std::fmt::Debug for LLMQEntry<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LLMQEntry")
             .field("entry_hash", &self.entry_hash)
+            .field("signers_bitset", &self.signers_bitset)
+            .field("signers_bitset_count", &self.signers_count.0)
             .finish()
     }
 }

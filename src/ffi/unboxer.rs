@@ -34,7 +34,6 @@ pub unsafe fn unbox_llmq_entry(x: *mut ffi::types::LLMQEntry) {
     if !entry.commitment_hash.is_null() {
         unbox_any(entry.commitment_hash);
     }
-
     unbox_any(entry.entry_hash);
     unbox_any(entry.llmq_hash);
     unbox_any(entry.public_key);
