@@ -31,20 +31,28 @@ pub unsafe fn unbox_masternode_entry(x: *mut ffi::types::MasternodeEntry) {
 pub unsafe fn unbox_llmq_entry(x: *mut ffi::types::LLMQEntry) {
     println!("unbox_llmq_entry.1: {:?}", x);
     let entry = unbox_any(x);
+    println!("unbox_llmq_entry.all_commitment_aggregated_signature: {:?}", entry.all_commitment_aggregated_signature);
     unbox_any(entry.all_commitment_aggregated_signature);
+    println!("unbox_llmq_entry.commitment_hash: {:?}", entry.commitment_hash);
     if !entry.commitment_hash.is_null() {
         unbox_any(entry.commitment_hash);
     }
     println!("unbox_llmq_entry.entry_hash: {:?}", entry.entry_hash);
     unbox_any(entry.entry_hash);
+    println!("unbox_llmq_entry.llmq_hash =>: {:?}", entry.llmq_hash);
     unbox_any(entry.llmq_hash);
+    println!("unbox_llmq_entry.public_key =>: {:?}", entry.public_key);
     unbox_any(entry.public_key);
+    println!("unbox_llmq_entry.threshold_signature =>: {:?}", entry.threshold_signature);
     unbox_any(entry.threshold_signature);
+    println!("unbox_llmq_entry.verification_vector_hash =>: {:?}", entry.verification_vector_hash);
     unbox_any(entry.verification_vector_hash);
     println!("unbox_llmq_entry.signers_bitset =>: {:?}:{:?}", entry.signers_bitset, entry.signers_bitset_length);
+    println!("unbox_llmq_entry.valid_members_bitset =>: {:?}:{:?}", entry.valid_members_bitset, entry.valid_members_bitset_length);
     let signers_bitset = std::ptr::slice_from_raw_parts_mut(entry.signers_bitset, entry.signers_bitset_length);
-    println!("unbox_llmq_entry.signers_bitset <=: {:?}", signers_bitset);
     let valid_members_bitset = std::ptr::slice_from_raw_parts_mut(entry.valid_members_bitset, entry.valid_members_bitset_length);
+    println!("unbox_llmq_entry.signers_bitset <=: {:?}", signers_bitset);
+    println!("unbox_llmq_entry.valid_members_bitset <=: {:?}", valid_members_bitset);
     unbox_any(signers_bitset as *mut [u8]);
     unbox_any(valid_members_bitset as *mut [u8]);
 }
