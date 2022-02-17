@@ -49,12 +49,12 @@ pub unsafe fn unbox_llmq_entry(x: *mut ffi::types::LLMQEntry) {
     unbox_any(entry.verification_vector_hash);
     println!("unbox_llmq_entry.signers_bitset =>: {:?}:{:?}", entry.signers_bitset, entry.signers_bitset_length);
     println!("unbox_llmq_entry.valid_members_bitset =>: {:?}:{:?}", entry.valid_members_bitset, entry.valid_members_bitset_length);
-    let signers_bitset = std::ptr::slice_from_raw_parts_mut(entry.signers_bitset, entry.signers_bitset_length);
-    let valid_members_bitset = std::ptr::slice_from_raw_parts_mut(entry.valid_members_bitset, entry.valid_members_bitset_length);
+    let signers_bitset = std::ptr::slice_from_raw_parts_mut::<u8>(entry.signers_bitset, entry.signers_bitset_length);
+    let valid_members_bitset = std::ptr::slice_from_raw_parts_mut::<u8>(entry.valid_members_bitset, entry.valid_members_bitset_length);
     println!("unbox_llmq_entry.signers_bitset <=: {:?}", signers_bitset);
     println!("unbox_llmq_entry.valid_members_bitset <=: {:?}", valid_members_bitset);
-    unbox_any(signers_bitset as *mut [u8]);
-    unbox_any(valid_members_bitset as *mut [u8]);
+    unbox_any(signers_bitset);
+    unbox_any(valid_members_bitset);
 }
 
 pub unsafe fn unbox_llmq_map(x: *mut ffi::types::LLMQMap) {
