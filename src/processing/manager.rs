@@ -35,10 +35,11 @@ pub fn lookup_masternode_list<'a,
     let lookup_result = masternode_list_lookup(block_hash);
     if !lookup_result.is_null() {
         let list_encoded = unsafe { *lookup_result };
-        println!("lookup_masternode_list (encoded) ->: {:?}", list_encoded);
+        println!("lookup_masternode_list (encoded) ->: {:?}", list_encoded.llmq_type_maps);
         let list = unsafe { list_encoded.decode() };
-        println!("lookup_masternode_list (decoded) ->: {:?}", list);
+        println!("lookup_masternode_list (decoded) ->: {:?}", list.quorums);
         masternode_list_destroy(lookup_result);
+        println!("lookup_masternode_list (after destroy) ->: {:?}", list.quorums);
         Some(list)
     } else {
         None
