@@ -37,9 +37,9 @@ pub fn lookup_masternode_list<'a,
         let list_encoded = unsafe { *lookup_result };
         println!("lookup_masternode_list (encoded) ->: {:?}", list_encoded.llmq_type_maps);
         let list = unsafe { list_encoded.decode() };
-        println!("lookup_masternode_list (decoded) ->: {:?}", list.quorums);
+        println!("lookup_masternode_list (decoded) ->: {:?}", list);
         masternode_list_destroy(lookup_result);
-        println!("lookup_masternode_list (after destroy) ->: {:?}", list.quorums);
+        println!("lookup_masternode_list (after destroy) ->: {:?}", list);
         Some(list)
     } else {
         None

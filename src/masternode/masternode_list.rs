@@ -22,8 +22,7 @@ impl<'a> std::fmt::Debug for MasternodeList<'a> {
             .field("masternode_merkle_root", &self.masternode_merkle_root)
             .field("llmq_merkle_root", &self.llmq_merkle_root)
             .field("masternodes", &self.masternodes.len())
-            .field("quorums", &self.quorums.len())
-            // .field("quorums", &self.quorums)
+            .field("quorums", &self.quorums)
             .finish()
     }
 }

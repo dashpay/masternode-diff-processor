@@ -34,10 +34,10 @@ pub struct LLMQEntry<'a> {
 impl<'a> std::fmt::Debug for LLMQEntry<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LLMQEntry")
+            .field("llmq_hash", &self.llmq_hash)
             .field("entry_hash", &self.entry_hash)
             .field("signers_bitset", &self.signers_bitset.to_hex())
             .field("signers_bitset_length", &self.signers_bitset.len())
-            .field("signers_bitset_count", &self.signers_count.0)
             .finish()
     }
 }
