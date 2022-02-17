@@ -34,9 +34,7 @@ pub fn lookup_masternode_list<'a,
     //println!("lookup_masternode_list <-: {:?}", hex_with_data(block_hash.0.as_slice()));
     let lookup_result = masternode_list_lookup(block_hash);
     if !lookup_result.is_null() {
-        let list_encoded = unsafe { *lookup_result };
-        println!("lookup_masternode_list (encoded) ->: {:?}", list_encoded.llmq_type_maps);
-        let list = unsafe { list_encoded.decode() };
+        let list = unsafe { (*lookup_result).decode() };
         println!("lookup_masternode_list (decoded) ->: {:?}", list);
         masternode_list_destroy(lookup_result);
         println!("lookup_masternode_list (after destroy) ->: {:?}", list);

@@ -180,10 +180,8 @@ impl<'a> FromFFI<'a> for ffi::types::LLMQEntry {
     type Item = llmq_entry::LLMQEntry<'a>;
 
     unsafe fn decode(&self) -> Self::Item {
-        let signers_bitset = slice::from_raw_parts_mut(self.signers_bitset, self.signers_bitset_length);
-        //let signers_bitset = slice::from_raw_parts(self.signers_bitset, self.signers_bitset_length);
-        let valid_members_bitset = slice::from_raw_parts_mut(self.valid_members_bitset, self.valid_members_bitset_length);
-        //let valid_members_bitset = slice::from_raw_parts(self.valid_members_bitset, self.valid_members_bitset_length);
+        let signers_bitset = slice::from_raw_parts(self.signers_bitset, self.signers_bitset_length);
+        let valid_members_bitset = slice::from_raw_parts(self.valid_members_bitset, self.valid_members_bitset_length);
         println!("LLMQEntry.from: {:?} {:?} {:?} {}", self.entry_hash, self.signers_bitset, self.signers_bitset_length, signers_bitset.to_hex());
         // println!("LLMQEntry.from: {:?} {:?} {:?} {}", self.entry_hash, self.valid_members_bitset, self.signers_bitset_length, signers_bitset.to_hex());
         Self::Item {
