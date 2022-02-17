@@ -56,7 +56,7 @@ pub fn lookup_masternodes_and_quorums_for<'a,
 ) -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>) {
     if let Some(block_hash) = block_hash {
         if let Some(list) = lookup_masternode_list(block_hash, masternode_list_lookup, masternode_list_destroy) {
-            return (list.masternodes.clone(), list.quorums.clone());
+            return (list.masternodes, list.quorums);
         }
     }
     (BTreeMap::new(), HashMap::new())

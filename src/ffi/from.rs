@@ -180,8 +180,10 @@ impl<'a> FromFFI<'a> for ffi::types::LLMQEntry {
     type Item = llmq_entry::LLMQEntry<'a>;
 
     unsafe fn decode(&self) -> Self::Item {
-        let signers_bitset = slice::from_raw_parts(self.signers_bitset, self.signers_bitset_length);
+        let signers_bitset = slice::from_raw_parts(self.signers_bitset.clone(), self.signers_bitset_length);
+        let valid_members_bitset = slice::from_raw_parts(self.valid_members_bitset.clone(), self.valid_members_bitset_length);
         println!("LLMQEntry.from: {:?} {:?} {:?} {}", self.entry_hash, self.signers_bitset, self.signers_bitset_length, signers_bitset.to_hex());
+        // println!("LLMQEntry.from: {:?} {:?} {:?} {}", self.entry_hash, self.valid_members_bitset, self.signers_bitset_length, signers_bitset.to_hex());
         Self::Item {
             version: self.version,
             llmq_hash: UInt256(*self.llmq_hash),
@@ -194,7 +196,7 @@ impl<'a> FromFFI<'a> for ffi::types::LLMQEntry {
             llmq_type: self.llmq_type,
             valid_members_count: encode::VarInt(self.valid_members_count),
             signers_bitset,
-            valid_members_bitset: slice::from_raw_parts(self.valid_members_bitset, self.valid_members_bitset_length),
+            valid_members_bitset,
             length: self.length,
             entry_hash: UInt256(*self.entry_hash),
             verified: self.verified,
