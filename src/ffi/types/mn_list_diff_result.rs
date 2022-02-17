@@ -55,6 +55,7 @@ impl MNListDiffResult {
             block_height,
             block_hash
         );
+        println!("MNListDiffResult.from_diff.base_quorums: \n[{:?}] \nadded_quorums:\n [{:?}]", base_quorums.clone(), list_diff.added_quorums.clone());
         let (added_quorums,
             quorums,
             has_valid_quorums,
@@ -64,6 +65,7 @@ impl MNListDiffResult {
             list_diff.deleted_quorums,
             manager
         );
+        println!("MNListDiffResult.from_diff.added_quorums: \n[{:?}] \nquorums:\n [{:?}]", added_quorums.clone(), quorums.clone());
         let masternode_list = masternode_list::MasternodeList::new(masternodes, quorums, block_hash, block_height, quorums_active);
         let has_valid_mn_list_root = masternode_list.has_valid_mn_list_root(&coinbase_transaction);
         let tree_element_count = list_diff.total_transactions;
