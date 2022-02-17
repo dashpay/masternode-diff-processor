@@ -57,6 +57,8 @@ pub unsafe fn unbox_llmq_map(x: *mut ffi::types::LLMQMap) {
     }
 }
 pub unsafe fn unbox_masternode_list(masternode_list: Box<ffi::types::MasternodeList>) {
+    println!("unbox_masternode_list.1 {:?}", masternode_list);
+    println!("unbox_masternode_list.2 {:?}", masternode_list.block_hash);
     unbox_any(masternode_list.block_hash);
     if !masternode_list.masternode_merkle_root.is_null() {
         unbox_any(masternode_list.masternode_merkle_root);
