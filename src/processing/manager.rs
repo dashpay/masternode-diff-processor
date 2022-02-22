@@ -25,7 +25,7 @@ pub struct Manager<
 
 pub fn lookup_masternode_list<'a,
     MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
-    MND: Fn(*const ffi::types::MasternodeList) + Copy,
+    MND: Fn(*const ffi::types::MasternodeList),
 >(
     block_hash: UInt256,
     masternode_list_lookup: MNL,
