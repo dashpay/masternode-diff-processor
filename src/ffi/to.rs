@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ptr::null_mut;
-use hashes::hex::ToHex;
 use crate::common::block_data::BlockData;
 use crate::crypto::byte_util::UInt256;
 use crate::{ffi, LLMQType};
@@ -188,7 +187,7 @@ impl<'a> ToFFI<'a> for llmq_entry::LLMQEntry<'a> {
     type Item = ffi::types::LLMQEntry;
 
     fn encode(&self) -> Self::Item {
-        println!("LLMQEntry.to: {:?} {} {}", self.entry_hash, self.signers_bitset.to_hex(), self.signers_bitset.len());
+        //println!("LLMQEntry.to: {:?} {} {}", self.entry_hash, self.signers_bitset.to_hex(), self.signers_bitset.len());
         Self::Item {
             all_commitment_aggregated_signature: boxed(self.all_commitment_aggregated_signature.0),
             commitment_hash: if self.commitment_hash.is_none() {

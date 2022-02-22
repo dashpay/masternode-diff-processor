@@ -76,8 +76,8 @@ impl<'a> TryRead<'a, Endian> for LLMQEntry<'a> {
             public_key, verification_vector_hash, threshold_signature,
             all_commitment_aggregated_signature);
         let entry_hash = UInt256(sha256d::Hash::hash(q_data.as_slice()).into_inner());
-        println!("LLMQEntry.try_read.signers_bitset: {:?} {:?} {}", entry_hash, signers_bitset.len(), signers_bitset.to_hex());
-        println!("LLMQEntry.try_read.valid_members_bitset: {:?} {:?} {}", entry_hash, valid_members_bitset.len(), valid_members_bitset.to_hex());
+        // println!("LLMQEntry.try_read.signers_bitset: {:?} {:?} {}", entry_hash, signers_bitset.len(), signers_bitset.to_hex());
+        // println!("LLMQEntry.try_read.valid_members_bitset: {:?} {:?} {}", entry_hash, valid_members_bitset.len(), valid_members_bitset.to_hex());
         Ok((LLMQEntry {
             version,
             llmq_hash,

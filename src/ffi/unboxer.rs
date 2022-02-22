@@ -29,25 +29,24 @@ pub unsafe fn unbox_masternode_entry(x: *mut ffi::types::MasternodeEntry) {
 }
 
 pub unsafe fn unbox_llmq_entry(x: *mut ffi::types::LLMQEntry) {
-    println!("unbox_llmq_entry.1: {:?}", x);
     let entry = unbox_any(x);
     unbox_any(entry.all_commitment_aggregated_signature);
     if !entry.commitment_hash.is_null() {
         unbox_any(entry.commitment_hash);
     }
-    println!("unbox_llmq_entry.entry_hash: {:?}", entry.entry_hash);
+    // println!("unbox_llmq_entry.entry_hash: {:?}", entry.entry_hash);
     unbox_any(entry.entry_hash);
-    println!("unbox_llmq_entry.llmq_hash =>: {:?}", entry.llmq_hash);
+    // println!("unbox_llmq_entry.llmq_hash =>: {:?}", entry.llmq_hash);
     unbox_any(entry.llmq_hash);
     unbox_any(entry.public_key);
     unbox_any(entry.threshold_signature);
     unbox_any(entry.verification_vector_hash);
-    println!("unbox_llmq_entry.signers_bitset =>: {:?}:{:?}", entry.signers_bitset, entry.signers_bitset_length);
-    println!("unbox_llmq_entry.valid_members_bitset =>: {:?}:{:?}", entry.valid_members_bitset, entry.valid_members_bitset_length);
+    // println!("unbox_llmq_entry.signers_bitset =>: {:?}:{:?}", entry.signers_bitset, entry.signers_bitset_length);
+    // println!("unbox_llmq_entry.valid_members_bitset =>: {:?}:{:?}", entry.valid_members_bitset, entry.valid_members_bitset_length);
     let signers_bitset = std::ptr::slice_from_raw_parts_mut::<u8>(entry.signers_bitset, entry.signers_bitset_length);
     let valid_members_bitset = std::ptr::slice_from_raw_parts_mut::<u8>(entry.valid_members_bitset, entry.valid_members_bitset_length);
-    println!("unbox_llmq_entry.signers_bitset <=: {:?}", signers_bitset);
-    println!("unbox_llmq_entry.valid_members_bitset <=: {:?}", valid_members_bitset);
+    // println!("unbox_llmq_entry.signers_bitset <=: {:?}", signers_bitset);
+    // println!("unbox_llmq_entry.valid_members_bitset <=: {:?}", valid_members_bitset);
     unbox_any(signers_bitset);
     unbox_any(valid_members_bitset);
 }
@@ -60,8 +59,8 @@ pub unsafe fn unbox_llmq_map(x: *mut ffi::types::LLMQMap) {
     }
 }
 pub unsafe fn unbox_masternode_list(masternode_list: Box<ffi::types::MasternodeList>) {
-    println!("unbox_masternode_list.1 {:?}", masternode_list);
-    println!("unbox_masternode_list.2 {:?}", masternode_list.block_hash);
+    // println!("unbox_masternode_list.1 {:?}", masternode_list);
+    // println!("unbox_masternode_list.2 {:?}", masternode_list.block_hash);
     unbox_any(masternode_list.block_hash);
     if !masternode_list.masternode_merkle_root.is_null() {
         unbox_any(masternode_list.masternode_merkle_root);

@@ -73,6 +73,7 @@ pub fn mnl_diff_process<
     validate_llmq_callback: ValidateLLMQCallback,
     context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut MNListDiffResult {
+    println!("mnl_diff_process.start: {:?}", std::time::Instant::now());
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let desired_merkle_root = match UInt256::from_const(merkle_root) {
         Some(data) => data,
@@ -83,7 +84,7 @@ pub fn mnl_diff_process<
         None => { return failure(); }
     };
     let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
-    println!("mnl_diff_process: {:?}", base_masternode_list_hash);
+    // println!("mnl_diff_process: {:?}", base_masternode_list_hash);
     let manager = Manager {
         block_height_lookup,
         masternode_list_lookup,
@@ -95,6 +96,7 @@ pub fn mnl_diff_process<
         base_masternode_list_hash
     };
     let result = MNListDiffResult::from_diff(list_diff, manager, desired_merkle_root);
+    println!("mnl_diff_process.finish: {:?}", std::time::Instant::now());
     boxed(result)
 }
 
