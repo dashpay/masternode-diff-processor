@@ -36,7 +36,7 @@ pub fn lookup_masternode_list<'a,
     if !lookup_result.is_null() {
         let list = unsafe { (*lookup_result).decode() };
         println!("lookup_masternode_list (decoded) ->: {:?}", list);
-        masternode_list_destroy(lookup_result);
+        //masternode_list_destroy(lookup_result);
         println!("lookup_masternode_list (after destroy) ->: {:?}", list);
         Some(list)
     } else {
