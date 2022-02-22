@@ -119,7 +119,8 @@ impl<'a> FromFFI<'a> for ffi::types::MasternodeList {
                         (0..llmq_map.count)
                             .into_iter()
                             .fold(HashMap::new(), |mut acc, j| {
-                                let value = (*(*(llmq_map.values.offset(j as isize)))).decode();
+                                let raw_value = *(*(llmq_map.values.offset(j as isize)));
+                                let value = raw_value.decode();
                                 let key = value.llmq_hash.clone();
                                 acc.insert(key, value);
                                 acc
@@ -180,8 +181,8 @@ impl<'a> FromFFI<'a> for ffi::types::LLMQEntry {
     type Item = llmq_entry::LLMQEntry<'a>;
 
     unsafe fn decode(&self) -> Self::Item {
-        let signers_bitset = slice::from_raw_parts(self.signers_bitset, self.signers_bitset_length);
-        let valid_members_bitset = slice::from_raw_parts(self.valid_members_bitset, self.valid_members_bitset_length);
+        let signers_bitset = slice::from_raw_parts(self.signers_bitset as *const u8, self.signers_bitset_length);
+        let valid_members_bitset = slice::from_raw_parts(self.valid_members_bitset as *const u8, self.valid_members_bitset_length);
         println!("LLMQEntry.from: {:?} {:?} {:?} {}", self.entry_hash, self.signers_bitset, self.signers_bitset_length, signers_bitset.to_hex());
         // println!("LLMQEntry.from: {:?} {:?} {:?} {}", self.entry_hash, self.valid_members_bitset, self.signers_bitset_length, signers_bitset.to_hex());
         Self::Item {
