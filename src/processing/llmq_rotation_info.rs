@@ -1,5 +1,3 @@
-// use crate::{MNListDiff, LLMQSnapshot};
-
 use crate::{LLMQSnapshot, MNListDiff};
 
 #[derive(Debug)]
@@ -15,7 +13,4 @@ pub struct LLMQRotationInfo<'a> {
     pub mn_list_diff_at_h_3c: MNListDiff<'a>,
     pub mn_list_diff_at_h_4c: Option<MNListDiff<'a>>, // exist only if extra_share is true
     pub extra_share: bool,
-    /*pub block_hash_list: Vec<UInt256>,
-    pub snapshot_list: Vec<LLMQSnapshot<'a>>,
-    pub mn_list_diff_list: Vec<MNListDiff<'a>>,*/
 }
