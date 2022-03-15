@@ -122,8 +122,7 @@ impl<'a> MasternodeList<'a> {
                 .into_iter()
                 .map(|hash| {
                     let h = hash.clone();
-                    let map = mns.clone();
-                    let mn = &map[&h];
+                    let mn = &mns[&h];
                     let entry_hash = mn.masternode_entry_hash_at(block_height);
                     entry_hash
                 })
