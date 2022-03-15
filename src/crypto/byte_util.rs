@@ -75,7 +75,7 @@ pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
         let len = level.len();
         let capacity = (0.5 * len as f64).round();
         let mut higher_level: Vec<UInt256> = Vec::with_capacity(capacity as usize);
-        for i in (0..level.len()).step_by(2) {
+        for i in (0..len).step_by(2) {
             let offset = &mut 0;
             let mut buffer: Vec<u8> = Vec::with_capacity(64);
             let left = level[i];
