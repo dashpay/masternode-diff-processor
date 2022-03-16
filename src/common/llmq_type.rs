@@ -1,10 +1,11 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, TryWrite};
 use crate::consensus::Encodable;
+use crate::crypto::byte_util::BytesDecodable;
 
 #[warn(non_camel_case_types)]
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 pub enum LLMQType {
     Llmqtype50_60 = 1,  // every 24 blocks
     Llmqtype400_60 = 2, // 288 blocks
@@ -16,7 +17,7 @@ pub enum LLMQType {
 }
 
 impl LLMQType {
-    pub fn quorum_size(&self) -> u32 {
+    pub fn size(&self) -> u32 {
         match self {
             LLMQType::Llmqtype5_60 => 5,
             LLMQType::Llmqtype10_60 => 10,
@@ -28,7 +29,7 @@ impl LLMQType {
         }
     }
 
-    pub fn quorum_threshold(&self) -> u32 {
+    pub fn threshold(&self) -> u32 {
         match self {
             LLMQType::Llmqtype50_60 => 30,
             LLMQType::Llmqtype400_60 => 240,
@@ -83,5 +84,13 @@ impl<'a> TryWrite<Endian> for LLMQType {
         let orig: u8 = self.into();
         orig.consensus_encode(bytes).unwrap();
         Ok(1)
+    }
+}
+impl<'a> BytesDecodable<'a, LLMQType> for LLMQType {
+    fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<LLMQType> {
+        match bytes.read_with::<LLMQType>(offset, byte::LE) {
+            Ok(data) => Some(data),
+            Err(_err) => None
+        }
     }
 }

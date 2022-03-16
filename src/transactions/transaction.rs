@@ -1,21 +1,13 @@
-use byte::{BytesExt, LE};
+use byte::ctx::Endian;
+use byte::{BytesExt, LE, TryRead};
 use hashes::Hash;
-//use crate::blockdata::opcodes::all::OP_RETURN;
-use crate::consensus::{Decodable, Encodable};
+use crate::consensus::Encodable;
 use crate::consensus::encode::{consensus_encode_with_size, VarInt};
-use crate::crypto::byte_util::{data_at_offset_from, UInt256};
+use crate::crypto::byte_util::{UInt256, VarBytes};
 use crate::hashes::{sha256d};
 use crate::hashes::_export::_core::fmt::Debug;
 use crate::transactions::transaction::TransactionType::Classic;
 
-// estimated size for a typical transaction output
-//pub static TX_OUTPUT_SIZE: usize = 34;
-// estimated size for a typical compact pubkey transaction input
-//pub static TX_INPUT_SIZE: usize = 148;
-// standard tx fee per b of tx size
-//pub static TX_FEE_PER_B: u64 = 1;
-// standard ix fee per input
-//pub static TX_FEE_PER_INPUT: u64 = 10000;
 // block height indicating transaction is unconfirmed
 pub const TX_UNCONFIRMED: i32 = i32::MAX;
 
@@ -64,7 +56,6 @@ impl Into<u16> for TransactionType {
     }
 }
 
-
 impl TransactionType {
     fn raw_value(&self) -> u16 {
         *self as u16
@@ -72,8 +63,7 @@ impl TransactionType {
     pub fn requires_inputs(&self) -> bool { true }
 }
 
-// #[repr(C)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct TransactionInput<'a> {
     pub input_hash: UInt256,
     pub index: u32,
@@ -82,13 +72,48 @@ pub struct TransactionInput<'a> {
     pub sequence: u32,
 }
 
-// #[repr(C)]
-#[derive(Debug)]
+impl<'a> TryRead<'a, Endian> for TransactionInput<'a> {
+    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
+        let offset = &mut 0;
+        let input_hash = bytes.read_with::<UInt256>(offset, LE)?;
+        let index = bytes.read_with::<u32>(offset, LE)?;
+        let signature = match bytes.read_with::<VarBytes>(offset, LE) {
+            Ok(data) => Some(data.1),
+            Err(_err) => None
+        };
+        let sequence = bytes.read_with::<u32>(offset, LE)?;
+        let input = TransactionInput {
+            input_hash,
+            index,
+            script: None,
+            signature,
+            sequence
+        };
+        Ok((input, *offset))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct TransactionOutput<'a> {
     pub amount: u64,
     pub script: Option<&'a [u8]>,
-    pub address: Option<&'a str>,
+    pub address: Option<&'a [u8]>,
 }
+
+impl<'a> TryRead<'a, Endian> for TransactionOutput<'a> {
+    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
+        let offset = &mut 0;
+        let amount = bytes.read_with::<u64>(offset, LE)?;
+        let script = match bytes.read_with::<VarBytes>(offset, LE) {
+            Ok(data) => Some(data.1),
+            Err(_err) => None
+        };
+        let output = TransactionOutput { amount, script, address: None };
+        Ok((output, *offset))
+    }
+}
+
+
 pub trait ITransaction {
     fn payload_data(&self) -> Vec<u8>;
     fn payload_data_for(&self) -> Vec<u8>;
@@ -167,82 +192,30 @@ impl<'a> Transaction<'a> {
         }
         buffer
     }
-
-    pub fn new(message: &'a [u8]) -> Option<Self> {
-        let payload_offset = &mut 0;
-        let version = match message.read_with::<u16>(payload_offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let tx_type = match message.read_with::<u16>(payload_offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
-        let tx_type = TransactionType::from(tx_type);
-
-        let count_var = match VarInt::consensus_decode(&message[*payload_offset..]) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
+}
+impl<'a> TryRead<'a, Endian> for Transaction<'a> {
+    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
+        let offset = &mut 0;
+        let version = bytes.read_with::<u16>(offset, endian)?;
+        let tx_type_uint = bytes.read_with::<u16>(offset, endian)?;
+        let tx_type = TransactionType::from(tx_type_uint);
+        let count_var = bytes.read_with::<VarInt>(offset, endian)?;
         let count = count_var.0;
-        *payload_offset += count_var.len();
-
+        // at least one input is required
         if count == 0 && tx_type.requires_inputs() {
-            return None; // at least one input is required
+            return Err(byte::Error::Incomplete);
         }
         let mut inputs: Vec<TransactionInput> = Vec::new();
         for _i in 0..count {
-            let input_hash = match message.read_with::<UInt256>(payload_offset, LE) {
-                Ok(data) => data,
-                Err(_err) => { return None; }
-            };
-            let index = match message.read_with::<u32>(payload_offset, LE) {
-                Ok(data) => data,
-                Err(_err) => { return None; }
-            };
-            let signature: Option<&[u8]> = match data_at_offset_from(message, payload_offset) {
-                Ok(data) => Some(data),
-                Err(_err) => None
-            };
-            let sequence = match message.read_with::<u32>(payload_offset, LE) {
-                Ok(data) => data,
-                Err(_err) => { return None; }
-            };
-            let input = TransactionInput {
-                input_hash,
-                index,
-                script: None,
-                signature,
-                sequence
-            };
-            inputs.push(input);
+            inputs.push(bytes.read_with::<TransactionInput>(offset, endian)?);
         }
         let mut outputs: Vec<TransactionOutput> = Vec::new();
-
-        let count_var = match VarInt::consensus_decode(&message[*payload_offset..]) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
+        let count_var = bytes.read_with::<VarInt>(offset, endian)?;
         let count = count_var.0;
-        *payload_offset += count_var.len();
-
         for _i in 0..count {
-            let amount = match message.read_with::<u64>(payload_offset, LE) {
-                Ok(data) => data,
-                Err(_err) => { return None; }
-            };
-            let script: Option<&[u8]> = match data_at_offset_from(message, payload_offset) {
-                Ok(data) => Some(data),
-                Err(_err) => None
-            };
-            let output = TransactionOutput { amount, script, address: None };
-            outputs.push(output);
+            outputs.push(bytes.read_with::<TransactionOutput>(offset, endian)?);
         }
-
-        let lock_time = match message.read_with::<u32>(payload_offset, LE) {
-            Ok(data) => data,
-            Err(_err) => { return None; }
-        };
+        let lock_time = bytes.read_with::<u32>(offset, endian)?;
         let mut tx = Self {
             inputs,
             outputs,
@@ -250,7 +223,7 @@ impl<'a> Transaction<'a> {
             version,
             tx_type,
             lock_time,
-            payload_offset: payload_offset.clone(),
+            payload_offset: *offset,
             block_height: TX_UNCONFIRMED as u32
         };
         tx.tx_hash = if tx_type == Classic {
@@ -258,82 +231,6 @@ impl<'a> Transaction<'a> {
         } else {
             None
         };
-        Some(tx)
+        Ok((tx, *offset))
     }
-
-    // unused at this moment
-    /*
-    fn payload_data(&self) -> Vec<u8> {
-        Vec::new()
-    }
-
-    pub fn input_addresses(&self) -> Vec<&str> {
-         self.inputs
-             .iter()
-             .map(|i| if let Some(script) = i.script {
-                 address_with_script_pub_key(&script, self.chain.pub_key_address(), self.chain.script_address())
-             } else {
-                 address_with_script_signature(*i.signature, self.chain.pub_key_address(), self.chain.script_address())
-             })
-             .collect()
-     }
-
-    pub fn output_addresses(&self) -> Vec<&'a str> {
-        self.outputs
-            .iter()
-            .map(|o| *o.address)
-            .collect()
-    }
-
-    // size in bytes if signed, or estimated size assuming compact pubkey sigs
-    pub fn size(&self) -> usize {
-        if self.tx_hash.is_some() {
-            return self.to_data().len();
-        }
-        let input_count = self.inputs.len();
-        let output_count = self.outputs.len();
-        8 + VarInt(input_count as u64).len() + VarInt(output_count as u64).len() +
-            TX_INPUT_SIZE + input_count + TX_OUTPUT_SIZE + output_count
-    }
-
-    pub fn standard_fee(&self) -> u64 {
-        self.size() as u64 * TX_FEE_PER_B as u64
-    }
-
-    pub fn standard_instant_fee(&self) -> u64 {
-        TX_FEE_PER_INPUT * self.inputs.len() as u64
-    }
-
-    // checks if all signatures exist, but does not verify them
-    pub fn is_signed(&self) -> bool {
-        let mut signed = true;
-        for input in &self.inputs {
-            let input_is_signed = input.signature.is_some();
-            signed &= input_is_signed;
-            if !input_is_signed {
-                break;
-            }
-        }
-        return signed;
-    }
-
-    pub fn is_coinbase_classic_transaction(&self) -> bool {
-        self.inputs.len() == 1 &&
-            self.inputs[0].input_hash.0.is_empty() &&
-            self.inputs[0].index == u32::MAX
-    }
-
-    pub fn is_credit_funding_transaction(&self) -> bool {
-        for output in &self.outputs {
-            if let Some(script) = output.script {
-                if let Ok(code) = script.read_with::<u8>(&mut 0, LE) {
-                    if code == OP_RETURN.into_u8() &&
-                        script.len() == 22 {
-                        return true;
-                    }
-                };
-            }
-        }
-        false
-    }*/
 }
