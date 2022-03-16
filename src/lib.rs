@@ -25,7 +25,6 @@ use std::slice;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::c_void;
 use byte::*;
-use hashes::hex::ToHex;
 use ffi::wrapped_types;
 use crate::common::block_data::BlockData;
 use crate::common::llmq_type::LLMQType;
@@ -111,8 +110,6 @@ pub extern "C" fn mndiff_process(
     let coinbase_transaction = CoinbaseTransaction::new(&message[*offset..]);
     if coinbase_transaction.is_none() { return failure(); }
     let coinbase_transaction = coinbase_transaction.unwrap();
-    let _block_hash_hex = block_hash.0.to_hex();
-    let _coinbase_tx_hash = coinbase_transaction.base.tx_hash.unwrap().0.to_hex();
 
     *offset += coinbase_transaction.base.payload_offset;
     if message_length - *offset < 1 { return failure(); }
@@ -237,8 +234,10 @@ pub extern "C" fn mndiff_process(
                         let valid_masternodes = quorum_masternode_list.valid_masternodes_for(quorum_entry.llmq_quorum_hash(), llmq_type.quorum_size(), block_height);
                         let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
                             .into_iter()
-                            .filter(|&i| quorum_entry.signers_bitset.bit_is_true_at_le_index(i as u32))
-                            .map(|i| boxed(valid_masternodes[i].operator_public_key_at(block_height).0))
+                            .filter_map(|i| match quorum_entry.signers_bitset.bit_is_true_at_le_index(i as u32) {
+                                true => Some(boxed(valid_masternodes[i].operator_public_key_at(block_height).0)),
+                                false => None
+                            })
                             .collect();
                         let operator_public_keys_count = operator_pks.len();
                         let is_valid_signature = unsafe {
@@ -263,9 +262,7 @@ pub extern "C" fn mndiff_process(
                             needed_masternode_lists.push(boxed(quorum_hash.0));
                         } else {
                             if use_insight_as_backup {
-                                println!("use_insight_as_backup.1: {:?}", quorum_hash);
                                 unsafe { add_insight_lookup(boxed(quorum_hash.0), context) };
-                                println!("use_insight_as_backup.2: {:?}", quorum_hash);
                                 if unsafe { block_height_lookup(boxed(quorum_hash.0), context) != u32::MAX } {
                                     needed_masternode_lists.push(boxed(quorum_hash.0));
                                 }

@@ -26,9 +26,9 @@ impl std::fmt::Debug for MasternodeEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MasternodeEntry")
             .field("provider_registration_transaction_hash", &self.provider_registration_transaction_hash)
-            .field("update_height", &self.update_height)
-            .field("masternode_entry_hash", &self.masternode_entry_hash)
-            .field("previous_masternode_entry_hashes", &self.previous_masternode_entry_hashes)
+            // .field("update_height", &self.update_height)
+            // .field("masternode_entry_hash", &self.masternode_entry_hash)
+            // .field("previous_masternode_entry_hashes", &self.previous_masternode_entry_hashes)
             .finish()
     }
 }
@@ -56,11 +56,9 @@ impl MasternodeEntry {
     }
 
     pub fn confirmed_hash_at(&self, block_height: u32) -> Option<UInt256> {
-        if self.known_confirmed_at_height.is_some() &&
-            self.known_confirmed_at_height.unwrap() > block_height {
-            None
-        } else {
-            Some(self.confirmed_hash)
+        match self.known_confirmed_at_height {
+            Some(h) => if h > block_height { None } else { Some(self.confirmed_hash) },
+            None => None
         }
     }
 
