@@ -94,11 +94,9 @@ impl MasternodeEntry {
     }
 
     pub fn confirmed_hash_at(&self, block_height: u32) -> Option<UInt256> {
-        if self.known_confirmed_at_height.is_some() &&
-            self.known_confirmed_at_height.unwrap() > block_height {
-            None
-        } else {
-            Some(self.confirmed_hash)
+        match self.known_confirmed_at_height {
+            Some(h) => if h > block_height { None } else { Some(self.confirmed_hash) },
+            None => None
         }
     }
 
