@@ -1,7 +1,6 @@
-use hashes::{sha256d};
-use crate::consensus::Encodable;
-use crate::crypto::byte_util::{BytesDecodable, UInt256};
-use crate::hashes::Hash;
+use dash_spv_primitives::consensus::Encodable;
+use dash_spv_primitives::crypto::byte_util::{BytesDecodable, UInt256};
+use dash_spv_primitives::hashes::{Hash, sha256d};
 
 #[inline]
 fn ceil_log2(mut x: i32) -> i32 {

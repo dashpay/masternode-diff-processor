@@ -1,8 +1,8 @@
 use std::ptr::null_mut;
 use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, LE, TryRead};
-use crate::{boxed, boxed_vec, LLMQType, UInt256};
-use crate::crypto::byte_util::{UInt384, UInt768};
+use crate::{boxed, boxed_vec, LLMQType};
+use dash_spv_primitives::crypto::byte_util::{UInt256, UInt384, UInt768};
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct LLMQEntry {
@@ -37,13 +37,13 @@ impl<'a> TryRead<'a, Endian> for LLMQEntry {
             2 => bytes.read_with::<u32>(offset, LE)?,
             _ => 0,
         };
-        let signers_count = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?;
+        let signers_count = bytes.read_with::<dash_spv_primitives::consensus::encode::VarInt>(offset, LE)?;
         let signers_buffer_length: usize = ((signers_count.0 as usize) + 7) / 8;
         if length - *offset < signers_buffer_length {
             return Err(byte::Error::BadOffset(*offset));
         }
         let signers_bitset: &[u8] = bytes.read_with(offset, Bytes::Len(signers_buffer_length))?;
-        let valid_members_count = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?;
+        let valid_members_count = bytes.read_with::<dash_spv_primitives::consensus::encode::VarInt>(offset, LE)?;
         let valid_members_count_buffer_length: usize = ((valid_members_count.0 as usize) + 7) / 8;
         if length - *offset < valid_members_count_buffer_length {
             return Err(byte::Error::BadOffset(*offset));

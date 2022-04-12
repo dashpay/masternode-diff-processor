@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 use byte::BytesExt;
 use byte::ctx::Bytes;
-use crate::{CoinbaseTransaction, LLMQType, MasternodeEntry, LLMQEntry, Reversable, UInt256, VarInt};
-use crate::crypto::byte_util::{BytesDecodable, VarBytes};
+use dash_spv_primitives::consensus::encode::VarInt;
+use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256, VarBytes};
+use crate::{CoinbaseTransaction, LLMQType, MasternodeEntry, LLMQEntry};
 
 #[derive(Debug)]
 pub struct MNListDiff<'a> {

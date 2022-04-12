@@ -1,11 +1,9 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
-use hashes::Hash;
-use crate::consensus::Encodable;
-use crate::consensus::encode::{consensus_encode_with_size, VarInt};
-use crate::crypto::byte_util::{UInt256, VarBytes};
-use crate::hashes::{sha256d};
-use crate::hashes::_export::_core::fmt::Debug;
+use dash_spv_primitives::consensus::Encodable;
+use dash_spv_primitives::consensus::encode::{consensus_encode_with_size, VarInt};
+use dash_spv_primitives::crypto::byte_util::{UInt256, VarBytes};
+use dash_spv_primitives::hashes::{Hash, sha256d};
 use crate::transactions::transaction::TransactionType::Classic;
 
 // block height indicating transaction is unconfirmed

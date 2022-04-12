@@ -1,8 +1,8 @@
 use std::ptr::null_mut;
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
+use dash_spv_primitives::crypto::byte_util::VarBytes;
 use crate::boxed_vec;
-use crate::crypto::byte_util::VarBytes;
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct TransactionOutput {

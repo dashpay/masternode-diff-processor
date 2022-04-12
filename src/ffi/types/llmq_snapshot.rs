@@ -17,9 +17,9 @@ impl<'a> TryRead<'a, Endian> for LLMQSnapshot {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
         let skip_list_mode = bytes.read_with::<LLMQSnapshotSkipMode>(offset, LE)?;
-        let member_list_length = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?.0 as usize;
+        let member_list_length = bytes.read_with::<dash_spv_primitives::consensus::encode::VarInt>(offset, LE)?.0 as usize;
         let member_list: &[u8] = bytes.read_with(offset, Bytes::Len((member_list_length + 7) / 8))?;
-        let skip_list_length = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?.0 as usize;
+        let skip_list_length = bytes.read_with::<dash_spv_primitives::consensus::encode::VarInt>(offset, LE)?.0 as usize;
         // let skip_list_length = bytes.read_with::<u16>(offset, LE)? as usize;
         let mut skip_list_vec = Vec::with_capacity(skip_list_length);
         for _i in 0..skip_list_length {

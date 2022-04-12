@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ptr::null_mut;
+use dash_spv_primitives::crypto::byte_util::UInt256;
 use crate::common::block_data::BlockData;
-use crate::crypto::byte_util::UInt256;
 use crate::{ffi, LLMQType};
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;

@@ -2,8 +2,8 @@ use std::ffi::c_void;
 use std::ptr::null_mut;
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
-use crate::{BlockHeightLookup, boxed, processing, ToFFI, UInt256};
-use crate::crypto::byte_util::BytesDecodable;
+use dash_spv_primitives::crypto::byte_util::{BytesDecodable, UInt256};
+use crate::{BlockHeightLookup, boxed, processing, ToFFI};
 use crate::ffi::types::mn_list_diff::MNListDiff;
 use crate::ffi::types::llmq_snapshot::LLMQSnapshot;
 

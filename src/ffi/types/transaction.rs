@@ -24,7 +24,7 @@ impl<'a> TryRead<'a, Endian> for Transaction {
         let offset = &mut 0;
         let version = bytes.read_with::<u16>(offset, LE)?;
         let tx_type = TransactionType::from(bytes.read_with::<u16>(offset, LE)?);
-        let inputs_count = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?.0 as usize;
+        let inputs_count = bytes.read_with::<dash_spv_primitives::consensus::encode::VarInt>(offset, LE)?.0 as usize;
         if inputs_count == 0 && tx_type.requires_inputs() {
             return Err(byte::Error::BadOffset(*offset));
         }
@@ -32,7 +32,7 @@ impl<'a> TryRead<'a, Endian> for Transaction {
         for _i in 0..inputs_count {
             inputs_vec.push(boxed(bytes.read_with::<TransactionInput>(offset, LE)?));
         }
-        let outputs_count = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?.0 as usize;
+        let outputs_count = bytes.read_with::<dash_spv_primitives::consensus::encode::VarInt>(offset, LE)?.0 as usize;
         let mut outputs_vec: Vec<*mut TransactionOutput> = Vec::new();
         for _i in 0..outputs_count {
             outputs_vec.push(boxed(bytes.read_with::<TransactionOutput>(offset, LE)?));

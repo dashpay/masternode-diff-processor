@@ -1,11 +1,10 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap};
+use dash_spv_primitives::crypto::byte_util::{merkle_root_from_hashes, Reversable, UInt256, Zeroable};
 use crate::{CoinbaseTransaction, LLMQType};
-use crate::crypto::byte_util::{merkle_root_from_hashes, Reversable, UInt256};
 use crate::masternode::llmq_entry::LLMQEntry;
 use crate::masternode::masternode_entry::MasternodeEntry;
 use crate::processing::masternode_score;
-use crate::Zeroable;
 
 #[derive(Clone)]
 pub struct MasternodeList<'a> {

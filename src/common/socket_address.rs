@@ -1,4 +1,4 @@
-use crate::crypto::byte_util::UInt128;
+use dash_spv_primitives::crypto::byte_util::UInt128;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

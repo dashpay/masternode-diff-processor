@@ -1,7 +1,7 @@
 use std::ptr::null_mut;
 use byte::BytesExt;
-use crate::{boxed, ffi, FromFFI, LLMQType, Manager, MNListDiffResult, processing, UInt256};
-use crate::crypto::byte_util::BytesDecodable;
+use dash_spv_primitives::crypto::byte_util::{BytesDecodable, UInt256};
+use crate::{boxed, ffi, FromFFI, LLMQType, Manager, MNListDiffResult, processing};
 use crate::ffi::types::{LLMQSnapshot, LLMQValidationData};
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]

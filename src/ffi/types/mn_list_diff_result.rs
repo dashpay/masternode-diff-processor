@@ -1,5 +1,6 @@
 use std::ptr::null_mut;
-use crate::{boxed, boxed_vec, ffi, LLMQType, Manager, ToFFI, UInt256};
+use dash_spv_primitives::crypto::byte_util::UInt256;
+use crate::{boxed, boxed_vec, ffi, LLMQType, Manager, ToFFI};
 use crate::ffi::types::LLMQValidationData;
 use crate::masternode::masternode_list;
 use crate::processing::manager;

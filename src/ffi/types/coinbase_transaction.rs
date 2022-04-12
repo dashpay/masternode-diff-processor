@@ -1,7 +1,8 @@
 use std::ptr::null_mut;
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
-use crate::{boxed, UInt256};
+use dash_spv_primitives::crypto::byte_util::UInt256;
+use crate::boxed;
 use crate::ffi::types::transaction::Transaction;
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
@@ -16,7 +17,7 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
         let base = boxed(bytes.read_with::<Transaction>(offset, LE)?);
-        let extra_payload_size_var_int = bytes.read_with::<crate::consensus::encode::VarInt>(offset, LE)?;
+        let extra_payload_size_var_int = bytes.read_with::<dash_spv_primitives::consensus::encode::VarInt>(offset, LE)?;
         let coinbase_transaction_version = bytes.read_with::<u16>(offset, LE)?;
         let height = bytes.read_with::<u32>(offset, LE)?;
         let merkle_root_mn_list = boxed(bytes.read_with::<UInt256>(offset, LE)?.0);

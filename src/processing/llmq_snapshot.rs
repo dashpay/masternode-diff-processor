@@ -1,6 +1,6 @@
 use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, LE, TryRead};
-use crate::VarInt;
+use dash_spv_primitives::consensus::encode::VarInt;
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash)]

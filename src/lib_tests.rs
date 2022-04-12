@@ -5,14 +5,14 @@ pub mod tests {
     use std::collections::HashMap;
     use std::io::Read;
     use std::ptr::null_mut;
-    use bitcoin_hashes::hex::FromHex;
     use byte::BytesExt;
+    use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384, UInt768};
+    use dash_spv_primitives::hashes::hex::FromHex;
     use ffi::from::FromFFI;
     use ffi::to::ToFFI;
     use ffi::unboxer::unbox_any;
     use crate::common::chain_type::ChainType;
-    use crate::{ffi, LLMQType, Reversable, UInt256};
-    use crate::crypto::byte_util::{BytesDecodable, UInt384, UInt768};
+    use crate::{ffi, LLMQType};
     use crate::masternode;
     use crate::mnl_diff_process;
 

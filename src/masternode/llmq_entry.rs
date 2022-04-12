@@ -1,12 +1,12 @@
 use std::convert::Into;
 use byte::{BytesExt, LE, TryRead};
 use byte::ctx::{Bytes, Endian};
-use hashes::{Hash, sha256d};
-use hashes::hex::ToHex;
+use dash_spv_primitives::consensus::{Encodable, WriteExt};
+use dash_spv_primitives::consensus::encode::VarInt;
+use dash_spv_primitives::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
+use dash_spv_primitives::hashes::hex::ToHex;
+use dash_spv_primitives::hashes::{Hash, sha256d};
 use crate::common::llmq_type::LLMQType;
-use crate::consensus::{Encodable, WriteExt};
-use crate::consensus::encode::VarInt;
-use crate::crypto::byte_util::{Data, UInt256, UInt384, UInt768};
 
 pub const LLMQ_DEFAULT_VERSION: u16 = 1;
 pub const LLMQ_INDEXED_VERSION: u16 = 2;

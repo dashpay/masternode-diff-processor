@@ -1,24 +1,13 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
-pub extern crate bitcoin_hashes as hashes;
-pub extern crate secp256k1;
-
-#[cfg(feature = "std")]
-use std::io;
-#[cfg(not(feature = "std"))]
-use core2::io;
+// pub extern crate bitcoin_hashes as hashes;
+// pub extern crate secp256k1;
 
 #[macro_use]
-pub mod internal_macros;
 pub mod common;
-pub mod consensus;
 pub mod crypto;
 pub mod masternode;
 pub mod transactions;
-pub mod util;
-pub mod blockdata;
-pub mod network;
-pub mod hash_types;
 pub mod ffi;
 pub mod processing;
 
@@ -29,13 +18,10 @@ mod tests;
 
 use std::slice;
 use std::ffi::c_void;
+use dash_spv_primitives::crypto::byte_util::{ConstDecodable, UInt256};
 use crate::common::block_data::BlockData;
 use crate::common::llmq_type::LLMQType;
 use crate::common::merkle_tree::MerkleTree;
-use crate::consensus::Encodable;
-use crate::consensus::encode::VarInt;
-use crate::crypto::byte_util::{ConstDecodable, Data, Reversable, UInt256, Zeroable};
-use crate::crypto::data_ops::inplace_intersection;
 use crate::masternode::masternode_list::MasternodeList;
 use crate::masternode::llmq_entry::LLMQEntry;
 use crate::masternode::masternode_entry::MasternodeEntry;

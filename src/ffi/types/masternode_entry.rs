@@ -1,8 +1,8 @@
 use std::ptr::null_mut;
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
-use crate::{boxed, UInt256};
-use crate::crypto::byte_util::{UInt128, UInt160, UInt384};
+use dash_spv_primitives::crypto::byte_util::{UInt128, UInt160, UInt256, UInt384};
+use crate::boxed;
 use crate::ffi::types::masternode_entry_hash::MasternodeEntryHash;
 use crate::ffi::types::operator_public_key::OperatorPublicKey;
 use crate::ffi::types::validity::Validity;

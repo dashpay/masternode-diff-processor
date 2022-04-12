@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 use std::slice;
+use dash_spv_primitives::consensus::encode;
+use dash_spv_primitives::crypto::byte_util::{Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::common::block_data::BlockData;
 use crate::common::socket_address::SocketAddress;
-use crate::consensus::encode;
-use crate::crypto::byte_util::{Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::{ffi, LLMQType};
 use crate::ffi::to::ToFFI;
 use crate::masternode::{masternode_entry, masternode_list, llmq_entry};

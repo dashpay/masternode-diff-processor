@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
+use dash_spv_primitives::consensus::Encodable;
+use dash_spv_primitives::crypto::byte_util::{short_hex_string_from, UInt128, UInt160, UInt256, UInt384, Zeroable};
+use dash_spv_primitives::hashes::{Hash, sha256, sha256d};
 use crate::common::block_data::BlockData;
 use crate::common::socket_address::SocketAddress;
-use crate::consensus::Encodable;
-use crate::crypto::byte_util::{short_hex_string_from, UInt128, UInt160, UInt256, UInt384, Zeroable};
-use crate::hashes::{Hash, sha256, sha256d};
 
 #[derive(Clone)]
 pub struct MasternodeEntry {

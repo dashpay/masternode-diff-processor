@@ -1,8 +1,8 @@
 use std::ptr::null_mut;
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
-use crate::{boxed, boxed_vec, UInt256};
-use crate::crypto::byte_util::VarBytes;
+use dash_spv_primitives::crypto::byte_util::{UInt256, VarBytes};
+use crate::{boxed, boxed_vec};
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct TransactionInput {

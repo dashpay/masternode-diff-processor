@@ -1,7 +1,10 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use hashes::{Hash, sha256};
-use crate::{BlockData, boxed, boxed_vec, Data, Encodable, ffi, FromFFI, inplace_intersection, MasternodeEntry, MasternodeList, LLMQEntry, Reversable, UInt256, Zeroable, LLMQType};
+use dash_spv_primitives::consensus::Encodable;
+use dash_spv_primitives::crypto::byte_util::{Data, Reversable, UInt256, Zeroable};
+use dash_spv_primitives::crypto::data_ops::inplace_intersection;
+use dash_spv_primitives::hashes::{Hash, sha256};
+use crate::{BlockData, boxed, boxed_vec, ffi, FromFFI, MasternodeEntry, MasternodeList, LLMQEntry, LLMQType};
 use crate::ffi::types::LLMQValidationData;
 
 #[derive(Clone, Copy, Debug)]
