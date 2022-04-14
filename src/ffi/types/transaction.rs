@@ -1,10 +1,10 @@
 use std::ptr::null_mut;
 use byte::ctx::Endian;
 use byte::{BytesExt, LE, TryRead};
+use dash_spv_models::tx::transaction::{TransactionType, TX_UNCONFIRMED};
 use crate::{boxed, boxed_vec};
 use crate::ffi::types::transaction_input::TransactionInput;
 use crate::ffi::types::transaction_output::TransactionOutput;
-use crate::transactions::transaction::{TransactionType, TX_UNCONFIRMED};
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct Transaction {

@@ -1,10 +1,10 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use dash_spv_primitives::consensus::Encodable;
+use dash_spv_models::common::block_data::BlockData;
+use dash_spv_models::masternode::{LLMQEntry, MasternodeEntry, MasternodeList};
 use dash_spv_primitives::crypto::byte_util::{Data, Reversable, UInt256, Zeroable};
 use dash_spv_primitives::crypto::data_ops::inplace_intersection;
-use dash_spv_primitives::hashes::{Hash, sha256};
-use crate::{BlockData, boxed, boxed_vec, ffi, FromFFI, MasternodeEntry, MasternodeList, LLMQEntry, LLMQType};
+use crate::{boxed, boxed_vec, ffi, FromFFI, LLMQType};
 use crate::ffi::types::LLMQValidationData;
 
 #[derive(Clone, Copy, Debug)]
@@ -246,21 +246,9 @@ pub fn validate_quorum<
     }
 }
 
-pub fn masternode_score(entry: MasternodeEntry, modifier: UInt256, block_height: u32) -> Option<UInt256> {
-    if entry.confirmed_hash_at(block_height).is_none() {
-        return None;
-    }
-    let mut buffer: Vec<u8> = Vec::new();
-    if let Some(hash) = entry.confirmed_hash_hashed_with_provider_registration_transaction_hash_at(block_height) {
-        hash.consensus_encode(&mut buffer).unwrap();
-    }
-    modifier.consensus_encode(&mut buffer).unwrap();
-    Some(UInt256(sha256::Hash::hash(&buffer).into_inner()))
-}
-
 pub fn valid_masternodes_for(masternodes: BTreeMap<UInt256, MasternodeEntry>, quorum_modifier: UInt256, quorum_count: u32, block_height: u32) -> Vec<MasternodeEntry> {
     let mut score_dictionary: BTreeMap<UInt256, MasternodeEntry> = masternodes.clone().into_iter().filter_map(|(_, entry)| {
-        let score = masternode_score(entry.clone(), quorum_modifier, block_height);
+        let score = MasternodeList::masternode_score(entry.clone(), quorum_modifier, block_height);
         if score.is_some() && !score.unwrap().0.is_empty() {
             Some((score.unwrap(), entry))
         } else {

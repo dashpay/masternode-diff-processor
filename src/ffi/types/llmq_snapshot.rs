@@ -1,7 +1,7 @@
 use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, LE, TryRead};
+use dash_spv_models::common::llmq_snapshot_skip_mode::LLMQSnapshotSkipMode;
 use crate::boxed_vec;
-use crate::processing::llmq_snapshot::LLMQSnapshotSkipMode;
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
 pub struct LLMQSnapshot {

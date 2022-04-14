@@ -1,7 +1,7 @@
 use std::ptr::null_mut;
+use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::ToHex;
-use crate::common::chain_type::ChainType;
 use crate::lib_tests::tests::{add_insight_lookup, block_height_lookup_5078, FFIContext, masternode_list_destroy, masternode_list_lookup, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
 use crate::llmq_rotation_info_process2;
 

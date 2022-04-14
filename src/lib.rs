@@ -4,10 +4,7 @@
 // pub extern crate secp256k1;
 
 #[macro_use]
-pub mod common;
 pub mod crypto;
-pub mod masternode;
-pub mod transactions;
 pub mod ffi;
 pub mod processing;
 
@@ -18,14 +15,8 @@ mod tests;
 
 use std::slice;
 use std::ffi::c_void;
+use dash_spv_models::common::llmq_type::LLMQType;
 use dash_spv_primitives::crypto::byte_util::{ConstDecodable, UInt256};
-use crate::common::block_data::BlockData;
-use crate::common::llmq_type::LLMQType;
-use crate::common::merkle_tree::MerkleTree;
-use crate::masternode::masternode_list::MasternodeList;
-use crate::masternode::llmq_entry::LLMQEntry;
-use crate::masternode::masternode_entry::MasternodeEntry;
-use crate::transactions::coinbase_transaction::CoinbaseTransaction;
 use ffi::wrapped_types::{AddInsightBlockingLookup, BlockHeightLookup, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;

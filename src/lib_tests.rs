@@ -6,14 +6,14 @@ pub mod tests {
     use std::io::Read;
     use std::ptr::null_mut;
     use byte::BytesExt;
+    use dash_spv_models::common::chain_type::ChainType;
+    use dash_spv_models::masternode;
     use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384, UInt768};
     use dash_spv_primitives::hashes::hex::FromHex;
     use ffi::from::FromFFI;
     use ffi::to::ToFFI;
     use ffi::unboxer::unbox_any;
-    use crate::common::chain_type::ChainType;
     use crate::{ffi, LLMQType};
-    use crate::masternode;
     use crate::mnl_diff_process;
 
     #[derive(Debug)]

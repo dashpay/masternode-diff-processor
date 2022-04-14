@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::ptr::null_mut;
+use dash_spv_models::common::chain_type::ChainType;
+use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::ToHex;
-use crate::common::chain_type::ChainType;
 use crate::ffi::from::FromFFI;
 use crate::ffi::to::ToFFI;
-use crate::{ffi, LLMQEntry, LLMQType, mnl_diff_process};
+use crate::{ffi, LLMQType, mnl_diff_process};
 use crate::lib_tests::tests::{add_insight_lookup, assert_diff_result, block_height_for, FFIContext, masternode_list_destroy, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
 
 #[test]

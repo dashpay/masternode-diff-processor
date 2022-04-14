@@ -1,7 +1,7 @@
 use std::ptr::null_mut;
+use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_primitives::crypto::byte_util::UInt256;
 use dash_spv_primitives::hashes::hex::FromHex;
-use crate::common::chain_type::ChainType;
 use crate::lib_tests::tests::{add_insight_lookup, assert_diff_result, FFIContext, masternode_list_destroy, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
 use crate::{FromFFI, mnl_diff_process};
 

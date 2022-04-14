@@ -1,9 +1,11 @@
 use std::collections::{BTreeMap, HashMap};
 use byte::BytesExt;
 use byte::ctx::Bytes;
+use dash_spv_models::common::llmq_type::LLMQType;
+use dash_spv_models::masternode::{LLMQEntry, MasternodeEntry};
+use dash_spv_models::tx::coinbase_transaction::CoinbaseTransaction;
 use dash_spv_primitives::consensus::encode::VarInt;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256, VarBytes};
-use crate::{CoinbaseTransaction, LLMQType, MasternodeEntry, LLMQEntry};
 
 #[derive(Debug)]
 pub struct MNListDiff<'a> {

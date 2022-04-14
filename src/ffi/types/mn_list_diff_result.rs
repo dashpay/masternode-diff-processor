@@ -1,8 +1,9 @@
 use std::ptr::null_mut;
+use dash_spv_models::common::merkle_tree::MerkleTree;
+use dash_spv_models::masternode::masternode_list;
 use dash_spv_primitives::crypto::byte_util::UInt256;
 use crate::{boxed, boxed_vec, ffi, LLMQType, Manager, ToFFI};
 use crate::ffi::types::LLMQValidationData;
-use crate::masternode::masternode_list;
 use crate::processing::manager;
 
 #[repr(C)] #[derive(Clone, Copy, Debug)]
@@ -73,7 +74,7 @@ impl MNListDiffResult {
         let hashes = list_diff.merkle_hashes;
         let flags = list_diff.merkle_flags;
         let has_found_coinbase = coinbase_transaction.has_found_coinbase(hashes);
-        let merkle_tree = crate::MerkleTree { tree_element_count, hashes, flags };
+        let merkle_tree = MerkleTree { tree_element_count, hashes, flags };
         let has_valid_quorum_list_root = !quorums_active || masternode_list.has_valid_llmq_list_root(&coinbase_transaction);
         let needed_masternode_lists_count = needed_masternode_lists.len();
         MNListDiffResult {

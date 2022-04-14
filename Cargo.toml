@@ -12,6 +12,10 @@ byte = "0.2"
 git = "https://github.com/pankcuf/dash-spv-primitives"
 branch = "master"
 version = "0.1.2"
+[dependencies.dash-spv-models]
+git = "https://github.com/pankcuf/dash-spv-models"
+branch = "master"
+version = "0.1.2"
 
 [build-dependencies]
 cbindgen = "0.20.0"

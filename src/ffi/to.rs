@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ptr::null_mut;
+use dash_spv_models::common::block_data::BlockData;
+use dash_spv_models::masternode::{llmq_entry, masternode_entry, masternode_list};
+use dash_spv_models::tx::{coinbase_transaction, transaction};
 use dash_spv_primitives::crypto::byte_util::UInt256;
-use crate::common::block_data::BlockData;
 use crate::{ffi, LLMQType};
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;
-use crate::masternode::{masternode_entry, masternode_list, llmq_entry};
 use crate::processing::{mn_list_diff, llmq_rotation_info, llmq_snapshot};
-use crate::transactions::{coinbase_transaction, transaction};
 
 pub trait ToFFI<'a> {
     type Item: FromFFI<'a>;
