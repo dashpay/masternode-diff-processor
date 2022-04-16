@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::ptr::null_mut;
+use dash_spv_ffi::ffi::from::FromFFI;
+use dash_spv_ffi::ffi::to::ToFFI;
+use dash_spv_ffi::types;
 use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::ToHex;
-use crate::ffi::from::FromFFI;
-use crate::ffi::to::ToFFI;
-use crate::{ffi, LLMQType, mnl_diff_process};
+use crate::{LLMQType, mnl_diff_process};
 use crate::lib_tests::tests::{add_insight_lookup, assert_diff_result, block_height_for, FFIContext, masternode_list_destroy, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
 
 #[test]
@@ -53,7 +54,7 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
             block_height_lookup,
             |hash|
                 if hash == block_hash_119064 {
-                    &masternode_list_119064_encoded as *const ffi::types::MasternodeList
+                    &masternode_list_119064_encoded as *const types::MasternodeList
                 } else {
                     null_mut()
                 }

@@ -6,14 +6,15 @@ pub mod tests {
     use std::io::Read;
     use std::ptr::null_mut;
     use byte::BytesExt;
+    use dash_spv_ffi::ffi::from::FromFFI;
+    use dash_spv_ffi::ffi::to::ToFFI;
+    use dash_spv_ffi::ffi::unboxer::unbox_any;
+    use dash_spv_ffi::types;
     use dash_spv_models::common::chain_type::ChainType;
     use dash_spv_models::masternode;
     use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384, UInt768};
     use dash_spv_primitives::hashes::hex::FromHex;
-    use ffi::from::FromFFI;
-    use ffi::to::ToFFI;
-    use ffi::unboxer::unbox_any;
-    use crate::{ffi, LLMQType};
+    use crate::LLMQType;
     use crate::mnl_diff_process;
 
     #[derive(Debug)]
@@ -196,7 +197,7 @@ pub mod tests {
         file
     }
 
-    pub fn assert_diff_result(chain: ChainType, result: ffi::types::MNListDiffResult) {
+    pub fn assert_diff_result(chain: ChainType, result: types::MNListDiffResult) {
         let mut masternode_list = unsafe { (*result.masternode_list).decode() };
         let bh = block_height_for(chain, masternode_list.block_hash.reversed().to_string().as_str());
 
@@ -212,10 +213,10 @@ pub mod tests {
         5078
     }
 
-    pub unsafe extern "C" fn masternode_list_lookup(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const ffi::types::MasternodeList {
+    pub unsafe extern "C" fn masternode_list_lookup(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const types::MasternodeList {
         null_mut()
     }
-    pub unsafe extern "C" fn masternode_list_destroy(_masternode_list: *const ffi::types::MasternodeList) {
+    pub unsafe extern "C" fn masternode_list_destroy(_masternode_list: *const types::MasternodeList) {
 
     }
     pub unsafe extern "C" fn add_insight_lookup(_hash: *mut [u8; 32], _context: *const std::ffi::c_void) {
@@ -229,9 +230,9 @@ pub mod tests {
             ChainType::DevNet => LLMQType::Llmqtype10_60.into()
         }
     }
-    pub unsafe extern "C" fn validate_llmq_callback(data: *mut ffi::types::LLMQValidationData, _context: *const std::ffi::c_void) -> bool {
+    pub unsafe extern "C" fn validate_llmq_callback(data: *mut types::LLMQValidationData, _context: *const std::ffi::c_void) -> bool {
         let result = unbox_any(data);
-        let ffi::types::LLMQValidationData { items, count, commitment_hash, all_commitment_aggregated_signature, threshold_signature, public_key } = *result;
+        let types::LLMQValidationData { items, count, commitment_hash, all_commitment_aggregated_signature, threshold_signature, public_key } = *result;
         println!("validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}", items, count, commitment_hash, all_commitment_aggregated_signature, threshold_signature, public_key);
 
         // bool allCommitmentAggregatedSignatureValidated = [DSBLSKey verifySecureAggregated:commitmentHash signature:allCommitmentAggregatedSignature withPublicKeys:publicKeyArray];
@@ -349,7 +350,7 @@ pub mod tests {
                 |hash| match lists.get(&hash) {
                     Some(list) => {
                         let list_encoded = list.clone().encode();
-                        &list_encoded as *const ffi::types::MasternodeList
+                        &list_encoded as *const types::MasternodeList
                     },
                     None => null_mut()
                 },

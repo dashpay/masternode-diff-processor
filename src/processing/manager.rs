@@ -1,17 +1,20 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
+use dash_spv_ffi::ffi::from::FromFFI;
+use dash_spv_ffi::types;
+use dash_spv_ffi::types::LLMQValidationData;
 use dash_spv_models::common::block_data::BlockData;
+use dash_spv_models::common::LLMQType;
 use dash_spv_models::masternode::{LLMQEntry, MasternodeEntry, MasternodeList};
 use dash_spv_primitives::crypto::byte_util::{Data, Reversable, UInt256, Zeroable};
 use dash_spv_primitives::crypto::data_ops::inplace_intersection;
-use crate::{boxed, boxed_vec, ffi, FromFFI, LLMQType};
-use crate::ffi::types::LLMQValidationData;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Manager<
     BHL: Fn(UInt256) -> u32 + Copy,
-    MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
-    MND: Fn(*const ffi::types::MasternodeList) + Copy,
+    MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
+    MND: Fn(*const types::MasternodeList) + Copy,
     AIL: Fn(UInt256) + Copy,
     SPL: Fn(LLMQType) -> bool + Copy,
     VQL: Fn(LLMQValidationData) -> bool + Copy,
@@ -27,8 +30,8 @@ pub struct Manager<
 }
 
 pub fn lookup_masternode_list<'a,
-    MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
-    MND: Fn(*const ffi::types::MasternodeList),
+    MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
+    MND: Fn(*const types::MasternodeList),
 >(
     block_hash: UInt256,
     masternode_list_lookup: MNL,
@@ -44,8 +47,8 @@ pub fn lookup_masternode_list<'a,
 }
 
 pub fn lookup_masternodes_and_quorums_for<'a,
-    MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
-    MND: Fn(*const ffi::types::MasternodeList) + Copy,
+    MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
+    MND: Fn(*const types::MasternodeList) + Copy,
 >(
     block_hash: Option<UInt256>,
     masternode_list_lookup: MNL,
@@ -122,8 +125,8 @@ pub fn classify_masternodes(base_masternodes: BTreeMap<UInt256, MasternodeEntry>
 }
 
 pub fn classify_quorums<'a,
-    MNL: Fn(UInt256) -> *const ffi::types::MasternodeList + Copy,
-    MND: Fn(*const ffi::types::MasternodeList) + Copy,
+    MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
+    MND: Fn(*const types::MasternodeList) + Copy,
     AIL: Fn(UInt256) + Copy,
     SPL: Fn(LLMQType) -> bool + Copy,
     BHL: Fn(UInt256) -> u32 + Copy,
@@ -232,7 +235,7 @@ pub fn validate_quorum<
         })
         .collect();
     let operator_public_keys_count = operator_pks.len();
-    let is_valid_signature = validate_llmq_callback(ffi::types::LLMQValidationData {
+    let is_valid_signature = validate_llmq_callback(types::LLMQValidationData {
         items: boxed_vec(operator_pks),
         count: operator_public_keys_count,
         commitment_hash: boxed(quorum.generate_commitment_hash().0),
