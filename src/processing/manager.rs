@@ -7,8 +7,23 @@ use dash_spv_ffi::types::LLMQValidationData;
 use dash_spv_models::common::block_data::BlockData;
 use dash_spv_models::common::LLMQType;
 use dash_spv_models::masternode::{LLMQEntry, MasternodeEntry, MasternodeList};
-use dash_spv_primitives::crypto::byte_util::{Data, Reversable, UInt256, Zeroable};
-use dash_spv_primitives::crypto::data_ops::inplace_intersection;
+use dash_spv_primitives::crypto::byte_util::{Reversable, Zeroable};
+use dash_spv_primitives::crypto::data_ops::{Data, inplace_intersection};
+use dash_spv_primitives::crypto::UInt256;
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ConsensusType {
+    MN = 0,
+    LLMQ = 1,
+    LlmqRotation = 2
+}
+
+pub struct LLMQValidationParams {
+    pub consensus_type: ConsensusType,
+
+}
+
 
 #[derive(Clone, Copy, Debug)]
 pub struct Manager<
@@ -27,6 +42,7 @@ pub struct Manager<
     pub validate_llmq_callback: VQL,
     pub use_insight_as_backup: bool,
     pub base_masternode_list_hash: Option<UInt256>,
+    pub consensus_type: ConsensusType,
 }
 
 pub fn lookup_masternode_list<'a,
@@ -36,7 +52,7 @@ pub fn lookup_masternode_list<'a,
     block_hash: UInt256,
     masternode_list_lookup: MNL,
     masternode_list_destroy: MND,
-) -> Option<MasternodeList<'a>> {
+) -> Option<MasternodeList> {
     let lookup_result = masternode_list_lookup(block_hash);
     if !lookup_result.is_null() {
         let list = unsafe { (*lookup_result).decode() };
@@ -46,14 +62,15 @@ pub fn lookup_masternode_list<'a,
     }
 }
 
-pub fn lookup_masternodes_and_quorums_for<'a,
-    MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
-    MND: Fn(*const types::MasternodeList) + Copy,
->(
+pub fn lookup_masternodes_and_quorums_for<MNL, MND>(
     block_hash: Option<UInt256>,
     masternode_list_lookup: MNL,
     masternode_list_destroy: MND,
-) -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>) {
+) -> (BTreeMap<UInt256, MasternodeEntry>, HashMap<LLMQType, HashMap<UInt256, LLMQEntry>>)
+    where
+        MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
+        MND: Fn(*const types::MasternodeList) + Copy,
+{
     if let Some(block_hash) = block_hash {
         if let Some(list) = lookup_masternode_list(block_hash, masternode_list_lookup, masternode_list_destroy) {
             return (list.masternodes, list.quorums);
@@ -132,13 +149,13 @@ pub fn classify_quorums<'a,
     BHL: Fn(UInt256) -> u32 + Copy,
     VQL: Fn(LLMQValidationData) -> bool + Copy,
 >(
-    base_quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
-    added_quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
+    base_quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry>>,
+    added_quorums: HashMap<LLMQType, HashMap<UInt256, LLMQEntry>>,
     deleted_quorums: HashMap<LLMQType, Vec<UInt256>>,
     manager: Manager<BHL, MNL, MND, AIL, SPL, VQL>,
 )
-    -> (HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
-        HashMap<LLMQType, HashMap<UInt256, LLMQEntry<'a>>>,
+    -> (HashMap<LLMQType, HashMap<UInt256, LLMQEntry>>,
+        HashMap<LLMQType, HashMap<UInt256, LLMQEntry>>,
         bool,
         Vec<*mut [u8; 32]>
     ) {
@@ -155,7 +172,8 @@ pub fn classify_quorums<'a,
                                 has_valid_quorums,
                                 llmq_masternode_list,
                                 manager.block_height_lookup,
-                                manager.validate_llmq_callback),
+                                manager.validate_llmq_callback,
+                                manager.consensus_type),
                         None =>
                             if (manager.block_height_lookup)(llmq_hash) != u32::MAX {
                                 needed_masternode_lists.push(boxed(llmq_hash.0));
@@ -221,12 +239,17 @@ pub fn validate_quorum<
     mut has_valid_quorums: bool,
     llmq_masternode_list: MasternodeList,
     block_height_lookup: BHL,
-    validate_llmq_callback: VQL
+    validate_llmq_callback: VQL,
+    consensus_type: ConsensusType,
 ) {
     let block_height: u32 = block_height_lookup(llmq_masternode_list.block_hash);
     let quorum_modifier = quorum.llmq_quorum_hash();
     let quorum_count = quorum.llmq_type.size();
-    let valid_masternodes = valid_masternodes_for(llmq_masternode_list.masternodes, quorum_modifier, quorum_count, block_height);
+    let valid_masternodes = if consensus_type == ConsensusType::LlmqRotation {
+        valid_masternodes_for_rotated_llmq(llmq_masternode_list.masternodes, block_height)
+    } else {
+        valid_masternodes_for(llmq_masternode_list.masternodes, quorum_modifier, quorum_count, block_height)
+    };
     let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
         .into_iter()
         .filter_map(|i| match quorum.signers_bitset.bit_is_true_at_le_index(i as u32) {
@@ -274,5 +297,16 @@ pub fn valid_masternodes_for(masternodes: BTreeMap<UInt256, MasternodeEntry>, qu
             break;
         }
     }
+    valid_masternodes
+}
+
+pub fn valid_masternodes_for_rotated_llmq(masternodes: BTreeMap<UInt256, MasternodeEntry>, block_height: u32) -> Vec<MasternodeEntry> {
+    //final StoredBlock cycleQuorumBaseBlock = blockChain.getBlockStore().get(cycleQuorumBaseHeight);
+    let dkg_interval = 24;
+    let llmq_index = block_height % dkg_interval;
+    let cycle_height = block_height - llmq_index;
+    let mut valid_masternodes = Vec::new();
+
+
     valid_masternodes
 }

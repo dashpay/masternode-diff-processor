@@ -334,7 +334,7 @@ pub mod tests {
 
     pub fn load_masternode_lists_for_files
     <'a, BHL: Fn(UInt256) -> u32 + Copy>(files: Vec<String>, chain: ChainType, block_height_lookup: BHL)
-                                         -> (bool, HashMap<UInt256, masternode::MasternodeList<'a>>) {
+                                         -> (bool, HashMap<UInt256, masternode::MasternodeList>) {
         let mut lists: HashMap<UInt256, masternode::MasternodeList> = HashMap::new();
         let mut base_masternode_list_hash: Option<UInt256> = None;
         for file in files {

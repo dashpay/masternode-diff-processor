@@ -41,7 +41,7 @@ fn test_llmq_rotation() {
 }
 #[test]
 fn test_llmq_rotation_2() {
-    let bytes = message_from_file("QRINFO_test22.dat".to_string());
+    let bytes = message_from_file("QRINFO_1_8344.dat".to_string());
     let length = bytes.len();
     let c_array = bytes.as_ptr();
     let merkle_root = [0u8; 32].as_ptr();
@@ -81,4 +81,30 @@ unsafe extern "C" fn block_height_lookup_(block_hash: *mut [u8; 32], _context: *
         "000001f340d35fe89d1924de57ccbf63a7a09347835e6e4990ee2df12a4a67f9" => 4096,
         _ => u32::MAX
     }
+}
+
+#[test]
+fn test_llmq_rotation_3() {
+    let bytes = message_from_file("QRINFO_0125771d2f9419377aebc77e3b880afaa6f3438ccf247919ce4e9bd450a029343fe9f3a8caf3845251ee9002770cb0f2e1c6f6c43fdff480f7a59f8e29c000000001".to_string());
+    let length = bytes.len();
+    let c_array = bytes.as_ptr();
+    let merkle_root = [0u8; 32].as_ptr();
+    let use_insight_as_backup= false;
+    let base_masternode_list_hash = null_mut();
+    let context = &mut (FFIContext { chain: ChainType::DevNet }) as *mut _ as *mut std::ffi::c_void;
+    println!("test_llmq_rotation_3 {:?}", bytes.to_hex());
+    let result = llmq_rotation_info_process2(
+        c_array,
+        length,
+        base_masternode_list_hash,
+        merkle_root,
+        use_insight_as_backup,
+        block_height_lookup_,
+        masternode_list_lookup,
+        masternode_list_destroy,
+        add_insight_lookup,
+        should_process_llmq_of_type,
+        validate_llmq_callback,
+        context,
+    );
 }
