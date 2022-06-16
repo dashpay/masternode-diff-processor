@@ -19,11 +19,11 @@ use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
 use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_llmq_rotation_info, unbox_llmq_rotation_info_result, unbox_llmq_validation_data, unbox_result};
 use dash_spv_ffi::types;
-use dash_spv_ffi::types::{LLMQSnapshot, MNListDiffResult};
 use dash_spv_models::common::llmq_type::LLMQType;
 use dash_spv_models::common::MerkleTree;
 use dash_spv_models::llmq;
 use dash_spv_models::masternode::{LLMQEntry, masternode_list};
+use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable, UInt256};
 use crate::processing::{classify_masternodes, classify_quorums};
 use crate::processing::manager::{ConsensusType, lookup_masternodes_and_quorums_for, Manager};
@@ -36,6 +36,27 @@ fn qr_failure() -> *mut types::LLMQRotationInfo {
 }
 fn qr_result_failure() -> *mut types::LLMQRotationInfoResult {
     boxed(types::LLMQRotationInfoResult::default())
+}
+
+macro_rules! unwrap_or_return {
+    ($e: expr, $re: expr) => {
+        match $e {
+            Some(x) => x,
+            None => { return $re() },
+        }
+    }
+}
+
+macro_rules! unwrap_or_failure {
+    ($e: expr) => { unwrap_or_return!($e, failure) }
+}
+
+macro_rules! unwrap_or_qr_failure {
+    ($e: expr) => { unwrap_or_return!($e, qr_failure) }
+}
+
+macro_rules! unwrap_or_qr_result_failure {
+    ($e: expr) => { unwrap_or_return!($e, qr_result_failure) }
 }
 
 fn list_diff_result<
@@ -105,7 +126,6 @@ fn list_diff_result<
         needed_masternode_lists: boxed_vec(needed_masternode_lists),
         needed_masternode_lists_count
     }
-
 }
 
 pub fn mnl_diff_process<
@@ -127,16 +147,9 @@ pub fn mnl_diff_process<
 ) -> *mut types::MNListDiffResult {
     println!("mnl_diff_process.start: {:?}", std::time::Instant::now());
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
-    let desired_merkle_root = match UInt256::from_const(merkle_root) {
-        Some(data) => data,
-        None => { return failure(); }
-    };
-    let list_diff = match llmq::MNListDiff::new(message, &mut 0, block_height_lookup) {
-        Some(data) => data,
-        None => { return failure(); }
-    };
+    let desired_merkle_root = unwrap_or_failure!(UInt256::from_const(merkle_root));
+    let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, block_height_lookup));
     let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
-    // println!("mnl_diff_process: {:?}", base_masternode_list_hash);
     let manager = Manager {
         block_height_lookup,
         masternode_list_lookup,
@@ -208,95 +221,41 @@ pub extern "C" fn llmq_rotation_info_read(
     context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut types::LLMQRotationInfo {
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
-
     let bh_lookup = |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) };
     let offset = &mut 0;
-    let snapshot_at_h_c = match LLMQSnapshot::from_bytes(message, offset) {
-        Some(data) => boxed(data),
-        None => { return qr_failure() }
-    };
-    let snapshot_at_h_2c = match LLMQSnapshot::from_bytes(message, offset) {
-        Some(data) => boxed(data),
-        None => { return qr_failure() }
-    };
-    let snapshot_at_h_3c = match LLMQSnapshot::from_bytes(message, offset) {
-        Some(data) => boxed(data),
-        None => { return qr_failure() }
-    };
-    let mn_list_diff_tip = match llmq::MNListDiff::new(message, offset, bh_lookup) {
-        Some(data) => boxed(data.encode()),
-        None => { return qr_failure() }
-    };
-    let mn_list_diff_at_h = match llmq::MNListDiff::new(message, offset, bh_lookup) {
-        Some(data) => boxed(data.encode()),
-        None => { return qr_failure() }
-    };
-    let mn_list_diff_at_h_c = match llmq::MNListDiff::new(message, offset, bh_lookup) {
-        Some(data) => boxed(data.encode()),
-        None => { return qr_failure() }
-    };
-    let mn_list_diff_at_h_2c = match llmq::MNListDiff::new(message, offset, bh_lookup) {
-        Some(data) => boxed(data.encode()),
-        None => { return boxed(types::LLMQRotationInfo::default()); }
-    };
-    let mn_list_diff_at_h_3c = match llmq::MNListDiff::new(message, offset, bh_lookup) {
-        Some(data) => boxed(data.encode()),
-        None => { return qr_failure() }
-    };
+    let snapshot_at_h_c = boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let snapshot_at_h_2c = boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let snapshot_at_h_3c = boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let mn_list_diff_tip = boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode());
+    let mn_list_diff_at_h = boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode());
+    let mn_list_diff_at_h_c = boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode());
+    let mn_list_diff_at_h_2c = boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode());
+    let mn_list_diff_at_h_3c = boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode());
     let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
-    let (snapshot_at_h_4c,
-        mn_list_diff_at_h_4c) = if extra_share {
-        (match LLMQSnapshot::from_bytes(message, offset) {
-            Some(data) => boxed(data),
-            None => { return qr_failure() }
-        },
-         match llmq::MNListDiff::new(message, offset, bh_lookup) {
-             Some(data) => boxed(data.encode()),
-             None => { return qr_failure() }
-         })
+    let (snapshot_at_h_4c, mn_list_diff_at_h_4c) = if extra_share {
+        (boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset))),
+         boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode()))
     } else {
         (null_mut(), null_mut())
     };
-    let last_quorum_per_index_count = match dash_spv_primitives::consensus::encode::VarInt::from_bytes(message, offset) {
-        Some(data) => data.0 as usize,
-        None => { return qr_failure(); }
-    };
+    let last_quorum_per_index_count = unwrap_or_qr_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
     for _i in 0..last_quorum_per_index_count {
-        match LLMQEntry::from_bytes(message, offset) {
-            Some(data) => last_quorum_per_index_vec.push(boxed(data.encode())),
-            None => { return qr_failure(); }
-        };
+        last_quorum_per_index_vec.push(boxed(unwrap_or_qr_failure!(LLMQEntry::from_bytes(message, offset)).encode()));
     }
     let last_quorum_per_index = boxed_vec(last_quorum_per_index_vec);
-
-    let quorum_snapshot_list_count = match dash_spv_primitives::consensus::encode::VarInt::from_bytes(message, offset) {
-        Some(data) => data.0 as usize,
-        None => { return qr_failure(); }
-    };
-    let mut quorum_snapshot_list_vec: Vec<*mut LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
+    let quorum_snapshot_list_count = unwrap_or_qr_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
+    let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
     for _i in 0..quorum_snapshot_list_count {
-        match LLMQSnapshot::from_bytes(message, offset) {
-            Some(data) => quorum_snapshot_list_vec.push(boxed(data)),
-            None => { return qr_failure() }
-        };
+        quorum_snapshot_list_vec.push(boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset))));
     }
     let quorum_snapshot_list = boxed_vec(quorum_snapshot_list_vec);
-
-    let mn_list_diff_list_count = match dash_spv_primitives::consensus::encode::VarInt::from_bytes(message, offset) {
-        Some(data) => data.0 as usize,
-        None => { return qr_failure(); }
-    };
+    let mn_list_diff_list_count = unwrap_or_qr_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiff> = Vec::with_capacity(mn_list_diff_list_count);
     for _i in 0..mn_list_diff_list_count {
-        match llmq::MNListDiff::new(message, offset, bh_lookup) {
-            Some(data) => mn_list_diff_list_vec.push(boxed(data.encode())),
-            None => { return qr_failure() }
-        }
+        mn_list_diff_list_vec.push(boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode()));
     }
     let mn_list_diff_list = boxed_vec(mn_list_diff_list_vec);
-
-
     boxed(types::LLMQRotationInfo {
         snapshot_at_h_c,
         snapshot_at_h_2c,
@@ -333,10 +292,7 @@ pub extern "C" fn llmq_rotation_info_process(
     context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut types::LLMQRotationInfoResult {
     let llmq_rotation_info = unsafe { *info };
-    let desired_merkle_root = match UInt256::from_const(merkle_root) {
-        Some(data) => data,
-        None => { return qr_result_failure(); }
-    };
+    let desired_merkle_root = unwrap_or_qr_result_failure!(UInt256::from_const(merkle_root));
     let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let manager = Manager {
         block_height_lookup: |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) },
@@ -376,7 +332,7 @@ pub extern "C" fn llmq_rotation_info_process(
             let list_diff = (*(*llmq_rotation_info.mn_list_diff_list.offset(i as isize))).decode();
             let result = list_diff_result(list_diff, manager, desired_merkle_root);
             boxed(result)
-        }).collect::<Vec<*mut MNListDiffResult>>());
+        }).collect::<Vec<*mut types::MNListDiffResult>>());
 
     boxed(types::LLMQRotationInfoResult {
         result_at_tip,
@@ -415,10 +371,7 @@ pub extern "C" fn llmq_rotation_info_process2(
     context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut types::LLMQRotationInfoResult {
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
-    let desired_merkle_root = match UInt256::from_const(merkle_root) {
-        Some(data) => data,
-        None => { return qr_result_failure(); }
-    };
+    let desired_merkle_root = unwrap_or_qr_result_failure!(UInt256::from_const(merkle_root));
     let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let manager = Manager {
         block_height_lookup: |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) },
@@ -431,114 +384,41 @@ pub extern "C" fn llmq_rotation_info_process2(
         base_masternode_list_hash,
         consensus_type: ConsensusType::LlmqRotation,
     };
-
     let offset = &mut 0;
-
-    let snapshot_at_h_c = match LLMQSnapshot::from_bytes(message, offset) {
-        Some(data) => boxed(data),
-        None => { return qr_result_failure(); }
-    };
-    let snapshot_at_h_2c = match LLMQSnapshot::from_bytes(message, offset) {
-        Some(data) => boxed(data),
-        None => { return qr_result_failure(); }
-    };
-    let snapshot_at_h_3c = match LLMQSnapshot::from_bytes(message, offset) {
-        Some(data) => boxed(data),
-        None => { return qr_result_failure(); }
-    };
-
-    let diff_tip = match llmq::MNListDiff::new(message, offset, manager.block_height_lookup) {
-        Some(data) => data,
-        None => { return qr_result_failure(); }
-    };
-    let diff_h = match llmq::MNListDiff::new(message, offset, manager.block_height_lookup) {
-        Some(data) => data,
-        None => { return qr_result_failure(); }
-    };
-    let diff_h_c = match llmq::MNListDiff::new(message, offset, manager.block_height_lookup) {
-        Some(data) => data,
-        None => { return qr_result_failure(); }
-    };
-    let diff_h_2c = match llmq::MNListDiff::new(message, offset, manager.block_height_lookup) {
-        Some(data) => data,
-        None => { return qr_result_failure(); }
-    };
-    let diff_h_3c = match llmq::MNListDiff::new(message, offset, manager.block_height_lookup) {
-        Some(data) => data,
-        None => { return qr_result_failure(); }
-    };
+    let snapshot_at_h_c = boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let snapshot_at_h_2c = boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let snapshot_at_h_3c = boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let diff_tip = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup));
+    let diff_h = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup));
+    let diff_h_c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup));
+    let diff_h_2c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup));
+    let diff_h_3c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup));
     let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
 
-    let (snapshot_at_h_4c,
-        diff_h_4c) = if extra_share {
-        (match LLMQSnapshot::from_bytes(message, offset) {
-            Some(data) => boxed(data),
-            None => { return qr_result_failure(); }
-        },
-         Some(match llmq::MNListDiff::new(message, offset, manager.block_height_lookup) {
-             Some(data) => data,
-             None => { return qr_result_failure(); }
-         }))
+    let (snapshot_at_h_4c, diff_h_4c) = if extra_share {
+        (boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset))),
+         Some(unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup))))
     } else {
         (null_mut(), None)
     };
-
-    let last_quorum_per_index_count = match dash_spv_primitives::consensus::encode::VarInt::from_bytes(message, offset) {
-        Some(data) => data.0 as usize,
-        None => { return qr_result_failure(); }
-    };
+    let last_quorum_per_index_count = unwrap_or_qr_result_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
     for _i in 0..last_quorum_per_index_count {
-        match LLMQEntry::from_bytes(message, offset) {
-            Some(data) => last_quorum_per_index_vec.push(boxed(data.encode())),
-            None => { return qr_result_failure(); }
-        };
+        last_quorum_per_index_vec.push(boxed(unwrap_or_qr_result_failure!(LLMQEntry::from_bytes(message, offset)).encode()));
     }
     let last_quorum_per_index = boxed_vec(last_quorum_per_index_vec);
 
-
-    /*
-    let last_quorum_hash_per_index_count = match dash_spv_primitives::consensus::encode::VarInt::from_bytes(message, offset) {
-        Some(data) => data.0 as usize,
-        None => { return qr_result_failure(); }
-    };
-    let mut last_quorum_hash_per_index_vec: Vec<*mut [u8; 32]> = Vec::with_capacity(last_quorum_hash_per_index_count);
-    for _i in 0..last_quorum_hash_per_index_count {
-        match UInt256::from_bytes(message, offset) {
-            Some(data) => last_quorum_hash_per_index_vec.push(boxed(data.0)),
-            None => { return qr_result_failure(); }
-        };
-    }
-    let last_quorum_hash_per_index = boxed_vec(last_quorum_hash_per_index_vec);*/
-
-
-    let quorum_snapshot_list_count = match dash_spv_primitives::consensus::encode::VarInt::from_bytes(message, offset) {
-        Some(data) => data.0 as usize,
-        None => { return qr_result_failure(); }
-    };
-    let mut quorum_snapshot_list_vec: Vec<*mut LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
+    let quorum_snapshot_list_count = unwrap_or_qr_result_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
+    let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
     for _i in 0..quorum_snapshot_list_count {
-        match LLMQSnapshot::from_bytes(message, offset) {
-            Some(data) => quorum_snapshot_list_vec.push(boxed(data)),
-            None => { return qr_result_failure() }
-        };
+        quorum_snapshot_list_vec.push(boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset))));
     }
     let quorum_snapshot_list = boxed_vec(quorum_snapshot_list_vec);
 
-    let mn_list_diff_list_count = match dash_spv_primitives::consensus::encode::VarInt::from_bytes(message, offset) {
-        Some(data) => data.0 as usize,
-        None => { return qr_result_failure(); }
-    };
+    let mn_list_diff_list_count = unwrap_or_qr_result_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> = Vec::with_capacity(mn_list_diff_list_count);
     for _i in 0..mn_list_diff_list_count {
-        match llmq::MNListDiff::new(message, offset, manager.block_height_lookup) {
-            Some(data) =>
-                mn_list_diff_list_vec.push(boxed(list_diff_result(data, manager, desired_merkle_root))),
-            None => { return qr_result_failure() }
-        }
-
-
-
+        mn_list_diff_list_vec.push(boxed(list_diff_result(unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup)), manager, desired_merkle_root)));
     }
     let mn_list_diff_list = boxed_vec(mn_list_diff_list_vec);
 
