@@ -8,19 +8,19 @@ pub mod processing;
 mod lib_tests;
 #[cfg(test)]
 mod tests;
+mod macros;
 
 use std::slice;
 use std::ffi::c_void;
 use std::ptr::null_mut;
 use byte::BytesExt;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, BlockHeightLookup, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
+use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, GetLLMQSnapshotByBlockHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
-use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_llmq_rotation_info, unbox_llmq_rotation_info_result, unbox_llmq_validation_data, unbox_result};
+use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_llmq_rotation_info, unbox_llmq_rotation_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_result};
 use dash_spv_ffi::types;
-use dash_spv_models::common::llmq_type::LLMQType;
-use dash_spv_models::common::MerkleTree;
+use dash_spv_models::common::{LLMQType, MerkleTree};
 use dash_spv_models::llmq;
 use dash_spv_models::masternode::{LLMQEntry, masternode_list};
 use dash_spv_primitives::consensus::encode;
@@ -28,47 +28,22 @@ use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable, UIn
 use crate::processing::{classify_masternodes, classify_quorums};
 use crate::processing::manager::{ConsensusType, lookup_masternodes_and_quorums_for, Manager};
 
-fn failure<'a>() -> *mut types::MNListDiffResult {
-    boxed(types::MNListDiffResult::default())
-}
-fn qr_failure() -> *mut types::LLMQRotationInfo {
-    boxed(types::LLMQRotationInfo::default())
-}
-fn qr_result_failure() -> *mut types::LLMQRotationInfoResult {
-    boxed(types::LLMQRotationInfoResult::default())
-}
-
-macro_rules! unwrap_or_return {
-    ($e: expr, $re: expr) => {
-        match $e {
-            Some(x) => x,
-            None => { return $re() },
-        }
-    }
-}
-
-macro_rules! unwrap_or_failure {
-    ($e: expr) => { unwrap_or_return!($e, failure) }
-}
-
-macro_rules! unwrap_or_qr_failure {
-    ($e: expr) => { unwrap_or_return!($e, qr_failure) }
-}
-
-macro_rules! unwrap_or_qr_result_failure {
-    ($e: expr) => { unwrap_or_return!($e, qr_result_failure) }
+fn list_diff_from_ffi<'a>(list_diff: *mut types::MNListDiff) -> llmq::MNListDiff<'a> {
+    unsafe { (*(list_diff)).decode() }
 }
 
 fn list_diff_result<
+    BHH: Fn(UInt256) -> u32 + Copy,
+    BHT: Fn(u32) -> *const u8 + Copy,
+    SL: Fn(u32) -> *const types::LLMQSnapshot + Copy,
     MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
     MND: Fn(*const types::MasternodeList) + Copy,
-    AIL: Fn(UInt256) + Copy,
-    BHL: Fn(UInt256) -> u32 + Copy,
-    SPL: Fn(LLMQType) -> bool + Copy,
-    VQL: Fn(types::LLMQValidationData) -> bool + Copy,
+    AI: Fn(UInt256) + Copy,
+    SPQ: Fn(LLMQType) -> bool + Copy,
+    VQ: Fn(types::LLMQValidationData) -> bool + Copy,
 >(
     list_diff: llmq::MNListDiff,
-    manager: Manager<BHL, MNL, MND, AIL, SPL, VQL>,
+    manager: Manager<BHH, BHT, SL, MNL, MND, AI, SPQ, VQ>,
     merkle_root: UInt256
 ) -> types::MNListDiffResult {
     let block_hash = list_diff.block_hash;
@@ -129,7 +104,8 @@ fn list_diff_result<
 }
 
 pub fn mnl_diff_process<
-    BHL: Fn(UInt256) -> u32 + Copy,
+    BHH: Fn(UInt256) -> u32 + Copy,
+    BHT: Fn(u32) -> *const u8 + Copy,
     MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
 >(
     message_arr: *const u8,
@@ -137,7 +113,9 @@ pub fn mnl_diff_process<
     base_masternode_list_hash: *const u8,
     merkle_root: *const u8,
     use_insight_as_backup: bool,
-    block_height_lookup: BHL,
+    get_block_height_by_hash: BHH,
+    get_block_hash_by_height: BHT,
+    get_snapshot_by_block_height: GetLLMQSnapshotByBlockHeight,
     masternode_list_lookup: MNL,
     masternode_list_destroy: MasternodeListDestroy,
     add_insight_lookup: AddInsightBlockingLookup,
@@ -148,23 +126,27 @@ pub fn mnl_diff_process<
     println!("mnl_diff_process.start: {:?}", std::time::Instant::now());
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let desired_merkle_root = unwrap_or_failure!(UInt256::from_const(merkle_root));
-    let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, block_height_lookup));
+    let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, get_block_height_by_hash));
     let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let manager = Manager {
-        block_height_lookup,
+        get_block_height_by_hash,
+        get_block_hash_by_height,
         masternode_list_lookup,
         masternode_list_destroy: |list: *const types::MasternodeList| unsafe { masternode_list_destroy(list) },
-        add_insight_lookup: |hash: UInt256| unsafe { add_insight_lookup(boxed(hash.0), context) },
+        add_insight_lookup: |h: UInt256| unsafe { add_insight_lookup(boxed(h.0), context) },
         should_process_llmq_of_type: |llmq_type: LLMQType| unsafe { should_process_llmq_of_type(llmq_type.into(), context) },
         validate_llmq_callback: |data: types::LLMQValidationData| unsafe { validate_llmq_callback(boxed(data), context) },
         use_insight_as_backup,
         base_masternode_list_hash,
-        consensus_type: ConsensusType::LLMQ
+        consensus_type: ConsensusType::LLMQ,
+        get_snapshot_by_block_height: |h: u32| unsafe { get_snapshot_by_block_height(h, context) },
     };
     let result = list_diff_result(list_diff, manager, desired_merkle_root);
     println!("mnl_diff_process.finish: {:?}", std::time::Instant::now());
     boxed(result)
 }
+
+/// Core v0.17
 
 #[no_mangle]
 pub extern "C" fn mndiff_process(
@@ -173,7 +155,9 @@ pub extern "C" fn mndiff_process(
     base_masternode_list_hash: *const u8,
     merkle_root: *const u8,
     use_insight_as_backup: bool,
-    block_height_lookup: BlockHeightLookup,
+    get_block_height_by_hash: GetBlockHeightByHash,
+    get_block_hash_by_height: GetBlockHashByHeight,
+    get_snapshot_by_height: GetLLMQSnapshotByBlockHeight,
     masternode_list_lookup: MasternodeListLookup,
     masternode_list_destroy: MasternodeListDestroy,
     add_insight_lookup: AddInsightBlockingLookup,
@@ -187,7 +171,9 @@ pub extern "C" fn mndiff_process(
         base_masternode_list_hash,
         merkle_root,
         use_insight_as_backup,
-        |hash: UInt256| unsafe { block_height_lookup(boxed(hash.0), context) },
+        |hash: UInt256| unsafe { get_block_height_by_hash(boxed(hash.0), context) },
+        |height: u32| unsafe { get_block_hash_by_height(height, context) },
+        get_snapshot_by_height,
         |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
         masternode_list_destroy,
         add_insight_lookup,
@@ -212,16 +198,17 @@ pub unsafe extern fn mndiff_destroy(result: *mut types::MNListDiffResult) {
     unbox_result(result);
 }
 
+/// Core v0.18
 
 #[no_mangle]
 pub extern "C" fn llmq_rotation_info_read(
     message_arr: *const u8,
     message_length: usize,
-    block_height_lookup: BlockHeightLookup,
+    get_block_height_by_hash: GetBlockHeightByHash,
     context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut types::LLMQRotationInfo {
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
-    let bh_lookup = |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) };
+    let bh_lookup = |h: UInt256| unsafe { get_block_height_by_hash(boxed(h.0), context) };
     let offset = &mut 0;
     let snapshot_at_h_c = boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
     let snapshot_at_h_2c = boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
@@ -283,7 +270,9 @@ pub extern "C" fn llmq_rotation_info_process(
     base_masternode_list_hash: *const u8,
     merkle_root: *const u8,
     use_insight_as_backup: bool,
-    block_height_lookup: BlockHeightLookup,
+    get_block_height_by_hash: GetBlockHeightByHash,
+    get_block_hash_by_height: GetBlockHashByHeight,
+    get_snapshot_by_block_height: GetLLMQSnapshotByBlockHeight,
     masternode_list_lookup: MasternodeListLookup,
     masternode_list_destroy: MasternodeListDestroy,
     add_insight_lookup: AddInsightBlockingLookup,
@@ -295,37 +284,35 @@ pub extern "C" fn llmq_rotation_info_process(
     let desired_merkle_root = unwrap_or_qr_result_failure!(UInt256::from_const(merkle_root));
     let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let manager = Manager {
-        block_height_lookup: |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) },
-        masternode_list_lookup: |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
+        get_block_height_by_hash: |h: UInt256| unsafe { get_block_height_by_hash(boxed(h.0), context) },
+        get_block_hash_by_height: |h: u32| unsafe { get_block_hash_by_height(h, context) },
+        get_snapshot_by_block_height: |h: u32| unsafe { get_snapshot_by_block_height(h, context) },
+        masternode_list_lookup: |h: UInt256| unsafe { masternode_list_lookup(boxed(h.0), context) },
         masternode_list_destroy: |list: *const types::MasternodeList| unsafe { masternode_list_destroy(list) },
-        add_insight_lookup: |hash: UInt256| unsafe { add_insight_lookup(boxed(hash.0), context) },
+        add_insight_lookup: |h: UInt256| unsafe { add_insight_lookup(boxed(h.0), context) },
         should_process_llmq_of_type: |llmq_type: LLMQType| unsafe { should_process_llmq_of_type(llmq_type.into(), context) },
         validate_llmq_callback: |data: types::LLMQValidationData| unsafe { validate_llmq_callback(boxed(data), context) },
         use_insight_as_backup,
         base_masternode_list_hash,
         consensus_type: ConsensusType::LlmqRotation,
     };
-
     let extra_share = llmq_rotation_info.extra_share;
-    let result_at_tip = boxed(list_diff_result(unsafe { (*(llmq_rotation_info.mn_list_diff_tip)).decode() }, manager, desired_merkle_root));
-    let result_at_h = boxed(list_diff_result(unsafe { (*(llmq_rotation_info.mn_list_diff_at_h)).decode() }, manager, desired_merkle_root ));
-    let result_at_h_c = boxed(list_diff_result(unsafe { (*(llmq_rotation_info.mn_list_diff_at_h_c)).decode() }, manager, desired_merkle_root));
-    let result_at_h_2c = boxed(list_diff_result(unsafe { (*(llmq_rotation_info.mn_list_diff_at_h_2c)).decode() }, manager, desired_merkle_root));
-    let result_at_h_3c = boxed(list_diff_result(unsafe { (*(llmq_rotation_info.mn_list_diff_at_h_3c)).decode() }, manager, desired_merkle_root));
+    let result_at_tip = boxed(list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_tip), manager, desired_merkle_root));
+    let result_at_h = boxed(list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_at_h), manager, desired_merkle_root ));
+    let result_at_h_c = boxed(list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_at_h_c), manager, desired_merkle_root));
+    let result_at_h_2c = boxed(list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_at_h_2c), manager, desired_merkle_root));
+    let result_at_h_3c = boxed(list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_at_h_3c), manager, desired_merkle_root));
     let result_at_h_4c = if extra_share {
-        let list_diff = unsafe { (*(llmq_rotation_info.mn_list_diff_at_h_4c)).decode() };
+        let list_diff = list_diff_from_ffi(llmq_rotation_info.mn_list_diff_at_h_4c);
         let result = list_diff_result(list_diff, manager, desired_merkle_root);
         boxed(result)
     } else {
         null_mut()
     };
-
     let last_quorum_per_index_count = llmq_rotation_info.last_quorum_per_index_count;
     let quorum_snapshot_list_count = llmq_rotation_info.quorum_snapshot_list_count;
     let mn_list_diff_list_count = llmq_rotation_info.mn_list_diff_list_count;
-
     let last_quorum_per_index = llmq_rotation_info.last_quorum_per_index;
-
     let mn_list_diff_list = boxed_vec((0..mn_list_diff_list_count)
         .into_iter()
         .map(|i| unsafe {
@@ -362,7 +349,9 @@ pub extern "C" fn llmq_rotation_info_process2(
     base_masternode_list_hash: *const u8,
     merkle_root: *const u8,
     use_insight_as_backup: bool,
-    block_height_lookup: BlockHeightLookup,
+    get_block_height_by_hash: GetBlockHeightByHash,
+    get_block_hash_by_height: GetBlockHashByHeight,
+    get_llmq_snapshot_by_block_height: GetLLMQSnapshotByBlockHeight,
     masternode_list_lookup: MasternodeListLookup,
     masternode_list_destroy: MasternodeListDestroy,
     add_insight_lookup: AddInsightBlockingLookup,
@@ -374,7 +363,9 @@ pub extern "C" fn llmq_rotation_info_process2(
     let desired_merkle_root = unwrap_or_qr_result_failure!(UInt256::from_const(merkle_root));
     let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let manager = Manager {
-        block_height_lookup: |h: UInt256| unsafe { block_height_lookup(boxed(h.0), context) },
+        get_block_height_by_hash: |h: UInt256| unsafe { get_block_height_by_hash(boxed(h.0), context) },
+        get_block_hash_by_height: |h: u32| unsafe { get_block_hash_by_height(h, context) },
+        get_snapshot_by_block_height: |h: u32| unsafe { get_llmq_snapshot_by_block_height(h, context) },
         masternode_list_lookup: |hash: UInt256| unsafe { masternode_list_lookup(boxed(hash.0), context) },
         masternode_list_destroy: |list: *const types::MasternodeList| unsafe { masternode_list_destroy(list) },
         add_insight_lookup: |hash: UInt256| unsafe { add_insight_lookup(boxed(hash.0), context) },
@@ -388,16 +379,15 @@ pub extern "C" fn llmq_rotation_info_process2(
     let snapshot_at_h_c = boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
     let snapshot_at_h_2c = boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
     let snapshot_at_h_3c = boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
-    let diff_tip = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup));
-    let diff_h = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup));
-    let diff_h_c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup));
-    let diff_h_2c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup));
-    let diff_h_3c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup));
+    let diff_tip = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.get_block_height_by_hash));
+    let diff_h = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.get_block_height_by_hash));
+    let diff_h_c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.get_block_height_by_hash));
+    let diff_h_2c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.get_block_height_by_hash));
+    let diff_h_3c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.get_block_height_by_hash));
     let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
-
     let (snapshot_at_h_4c, diff_h_4c) = if extra_share {
         (boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset))),
-         Some(unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup))))
+         Some(unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.get_block_height_by_hash))))
     } else {
         (null_mut(), None)
     };
@@ -418,7 +408,7 @@ pub extern "C" fn llmq_rotation_info_process2(
     let mn_list_diff_list_count = unwrap_or_qr_result_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> = Vec::with_capacity(mn_list_diff_list_count);
     for _i in 0..mn_list_diff_list_count {
-        mn_list_diff_list_vec.push(boxed(list_diff_result(unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.block_height_lookup)), manager, desired_merkle_root)));
+        mn_list_diff_list_vec.push(boxed(list_diff_result(unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, manager.get_block_height_by_hash)), manager, desired_merkle_root)));
     }
     let mn_list_diff_list = boxed_vec(mn_list_diff_list_vec);
 
@@ -433,8 +423,6 @@ pub extern "C" fn llmq_rotation_info_process2(
     } else {
         null_mut()
     };
-
-
     boxed(types::LLMQRotationInfoResult {
         result_at_tip,
         result_at_h,
@@ -465,4 +453,15 @@ pub unsafe extern fn llmq_rotation_info_destroy(result: *mut types::LLMQRotation
 pub unsafe extern fn llmq_rotation_info_result_destroy(result: *mut types::LLMQRotationInfoResult) {
     unbox_llmq_rotation_info_result(result);
 }
+
+#[no_mangle]
+pub unsafe extern fn llmq_snapshot_destroy(result: *mut types::LLMQSnapshot) {
+    unbox_llmq_snapshot(result);
+}
+
+#[no_mangle]
+pub unsafe extern fn block_destroy(result: *mut types::Block) {
+    unbox_block(result);
+}
+
 

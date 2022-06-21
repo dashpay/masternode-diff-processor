@@ -8,7 +8,7 @@ use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::ToHex;
 use crate::{LLMQType, mnl_diff_process};
-use crate::lib_tests::tests::{add_insight_lookup, assert_diff_result, block_height_for, FFIContext, masternode_list_destroy, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
+use crate::lib_tests::tests::{add_insight_lookup, assert_diff_result, block_height_for, FFIContext, get_llmq_snapshot_by_block_height, masternode_list_destroy, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
 
 #[test]
 fn testnet_llmq_verification() { //testTestnetQuorumVerification
@@ -16,7 +16,7 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
     let merkle_root = [0u8; 32].as_ptr();
     let use_insight_as_backup= false;
     let chain = ChainType::TestNet;
-    let block_height_lookup = |block_hash: UInt256| block_height_for(chain, block_hash.clone().reversed().0.to_hex().as_str());
+    let get_block_height_by_hash = |block_hash: UInt256| block_height_for(chain, block_hash.clone().reversed().0.to_hex().as_str());
     let base_masternode_list_hash: *const u8 = null_mut();
     let context = &mut FFIContext { chain } as *mut _ as *mut std::ffi::c_void;
 
@@ -26,7 +26,9 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
         base_masternode_list_hash,
         merkle_root,
         use_insight_as_backup,
-        block_height_lookup,
+        get_block_height_by_hash,
+        |height| null_mut(),
+        get_llmq_snapshot_by_block_height,
         |block_hash| null_mut(),
         masternode_list_destroy,
         add_insight_lookup,
@@ -51,7 +53,9 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
             block_hash_119064.0.as_ptr(),
             merkle_root,
             use_insight_as_backup,
-            block_height_lookup,
+            get_block_height_by_hash,
+            |height| null_mut(),
+            get_llmq_snapshot_by_block_height,
             |hash|
                 if hash == block_hash_119064 {
                     &masternode_list_119064_encoded as *const types::MasternodeList

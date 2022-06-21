@@ -1,6 +1,6 @@
 [package]
 name = "dash_mndiff"
-version = "0.1.1"
+version = "0.2.1"
 edition = "2018"
 build = "build.rs"
 publish = false
@@ -8,27 +8,28 @@ publish = false
 [dependencies]
 byte = "0.2"
 
-[dependencies.dash-spv-primitives]
+#[dependencies.dash-spv-primitives]
 #path = "../dash-spv-primitives"
+#[dependencies.dash-spv-models]
+#path = "../dash-spv-models"
+#[dependencies.dash-spv-ffi]
+#path = "../dash-spv-ffi"
+#[dependencies.dash-spv-storage]
+#path = "../dash-spv-storage"
+
+[dependencies.dash-spv-primitives]
 git = "https://github.com/pankcuf/dash-spv-primitives"
 branch = "master"
 version = "0.1.12"
-
 [dependencies.dash-spv-models]
-#path = "../dash-spv-models"
-
 git = "https://github.com/pankcuf/dash-spv-models"
 branch = "core-v0.18"
-version = "0.1.8"
-
+version = "0.1.9"
 [dependencies.dash-spv-ffi]
-#path = "../dash-spv-ffi"
 git = "https://github.com/pankcuf/dash-spv-ffi"
 branch = "master"
-version = "0.1.10"
+version = "0.1.11"
 
-#[dependencies.dash-spv-storage]
-#path = "../dash-spv-storage"
 
 [build-dependencies]
 cbindgen = "0.20.0"

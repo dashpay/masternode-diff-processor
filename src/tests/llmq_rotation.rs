@@ -1,8 +1,8 @@
 use std::ptr::null_mut;
 use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
-use dash_spv_primitives::hashes::hex::ToHex;
-use crate::lib_tests::tests::{add_insight_lookup, block_height_lookup_5078, FFIContext, masternode_list_destroy, masternode_list_lookup, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
+use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
+use crate::lib_tests::tests::{add_insight_lookup, block_height_lookup_5078, FFIContext, get_block_hash_by_height_5078, get_llmq_snapshot_by_block_height, masternode_list_destroy, masternode_list_lookup, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
 use crate::llmq_rotation_info_process2;
 
 #[test]
@@ -22,6 +22,8 @@ fn test_llmq_rotation() {
         merkle_root,
         use_insight_as_backup,
         block_height_lookup_5078,
+        get_block_hash_by_height_5078,
+        get_llmq_snapshot_by_block_height,
         masternode_list_lookup,
         masternode_list_destroy,
         add_insight_lookup,
@@ -56,6 +58,8 @@ fn test_llmq_rotation_2() {
         merkle_root,
         use_insight_as_backup,
         block_height_lookup_,
+        get_block_hash_by_height_5078,
+        get_llmq_snapshot_by_block_height,
         masternode_list_lookup,
         masternode_list_destroy,
         add_insight_lookup,
@@ -83,6 +87,19 @@ unsafe extern "C" fn block_height_lookup_(block_hash: *mut [u8; 32], _context: *
     }
 }
 
+unsafe extern "C" fn get_block_hash_by_height_(block_height: u32, _context: *const std::ffi::c_void) -> *const u8 {
+    match block_height {
+        5334 => UInt256::from_hex("00000072f3c73d891d86546f259ba2cd87d1aa655c447640a4257f6a8e6f7018").unwrap().reversed().0.as_ptr(),
+        4207 => UInt256::from_hex("000000a451ba6459b3ce6128a5e8f273f9bc2010645dd4721e1b51efce18dda7").unwrap().reversed().0.as_ptr(),
+        4192 => UInt256::from_hex("000000076aeba26f76a5d0e12e11c9b4d35d7232f1bbae6c47b4d8bef4a12b62").unwrap().reversed().0.as_ptr(),
+        4168 => UInt256::from_hex("00000179987c39850ddd901eec6bfd0a508ec54fb6a0cd28481481aa0adf56b6").unwrap().reversed().0.as_ptr(),
+        4144 => UInt256::from_hex("00000028bd64fd360dba79acf7cb3bae6cea18553c7232894a2ace15ada70940").unwrap().reversed().0.as_ptr(),
+        4120 => UInt256::from_hex("000002410622902b361d1e2194f2072c6409c6f22ef5fea854d3326a27075713").unwrap().reversed().0.as_ptr(),
+        4096 => UInt256::from_hex("000001f340d35fe89d1924de57ccbf63a7a09347835e6e4990ee2df12a4a67f9").unwrap().reversed().0.as_ptr(),
+        _ => UInt256::MIN.0.as_ptr()
+    }
+}
+
 #[test]
 fn test_llmq_rotation_3() {
     let bytes = message_from_file("QRINFO_0125771d2f9419377aebc77e3b880afaa6f3438ccf247919ce4e9bd450a029343fe9f3a8caf3845251ee9002770cb0f2e1c6f6c43fdff480f7a59f8e29c000000001".to_string());
@@ -100,6 +117,8 @@ fn test_llmq_rotation_3() {
         merkle_root,
         use_insight_as_backup,
         block_height_lookup_,
+        get_block_hash_by_height_5078,
+        get_llmq_snapshot_by_block_height,
         masternode_list_lookup,
         masternode_list_destroy,
         add_insight_lookup,
@@ -139,6 +158,8 @@ fn test_devnet_333() {
         [0u8; 32].as_ptr(),
         false,
         block_height_lookup_333,
+        get_block_hash_by_height_5078,
+        get_llmq_snapshot_by_block_height,
         masternode_list_lookup,
         masternode_list_destroy,
         add_insight_lookup,

@@ -212,6 +212,13 @@ pub mod tests {
     pub unsafe extern "C" fn block_height_lookup_5078(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> u32 {
         5078
     }
+    pub unsafe extern "C" fn get_block_hash_by_height_5078(_block_height: u32, _context: *const std::ffi::c_void) -> *const u8 {
+        null_mut()
+    }
+
+    pub unsafe extern "C" fn get_llmq_snapshot_by_block_height(_block_height: u32, _context: *const std::ffi::c_void) -> *const types::LLMQSnapshot {
+        null_mut()
+    }
 
     pub unsafe extern "C" fn masternode_list_lookup(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const types::MasternodeList {
         null_mut()
@@ -227,7 +234,7 @@ pub mod tests {
         llmq_type == match data.chain {
             ChainType::MainNet => LLMQType::Llmqtype400_60.into(),
             ChainType::TestNet => LLMQType::Llmqtype50_60.into(),
-            ChainType::DevNet => LLMQType::Llmqtype10_60.into()
+            ChainType::DevNet => LLMQType::Llmqtype60_75.into()
         }
     }
     pub unsafe extern "C" fn validate_llmq_callback(data: *mut types::LLMQValidationData, _context: *const std::ffi::c_void) -> bool {
@@ -288,6 +295,8 @@ pub mod tests {
             merkle_root,
             use_insight_as_backup,
             |block_hash| 122088,
+            |height| null_mut(),
+            get_llmq_snapshot_by_block_height,
             |block_hash| null_mut(),
             masternode_list_destroy,
             add_insight_lookup,
@@ -333,8 +342,10 @@ pub mod tests {
     }
 
     pub fn load_masternode_lists_for_files
-    <'a, BHL: Fn(UInt256) -> u32 + Copy>(files: Vec<String>, chain: ChainType, block_height_lookup: BHL)
-                                         -> (bool, HashMap<UInt256, masternode::MasternodeList>) {
+    <'a, BlockHeightByHash: Fn(UInt256) -> u32 + Copy>(
+        files: Vec<String>, chain: ChainType,
+        get_block_height_by_hash: BlockHeightByHash)
+        -> (bool, HashMap<UInt256, masternode::MasternodeList>) {
         let mut lists: HashMap<UInt256, masternode::MasternodeList> = HashMap::new();
         let mut base_masternode_list_hash: Option<UInt256> = None;
         for file in files {
@@ -346,7 +357,9 @@ pub mod tests {
                 match base_masternode_list_hash { Some(data) => data.0.as_ptr(), None => null_mut() },
                 [0u8; 32].as_ptr(),
                 false,
-                block_height_lookup,
+                get_block_height_by_hash,
+                |height| null_mut(),
+                get_llmq_snapshot_by_block_height,
                 |hash| match lists.get(&hash) {
                     Some(list) => {
                         let list_encoded = list.clone().encode();
