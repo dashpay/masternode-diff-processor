@@ -25,6 +25,8 @@ pub struct LLMQValidationParams {
     pub consensus_type: ConsensusType,
 }
 
+
+// https://github.com/rust-lang/rfcs/issues/2770
 #[derive(Clone, Copy, Debug)]
 pub struct Manager<
     BHH: Fn(UInt256) -> u32 + Copy,

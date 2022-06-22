@@ -27,6 +27,7 @@ use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable, UInt256};
 use crate::processing::{classify_masternodes, classify_quorums};
 use crate::processing::manager::{ConsensusType, lookup_masternodes_and_quorums_for, Manager};
+use crate::processing::processor::{Processor4, ProcessorContext, QuorumSelectionType};
 
 fn list_diff_from_ffi<'a>(list_diff: *mut types::MNListDiff) -> llmq::MNListDiff<'a> {
     unsafe { (*(list_diff)).decode() }
@@ -465,3 +466,292 @@ pub unsafe extern fn block_destroy(result: *mut types::Block) {
 }
 
 
+
+
+//
+// Experimental FFI API with saving context
+//
+
+pub fn get_mnl_diff_processing_result(
+    message_arr: *const u8,
+    message_length: usize,
+    base_masternode_list_hash: *const u8,
+    merkle_root: *const u8,
+    use_insight_as_backup: bool,
+    selection_type: QuorumSelectionType,
+    processor: &Processor4
+) -> *mut types::MNListDiffResult {
+    println!("get_mnl_diff_processing_result.start: {:?}", std::time::Instant::now());
+    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
+    let desired_merkle_root = unwrap_or_failure!(UInt256::from_const(merkle_root));
+    let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
+    let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
+    let processor_context = ProcessorContext {
+        selection_type,
+        use_insight_as_backup,
+        base_masternode_list_hash
+    };
+    let result = processor.get_list_diff_result(list_diff, desired_merkle_root, processor_context);
+    println!("get_mnl_diff_processing_result.finish: {:?}", std::time::Instant::now());
+    boxed(result)
+}
+
+#[no_mangle]
+pub unsafe extern fn register_processor(
+    get_block_height_by_hash: GetBlockHeightByHash,
+    get_block_hash_by_height: GetBlockHashByHeight,
+    get_llmq_snapshot_by_block_height: GetLLMQSnapshotByBlockHeight,
+    get_masternode_list_by_block_hash: MasternodeListLookup,
+    destroy_masternode_list: MasternodeListDestroy,
+    add_insight: AddInsightBlockingLookup,
+    should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
+    validate_llmq: ValidateLLMQCallback,
+    context: *const c_void, // External Masternode Manager Diff Message Context ()
+) -> *mut Processor4 {
+    boxed(Processor4::new(
+        get_block_height_by_hash,
+        get_block_hash_by_height,
+        get_llmq_snapshot_by_block_height,
+        get_masternode_list_by_block_hash,
+        destroy_masternode_list,
+        add_insight,
+        should_process_llmq_of_type,
+        validate_llmq,
+        context
+    ))
+}
+
+#[no_mangle]
+pub unsafe extern fn unregister_processor(processor: *mut Processor4) {
+    unbox_any(processor);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn process_mnl_diff(
+    message_arr: *const u8,
+    message_length: usize,
+    base_masternode_list_hash: *const u8,
+    merkle_root: *const u8,
+    use_insight_as_backup: bool,
+    processor: *const Processor4,
+) -> *mut types::MNListDiffResult {
+    get_mnl_diff_processing_result(
+        message_arr,
+        message_length,
+        base_masternode_list_hash,
+        merkle_root,
+        use_insight_as_backup,
+        QuorumSelectionType::LLMQ,
+        unwrap_or_failure!(processor.as_ref()))
+}
+
+#[no_mangle]
+pub extern "C" fn process_llmq_rotation_info_read(
+    message_arr: *const u8,
+    message_length: usize,
+    processor: *const Processor4,
+) -> *mut types::LLMQRotationInfo {
+    let processor = unwrap_or_qr_failure!(unsafe { processor.as_ref() });
+    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
+    let bh_lookup = |h: UInt256| processor.lookup_block_height_by_hash(h);
+    let offset = &mut 0;
+    let snapshot_at_h_c = boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let snapshot_at_h_2c = boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let snapshot_at_h_3c = boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let mn_list_diff_tip = boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode());
+    let mn_list_diff_at_h = boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode());
+    let mn_list_diff_at_h_c = boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode());
+    let mn_list_diff_at_h_2c = boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode());
+    let mn_list_diff_at_h_3c = boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode());
+    let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
+    let (snapshot_at_h_4c, mn_list_diff_at_h_4c) = if extra_share {
+        (boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset))),
+         boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode()))
+    } else {
+        (null_mut(), null_mut())
+    };
+    let last_quorum_per_index_count = unwrap_or_qr_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
+    let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
+    for _i in 0..last_quorum_per_index_count {
+        last_quorum_per_index_vec.push(boxed(unwrap_or_qr_failure!(LLMQEntry::from_bytes(message, offset)).encode()));
+    }
+    let quorum_snapshot_list_count = unwrap_or_qr_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
+    let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
+    for _i in 0..quorum_snapshot_list_count {
+        quorum_snapshot_list_vec.push(boxed(unwrap_or_qr_failure!(types::LLMQSnapshot::from_bytes(message, offset))));
+    }
+    let mn_list_diff_list_count = unwrap_or_qr_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
+    let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiff> = Vec::with_capacity(mn_list_diff_list_count);
+    for _i in 0..mn_list_diff_list_count {
+        mn_list_diff_list_vec.push(boxed(unwrap_or_qr_failure!(llmq::MNListDiff::new(message, offset, bh_lookup)).encode()));
+    }
+    boxed(types::LLMQRotationInfo {
+        snapshot_at_h_c,
+        snapshot_at_h_2c,
+        snapshot_at_h_3c,
+        snapshot_at_h_4c,
+        mn_list_diff_tip,
+        mn_list_diff_at_h,
+        mn_list_diff_at_h_c,
+        mn_list_diff_at_h_2c,
+        mn_list_diff_at_h_3c,
+        mn_list_diff_at_h_4c,
+        extra_share,
+        last_quorum_per_index_count,
+        last_quorum_per_index: boxed_vec(last_quorum_per_index_vec),
+        quorum_snapshot_list_count,
+        quorum_snapshot_list: boxed_vec(quorum_snapshot_list_vec),
+        mn_list_diff_list_count,
+        mn_list_diff_list: boxed_vec(mn_list_diff_list_vec),
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn process_llmq_rotation_info_result(
+    info: *mut types::LLMQRotationInfo,
+    base_masternode_list_hash: *const u8,
+    merkle_root: *const u8,
+    use_insight_as_backup: bool,
+    processor: *const Processor4,
+) -> *mut types::LLMQRotationInfoResult {
+    let llmq_rotation_info = unsafe { *info };
+    let desired_merkle_root = unwrap_or_qr_result_failure!(UInt256::from_const(merkle_root));
+    let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
+    let extra_share = llmq_rotation_info.extra_share;
+    let processor_context = ProcessorContext {
+        selection_type: QuorumSelectionType::LlmqRotation,
+        use_insight_as_backup,
+        base_masternode_list_hash
+    };
+    let processor = unwrap_or_qr_result_failure!(unsafe { processor.as_ref() });
+    let result_at_tip = boxed(processor.get_list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_tip), desired_merkle_root, processor_context));
+    let result_at_h = boxed(processor.get_list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_at_h), desired_merkle_root, processor_context));
+    let result_at_h_c = boxed(processor.get_list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_at_h_c), desired_merkle_root, processor_context));
+    let result_at_h_2c = boxed(processor.get_list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_at_h_2c), desired_merkle_root, processor_context));
+    let result_at_h_3c = boxed(processor.get_list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_at_h_3c), desired_merkle_root, processor_context));
+    let result_at_h_4c = if extra_share {
+        let list_diff = list_diff_from_ffi(llmq_rotation_info.mn_list_diff_at_h_4c);
+        let result = processor.get_list_diff_result(list_diff, desired_merkle_root, processor_context);
+        boxed(result)
+    } else {
+        null_mut()
+    };
+    let last_quorum_per_index_count = llmq_rotation_info.last_quorum_per_index_count;
+    let quorum_snapshot_list_count = llmq_rotation_info.quorum_snapshot_list_count;
+    let mn_list_diff_list_count = llmq_rotation_info.mn_list_diff_list_count;
+    let last_quorum_per_index = llmq_rotation_info.last_quorum_per_index;
+    let mn_list_diff_list = boxed_vec((0..mn_list_diff_list_count)
+        .into_iter()
+        .map(|i| unsafe {
+            let list_diff = (*(*llmq_rotation_info.mn_list_diff_list.offset(i as isize))).decode();
+            let result = processor.get_list_diff_result(list_diff, desired_merkle_root, processor_context);
+            boxed(result)
+        }).collect::<Vec<*mut types::MNListDiffResult>>());
+
+    boxed(types::LLMQRotationInfoResult {
+        result_at_tip,
+        result_at_h,
+        result_at_h_c,
+        result_at_h_2c,
+        result_at_h_3c,
+        result_at_h_4c,
+        snapshot_at_h_c: llmq_rotation_info.snapshot_at_h_c,
+        snapshot_at_h_2c: llmq_rotation_info.snapshot_at_h_2c,
+        snapshot_at_h_3c: llmq_rotation_info.snapshot_at_h_3c,
+        snapshot_at_h_4c: llmq_rotation_info.snapshot_at_h_4c,
+        extra_share,
+        last_quorum_per_index_count,
+        last_quorum_per_index,
+        quorum_snapshot_list_count,
+        quorum_snapshot_list: llmq_rotation_info.quorum_snapshot_list,
+        mn_list_diff_list_count,
+        mn_list_diff_list,
+    })
+}
+#[no_mangle]
+pub extern "C" fn process_llmq_rotation_info_result2(
+    message_arr: *const u8,
+    message_length: usize,
+    base_masternode_list_hash: *const u8,
+    merkle_root: *const u8,
+    use_insight_as_backup: bool,
+    processor: *const Processor4,
+) -> *mut types::LLMQRotationInfoResult {
+    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
+    let desired_merkle_root = unwrap_or_qr_result_failure!(UInt256::from_const(merkle_root));
+    let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
+    let processor = unwrap_or_qr_result_failure!(unsafe { processor.as_ref() });
+    let processor_context = ProcessorContext {
+        selection_type: QuorumSelectionType::LlmqRotation,
+        use_insight_as_backup,
+        base_masternode_list_hash
+    };
+    let offset = &mut 0;
+    let block_height_lookup = |hash| processor.lookup_block_height_by_hash(hash);
+    let snapshot_at_h_c = boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let snapshot_at_h_2c = boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let snapshot_at_h_3c = boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
+    let diff_tip = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, block_height_lookup));
+    let diff_h = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, block_height_lookup));
+    let diff_h_c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, block_height_lookup));
+    let diff_h_2c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, block_height_lookup));
+    let diff_h_3c = unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, block_height_lookup));
+    let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
+    let (snapshot_at_h_4c, diff_h_4c) = if extra_share {
+        (boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset))),
+         Some(unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, block_height_lookup))))
+    } else {
+        (null_mut(), None)
+    };
+    let last_quorum_per_index_count = unwrap_or_qr_result_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
+    let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
+    for _i in 0..last_quorum_per_index_count {
+        last_quorum_per_index_vec.push(boxed(unwrap_or_qr_result_failure!(LLMQEntry::from_bytes(message, offset)).encode()));
+    }
+    let last_quorum_per_index = boxed_vec(last_quorum_per_index_vec);
+
+    let quorum_snapshot_list_count = unwrap_or_qr_result_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
+    let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
+    for _i in 0..quorum_snapshot_list_count {
+        quorum_snapshot_list_vec.push(boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset))));
+    }
+    let quorum_snapshot_list = boxed_vec(quorum_snapshot_list_vec);
+
+    let mn_list_diff_list_count = unwrap_or_qr_result_failure!(encode::VarInt::from_bytes(message, offset)).0 as usize;
+    let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> = Vec::with_capacity(mn_list_diff_list_count);
+    for _i in 0..mn_list_diff_list_count {
+        mn_list_diff_list_vec.push(boxed(processor.get_list_diff_result(unwrap_or_qr_result_failure!(llmq::MNListDiff::new(message, offset, block_height_lookup)), desired_merkle_root, processor_context)));
+    }
+    let mn_list_diff_list = boxed_vec(mn_list_diff_list_vec);
+
+
+    let result_at_tip = boxed(processor.get_list_diff_result(diff_tip, desired_merkle_root, processor_context));
+    let result_at_h = boxed(processor.get_list_diff_result(diff_h, desired_merkle_root, processor_context));
+    let result_at_h_c = boxed(processor.get_list_diff_result(diff_h_c, desired_merkle_root, processor_context));
+    let result_at_h_2c = boxed(processor.get_list_diff_result(diff_h_2c, desired_merkle_root, processor_context));
+    let result_at_h_3c = boxed(processor.get_list_diff_result(diff_h_3c, desired_merkle_root, processor_context));
+    let result_at_h_4c = if extra_share {
+        boxed(processor.get_list_diff_result(diff_h_4c.unwrap(), desired_merkle_root, processor_context))
+    } else {
+        null_mut()
+    };
+    boxed(types::LLMQRotationInfoResult {
+        result_at_tip,
+        result_at_h,
+        result_at_h_c,
+        result_at_h_2c,
+        result_at_h_3c,
+        result_at_h_4c,
+        snapshot_at_h_c,
+        snapshot_at_h_2c,
+        snapshot_at_h_3c,
+        snapshot_at_h_4c,
+        extra_share,
+        last_quorum_per_index,
+        last_quorum_per_index_count,
+        quorum_snapshot_list,
+        quorum_snapshot_list_count,
+        mn_list_diff_list,
+        mn_list_diff_list_count
+    })
+}
