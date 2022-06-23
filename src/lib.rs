@@ -3,6 +3,8 @@
 #[macro_use]
 pub mod processing;
 // pub mod store;
+extern crate dash_spv_ffi;
+extern crate dash_spv_models;
 
 #[cfg(test)]
 mod lib_tests;
@@ -468,9 +470,7 @@ pub unsafe extern fn block_destroy(result: *mut types::Block) {
 
 
 
-//
-// Experimental FFI API with saving context
-//
+/// Experimental FFI API with saving context
 
 pub fn get_mnl_diff_processing_result(
     message_arr: *const u8,
