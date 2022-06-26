@@ -149,7 +149,8 @@ unsafe extern "C" fn block_height_lookup_333(block_hash: *mut [u8; 32], _context
 
 #[test]
 fn test_devnet_333() {
-    let bytes = message_from_file("QRINFO_1_10475.dat".to_string());
+    let bytes = message_from_file("qrinfo--1-20737.dat".to_string());
+    // let bytes = message_from_file("QRINFO_1_10475.dat".to_string());
     let context = &mut (FFIContext { chain: ChainType::DevNet }) as *mut _ as *mut std::ffi::c_void;
     let result = llmq_rotation_info_process2(
         bytes.as_ptr(),
