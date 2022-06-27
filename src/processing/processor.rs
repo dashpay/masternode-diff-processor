@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, HashSet};
 use std::ffi::c_void;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
 use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
-use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
 use dash_spv_ffi::types;
 use dash_spv_ffi::ffi::callbacks;
@@ -31,109 +30,12 @@ pub struct ProcessorContext {
     pub base_masternode_list_hash: Option<UInt256>,
 }
 
-pub struct Processor {
-    pub get_block_height_by_hash: Box<dyn Fn(UInt256) -> u32>,
-    pub get_block_hash_by_height: Box<dyn Fn(u32) -> *const u8>,
-    pub get_snapshot_by_block_height: Box<dyn Fn(u32) -> *const types::LLMQSnapshot>,
-    pub masternode_list_lookup: Box<dyn Fn(UInt256) -> *const types::MasternodeList>,
-    pub masternode_list_destroy: Box<dyn Fn(*const types::MasternodeList)>,
-    pub add_insight_lookup: Box<dyn Fn(UInt256)>,
-    pub should_process_llmq_of_type: Box<dyn Fn(LLMQType) -> bool>,
-    pub validate_llmq_callback: Box<dyn Fn(types::LLMQValidationData)>,
-}
 
-// #[derive(Clone, Debug)]
-// pub struct Processor2 {
-//     pub get_block_height_by_hash: dyn Fn(UInt256) -> u32,
-//     pub get_block_hash_by_height: dyn Fn(u32) -> *const u8,
-//     pub get_snapshot_by_block_height: dyn Fn(u32) -> *const types::LLMQSnapshot,
-//     pub masternode_list_lookup: dyn Fn(UInt256) -> *const types::MasternodeList,
-//     pub masternode_list_destroy: dyn Fn(*const types::MasternodeList),
-//     pub add_insight_lookup: dyn Fn(UInt256),
-//     pub should_process_llmq_of_type: dyn Fn(LLMQType) -> bool,
-//     pub validate_llmq_callback: dyn Fn(types::LLMQValidationData),
-// }
 
-pub struct Processor1<F> where F: Fn(UInt256) -> *const types::MasternodeList {
-    pub get_masternode_list_by_block_hash: F,
-}
-impl<F> Processor1<F> where F: Fn(UInt256) -> *const types::MasternodeList {
-    fn new(get_masternode_list_by_block_hash: F) -> Self {
-        Self { get_masternode_list_by_block_hash }
-    }
-    pub fn lookup_masternode_list(&self, block_hash: UInt256) -> Option<masternode::MasternodeList> {
-        let lookup_result = (self.get_masternode_list_by_block_hash)(block_hash);
-        if !lookup_result.is_null() {
-            let data = unsafe { (*lookup_result).decode() };
-            // masternode_list_destroy(data)
-            Some(data)
-        } else {
-            None
-        }
-    }
-}
 
-pub struct Processor2 {
-    pub get_masternode_list_by_block_hash: Box<dyn Fn(UInt256) -> *const types::MasternodeList>,
-}
-
-impl Processor2 {
-    fn new(get_masternode_list_by_block_hash: impl Fn(UInt256) -> *const types::MasternodeList + 'static) -> Self {
-        Self { get_masternode_list_by_block_hash: Box::new(get_masternode_list_by_block_hash) }
-    }
-    pub fn lookup_masternode_list(&self, block_hash: UInt256) -> Option<masternode::MasternodeList> {
-        let lookup_result = (self.get_masternode_list_by_block_hash)(block_hash);
-        if !lookup_result.is_null() {
-            let data = unsafe { (*lookup_result).decode() };
-            // masternode_list_destroy(data)
-            Some(data)
-        } else {
-            None
-        }
-    }
-
-}
-
-// fn main() {
-//     let foo = Foo {
-//         foo: Box::new(|a| a + 1),
-//     };
-//     (foo.foo)(42);
-//
-//     (Foo::new(|a| a + 1).foo)(42);
-// }
-//Trait object reference
-
-pub struct Processor3<'a> {
-    pub get_masternode_list_by_block_hash: &'a dyn Fn(UInt256) -> *const types::MasternodeList,
-}
-
-impl<'a> Processor3<'a> {
-    fn new(get_masternode_list_by_block_hash: &'a dyn Fn(UInt256) -> *const types::MasternodeList) -> Self {
-        Self { get_masternode_list_by_block_hash }
-    }
-    pub fn lookup_masternode_list(&self, block_hash: UInt256) -> Option<masternode::MasternodeList> {
-        let lookup_result = (self.get_masternode_list_by_block_hash)(block_hash);
-        if !lookup_result.is_null() {
-            let data = unsafe { (*lookup_result).decode() };
-            // masternode_list_destroy(data)
-            Some(data)
-        } else {
-            None
-        }
-    }
-
-}
-
-// fn main() {
-//     let foo = Foo { foo: &|a| a + 1 };
-//     (foo.foo)(42);
-//
-//     (Foo::new(&|a| a + 1).foo)(42);
-// }
-// Function pointer
-
-pub struct Processor4 {
+#[repr(C)]
+#[derive(Debug)]
+pub struct MasternodeManager {
     /// External Masternode Manager Diff Message Context
     pub context: *const c_void,
     pub get_block_height_by_hash: GetBlockHeightByHash,
@@ -146,7 +48,7 @@ pub struct Processor4 {
     validate_llmq: ValidateLLMQCallback,
 }
 
-impl Processor4 {
+impl MasternodeManager {
     pub fn new(
         get_block_height_by_hash: GetBlockHeightByHash,
         get_block_hash_by_height: GetBlockHashByHeight,
@@ -725,6 +627,7 @@ impl Processor4 {
     }
 
     pub fn lookup_masternode_list(&self, block_hash: UInt256) -> Option<masternode::MasternodeList> {
+        println!("lookup_masternode_list: {} {:?}", block_hash, self.context);
         callbacks::lookup_masternode_list(
             block_hash,
             |h: UInt256| unsafe { (self.get_masternode_list_by_block_hash)(boxed(h.0), self.context) },
@@ -733,10 +636,12 @@ impl Processor4 {
     }
 
     pub fn lookup_block_hash_by_height(&self, block_height: u32) -> Option<UInt256> {
+        println!("lookup_block_hash_by_height: {:?} {:?}", block_height, self.context);
         callbacks::lookup_block_hash_by_height(block_height, |h: u32| unsafe { (self.get_block_hash_by_height)(h, self.context) })
     }
 
     pub fn lookup_block_height_by_hash(&self, block_hash: UInt256) -> u32 {
+        println!("lookup_block_height_by_hash: {:?} {:?}", block_hash, self.context);
         unsafe { (self.get_block_height_by_hash)(boxed(block_hash.0), self.context) }
     }
 
