@@ -30,11 +30,7 @@ pub struct ProcessorContext {
     pub base_masternode_list_hash: Option<UInt256>,
 }
 
-
-
-
 #[repr(C)]
-#[derive(Debug)]
 pub struct MasternodeManager {
     /// External Masternode Manager Diff Message Context
     pub context: *const c_void,
@@ -46,6 +42,14 @@ pub struct MasternodeManager {
     add_insight: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq: ValidateLLMQCallback,
+}
+
+impl std::fmt::Debug for MasternodeManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MasternodeManager")
+            .field("context", &self.context)
+            .finish()
+    }
 }
 
 impl MasternodeManager {
