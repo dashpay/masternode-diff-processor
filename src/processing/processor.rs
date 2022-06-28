@@ -1,6 +1,5 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
-use std::ffi::c_void;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
 use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
 use dash_spv_ffi::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
@@ -28,12 +27,29 @@ pub struct ProcessorContext {
     pub selection_type: QuorumSelectionType,
     pub use_insight_as_backup: bool,
     pub base_masternode_list_hash: Option<UInt256>,
+    pub merkle_root: UInt256,
+}
+
+
+#[derive(Clone, Debug)]
+#[repr(C)]
+pub struct MasternodeProcessorCache {
+    pub map_quorum_members: BTreeMap<LLMQType, BTreeMap<UInt256, Vec<masternode::MasternodeEntry>>>,
+    pub map_indexed_quorum_members: BTreeMap<LLMQType, BTreeMap<llmq::LLMQIndexedHash, Vec<masternode::MasternodeEntry>>>,
+}
+impl Default for MasternodeProcessorCache {
+    fn default() -> Self {
+        MasternodeProcessorCache {
+            map_quorum_members: BTreeMap::new(),
+            map_indexed_quorum_members: BTreeMap::new(),
+        }
+    }
 }
 
 #[repr(C)]
-pub struct MasternodeManager {
+pub struct MasternodeProcessor {
     /// External Masternode Manager Diff Message Context
-    pub context: *const c_void,
+    pub context: *const std::ffi::c_void,
     pub get_block_height_by_hash: GetBlockHeightByHash,
     get_block_hash_by_height: GetBlockHashByHeight,
     get_llmq_snapshot_by_block_height: GetLLMQSnapshotByBlockHeight,
@@ -43,16 +59,15 @@ pub struct MasternodeManager {
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq: ValidateLLMQCallback,
 }
-
-impl std::fmt::Debug for MasternodeManager {
+impl std::fmt::Debug for MasternodeProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MasternodeManager")
+        f.debug_struct("MasternodeProcessor")
             .field("context", &self.context)
             .finish()
     }
 }
 
-impl MasternodeManager {
+impl MasternodeProcessor {
     pub fn new(
         get_block_height_by_hash: GetBlockHeightByHash,
         get_block_hash_by_height: GetBlockHashByHeight,
@@ -62,7 +77,7 @@ impl MasternodeManager {
         add_insight: AddInsightBlockingLookup,
         should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
         validate_llmq: ValidateLLMQCallback,
-        context: *const c_void) -> Self {
+        context: *const std::ffi::c_void) -> Self {
         Self {
             get_block_height_by_hash,
             get_block_hash_by_height,
@@ -72,11 +87,11 @@ impl MasternodeManager {
             add_insight,
             should_process_llmq_of_type,
             validate_llmq,
-            context
+            context,
         }
     }
 
-    pub(crate) fn get_list_diff_result(&self, list_diff: llmq::MNListDiff, merkle_root: UInt256, processor_context: ProcessorContext) -> types::MNListDiffResult {
+    pub(crate) fn get_list_diff_result(&self, list_diff: llmq::MNListDiff, processor_context: ProcessorContext, cache: &mut MasternodeProcessorCache) -> types::MNListDiffResult {
         let block_hash = list_diff.block_hash;
         let (base_masternodes, base_quorums) = self.lookup_masternodes_and_quorums_for(processor_context.base_masternode_list_hash);
         let block_height = list_diff.block_height;
@@ -99,7 +114,8 @@ impl MasternodeManager {
             base_quorums,
             list_diff.added_quorums,
             list_diff.deleted_quorums,
-            processor_context
+            processor_context,
+            cache
         );
         //println!("MNListDiffResult.from_diff.added_quorums: \n[{:?}] \nquorums:\n [{:?}]", added_quorums.clone(), quorums.clone());
         let masternode_list = masternode::MasternodeList::new(masternodes, quorums, block_hash, block_height, quorums_active);
@@ -114,7 +130,7 @@ impl MasternodeManager {
         types::MNListDiffResult {
             block_hash: boxed(list_diff.block_hash.clone().0),
             has_found_coinbase,
-            has_valid_coinbase: merkle_tree.has_root(merkle_root),
+            has_valid_coinbase: merkle_tree.has_root(processor_context.merkle_root),
             has_valid_mn_list_root,
             has_valid_llmq_list_root: has_valid_quorum_list_root,
             has_valid_quorums,
@@ -194,12 +210,13 @@ impl MasternodeManager {
     }
 
     pub fn classify_quorums(&self,
-        base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
-        added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
-        deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
-        processor_context: ProcessorContext,
+                            base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
+                            added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
+                            deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
+                            processor_context: ProcessorContext,
+                            cache: &mut MasternodeProcessorCache,
     )
-        -> (BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
+                            -> (BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
             BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
             bool,
             Vec<*mut [u8; 32]>
@@ -217,7 +234,9 @@ impl MasternodeManager {
                                     quorum.clone(),
                                     has_valid_quorums,
                                     llmq_masternode_list,
-                                    processor_context),
+                                    processor_context,
+                                    cache
+                                ),
                             None =>
                                 if self.lookup_block_height_by_hash(llmq_block_hash) != u32::MAX {
                                     needed_masternode_lists.push(boxed(llmq_block_hash.0));
@@ -258,12 +277,19 @@ impl MasternodeManager {
         has_valid_quorums: bool,
         llmq_masternode_list: masternode::MasternodeList,
         processor_context: ProcessorContext,
+        cache: &mut MasternodeProcessorCache,
     ) {
-        let block_height = self.lookup_block_height_by_hash(llmq_masternode_list.block_hash);
+        let block_hash = llmq_masternode_list.block_hash;
+        let block_height = self.lookup_block_height_by_hash(block_hash);
         let quorum_modifier = quorum.llmq_quorum_hash();
         let quorum_count = quorum.llmq_type.size();
         let valid_masternodes = if processor_context.selection_type == QuorumSelectionType::LlmqRotation {
-            self.get_rotated_masternodes_for_quorum(quorum.llmq_type, llmq_masternode_list.block_hash)
+            self.get_rotated_masternodes_for_quorum(
+                quorum.llmq_type,
+                block_hash,
+                block_height,
+                cache
+            )
         } else {
             Self::valid_masternodes_for(llmq_masternode_list.masternodes, quorum_modifier, quorum_count, block_height)
         };
@@ -341,17 +367,20 @@ impl MasternodeManager {
     fn masternode_usage_by_snapshot(
         &self,
         llmq_type: LLMQType,
-        quorum_base_block: common::Block,
+        block_height: u32,
         snapshot: llmq::LLMQSnapshot)
         -> (Vec<masternode::MasternodeEntry>, Vec<masternode::MasternodeEntry>) { // (used , unused)
-        let block_height = quorum_base_block.height - 8;
         match self.lookup_block_hash_by_height(block_height) {
             None => panic!("missing hash for block at height: {}", block_height),
             Some(block_hash) =>
                 match self.lookup_masternode_list(block_hash) {
                     None => panic!("missing masternode list for block at height: {} with hash: {}", block_height, block_hash),
                     Some(masternode_list) => {
-                        let nodes = Self::valid_masternodes_for(masternode_list.masternodes, Self::build_llmq_modifier(llmq_type, block_hash), llmq_type.active_quorum_count(), block_height);
+                        let nodes = Self::valid_masternodes_for(
+                            masternode_list.masternodes,
+                            Self::build_llmq_modifier(llmq_type, block_hash),
+                            llmq_type.active_quorum_count(),
+                            block_height);
                         let mut i: u32 = 0;
                         nodes
                             .into_iter()
@@ -379,8 +408,7 @@ impl MasternodeManager {
         let work_block_height = quorum_base_block.height - 8;
         let work_block_hash = self.lookup_block_hash_by_height(work_block_height).unwrap();
         let quorum_modifier = Self::build_llmq_modifier(llmq_params.r#type, work_block_hash);
-        let (used_at_h, unused_at_h) =
-            self.masternode_usage_by_snapshot(llmq_type, quorum_base_block, snapshot.clone());
+        let (used_at_h, unused_at_h) = self.masternode_usage_by_snapshot(llmq_type, work_block_height, snapshot.clone());
         let mut sorted_combined_mns_list = Self::valid_masternodes_for_quorum(unused_at_h, quorum_modifier, quorum_count, work_block_height);
         sorted_combined_mns_list.extend(Self::valid_masternodes_for_quorum(used_at_h, quorum_modifier, quorum_count, work_block_height));
         let quorum_num = quorum_count as usize;
@@ -460,7 +488,7 @@ impl MasternodeManager {
     pub fn new_quorum_quarter_members(
         &self,
         params: common::LLMQParams,
-        quorum_base_block: common::Block,
+        quorum_base_block_height: u32,
         previous_quarters: [Vec<Vec<masternode::MasternodeEntry>>; 3])
         -> Vec<Vec<masternode::MasternodeEntry>> {
         let quorum_count = params.signing_active_quorum_count;
@@ -468,11 +496,11 @@ impl MasternodeManager {
         let mut quarter_quorum_members = Vec::<Vec<masternode::MasternodeEntry>>::with_capacity(num_quorums);
         let quorum_size = params.size as usize;
         let quarter_size = quorum_size / 4;
-        let work_block_height = quorum_base_block.height - 8;
+        let work_block_height = quorum_base_block_height - 8;
         let work_block_hash = self.lookup_block_hash_by_height(work_block_height).unwrap();
         let modifier = Self::build_llmq_modifier(params.r#type, work_block_hash);
         match self.lookup_masternode_list(work_block_hash) {
-            None => panic!("missing masternode list for height: {} / -8:{}", quorum_base_block.height, work_block_height),
+            None => panic!("missing masternode list for height: {} / -8:{}", quorum_base_block_height, work_block_height),
             Some(masternode_list) => {
                 if masternode_list.masternodes.len() < quarter_size {
                     quarter_quorum_members
@@ -537,13 +565,13 @@ impl MasternodeManager {
     pub fn quorum_members_by_quarter_rotation(
         &self,
         llmq_type: LLMQType,
-        quorum_base_block: common::Block) -> Vec<Vec<masternode::MasternodeEntry>> {
+        quorum_base_block_height: u32) -> Vec<Vec<masternode::MasternodeEntry>> {
         let llmq_params = llmq_type.params();
         let num_quorums = llmq_params.signing_active_quorum_count as usize;
         let cycle_length = llmq_params.dkg_params.interval;
-        let block_m_c_height = quorum_base_block.height - cycle_length;
-        let block_m_2c_height = quorum_base_block.height - 2 * cycle_length;
-        let block_m_3c_height = quorum_base_block.height - 3 * cycle_length;
+        let block_m_c_height = quorum_base_block_height - cycle_length;
+        let block_m_2c_height = quorum_base_block_height - 2 * cycle_length;
+        let block_m_3c_height = quorum_base_block_height - 3 * cycle_length;
         let block_m_c = common::Block { height: block_m_c_height, hash: self.lookup_block_hash_by_height(block_m_c_height).unwrap() };
         let block_m_2c = common::Block { height: block_m_2c_height, hash: self.lookup_block_hash_by_height(block_m_2c_height).unwrap() };
         let block_m_3c = common::Block { height: block_m_3c_height, hash: self.lookup_block_hash_by_height(block_m_3c_height).unwrap() };
@@ -554,7 +582,7 @@ impl MasternodeManager {
         let prev_q_h_m_2c = self.quorum_quarter_members_by_snapshot(llmq_params, block_m_2c, q_snapshot_h_m_2c);
         let prev_q_h_m_3c = self.quorum_quarter_members_by_snapshot(llmq_params, block_m_3c, q_snapshot_h_m_3c);
         let mut quorum_members = Vec::<Vec<masternode::MasternodeEntry>>::with_capacity(num_quorums);
-        let new_quarter_members = self.new_quorum_quarter_members(llmq_params, quorum_base_block, [prev_q_h_m_c.clone(), prev_q_h_m_2c.clone(), prev_q_h_m_3c.clone()]);
+        let new_quarter_members = self.new_quorum_quarter_members(llmq_params, quorum_base_block_height, [prev_q_h_m_c.clone(), prev_q_h_m_2c.clone(), prev_q_h_m_3c.clone()]);
         (0..num_quorums).for_each(|i| {
             Self::add_quorum_members_from_quarter(&mut quorum_members, &prev_q_h_m_3c, i);
             Self::add_quorum_members_from_quarter(&mut quorum_members, &prev_q_h_m_2c, i);
@@ -577,24 +605,25 @@ impl MasternodeManager {
     }
 
     // Determine masternodes which is responsible for signing at this quorum index
-    pub fn get_rotated_masternodes_for_quorum(&self, llmq_type: LLMQType, quorum_base_block_hash: UInt256) -> Vec<masternode::MasternodeEntry> {
-        // TODO: load members from cache
-        let mut map_quorum_members = BTreeMap::<LLMQType, BTreeMap<UInt256, Vec<masternode::MasternodeEntry>>>::new();
-        let mut map_indexed_quorum_members = BTreeMap::<LLMQType, BTreeMap<llmq::LLMQIndexedHash, Vec<masternode::MasternodeEntry>>>::new();
-
+    pub fn get_rotated_masternodes_for_quorum(&self,
+                                              llmq_type: LLMQType,
+                                              llmq_base_block_hash: UInt256,
+                                              llmq_base_block_height: u32,
+                                              cache: &mut MasternodeProcessorCache)
+        -> Vec<masternode::MasternodeEntry> {
+        let map_quorum_members = &mut cache.map_quorum_members;
+        let map_indexed_quorum_members = &mut cache.map_indexed_quorum_members;
         let map_by_type_opt = map_quorum_members.get_mut(&llmq_type);
         if map_by_type_opt.is_some() {
-            if let Some(members) = map_by_type_opt.as_ref().unwrap().get(&quorum_base_block_hash) {
+            if let Some(members) = map_by_type_opt.as_ref().unwrap().get(&llmq_base_block_hash) {
                 return members.clone();
             }
         }
         let map_by_type = map_by_type_opt.unwrap();
         let mut quorum_members = Vec::<masternode::MasternodeEntry>::new();
-        let quorum_base_block_height = self.lookup_block_height_by_hash(quorum_base_block_hash);
-        let quorum_index = quorum_base_block_height % llmq_type.params().dkg_params.interval;
-        let cycle_quorum_base_block_height = quorum_base_block_height - quorum_index;
+        let quorum_index = llmq_base_block_height % llmq_type.params().dkg_params.interval;
+        let cycle_quorum_base_block_height = llmq_base_block_height - quorum_index;
         let cycle_quorum_base_block_hash = self.lookup_block_hash_by_height(cycle_quorum_base_block_height).unwrap();
-        let cycle_quorum_base_block = common::Block { height: cycle_quorum_base_block_height, hash: cycle_quorum_base_block_hash };
         if let Some(map_by_type_indexed) = map_indexed_quorum_members.get(&llmq_type) {
             let cycle_indexed_hash = llmq::LLMQIndexedHash { hash: cycle_quorum_base_block_hash, index: quorum_index };
             if let Some(indexed_members) = map_by_type_indexed.get(&cycle_indexed_hash) {
@@ -603,15 +632,14 @@ impl MasternodeManager {
                 return quorum_members;
             }
         }
-        let rotated_members = self.quorum_members_by_quarter_rotation(llmq_type, cycle_quorum_base_block);
+        let rotated_members = self.quorum_members_by_quarter_rotation(llmq_type, cycle_quorum_base_block_height);
         let map_indexed_quorum_members_of_type = map_indexed_quorum_members.get_mut(&llmq_type).unwrap();
         rotated_members.iter().enumerate().for_each(|(i, members)| {
-            let indexed_hash = llmq::LLMQIndexedHash { hash: cycle_quorum_base_block_hash, index: i as u32 };
-            map_indexed_quorum_members_of_type.insert(indexed_hash, members.clone());
+            map_indexed_quorum_members_of_type.insert(llmq::LLMQIndexedHash { hash: cycle_quorum_base_block_hash, index: i as u32 }, members.clone());
         });
         if let Some(members) = rotated_members.get(quorum_index as usize) {
             quorum_members = members.clone();
-            map_by_type.insert(quorum_base_block_hash, quorum_members.clone());
+            map_by_type.insert(llmq_base_block_hash, quorum_members.clone());
         }
         quorum_members
     }
