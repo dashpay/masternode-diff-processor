@@ -32,7 +32,7 @@ pub struct ProcessorContext {
 
 
 #[derive(Clone, Debug)]
-#[repr(C)]
+// #[repr(C)]
 pub struct MasternodeProcessorCache {
     pub map_quorum_members: BTreeMap<LLMQType, BTreeMap<UInt256, Vec<masternode::MasternodeEntry>>>,
     pub map_indexed_quorum_members: BTreeMap<LLMQType, BTreeMap<llmq::LLMQIndexedHash, Vec<masternode::MasternodeEntry>>>,
