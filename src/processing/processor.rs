@@ -1,5 +1,6 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
+use std::ptr::null;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
 use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
 use dash_spv_ffi::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
@@ -76,8 +77,8 @@ impl MasternodeProcessor {
         destroy_masternode_list: MasternodeListDestroy,
         add_insight: AddInsightBlockingLookup,
         should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-        validate_llmq: ValidateLLMQCallback,
-        context: *const std::ffi::c_void) -> Self {
+        validate_llmq: ValidateLLMQCallback/*,
+        context: *const std::ffi::c_void*/) -> Self {
         Self {
             get_block_height_by_hash,
             get_block_hash_by_height,
@@ -87,7 +88,7 @@ impl MasternodeProcessor {
             add_insight,
             should_process_llmq_of_type,
             validate_llmq,
-            context,
+            context: null(),
         }
     }
 

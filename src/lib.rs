@@ -13,7 +13,6 @@ mod tests;
 mod macros;
 
 use std::slice;
-use std::ffi::c_void;
 use std::ptr::null_mut;
 use byte::BytesExt;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
@@ -124,7 +123,7 @@ pub fn mnl_diff_process<
     add_insight_lookup: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq_callback: ValidateLLMQCallback,
-    context: *const c_void, // External Masternode Manager Diff Message Context ()
+    context: *const std::ffi::c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut types::MNListDiffResult {
     println!("mnl_diff_process.start: {:?}", std::time::Instant::now());
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
@@ -166,7 +165,7 @@ pub extern "C" fn mndiff_process(
     add_insight_lookup: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq_callback: ValidateLLMQCallback,
-    context: *const c_void, // External Masternode Manager Diff Message Context ()
+    context: *const std::ffi::c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut types::MNListDiffResult {
     mnl_diff_process(
         message_arr,
@@ -208,7 +207,7 @@ pub extern "C" fn llmq_rotation_info_read(
     message_arr: *const u8,
     message_length: usize,
     get_block_height_by_hash: GetBlockHeightByHash,
-    context: *const c_void, // External Masternode Manager Diff Message Context ()
+    context: *const std::ffi::c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut types::LLMQRotationInfo {
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let bh_lookup = |h: UInt256| unsafe { get_block_height_by_hash(boxed(h.0), context) };
@@ -281,7 +280,7 @@ pub extern "C" fn llmq_rotation_info_process(
     add_insight_lookup: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq_callback: ValidateLLMQCallback,
-    context: *const c_void, // External Masternode Manager Diff Message Context ()
+    context: *const std::ffi::c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut types::LLMQRotationInfoResult {
     let llmq_rotation_info = unsafe { *info };
     let desired_merkle_root = unwrap_or_qr_result_failure!(UInt256::from_const(merkle_root));
@@ -360,7 +359,7 @@ pub extern "C" fn llmq_rotation_info_process2(
     add_insight_lookup: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq_callback: ValidateLLMQCallback,
-    context: *const c_void, // External Masternode Manager Diff Message Context ()
+    context: *const std::ffi::c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut types::LLMQRotationInfoResult {
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let desired_merkle_root = unwrap_or_qr_result_failure!(UInt256::from_const(merkle_root));
@@ -481,8 +480,11 @@ pub fn get_mnl_diff_processing_result(
     selection_type: QuorumSelectionType,
     processor: &mut MasternodeProcessor,
     cache: &mut MasternodeProcessorCache,
-) -> *mut types::MNListDiffResult {
+    context: *const std::ffi::c_void
+)
+    -> *mut types::MNListDiffResult {
     println!("get_mnl_diff_processing_result.start: {:?}", std::time::Instant::now());
+    processor.context = context;
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let desired_merkle_root = unwrap_or_failure!(UInt256::from_const(merkle_root));
     let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
@@ -503,7 +505,7 @@ pub unsafe extern fn register_processor(
     add_insight: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq: ValidateLLMQCallback,
-    context: *const c_void, // External Masternode Manager Diff Message Context ()
+    // context: *const c_void, // External Masternode Manager Diff Message Context ()
 ) -> *mut MasternodeProcessor {
     let processor = MasternodeProcessor::new(
         get_block_height_by_hash,
@@ -514,9 +516,9 @@ pub unsafe extern fn register_processor(
         add_insight,
         should_process_llmq_of_type,
         validate_llmq,
-        context
+        // context
     );
-    println!("register_processor: {:?} {:?}", processor, context);
+    println!("register_processor: {:?}", processor);
     boxed(processor)
 }
 
@@ -548,6 +550,7 @@ pub unsafe extern "C" fn process_mnl_diff(
     use_insight_as_backup: bool,
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
+    context: *const std::ffi::c_void,
 ) -> *mut types::MNListDiffResult {
     println!("process_mnl_diff: {:?}", processor);
     get_mnl_diff_processing_result(
@@ -558,7 +561,9 @@ pub unsafe extern "C" fn process_mnl_diff(
         use_insight_as_backup,
         QuorumSelectionType::LLMQ,
         &mut *processor,
-        &mut *cache)
+        &mut *cache,
+        context
+    )
 }
 
 #[no_mangle]
@@ -566,10 +571,12 @@ pub extern "C" fn process_llmq_rotation_info_read(
     message_arr: *const u8,
     message_length: usize,
     processor: *mut MasternodeProcessor,
+    context: *const std::ffi::c_void,
 ) -> *mut types::LLMQRotationInfo {
     println!("process_llmq_rotation_info_read: {:?}", processor);
     let processor = unsafe { &mut *processor };
-    println!("process_llmq_rotation_info_read --: {:?} {:?}", processor, processor.context);
+    processor.context = context;
+    println!("process_llmq_rotation_info_read --: {:?} {:?}", processor, context);
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let block_height_lookup = |hash| processor.lookup_block_height_by_hash(hash);
     let read_list_diff = |offset: &mut usize| llmq::MNListDiff::new(message, offset, block_height_lookup);
@@ -635,6 +642,7 @@ pub extern "C" fn process_llmq_rotation_info_result(
     use_insight_as_backup: bool,
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
+    context: *const std::ffi::c_void,
 ) -> *mut types::LLMQRotationInfoResult {
     println!("process_llmq_rotation_info_result: processor: {:?} cache: {:?}", processor, cache);
     let llmq_rotation_info = unsafe { *info };
@@ -648,6 +656,7 @@ pub extern "C" fn process_llmq_rotation_info_result(
         merkle_root: desired_merkle_root
     };
     let processor = unsafe { &mut *processor };
+    processor.context = context;
     let cache = unsafe { &mut *cache };
     println!("process_llmq_rotation_info_result --: {:?} {:?} {:?}", processor, processor.context, cache);
     let mut process_list_diff = |list_diff: llmq::MNListDiff| processor.get_list_diff_result(list_diff, processor_context, cache);
@@ -700,12 +709,14 @@ pub extern "C" fn process_llmq_rotation_info_result2(
     use_insight_as_backup: bool,
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
+    context: *const std::ffi::c_void,
 ) -> *mut types::LLMQRotationInfoResult {
     println!("process_llmq_rotation_info_result2: {:?} {:?}", processor, cache);
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let desired_merkle_root = unwrap_or_qr_result_failure!(UInt256::from_const(merkle_root));
     let base_masternode_list_hash = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) };
     let processor = unsafe { &mut *processor };
+    processor.context = context;
     let cache = unsafe { &mut *cache };
     println!("process_llmq_rotation_info_result2 --: {:?} {:?} {:?}", processor, processor.context, cache);
     let processor_context = ProcessorContext {
