@@ -2,14 +2,14 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
+use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHeight, MasternodeListDestroy, MasternodeListLookup, MerkleRootLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
 use dash_spv_ffi::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
 use dash_spv_ffi::types;
 use dash_spv_ffi::ffi::callbacks;
 use dash_spv_models::common::{LLMQSnapshotSkipMode, LLMQType};
 use dash_spv_models::{common, llmq, masternode};
 use dash_spv_primitives::consensus::{Encodable, encode};
-use dash_spv_primitives::crypto::byte_util::{Reversable, Zeroable};
+use dash_spv_primitives::crypto::byte_util::{ConstDecodable, Reversable, Zeroable};
 use dash_spv_primitives::crypto::data_ops::{Data, inplace_intersection};
 use dash_spv_primitives::crypto::UInt256;
 use dash_spv_primitives::hashes::{Hash, sha256d};
@@ -27,22 +27,27 @@ pub enum QuorumSelectionType {
 pub struct ProcessorContext {
     pub selection_type: QuorumSelectionType,
     pub use_insight_as_backup: bool,
-    pub base_masternode_list_hash: Option<UInt256>,
-    pub merkle_root: UInt256,
+    // pub base_masternode_list_hash: Option<UInt256>,
+    // pub merkle_root: UInt256,
 }
 
 
 #[derive(Clone, Debug)]
 // #[repr(C)]
 pub struct MasternodeProcessorCache {
-    pub map_quorum_members: BTreeMap<LLMQType, BTreeMap<UInt256, Vec<masternode::MasternodeEntry>>>,
-    pub map_indexed_quorum_members: BTreeMap<LLMQType, BTreeMap<llmq::LLMQIndexedHash, Vec<masternode::MasternodeEntry>>>,
+    pub llmq_members: BTreeMap<LLMQType, BTreeMap<UInt256, Vec<masternode::MasternodeEntry>>>,
+    pub llmq_indexed_members: BTreeMap<LLMQType, BTreeMap<llmq::LLMQIndexedHash, Vec<masternode::MasternodeEntry>>>,
+    pub mn_lists: BTreeMap<UInt256, masternode::MasternodeList>,
+    pub llmq_snapshots: BTreeMap<UInt256, llmq::LLMQSnapshot>,
+
 }
 impl Default for MasternodeProcessorCache {
     fn default() -> Self {
         MasternodeProcessorCache {
-            map_quorum_members: BTreeMap::new(),
-            map_indexed_quorum_members: BTreeMap::new(),
+            llmq_members: BTreeMap::new(),
+            llmq_indexed_members: BTreeMap::new(),
+            llmq_snapshots: BTreeMap::new(),
+            mn_lists: BTreeMap::new(),
         }
     }
 }
@@ -52,6 +57,7 @@ pub struct MasternodeProcessor {
     /// External Masternode Manager Diff Message Context
     pub context: *const std::ffi::c_void,
     pub get_block_height_by_hash: GetBlockHeightByHash,
+    pub get_merkle_root_by_hash: MerkleRootLookup,
     get_block_hash_by_height: GetBlockHashByHeight,
     get_llmq_snapshot_by_block_height: GetLLMQSnapshotByBlockHeight,
     get_masternode_list_by_block_hash: MasternodeListLookup,
@@ -70,6 +76,7 @@ impl std::fmt::Debug for MasternodeProcessor {
 
 impl MasternodeProcessor {
     pub fn new(
+        get_merkle_root_by_hash: MerkleRootLookup,
         get_block_height_by_hash: GetBlockHeightByHash,
         get_block_hash_by_height: GetBlockHashByHeight,
         get_llmq_snapshot_by_block_height: GetLLMQSnapshotByBlockHeight,
@@ -80,6 +87,7 @@ impl MasternodeProcessor {
         validate_llmq: ValidateLLMQCallback/*,
         context: *const std::ffi::c_void*/) -> Self {
         Self {
+            get_merkle_root_by_hash,
             get_block_height_by_hash,
             get_block_hash_by_height,
             get_llmq_snapshot_by_block_height,
@@ -92,10 +100,29 @@ impl MasternodeProcessor {
         }
     }
 
-    pub(crate) fn get_list_diff_result(&self, list_diff: llmq::MNListDiff, processor_context: ProcessorContext, cache: &mut MasternodeProcessorCache) -> types::MNListDiffResult {
+    pub fn get_base_masternode_list(&self, base_masternode_list_hash: *const u8) -> Option<masternode::MasternodeList> {
+        if let Some(block_hash) = if base_masternode_list_hash.is_null() { None } else { UInt256::from_const(base_masternode_list_hash) } {
+            self.lookup_masternode_list(block_hash)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn get_list_diff_result(&self,
+                                       base_list: Option<masternode::MasternodeList>,
+                                       list_diff: llmq::MNListDiff,
+                                       processor_context: ProcessorContext,
+                                       cache: &mut MasternodeProcessorCache)
+        -> types::MNListDiffResult {
         let block_hash = list_diff.block_hash;
-        let (base_masternodes, base_quorums) = self.lookup_masternodes_and_quorums_for(processor_context.base_masternode_list_hash);
         let block_height = list_diff.block_height;
+        println!("get_list_diff_result: {}: {}", block_height, block_hash);
+        let (base_masternodes,
+            base_quorums) = match base_list {
+            Some(list) => (list.masternodes, list.quorums),
+            None => (BTreeMap::new(), BTreeMap::new())
+        };
+        //self.lookup_masternodes_and_quorums_for(processor_context.base_masternode_list_hash);
         let coinbase_transaction = list_diff.coinbase_transaction;
         let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
         let (added_masternodes,
@@ -131,7 +158,7 @@ impl MasternodeProcessor {
         types::MNListDiffResult {
             block_hash: boxed(list_diff.block_hash.clone().0),
             has_found_coinbase,
-            has_valid_coinbase: merkle_tree.has_root(processor_context.merkle_root),
+            has_valid_coinbase: merkle_tree.has_root(self.lookup_merkle_root_by_hash(block_hash).unwrap_or(UInt256::MIN)),
             has_valid_mn_list_root,
             has_valid_llmq_list_root: has_valid_quorum_list_root,
             has_valid_quorums,
@@ -612,8 +639,8 @@ impl MasternodeProcessor {
                                               llmq_base_block_height: u32,
                                               cache: &mut MasternodeProcessorCache)
         -> Vec<masternode::MasternodeEntry> {
-        let map_quorum_members = &mut cache.map_quorum_members;
-        let map_indexed_quorum_members = &mut cache.map_indexed_quorum_members;
+        let map_quorum_members = &mut cache.llmq_members;
+        let map_indexed_quorum_members = &mut cache.llmq_indexed_members;
         let map_by_type_opt = map_quorum_members.get_mut(&llmq_type);
         if map_by_type_opt.is_some() {
             if let Some(members) = map_by_type_opt.as_ref().unwrap().get(&llmq_base_block_hash) {
@@ -648,8 +675,8 @@ impl MasternodeProcessor {
 
     ///////////////////////////////////////////////////////////////////////////////////////////
 
-    fn lookup_masternodes_and_quorums_for(&self, block_hash: Option<UInt256>)
-        -> (BTreeMap<UInt256, masternode::MasternodeEntry>,
+    pub(crate) fn lookup_masternodes_and_quorums_for(&self, block_hash: Option<UInt256>)
+                                                     -> (BTreeMap<UInt256, masternode::MasternodeEntry>,
             BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>) {
         if let Some(block_hash) = block_hash {
             if let Some(list) = self.lookup_masternode_list(block_hash) {
@@ -678,8 +705,12 @@ impl MasternodeProcessor {
         unsafe { (self.get_block_height_by_hash)(boxed(block_hash.0), self.context) }
     }
 
-    pub fn lookup_snapshot<'a>(&self, block_height: u32) -> Option<llmq::LLMQSnapshot<'a>> {
+    pub fn lookup_snapshot<'a>(&self, block_height: u32) -> Option<llmq::LLMQSnapshot> {
         callbacks::lookup_snapshot(block_height, |h: u32| unsafe { (self.get_llmq_snapshot_by_block_height)(h, self.context) })
+    }
+
+    pub fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Option<UInt256> {
+        callbacks::lookup_merkle_root_by_hash(block_hash, |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(block_hash.0), self.context) })
     }
 
     pub fn should_process_quorum(&self, llmq_type: LLMQType) -> bool {

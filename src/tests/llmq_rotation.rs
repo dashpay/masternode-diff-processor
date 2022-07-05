@@ -3,7 +3,7 @@ use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 use crate::lib_tests::tests::{add_insight_lookup, block_height_lookup_5078, FFIContext, get_block_hash_by_height_5078, get_llmq_snapshot_by_block_height, masternode_list_destroy, masternode_list_lookup, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
-use crate::llmq_rotation_info_process2;
+use crate::{llmq_rotation_info_process2, process_qrinfo_from_message, processor_create_cache, register_processor};
 
 #[test]
 fn test_llmq_rotation() {
@@ -133,29 +133,26 @@ unsafe extern "C" fn block_height_lookup_333(block_hash: *mut [u8; 32], _context
     let h = UInt256(*(block_hash));
     let orig_s = h.clone().to_string();
     match orig_s.as_str() {
-        "27f4ddea9f4562b28ee1d01c3d66936eff7c1a7085b026bac9580e4b09000000" => 17520,
-        "3ad213d512a233f2d4c0ef8763680370f1cb2edd3297701813b435e646010000" => 17544,
-        "549af00509d113256ad6daa5e67573f9c79f3cd83f4c368d64651751b3040000" => 17568,
-        "c410c1b60a033bb22e3da5896e4fdf825598bb72e34a8ee09205b9e162000000" => 17592,
-        "ae865ff20dcf73393c1a0485099fdc638f829865577ecfe2ce4008dab7010000" => 17608,
-        "09c72994f74322cb65bf2a013855198eae0de28067fd9d3bd2bb75b270020000" => 17616,
-        "ffd2dc9bd11f959ee9832eddc4ef657bb2c155b66a2384853988927329040000" => 17640,
-        "e7a9f187b4cadf1d1271b38431fe0a07ca094417f3683da1f775d719fa060000" => 17656,
-        "7e69e2376224b50980814070ad44638cc5111e9b8ee7b887c0c0a04d58070000" => 17664,
-        "558cb45c1a7c52a74f44f448fcda6e60d8357239527e937f67c45a8e1f040000" => 17688,
-        "6da0b112ff140bddf9a156d0b998fa2b01d3bed2c7ba21efa7741dc719040000" => 17704,
-        "9eacde48386c394570e17adf9ef90779ab321282ace87e33f7666946ed000000" => 17712,
-        "44a2ea2e0cb42a9c0697fcf3a91c78d426f1db4093aa58533c8365a1d0000000" => 17736,
-        "14f7db0f8ced0c907feb56a7f28965a06f7c4e67bcd0aef81c891286e7010000" => 17752,
-        "d7369f81cae9a66bcc827a9870ad67242a5369a76792a4fab824442ed9050000" => 17760,
-        "539ab2f275630a461f429bfffad6d9e12ccc2f25cfa57e90434b103262080000" => 17784,
-        "54ecf7eb8bf41839fd544b4b8874013ed1c42c9bea5c14152e175efa3b030000" => 17800,
-        "94abdfd020aaea2d655f41bb900345cc7bd1bcaef9675a4c49da6c357d040000" => 17808,
-        "32d3f30cbf8d32328774ff18f49906a3383888e8296b70863aca6bc031030000" => 17822,
-        "52a04d847709ce52ec88806994f49db1a7ecf9178217df97162d786ae2050000" => 17823,
-        "251ad13ae41311a4515e40cd02f8586cb7305e47270ccf48e43cba3e82030000" => 17827,
-        "9529062177f1500581c50bbb47f51d0bef224232a7f0871f1500406032000000" => 17829,
-        "0da5c358331bbbb5015b9e83dce4e3bdc80cd80a6c25a0045e69d25dbf010000" => 17830,
+        "df111a9253e9f2f80d3de7a7274aaaa6d5ac0426b6a048991fc8ed7586000000" => 22030,
+        "4a53ef88bad2a12b5af9767bcef10980955971826b5f75ef0f17518a73020000" => 21976,
+        "ef176a4a5dbbb041f7e582e4adac44c81e7d1efdc92c2b532bcaa24106000000" => 21928,
+        "1efab5ab1fe9d99f90072d7d377b0271511e16b2f833b3314576ae23e4030000" => 21880,
+        "88d5f21114fddb86c8ab230f2b45fd90b8cfa7a61b0d819160fdb08345040000" => 21832,
+        "5b298e3fcc475e57f20520601057e3686219a2bbe09b0baa34d9759268050000" => 21784,
+        "0b06e90c32f0611bce49e4646213f0bb7a43c59b82cc5a87295bf4f15a060000" => 21984,
+        "7b9b8fe254a17c31a2315171b8b224ccf2ddf7960d69a87c5400514d19050000" => 22008,
+        "af5509f7e1a2c9827eac9487746dd6f363ac56d4659fdf0089f8bca54f020000" => 21936,
+        "c970d99fa088f3a1e9bc9eb3b9a4d03263b755149ce39a6db5bdff6d23090000" => 21960,
+        "4887de631c97d933c8a52026589ad02aa31ad2a9e6fd66c8b278aa34bd060000" => 21912,
+        "99867fdccf5f7b50c648b1ad3c93c1fa7515d4529aa5efde1ad17e0780050000" => 21888,
+        "2323ab4e88e0923e8e3bd506192dcaa4286c20340cc7525128665941ac050000" => 21840,
+        "e30d315d4a40d82d059a65a900242f393b50ff8fefde58a4a1b482d232010000" => 21864,
+        "c90366c6455c23930215ce724062fa1dd2ae89b66c722302dc9d56ba1d030000" => 21792,
+        "dbe354545727c9db4cf872765455d1aff09296a14daa4075d18db6bb4a030000" => 21816,
+        "4d523423dc19a438e57ee0e150c3f62369063a1bf99274083bd2f055fe020000" => 21768,
+        "c244b2775b5fd5ec60d911f7b851ec4e78cf54f678f3d64cc69245fe60070000" => 21744,
+        "36a179a25d081bc6836be48b11f10e6e484fd0ef068dd315a9e11482ea030000" => 21696,
+        "cd36d310de9b14823aa9aedc00abbe2b5ac4117cb8d00f7693ad22af05060000" => 21720,
         _ => u32::MAX
     }
 }
@@ -163,11 +160,9 @@ unsafe extern "C" fn block_height_lookup_333(block_hash: *mut [u8; 32], _context
 #[test]
 fn test_devnet_333() {
     // let bytes = message_from_file("qrinfo--1-20737.dat".to_string());
-    let bytes = message_from_file("QRINFO_1_17800.dat".to_string());
-    // let bytes = message_from_file("QRINFO_1_10475.dat".to_string());
+    let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
     let context = &mut (FFIContext { chain: ChainType::DevNet }) as *mut _ as *mut std::ffi::c_void;
-    let merkle_root = UInt256::from_hex("db682cdac4dcc62280c140d0293eec728d23cdad0c3c7774d6130984d71811a1").unwrap();
-    //233e10c14601ad3e46203dae9472cb33eee4a729fbc8b7ceede956c00fbbc221
+    let merkle_root = UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap();
     let result = llmq_rotation_info_process2(
         bytes.as_ptr(),
         bytes.len(),
@@ -182,6 +177,41 @@ fn test_devnet_333() {
         add_insight_lookup,
         should_process_llmq_of_type,
         validate_llmq_callback,
+        context
+    );
+}
+
+unsafe extern "C" fn get_merkle_root_by_hash(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const u8 {
+    UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap().0.as_ptr()
+}
+
+#[test]
+fn test_processor_devnet_333() {
+    let processor = unsafe {
+        register_processor(
+            get_merkle_root_by_hash,
+            block_height_lookup_333,
+            get_block_hash_by_height_5078,
+            get_llmq_snapshot_by_block_height,
+            masternode_list_lookup,
+            masternode_list_destroy,
+            add_insight_lookup,
+            should_process_llmq_of_type,
+            validate_llmq_callback,
+        )
+    };
+    let cache = unsafe { processor_create_cache() };
+    let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
+    let context = &mut (FFIContext { chain: ChainType::DevNet }) as *mut _ as *mut std::ffi::c_void;
+
+    let result = process_qrinfo_from_message(
+        bytes.as_ptr(),
+        bytes.len(),
+        null_mut(),
+        // UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap().0.as_ptr(),
+        false,
+        processor,
+        cache,
         context
     );
 }
