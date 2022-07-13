@@ -14,7 +14,7 @@ use dash_spv_models::masternode::llmq_entry::{LLMQ_DEFAULT_VERSION, LLMQ_INDEXED
 use dash_spv_primitives::consensus::encode::VarInt;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256};
 use dash_spv_primitives::crypto::var_array::VarArray;
-use dash_spv_primitives::crypto::{UInt160, UInt384, UInt768, VarBytes};
+use dash_spv_primitives::crypto::{UInt128, UInt160, UInt384, UInt768, VarBytes};
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 use dash_spv_primitives::util::base58;
 use crate::lib_tests::tests::{add_insight_lookup, block_height_lookup_5078, FFIContext, get_block_hash_by_height_5078, get_llmq_snapshot_by_block_height, masternode_list_destroy, masternode_list_lookup, masternode_list_save, message_from_file, save_llmq_snapshot, should_process_llmq_of_type, validate_llmq_callback};
@@ -469,7 +469,7 @@ fn test_processor_devnet_333() {
         context
     );
 }
-/*#[test]
+#[test]
 fn test_processor_devnet_manual() {
     let processor = unsafe {
         register_processor(
@@ -518,7 +518,7 @@ fn test_processor_devnet_manual() {
                 (tip_pro_reg_tx_hash_1, MasternodeEntry::new(
                     tip_pro_reg_tx_hash_1.clone(),
                     UInt256::from_hex("5fcef4606b48e92b611df852b12974e549fc385a7097d2370a7bd0bad8cbb055").unwrap(),
-                    SocketAddress::from_string("127.0.0.1".to_string(), 13998),
+                    SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13998 },
                     UInt160::from_bytes(base58::from("yhedxEwiZ162jKCd3WpvWgWWocDiciJuKk").unwrap().borrow(), &mut 0).unwrap(),
                     UInt384::from_hex("8c3a4249f6e1597ac13fce64b91361ebf6d0837d5a95736549b88826868c34c7c8ede2da665e2702708fc431c9eb231b").unwrap(),
                     1u8
@@ -526,7 +526,7 @@ fn test_processor_devnet_manual() {
                     tip_pro_reg_tx_hash_2, MasternodeEntry::new(
                         tip_pro_reg_tx_hash_2,
                         UInt256::from_hex("63f2bb5920d1a0c27c9689d62c6834a314584fcd7b2bf52388c1dcc2c987f2ec").unwrap(),
-                        SocketAddress::from_string("127.0.0.1".to_string(), 13999),
+                        SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13999 },
                         UInt160::from_bytes(base58::from("yZLegVnDt5t4KZAiXiH2M88LbvkHxRnXL5").unwrap().borrow(), &mut 0).unwrap(),
                         UInt384::from_hex("1185482390215003acac18979f4090b5cb4f2a7abd54a0e25b676d681bb6b53853488a74a014863403eab95b47afa017").unwrap(),
                         1u8
@@ -534,7 +534,7 @@ fn test_processor_devnet_manual() {
                     tip_pro_reg_tx_hash_3, MasternodeEntry::new(
                         tip_pro_reg_tx_hash_3,
                         UInt256::from_hex("17ac84060b137d5e2c19bc4f2fa030fd4c49aedc77c64380251d7c22bf78e560").unwrap(),
-                        SocketAddress::from_string("127.0.0.1".to_string(), 13995),
+                        SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13995 },
                         UInt160::from_bytes(base58::from("ygo4ZEACuXGWygecqexNvLR2ryPV6LJBXh").unwrap().borrow(), &mut 0).unwrap(),
                         UInt384::from_hex("1904bd1b479ff9fb5d99996575e4bdad5fefad11adf58de8e75d1b6e4964adf8b55d9e4f9432d56df6bef67f2ad68cda").unwrap(),
                         1u8
@@ -542,7 +542,7 @@ fn test_processor_devnet_manual() {
                     tip_pro_reg_tx_hash_4, MasternodeEntry::new(
                         tip_pro_reg_tx_hash_4,
                         UInt256::from_hex("50cc1bc3de661f923afd38e608a5b4fbd1b608cba85d050e7380cbbbe4fc41ff").unwrap(),
-                        SocketAddress::from_string("127.0.0.1".to_string(), 13997),
+                        SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13997 },
                         UInt160::from_bytes(base58::from("yiyRqpgyVXTw3SGyWMVNeWS5YMNC56MMnW").unwrap().borrow(), &mut 0).unwrap(),
                         UInt384::from_hex("0579dccf1de4e4bbf5f69bd1ccf5df2dd327d32b49e3789ec823858bb4fc3fef32c214461ca16151e7c5176573291429").unwrap(),
                         1u8
@@ -641,7 +641,7 @@ fn test_processor_devnet_manual() {
 
     let result_unboxed = unsafe { *result };
     let list_diff = unsafe { (*result_unboxed.snapshot_at_h_c).decode() };
-}*/
+}
 
 
 #[test]
