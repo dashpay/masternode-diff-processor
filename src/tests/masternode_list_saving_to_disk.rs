@@ -4,13 +4,13 @@ use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_primitives::crypto::byte_util::UInt256;
 use dash_spv_primitives::hashes::hex::FromHex;
 use crate::lib_tests::tests::{add_insight_lookup, assert_diff_result, FFIContext, get_llmq_snapshot_by_block_height, masternode_list_destroy, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
-use crate::mnl_diff_process;
+use crate::{MasternodeProcessorCache, mnl_diff_process};
 
 #[test]
 fn test_mnl_saving_to_disk() { // testMNLSavingToDisk
     let chain = ChainType::TestNet;
     let bytes = message_from_file("ML_at_122088.dat".to_string());
-    let context = &mut (FFIContext { chain }) as *mut _ as *mut std::ffi::c_void;
+    let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
     let result = mnl_diff_process(
         bytes.as_ptr(),
         bytes.len(),

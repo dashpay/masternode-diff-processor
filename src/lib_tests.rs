@@ -14,12 +14,13 @@ pub mod tests {
     use dash_spv_models::masternode;
     use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384, UInt768};
     use dash_spv_primitives::hashes::hex::FromHex;
-    use crate::LLMQType;
+    use crate::{LLMQType, MasternodeProcessorCache};
     use crate::mnl_diff_process;
 
     #[derive(Debug)]
     pub struct FFIContext {
         pub chain: ChainType,
+        pub cache: MasternodeProcessorCache,
     }
 
     pub struct AggregationInfo {
@@ -223,12 +224,19 @@ pub mod tests {
     pub unsafe extern "C" fn masternode_list_lookup(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const types::MasternodeList {
         null_mut()
     }
+    pub unsafe extern "C" fn masternode_list_save(_block_hash: *mut [u8; 32], _masternode_list: *const types::MasternodeList, _context: *const std::ffi::c_void) -> bool {
+        true
+    }
     pub unsafe extern "C" fn masternode_list_destroy(_masternode_list: *const types::MasternodeList) {
 
     }
     pub unsafe extern "C" fn add_insight_lookup(_hash: *mut [u8; 32], _context: *const std::ffi::c_void) {
 
     }
+    pub unsafe extern "C" fn save_llmq_snapshot(block_hash: *mut [u8; 32], snapshot: *const types::LLMQSnapshot, _context: *const std::ffi::c_void) -> bool {
+        true
+    }
+
     pub unsafe extern "C" fn should_process_llmq_of_type(llmq_type: u8, context: *const std::ffi::c_void) -> bool {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         llmq_type == match data.chain {
@@ -287,7 +295,7 @@ pub mod tests {
         assert_eq!(total_transactions, should_be_total_transactions, "Invalid transaction count");
         let use_insight_as_backup = false;
         let base_masternode_list_hash: *const u8 = null_mut();
-        let context = &mut FFIContext { chain } as *mut _ as *mut std::ffi::c_void;
+        let context = &mut FFIContext { chain, cache: MasternodeProcessorCache::default() } as *mut _ as *mut std::ffi::c_void;
         let result = mnl_diff_process(
             c_array,
             length,
@@ -371,7 +379,7 @@ pub mod tests {
                 add_insight_lookup,
                 should_process_llmq_of_type,
                 validate_llmq_callback,
-                &mut (FFIContext { chain }) as *mut _ as *mut std::ffi::c_void
+                &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void
             );
             let result = unsafe { *result };
             println!("result: [{:?}]", result);

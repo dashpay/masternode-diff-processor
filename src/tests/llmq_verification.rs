@@ -7,7 +7,7 @@ use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::ToHex;
-use crate::{LLMQType, mnl_diff_process};
+use crate::{LLMQType, MasternodeProcessorCache, mnl_diff_process};
 use crate::lib_tests::tests::{add_insight_lookup, assert_diff_result, block_height_for, FFIContext, get_llmq_snapshot_by_block_height, masternode_list_destroy, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
 
 #[test]
@@ -18,7 +18,7 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
     let chain = ChainType::TestNet;
     let get_block_height_by_hash = |block_hash: UInt256| block_height_for(chain, block_hash.clone().reversed().0.to_hex().as_str());
     let base_masternode_list_hash: *const u8 = null_mut();
-    let context = &mut FFIContext { chain } as *mut _ as *mut std::ffi::c_void;
+    let context = &mut FFIContext { chain, cache: MasternodeProcessorCache::default() } as *mut _ as *mut std::ffi::c_void;
 
     let result = mnl_diff_process(
         bytes.as_ptr(),

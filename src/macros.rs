@@ -22,3 +22,13 @@ macro_rules! unwrap_or_qr_failure {
 macro_rules! unwrap_or_qr_result_failure {
     ($e: expr) => { unwrap_or_return!($e, || boxed(types::LLMQRotationInfoResult::default())) }
 }
+
+#[macro_export]
+macro_rules! unwrap_or_qr_processing_failure {
+    ($e: expr) => { unwrap_or_return!($e, || crate::processing::processor::QRProcessingResult::default()) }
+}
+
+#[macro_export]
+macro_rules! unwrap_or_diff_processing_failure {
+    ($e: expr) => { unwrap_or_return!($e, || crate::processing::processor::DiffProcessingResult::default()) }
+}
