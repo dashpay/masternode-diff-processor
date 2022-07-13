@@ -1,6 +1,6 @@
 [package]
 name = "dash_mndiff"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2021"
 build = "build.rs"
 publish = false
@@ -36,7 +36,7 @@ cbindgen = "0.20.0"
 
 [lib]
 name = "dash_mndiff"
-crate-type = ["staticlib", "cdylib"]
+#crate-type = ["staticlib", "cdylib"]
 
 [profile.release]
 lto = "thin"
