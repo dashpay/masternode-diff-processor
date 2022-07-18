@@ -213,28 +213,36 @@ pub mod tests {
     pub unsafe extern "C" fn block_height_lookup_5078(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> u32 {
         5078
     }
-    pub unsafe extern "C" fn get_block_hash_by_height_5078(_block_height: u32, _context: *const std::ffi::c_void) -> *const u8 {
+    pub unsafe extern "C" fn get_block_hash_by_height_default(_block_height: u32, _context: *const std::ffi::c_void) -> *const u8 {
         null_mut()
     }
 
-    pub unsafe extern "C" fn get_llmq_snapshot_by_block_height(_block_height: u32, _context: *const std::ffi::c_void) -> *const types::LLMQSnapshot {
+    pub unsafe extern "C" fn get_llmq_snapshot_by_block_height_default(_block_height: u32, _context: *const std::ffi::c_void) -> *const types::LLMQSnapshot {
         null_mut()
     }
 
-    pub unsafe extern "C" fn masternode_list_lookup(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const types::MasternodeList {
+    pub unsafe extern "C" fn get_llmq_snapshot_by_block_hash_default(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const types::LLMQSnapshot {
         null_mut()
     }
-    pub unsafe extern "C" fn masternode_list_save(_block_hash: *mut [u8; 32], _masternode_list: *const types::MasternodeList, _context: *const std::ffi::c_void) -> bool {
+
+    pub unsafe extern "C" fn get_masternode_list_by_block_hash_default(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const types::MasternodeList {
+        null_mut()
+    }
+    pub unsafe extern "C" fn masternode_list_save_default(_block_hash: *mut [u8; 32], _masternode_list: *const types::MasternodeList, _context: *const std::ffi::c_void) -> bool {
         true
     }
-    pub unsafe extern "C" fn masternode_list_destroy(_masternode_list: *const types::MasternodeList) {
+    pub unsafe extern "C" fn masternode_list_destroy_default(_masternode_list: *const types::MasternodeList) {
 
     }
-    pub unsafe extern "C" fn add_insight_lookup(_hash: *mut [u8; 32], _context: *const std::ffi::c_void) {
+    pub unsafe extern "C" fn add_insight_lookup_default(_hash: *mut [u8; 32], _context: *const std::ffi::c_void) {
 
     }
-    pub unsafe extern "C" fn save_llmq_snapshot(block_hash: *mut [u8; 32], snapshot: *const types::LLMQSnapshot, _context: *const std::ffi::c_void) -> bool {
+    pub unsafe extern "C" fn save_llmq_snapshot_default(block_hash: *mut [u8; 32], snapshot: *const types::LLMQSnapshot, _context: *const std::ffi::c_void) -> bool {
         true
+    }
+
+    pub unsafe extern "C" fn get_merkle_root_by_hash_default(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const u8 {
+        UInt256::MIN.0.as_ptr()
     }
 
     pub unsafe extern "C" fn should_process_llmq_of_type(llmq_type: u8, context: *const std::ffi::c_void) -> bool {
@@ -304,10 +312,10 @@ pub mod tests {
             use_insight_as_backup,
             |block_hash| 122088,
             |height| null_mut(),
-            get_llmq_snapshot_by_block_height,
+            get_llmq_snapshot_by_block_hash_default,
             |block_hash| null_mut(),
-            masternode_list_destroy,
-            add_insight_lookup,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
             context
@@ -367,7 +375,7 @@ pub mod tests {
                 false,
                 get_block_height_by_hash,
                 |height| null_mut(),
-                get_llmq_snapshot_by_block_height,
+                get_llmq_snapshot_by_block_hash_default,
                 |hash| match lists.get(&hash) {
                     Some(list) => {
                         let list_encoded = list.clone().encode();
@@ -375,8 +383,8 @@ pub mod tests {
                     },
                     None => null_mut()
                 },
-                masternode_list_destroy,
-                add_insight_lookup,
+                masternode_list_destroy_default,
+                add_insight_lookup_default,
                 should_process_llmq_of_type,
                 validate_llmq_callback,
                 &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void

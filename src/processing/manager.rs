@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{lookup_block_hash_by_height, lookup_masternode_list, lookup_snapshot};
+use dash_spv_ffi::ffi::callbacks::{lookup_block_hash_by_height, lookup_masternode_list, lookup_snapshot_by_block_hash};
 use dash_spv_ffi::types;
 use dash_spv_models::common;
 use dash_spv_models::common::{LLMQSnapshotSkipMode, LLMQType};
@@ -31,7 +31,7 @@ pub struct LLMQValidationParams {
 pub struct Manager<
     BHH: Fn(UInt256) -> u32 + Copy,
     BHT: Fn(u32) -> *const u8 + Copy,
-    SL: Fn(u32) -> *const types::LLMQSnapshot + Copy,
+    SL: Fn(UInt256) -> *const types::LLMQSnapshot + Copy,
     MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
     MND: Fn(*const types::MasternodeList) + Copy,
     AI: Fn(UInt256) + Copy,
@@ -48,7 +48,7 @@ pub struct Manager<
     pub use_insight_as_backup: bool,
     pub base_masternode_list_hash: Option<UInt256>,
     pub consensus_type: ConsensusType,
-    pub get_snapshot_by_block_height: SL,
+    pub get_snapshot_by_block_hash: SL,
 }
 
 
@@ -139,7 +139,7 @@ pub fn classify_quorums<
     SPQ: Fn(LLMQType) -> bool + Copy,
     BHH: Fn(UInt256) -> u32 + Copy,
     BHT: Fn(u32) -> *const u8 + Copy,
-    SL: Fn(u32) -> *const types::LLMQSnapshot + Copy,
+    SL: Fn(UInt256) -> *const types::LLMQSnapshot + Copy,
     VQ: Fn(types::LLMQValidationData) -> bool + Copy,
 >(
     base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
@@ -167,7 +167,7 @@ pub fn classify_quorums<
                                 llmq_masternode_list,
                                 manager.get_block_height_by_hash,
                                 manager.get_block_hash_by_height,
-                                manager.get_snapshot_by_block_height,
+                                manager.get_snapshot_by_block_hash,
                                 manager.masternode_list_lookup,
                                 manager.masternode_list_destroy,
                                 manager.validate_llmq_callback,
@@ -231,7 +231,7 @@ fn log_quorums_map(q: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>, id: Stri
 pub fn validate_quorum<
     BHH: Fn(UInt256) -> u32,
     BHT: Fn(u32) -> *const u8 + Copy,
-    SL: Fn(u32) -> *const types::LLMQSnapshot + Copy,
+    SL: Fn(UInt256) -> *const types::LLMQSnapshot + Copy,
     MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
     MND: Fn(*const types::MasternodeList) + Copy,
     VQ: Fn(types::LLMQValidationData) -> bool + Copy,
@@ -241,7 +241,7 @@ pub fn validate_quorum<
     llmq_masternode_list: MasternodeList,
     get_block_height_by_hash: BHH,
     get_block_hash_by_height: BHT,
-    get_snapshot_by_block_height: SL,
+    get_snapshot_by_block_hash: SL,
     masternode_list_lookup: MNL,
     masternode_list_destroy: MND,
     validate_llmq_callback: VQ,
@@ -252,7 +252,7 @@ pub fn validate_quorum<
     let quorum_count = quorum.llmq_type.size();
     let valid_masternodes = if consensus_type == ConsensusType::LlmqRotation {
         //valid_masternodes_for_rotated_llmq(llmq_masternode_list.masternodes, block_height)
-        get_rotated_masternodes_for_quorum(quorum.llmq_type, llmq_masternode_list.block_hash, get_block_height_by_hash, get_block_hash_by_height, get_snapshot_by_block_height, masternode_list_lookup, masternode_list_destroy)
+        get_rotated_masternodes_for_quorum(quorum.llmq_type, llmq_masternode_list.block_hash, get_block_height_by_hash, get_block_hash_by_height, get_snapshot_by_block_hash, masternode_list_lookup, masternode_list_destroy)
     } else {
         valid_masternodes_for(llmq_masternode_list.masternodes, quorum_modifier, quorum_count, block_height)
     };
@@ -566,7 +566,7 @@ pub fn quorum_members_by_quarter_rotation<BHT, SL, MNL, MND>(
     masternode_list_destroy: MND) -> Vec<Vec<MasternodeEntry>>
     where
         BHT: Fn(u32) -> *const u8 + Copy,
-        SL: Fn(u32) -> *const types::LLMQSnapshot + Copy,
+        SL: Fn(UInt256) -> *const types::LLMQSnapshot + Copy,
         MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
         MND: Fn(*const types::MasternodeList) + Copy {
     let llmq_params = llmq_type.params();
@@ -575,12 +575,21 @@ pub fn quorum_members_by_quarter_rotation<BHT, SL, MNL, MND>(
     let block_m_c_height = quorum_base_block.height - cycle_length;
     let block_m_2c_height = quorum_base_block.height - 2 * cycle_length;
     let block_m_3c_height = quorum_base_block.height - 3 * cycle_length;
-    let block_m_c = common::Block { height: block_m_c_height, hash: lookup_block_hash_by_height(block_m_c_height, get_block_hash_by_height).unwrap() };
-    let block_m_2c = common::Block { height: block_m_2c_height, hash: lookup_block_hash_by_height(block_m_2c_height, get_block_hash_by_height).unwrap() };
-    let block_m_3c = common::Block { height: block_m_3c_height, hash: lookup_block_hash_by_height(block_m_3c_height, get_block_hash_by_height).unwrap() };
-    let q_snapshot_h_m_c = lookup_snapshot(block_m_c.height - 8, snapshot_lookup).unwrap();
-    let q_snapshot_h_m_2c = lookup_snapshot(block_m_2c.height - 8, snapshot_lookup).unwrap();
-    let q_snapshot_h_m_3c = lookup_snapshot(block_m_3c.height - 8, snapshot_lookup).unwrap();
+    let block_hash_m_c = lookup_block_hash_by_height(block_m_c_height, get_block_hash_by_height).unwrap();
+    let block_hash_m_2c = lookup_block_hash_by_height(block_m_2c_height, get_block_hash_by_height).unwrap();
+    let block_hash_m_3c = lookup_block_hash_by_height(block_m_3c_height, get_block_hash_by_height).unwrap();
+    let block_m_c = common::Block { height: block_m_c_height, hash: block_hash_m_c };
+    let block_m_2c = common::Block { height: block_m_2c_height, hash: block_hash_m_2c };
+    let block_m_3c = common::Block { height: block_m_3c_height, hash: block_hash_m_3c };
+
+    let block_hash_m_c_8 = lookup_block_hash_by_height(block_m_c_height - 8, get_block_hash_by_height).unwrap();
+    let block_hash_m_2c_8 = lookup_block_hash_by_height(block_m_2c_height - 8, get_block_hash_by_height).unwrap();
+    let block_hash_m_3c_8 = lookup_block_hash_by_height(block_m_3c_height - 8, get_block_hash_by_height).unwrap();
+
+    let q_snapshot_h_m_c = lookup_snapshot_by_block_hash(block_hash_m_c_8, snapshot_lookup).unwrap();
+    let q_snapshot_h_m_2c = lookup_snapshot_by_block_hash(block_hash_m_2c_8, snapshot_lookup).unwrap();
+    let q_snapshot_h_m_3c = lookup_snapshot_by_block_hash(block_hash_m_3c_8, snapshot_lookup).unwrap();
+
     let prev_q_h_m_c = quorum_quarter_members_by_snapshot(llmq_params, block_m_c, q_snapshot_h_m_c, get_block_hash_by_height, masternode_list_lookup, masternode_list_destroy);
     let prev_q_h_m_2c = quorum_quarter_members_by_snapshot(llmq_params, block_m_2c, q_snapshot_h_m_2c, get_block_hash_by_height, masternode_list_lookup, masternode_list_destroy);
     let prev_q_h_m_3c = quorum_quarter_members_by_snapshot(llmq_params, block_m_3c, q_snapshot_h_m_3c, get_block_hash_by_height, masternode_list_lookup, masternode_list_destroy);
@@ -619,7 +628,7 @@ pub fn get_rotated_masternodes_for_quorum<BHH, BHT, SL, MNL, MND>(
     where
         BHH: Fn(UInt256) -> u32,
         BHT: Fn(u32) -> *const u8 + Copy,
-        SL: Fn(u32) -> *const types::LLMQSnapshot + Copy,
+        SL: Fn(UInt256) -> *const types::LLMQSnapshot + Copy,
         MNL: Fn(UInt256) -> *const types::MasternodeList + Copy,
         MND: Fn(*const types::MasternodeList) + Copy {
     // TODO: load members from cache
