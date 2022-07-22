@@ -752,15 +752,15 @@ impl MasternodeProcessor {
                                               llmq_base_block_height: u32,
                                               cache: &mut MasternodeProcessorCache)
                                               -> Vec<masternode::MasternodeEntry> {
-
-
         let map_by_type_opt = cache.llmq_members.get_mut(&llmq_type);
         if map_by_type_opt.is_some() {
             if let Some(members) = map_by_type_opt.as_ref().unwrap().get(&llmq_base_hash) {
                 return members.clone();
             }
+        } else {
+            cache.llmq_members.insert(llmq_type, BTreeMap::new());
         }
-        let map_by_type = map_by_type_opt.unwrap();
+        let map_by_type = cache.llmq_members.get_mut(&llmq_type).unwrap();
         let llmq_params = llmq_type.params();
         let quorum_index = llmq_base_block_height % llmq_params.dkg_params.interval;
         let cycle_base_height = llmq_base_block_height - quorum_index;
@@ -871,4 +871,13 @@ impl MasternodeProcessor {
             quorum.verified = true;
         }
     }
+
+    pub fn read_list_diff_from_message<'a>(&self, message: &'a [u8], offset: &mut usize) -> Option<llmq::MNListDiff<'a>> {
+        llmq::MNListDiff::new(
+            message,
+            offset,
+            |hash|
+                self.lookup_block_height_by_hash(hash))
+    }
+
 }

@@ -144,14 +144,14 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
     };
     let cache = unsafe { processor_create_cache() };
 
-    let result = unsafe { process_mnlistdiff_from_message(
+    let result = process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
         use_insight_as_backup,
         processor,
         cache,
-        context as *mut _ as *mut std::ffi::c_void)
-    };
+        context as *mut _ as *mut std::ffi::c_void
+    );
 
     println!("{:?}", result);
     let result_119064 = unsafe { *result };
@@ -166,7 +166,7 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
         let masternode_list_119064_encoded = masternode_list_119064_decoded.encode();
         //context.cache.mn_lists.insert(block_hash_119064, masternode_list_119064_decoded);
 
-        let result = unsafe { process_mnlistdiff_from_message(
+        let result = process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
             // block_hash_119064.0.as_ptr(),
@@ -174,7 +174,7 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
             processor,
             cache,
             context as *mut _ as *mut std::ffi::c_void
-        ) };
+        );
 
         println!("{:?}", result);
         let result_119200 = unsafe { *result };

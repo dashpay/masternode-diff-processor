@@ -472,27 +472,6 @@ pub unsafe extern fn block_destroy(result: *mut types::Block) {
 
 /// Experimental FFI API with saving context
 
-
-pub fn get_mnl_diff_processing_result(
-    message_arr: *const u8,
-    message_length: usize,
-    use_insight_as_backup: bool,
-    selection_type: QuorumSelectionType,
-    processor: &mut MasternodeProcessor,
-    cache: &mut MasternodeProcessorCache,
-    context: *const std::ffi::c_void
-)
-    -> *mut types::MNListDiffResult {
-    println!("get_mnl_diff_processing_result.start: {:?}", std::time::Instant::now());
-    processor.context = context;
-    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
-    let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
-    let processor_context = ProcessorContext { selection_type, use_insight_as_backup };
-    let result = processor.get_list_diff_result_with_base_lookup(list_diff, processor_context, cache);
-    println!("get_mnl_diff_processing_result.finish: {:?}", std::time::Instant::now());
-    boxed(result)
-}
-
 pub fn get_mnl_diff_processing_result_internal(
     message_arr: *const u8,
     message_length: usize,
@@ -564,7 +543,7 @@ pub unsafe extern fn processor_destroy_cache(cache: *mut MasternodeProcessorCach
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn process_mnlistdiff_from_message(
+pub extern "C" fn process_mnlistdiff_from_message(
     message_arr: *const u8,
     message_length: usize,
     use_insight_as_backup: bool,
@@ -572,16 +551,17 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
 ) -> *mut types::MNListDiffResult {
-    println!("process_mnl_diff: {:?}", processor);
-    get_mnl_diff_processing_result(
-        message_arr,
-        message_length,
-        use_insight_as_backup,
-        QuorumSelectionType::LLMQ,
-        &mut *processor,
-        &mut *cache,
-        context
-    )
+    println!("process_mnlistdiff_from_message.start: {:?} {:?}", std::time::Instant::now(), processor);
+    let cache = unsafe { &mut *cache };
+    let processor = unsafe { &mut *processor };
+    processor.context = context;
+    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
+    let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
+    let processor_context = ProcessorContext { selection_type: QuorumSelectionType::LLMQ, use_insight_as_backup };
+    let result = processor.get_list_diff_result_with_base_lookup(list_diff, processor_context, cache);
+    println!("process_mnlistdiff_from_message.finish: {:?}", std::time::Instant::now());
+    boxed(result)
+
 }
 
 #[no_mangle]
@@ -733,18 +713,11 @@ pub extern "C" fn process_qrinfo_from_message(
     };
     let offset = &mut 0;
     let read_list_diff = |offset: &mut usize|
-        llmq::MNListDiff::new(
-            message,
-            offset,
-            |hash|
-                processor.lookup_block_height_by_hash(hash));
-
-    let mut process_list_diff = |list_diff: llmq::MNListDiff| processor.get_list_diff_result_with_base_lookup(list_diff, processor_context, cache);
-
+        processor.read_list_diff_from_message(message, offset);
+    let mut process_list_diff = |list_diff: llmq::MNListDiff|
+        processor.get_list_diff_result_with_base_lookup(list_diff, processor_context, cache);
     let read_snapshot = |offset: &mut usize| types::LLMQSnapshot::from_bytes(message, offset);
     let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
-
-
 
     let snapshot_at_h_c = boxed(unwrap_or_qr_result_failure!(read_snapshot(offset)));
     let snapshot_at_h_2c = boxed(unwrap_or_qr_result_failure!(read_snapshot(offset)));
@@ -859,12 +832,7 @@ pub fn process_qrinfo_from_message_internal(
     let offset = &mut 0;
 
     let read_list_diff = |offset: &mut usize|
-        llmq::MNListDiff::new(
-            message,
-            offset,
-            |hash|
-                processor.lookup_block_height_by_hash(hash));
-
+        processor.read_list_diff_from_message(message, offset);
     let mut process_list_diff = |list_diff: llmq::MNListDiff|
         processor.get_list_diff_result_internal_with_base_lookup(list_diff, processor_context, cache);
 

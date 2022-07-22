@@ -1,6 +1,6 @@
 [package]
 name = "dash_mndiff"
-version = "0.2.10"
+version = "0.2.11"
 edition = "2021"
 build = "build.rs"
 publish = false
