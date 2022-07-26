@@ -28,7 +28,7 @@ use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable, UInt256};
 use crate::processing::{classify_masternodes, classify_quorums};
 use crate::processing::manager::{ConsensusType, lookup_masternodes_and_quorums_for, Manager};
-use crate::processing::processor::{MasternodeProcessor, MasternodeProcessorCache, DiffProcessingResult, ProcessorContext, QuorumSelectionType, QRProcessingResult};
+use crate::processing::processor::{MasternodeProcessor, MasternodeProcessorCache, DiffProcessingResult, ProcessorContext, QRProcessingResult};
 
 fn list_diff_from_ffi<'a>(list_diff: *mut types::MNListDiff) -> llmq::MNListDiff<'a> {
     unsafe { (*(list_diff)).decode() }
@@ -476,7 +476,6 @@ pub fn get_mnl_diff_processing_result_internal(
     message_arr: *const u8,
     message_length: usize,
     use_insight_as_backup: bool,
-    selection_type: QuorumSelectionType,
     processor: &mut MasternodeProcessor,
     cache: &mut MasternodeProcessorCache,
     context: *const std::ffi::c_void
@@ -485,7 +484,7 @@ pub fn get_mnl_diff_processing_result_internal(
     println!("get_mnl_diff_processing_result_internal.start: {:?}", std::time::Instant::now());
     processor.context = context;
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
-    let processor_context = ProcessorContext { selection_type, use_insight_as_backup };
+    let processor_context = ProcessorContext { use_insight_as_backup };
     let list_diff = unwrap_or_diff_processing_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
     let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, processor_context, cache);
     println!("get_mnl_diff_processing_result_internal.finish: {:?}", std::time::Instant::now());
@@ -557,7 +556,7 @@ pub extern "C" fn process_mnlistdiff_from_message(
     processor.context = context;
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
-    let processor_context = ProcessorContext { selection_type: QuorumSelectionType::LLMQ, use_insight_as_backup };
+    let processor_context = ProcessorContext { use_insight_as_backup };
     let result = processor.get_list_diff_result_with_base_lookup(list_diff, processor_context, cache);
     println!("process_mnlistdiff_from_message.finish: {:?}", std::time::Instant::now());
     boxed(result)
@@ -643,10 +642,7 @@ pub extern "C" fn process_qrinfo(
     println!("process_llmq_rotation_info_result: processor: {:?} cache: {:?}", processor, cache);
     let llmq_rotation_info = unsafe { *info };
     let extra_share = llmq_rotation_info.extra_share;
-    let processor_context = ProcessorContext {
-        selection_type: QuorumSelectionType::LlmqRotation,
-        use_insight_as_backup,
-    };
+    let processor_context = ProcessorContext { use_insight_as_backup };
     let processor = unsafe { &mut *processor };
     processor.context = context;
     let cache = unsafe { &mut *cache };
@@ -707,10 +703,7 @@ pub extern "C" fn process_qrinfo_from_message(
     processor.context = context;
     let cache = unsafe { &mut *cache };
     println!("process_qrinfo_from_message --: {:?} {:?} {:?}", processor, processor.context, cache);
-    let processor_context = ProcessorContext {
-        selection_type: QuorumSelectionType::LlmqRotation,
-        use_insight_as_backup,
-    };
+    let processor_context = ProcessorContext { use_insight_as_backup };
     let offset = &mut 0;
     let read_list_diff = |offset: &mut usize|
         processor.read_list_diff_from_message(message, offset);
@@ -803,7 +796,6 @@ pub fn process_mnlistdiff_from_message_internal(
             message_arr,
             message_length,
             use_insight_as_backup,
-            QuorumSelectionType::LLMQ,
             &mut *processor,
             &mut *cache,
             context
@@ -825,10 +817,7 @@ pub fn process_qrinfo_from_message_internal(
     processor.context = context;
     let cache = unsafe { &mut *cache };
     println!("process_qrinfo_from_message --: {:?} {:?} {:?}", processor, processor.context, cache);
-    let processor_context = ProcessorContext {
-        selection_type: QuorumSelectionType::LlmqRotation,
-        use_insight_as_backup,
-    };
+    let processor_context = ProcessorContext { use_insight_as_backup };
     let offset = &mut 0;
 
     let read_list_diff = |offset: &mut usize|

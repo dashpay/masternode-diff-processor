@@ -14,26 +14,13 @@ use dash_spv_primitives::crypto::data_ops::{Data, inplace_intersection};
 use dash_spv_primitives::crypto::UInt256;
 use dash_spv_primitives::hashes::{Hash, sha256d};
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum QuorumSelectionType {
-    MN = 0,
-    LLMQ = 1,
-    LlmqRotation = 2
-}
-
-
 #[derive(Copy, Clone, Debug)]
 pub struct ProcessorContext {
-    pub selection_type: QuorumSelectionType,
     pub use_insight_as_backup: bool,
-    // pub base_masternode_list_hash: Option<UInt256>,
-    // pub merkle_root: UInt256,
 }
 
 
 #[derive(Clone, Debug)]
-// #[repr(C)]
 pub struct MasternodeProcessorCache {
     pub llmq_members: BTreeMap<LLMQType, BTreeMap<UInt256, Vec<masternode::MasternodeEntry>>>,
     pub llmq_indexed_members: BTreeMap<LLMQType, BTreeMap<llmq::LLMQIndexedHash, Vec<masternode::MasternodeEntry>>>,
@@ -53,7 +40,6 @@ impl Default for MasternodeProcessorCache {
 
 impl MasternodeProcessorCache {
     pub fn add_masternode_list(&mut self, block_hash: UInt256, list: masternode::MasternodeList) {
-        println!("MasternodeProcessorCache. add_masternode_list for: {}", block_hash);
         self.mn_lists.insert(block_hash, list);
     }
     pub fn get_quorum_members_of_type(&mut self, r#type: LLMQType) -> Option<&mut BTreeMap<UInt256, Vec<masternode::MasternodeEntry>>> {
@@ -220,14 +206,14 @@ impl MasternodeProcessor {
     pub(crate) fn find_snapshot(&self, block_hash: UInt256, cached_snapshots: &BTreeMap<UInt256, llmq::LLMQSnapshot>) -> Option<llmq::LLMQSnapshot> {
         if let Some(cached) = cached_snapshots.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
-            println!("find_masternode_list: (Cached) {}", block_hash);
+            println!("find_snapshot: (Cached) {}", block_hash);
             Some(cached.clone())
         } else if let Some(looked) = self.lookup_snapshot_by_block_hash(block_hash) {
             // Getting it from FFI directly
-            println!("find_masternode_list: (Looked) {}", block_hash);
+            println!("find_snapshot: (Looked) {}", block_hash);
             Some(looked)
         } else {
-            println!("find_masternode_list: (None) {}", block_hash);
+            println!("find_snapshot: (None) {}", block_hash);
             None
         }
     }
@@ -480,8 +466,8 @@ impl MasternodeProcessor {
         let block_height = self.lookup_block_height_by_hash(block_hash);
         let quorum_modifier = quorum.llmq_quorum_hash();
         let quorum_count = quorum.llmq_type.size();
-        println!("validate_quorum: {}:{} ({:?}) {:?}:{}:{:?}", block_height, block_hash, processor_context.selection_type, quorum.llmq_type, quorum.llmq_hash, quorum.index);
-        let valid_masternodes = if processor_context.selection_type == QuorumSelectionType::LlmqRotation {
+        println!("validate_quorum: {}:{} {:?}:{}:{:?}", block_height, block_hash, quorum.llmq_type, quorum.llmq_hash, quorum.index);
+        let valid_masternodes = if quorum.index.is_some() {
             self.get_rotated_masternodes_for_quorum(
                 quorum.llmq_type,
                 block_hash,
