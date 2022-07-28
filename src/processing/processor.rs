@@ -289,7 +289,7 @@ impl MasternodeProcessor {
             Some(list) => (list.masternodes, list.quorums),
             None => (BTreeMap::new(), BTreeMap::new())
         };
-        let coinbase_transaction = list_diff.coinbase_transaction;
+        let mut coinbase_transaction = list_diff.coinbase_transaction;
         let quorums_active = coinbase_transaction.coinbase_transaction_version >= 2;
         let (added_masternodes,
             modified_masternodes,
