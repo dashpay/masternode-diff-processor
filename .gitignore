@@ -7,3 +7,8 @@ Cargo.lock
 # Intellij IDEA project files
 /.idea
 masternodes-diff-processor.iml
+
+# Apple
+.DS_Store
+.github/.DS_Store
+src/.DS_Store
