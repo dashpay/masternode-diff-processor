@@ -435,7 +435,7 @@ impl MasternodeProcessor {
                 }
             });
         let mut quorums = base_quorums.clone();
-        quorums.extend(added_quorums
+        quorums.extend(added
             .clone()
             .into_iter()
             .filter(|(key, _entries)| !quorums.contains_key(key))
@@ -446,13 +446,13 @@ impl MasternodeProcessor {
                     (*llmq_map).remove(key);
                 });
             }
-            if let Some(keys_to_add) = added_quorums.get(llmq_type) {
+            if let Some(keys_to_add) = added.get(llmq_type) {
                 keys_to_add.clone().into_iter().for_each(|(key, entry)| {
                     (*llmq_map).insert(key, entry);
                 });
             }
         });
-        (added_quorums, quorums, has_valid_quorums, needed_masternode_lists)
+        (added, quorums, has_valid_quorums, needed_masternode_lists)
     }
 
     pub fn validate_quorum(
