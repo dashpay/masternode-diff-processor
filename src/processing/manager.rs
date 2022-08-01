@@ -13,19 +13,6 @@ use dash_spv_primitives::crypto::data_ops::{Data, inplace_intersection};
 use dash_spv_primitives::crypto::UInt256;
 use dash_spv_primitives::hashes::{Hash, sha256d};
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ConsensusType {
-    MN = 0,
-    LLMQ = 1,
-    LlmqRotation = 2
-}
-
-pub struct LLMQValidationParams {
-    pub consensus_type: ConsensusType,
-}
-
-
 // https://github.com/rust-lang/rfcs/issues/2770
 #[derive(Clone, Copy, Debug)]
 pub struct Manager<
@@ -47,7 +34,6 @@ pub struct Manager<
     pub validate_llmq_callback: VQ,
     pub use_insight_as_backup: bool,
     pub base_masternode_list_hash: Option<UInt256>,
-    pub consensus_type: ConsensusType,
     pub get_snapshot_by_block_hash: SL,
 }
 
@@ -170,8 +156,7 @@ pub fn classify_quorums<
                                 manager.get_snapshot_by_block_hash,
                                 manager.masternode_list_lookup,
                                 manager.masternode_list_destroy,
-                                manager.validate_llmq_callback,
-                                manager.consensus_type),
+                                manager.validate_llmq_callback),
                         None =>
                             if (manager.get_block_height_by_hash)(llmq_block_hash) != u32::MAX {
                                 needed_masternode_lists.push(boxed(llmq_block_hash.0));
@@ -245,12 +230,11 @@ pub fn validate_quorum<
     masternode_list_lookup: MNL,
     masternode_list_destroy: MND,
     validate_llmq_callback: VQ,
-    consensus_type: ConsensusType,
 ) {
     let block_height: u32 = get_block_height_by_hash(llmq_masternode_list.block_hash);
     let quorum_modifier = quorum.llmq_quorum_hash();
     let quorum_count = quorum.llmq_type.size();
-    let valid_masternodes = if consensus_type == ConsensusType::LlmqRotation {
+    let valid_masternodes = if quorum.index.is_some() {
         //valid_masternodes_for_rotated_llmq(llmq_masternode_list.masternodes, block_height)
         get_rotated_masternodes_for_quorum(quorum.llmq_type, llmq_masternode_list.block_hash, get_block_height_by_hash, get_block_hash_by_height, get_snapshot_by_block_hash, masternode_list_lookup, masternode_list_destroy)
     } else {

@@ -852,7 +852,9 @@ impl MasternodeProcessor {
             threshold_signature: boxed(quorum.threshold_signature.0),
             public_key: boxed(quorum.public_key.0)
         }), self.context) };
-        has_valid_quorums &= quorum.validate_payload() && is_valid_signature;
+        let is_valid_payload = quorum.validate_payload();
+        has_valid_quorums &= is_valid_payload && is_valid_signature;
+        println!("validate_signature: {}: signature: {} payload: {}, has_valid_quorums: {}", quorum.llmq_hash, is_valid_signature, is_valid_payload, has_valid_quorums);
         if has_valid_quorums {
             quorum.verified = true;
         }

@@ -27,7 +27,7 @@ use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable, UInt256};
 use crate::processing::{classify_masternodes, classify_quorums};
-use crate::processing::manager::{ConsensusType, lookup_masternodes_and_quorums_for, Manager};
+use crate::processing::manager::{lookup_masternodes_and_quorums_for, Manager};
 use crate::processing::processor::{MasternodeProcessor, MasternodeProcessorCache, DiffProcessingResult, ProcessorContext, QRProcessingResult};
 
 fn list_diff_from_ffi<'a>(list_diff: *mut types::MNListDiff) -> llmq::MNListDiff<'a> {
@@ -141,7 +141,6 @@ pub fn mnl_diff_process<
         validate_llmq_callback: |data: types::LLMQValidationData| unsafe { validate_llmq_callback(boxed(data), context) },
         use_insight_as_backup,
         base_masternode_list_hash,
-        consensus_type: ConsensusType::LLMQ,
         get_snapshot_by_block_hash: |h: UInt256| unsafe { get_snapshot_by_block_hash(boxed(h.0), context) },
     };
     let result = list_diff_result(list_diff, manager, desired_merkle_root);
@@ -296,8 +295,7 @@ pub extern "C" fn llmq_rotation_info_process(
         should_process_llmq_of_type: |llmq_type: LLMQType| unsafe { should_process_llmq_of_type(llmq_type.into(), context) },
         validate_llmq_callback: |data: types::LLMQValidationData| unsafe { validate_llmq_callback(boxed(data), context) },
         use_insight_as_backup,
-        base_masternode_list_hash,
-        consensus_type: ConsensusType::LlmqRotation,
+        base_masternode_list_hash
     };
     let extra_share = llmq_rotation_info.extra_share;
     let result_at_tip = boxed(list_diff_result(list_diff_from_ffi(llmq_rotation_info.mn_list_diff_tip), manager, desired_merkle_root));
@@ -375,8 +373,7 @@ pub extern "C" fn llmq_rotation_info_process2(
         should_process_llmq_of_type: |llmq_type: LLMQType| unsafe { should_process_llmq_of_type(llmq_type.into(), context) },
         validate_llmq_callback: |data: types::LLMQValidationData| unsafe { validate_llmq_callback(boxed(data), context) },
         use_insight_as_backup,
-        base_masternode_list_hash,
-        consensus_type: ConsensusType::LlmqRotation,
+        base_masternode_list_hash
     };
     let offset = &mut 0;
     let snapshot_at_h_c = boxed(unwrap_or_qr_result_failure!(types::LLMQSnapshot::from_bytes(message, offset)));
