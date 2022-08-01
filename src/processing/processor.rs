@@ -452,6 +452,7 @@ impl MasternodeProcessor {
                 });
             }
         });
+        println!("classify_quorums: valid: {}, added: {:#?}, quorums: {:#?}", has_valid_quorums, added, quorums, );
         (added, quorums, has_valid_quorums, needed_masternode_lists)
     }
 
