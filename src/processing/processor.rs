@@ -405,15 +405,16 @@ impl MasternodeProcessor {
                                 Vec<UInt256>) {
         let has_valid_quorums = true;
         let mut needed_masternode_lists: Vec<UInt256> = Vec::new();
-        added_quorums
-            .iter()
+        let mut added = added_quorums.clone();
+        added
+            .iter_mut()
             .for_each(|(&llmq_type, llmqs_of_type)| {
                 if self.should_process_quorum(llmq_type) {
-                    (*llmqs_of_type).iter().for_each(|(&llmq_block_hash, quorum)| {
+                    (*llmqs_of_type).iter_mut().for_each(|(&llmq_block_hash, quorum)| {
                         match self.find_masternode_list(llmq_block_hash, &cache.mn_lists) {
                             Some(llmq_masternode_list) =>
                                 self.validate_quorum(
-                                    quorum.clone(),
+                                    quorum,
                                     has_valid_quorums,
                                     llmq_block_hash,
                                     llmq_masternode_list.masternodes,
@@ -456,7 +457,7 @@ impl MasternodeProcessor {
 
     pub fn validate_quorum(
         &self,
-        quorum: masternode::LLMQEntry,
+        quorum: &mut masternode::LLMQEntry,
         has_valid_quorums: bool,
         block_hash: UInt256,
         masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>,
@@ -834,7 +835,7 @@ impl MasternodeProcessor {
     }
 
     /// Calls c++ BLS lib via FFI
-    fn validate_signature(&self, valid_masternodes: Vec<masternode::MasternodeEntry>, mut quorum: masternode::LLMQEntry, block_height: u32, mut has_valid_quorums: bool) {
+    fn validate_signature(&self, valid_masternodes: Vec<masternode::MasternodeEntry>, quorum: &mut masternode::LLMQEntry, block_height: u32, mut has_valid_quorums: bool) {
         let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
             .into_iter()
             .filter_map(|i| match quorum.signers_bitset.bit_is_true_at_le_index(i as u32) {
