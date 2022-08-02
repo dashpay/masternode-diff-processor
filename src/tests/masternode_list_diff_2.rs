@@ -1,4 +1,3 @@
-use dash_spv_models::common::chain_type::ChainType;
 use crate::lib_tests::tests::perform_mnlist_diff_test_for_message;
 
 #[test]
@@ -30,6 +29,5 @@ fn test_masternode_list_diff2() {
         hex_string,
         2,
         verify_string_hashes,
-        verify_string_smle_hashes,
-        ChainType::TestNet);
+        verify_string_smle_hashes);
 }

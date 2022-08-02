@@ -4,11 +4,14 @@ use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::ToFFI;
 use dash_spv_ffi::types;
 use dash_spv_models::common::chain_type::ChainType;
+use dash_spv_models::common::LLMQType;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::ToHex;
-use crate::{LLMQType, MasternodeProcessorCache, mnl_diff_process, process_mnlistdiff_from_message, processor_create_cache, register_processor};
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_for, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, masternode_list_destroy_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
+use crate::{MasternodeProcessorCache, process_mnlistdiff_from_message, processor_create_cache, register_processor};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_for, block_height_lookup_default, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
+
+
 
 #[test]
 fn testnet_llmq_verification() { //testTestnetQuorumVerification
@@ -16,24 +19,30 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
     let merkle_root = [0u8; 32].as_ptr();
     let use_insight_as_backup= false;
     let chain = ChainType::TestNet;
-    let get_block_height_by_hash = |block_hash: UInt256| block_height_for(chain, block_hash.clone().reversed().0.to_hex().as_str());
     let base_masternode_list_hash: *const u8 = null_mut();
     let context = &mut FFIContext { chain, cache: MasternodeProcessorCache::default() } as *mut _ as *mut std::ffi::c_void;
-
-    let result = mnl_diff_process(
+    let cache = unsafe { processor_create_cache() };
+    let processor = unsafe {
+        register_processor(
+            get_merkle_root_by_hash_default,
+            block_height_lookup_default,
+            get_block_hash_by_height_default,
+            get_llmq_snapshot_by_block_hash_default,
+            save_llmq_snapshot_default,
+            get_masternode_list_by_block_hash_from_cache,
+            masternode_list_save_in_cache,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
+            should_process_llmq_of_type,
+            validate_llmq_callback,
+        )
+    };
+    let result = process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
-        base_masternode_list_hash,
-        merkle_root,
         use_insight_as_backup,
-        get_block_height_by_hash,
-        |height| null_mut(),
-        get_llmq_snapshot_by_block_hash_default,
-        |block_hash| null_mut(),
-        masternode_list_destroy_default,
-        add_insight_lookup_default,
-        should_process_llmq_of_type,
-        validate_llmq_callback,
+        processor,
+        cache,
         context
     );
     println!("{:?}", result);
@@ -47,26 +56,12 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
         let masternode_list_119064 = unsafe { *result_119064.masternode_list };
         let masternode_list_119064_decoded = unsafe { masternode_list_119064.decode() };
         let masternode_list_119064_encoded = masternode_list_119064_decoded.encode();
-        let result = mnl_diff_process(
+        let result = process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
-            block_hash_119064.0.as_ptr(),
-            merkle_root,
             use_insight_as_backup,
-            get_block_height_by_hash,
-            |height| null_mut(),
-            get_llmq_snapshot_by_block_hash_default,
-            |hash|
-                if hash == block_hash_119064 {
-                    &masternode_list_119064_encoded as *const types::MasternodeList
-                } else {
-                    null_mut()
-                }
-            ,
-            masternode_list_destroy_default,
-            add_insight_lookup_default,
-            should_process_llmq_of_type,
-            validate_llmq_callback,
+            processor,
+            cache,
             context
         );
         println!("{:?}", result);

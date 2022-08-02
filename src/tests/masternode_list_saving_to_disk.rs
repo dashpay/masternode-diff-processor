@@ -1,30 +1,39 @@
-use std::ptr::null_mut;
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_primitives::crypto::byte_util::UInt256;
 use dash_spv_primitives::hashes::hex::FromHex;
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_llmq_snapshot_by_block_hash_default, masternode_list_destroy_default, message_from_file, should_process_llmq_of_type, validate_llmq_callback};
-use crate::{MasternodeProcessorCache, mnl_diff_process};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_lookup_122088, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, masternode_list_destroy_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
+use crate::{MasternodeProcessorCache, process_mnlistdiff_from_message, processor_create_cache, register_processor};
 
 #[test]
 fn test_mnl_saving_to_disk() { // testMNLSavingToDisk
     let chain = ChainType::TestNet;
     let bytes = message_from_file("ML_at_122088.dat".to_string());
     let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
-    let result = mnl_diff_process(
+
+    let cache = unsafe { processor_create_cache() };
+    let processor = unsafe {
+        register_processor(
+            get_merkle_root_by_hash_default,
+            block_height_lookup_122088,
+            get_block_hash_by_height_default,
+            get_llmq_snapshot_by_block_hash_default,
+            save_llmq_snapshot_default,
+            get_masternode_list_by_block_hash_default,
+            masternode_list_save_default,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
+            should_process_llmq_of_type,
+            validate_llmq_callback,
+        )
+    };
+
+    let result = process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
-        null_mut(),
-        [0u8; 32].as_ptr(),
         false,
-        |block_hash| 122088,
-        |height| null_mut(),
-        get_llmq_snapshot_by_block_hash_default,
-        |block_hash| null_mut(),
-        masternode_list_destroy_default,
-        add_insight_lookup_default,
-        should_process_llmq_of_type,
-        validate_llmq_callback,
+        processor,
+        cache,
         context
     );
     println!("{:?}", result);

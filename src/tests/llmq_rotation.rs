@@ -16,39 +16,46 @@ use dash_spv_primitives::crypto::var_array::VarArray;
 use dash_spv_primitives::crypto::{UInt128, UInt160, UInt384, UInt768};
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 use dash_spv_primitives::util::base58;
-use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, masternode_list_destroy_default, get_masternode_list_by_block_hash_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
-use crate::{llmq_rotation_info_process2, MasternodeProcessorCache, process_mnlistdiff_from_message_internal, process_qrinfo, process_qrinfo_from_message, process_qrinfo_from_message_internal, processor_create_cache, register_processor};
+use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, masternode_list_destroy_default, get_masternode_list_by_block_hash_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback, get_merkle_root_by_hash_default};
+use crate::{MasternodeProcessorCache, process_mnlistdiff_from_message_internal, process_qrinfo, process_qrinfo_from_message, process_qrinfo_from_message_internal, processor_create_cache, register_processor};
 
-#[test]
+// #[test]
+// Deprecated
 fn test_llmq_rotation() {
     let bytes = message_from_file("qrinfo--1-5078.dat".to_string());
     let length = bytes.len();
     let c_array = bytes.as_ptr();
     let merkle_root = [0u8; 32].as_ptr();
     let use_insight_as_backup= false;
-    let base_masternode_list_hash = null_mut();
-    let h = 5078;
     let context = &mut (FFIContext { chain: ChainType::DevNet, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
-    let result = llmq_rotation_info_process2(
-        c_array,
-        length,
-        base_masternode_list_hash,
-        merkle_root,
+    let cache = unsafe { processor_create_cache() };
+    let processor = unsafe {
+        register_processor(
+            get_merkle_root_by_hash_default,
+            block_height_lookup_5078,
+            get_block_hash_by_height_default,
+            get_llmq_snapshot_by_block_hash_default,
+            save_llmq_snapshot_default,
+            get_masternode_list_by_block_hash_default,
+            masternode_list_save_default,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
+            should_process_llmq_of_type,
+            validate_llmq_callback,
+        )
+    };
+    let result = process_qrinfo_from_message(
+        bytes.as_ptr(),
+        bytes.len(),
         use_insight_as_backup,
-        block_height_lookup_5078,
-        get_block_hash_by_height_default,
-        get_llmq_snapshot_by_block_hash_default,
-        get_masternode_list_by_block_hash_default,
-        masternode_list_destroy_default,
-        add_insight_lookup_default,
-        should_process_llmq_of_type,
-        validate_llmq_callback,
-        context,
+        processor,
+        cache,
+        context
     );
     println!("{:?}", result);
     let result_5078 = unsafe { *result };
     let result_at_h = unsafe { *result_5078.result_at_h };
-    assert!(result_at_h.has_found_coinbase, "Did not find coinbase at height {}", h);
+    assert!(result_at_h.has_found_coinbase, "Did not find coinbase at height 5078");
     // turned off on purpose as we don't have the coinbase block
     // assert!(result.valid_coinbase, "Coinbase not valid at height {}", h);
     // assert!(result_at_h.has_valid_mn_list_root, "mn list root not valid at height {}", h);
@@ -58,33 +65,36 @@ fn test_llmq_rotation() {
 #[test]
 fn test_llmq_rotation_2() {
     let bytes = message_from_file("QRINFO_1_8344.dat".to_string());
-    let length = bytes.len();
-    let c_array = bytes.as_ptr();
-    let merkle_root = [0u8; 32].as_ptr();
     let use_insight_as_backup= false;
-    let base_masternode_list_hash = null_mut();
     let context = &mut (FFIContext { chain: ChainType::DevNet, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
     println!("test_llmq_rotation_2 {:?}", bytes.to_hex());
-    let result = llmq_rotation_info_process2(
-        c_array,
-        length,
-        base_masternode_list_hash,
-        merkle_root,
+    let cache = unsafe { processor_create_cache() };
+    let processor = unsafe {
+        register_processor(
+            get_merkle_root_by_hash_default,
+            block_height_lookup_,
+            get_block_hash_by_height_default,
+            get_llmq_snapshot_by_block_hash_default,
+            save_llmq_snapshot_default,
+            get_masternode_list_by_block_hash_default,
+            masternode_list_save_default,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
+            should_process_llmq_of_type,
+            validate_llmq_callback,
+        )
+    };
+    let result = process_qrinfo_from_message(
+        bytes.as_ptr(),
+        bytes.len(),
         use_insight_as_backup,
-        block_height_lookup_,
-        get_block_hash_by_height_default,
-        get_llmq_snapshot_by_block_hash_default,
-        get_masternode_list_by_block_hash_default,
-        masternode_list_destroy_default,
-        add_insight_lookup_default,
-        should_process_llmq_of_type,
-        validate_llmq_callback,
-        context,
+        processor,
+        cache,
+        context
     );
 }
 
 unsafe extern "C" fn block_height_lookup_(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> u32 {
-    //let bh = block_height_for(chain, masternode_list.block_hash.reversed().to_string().as_str());
     let mut h = UInt256(*(block_hash));
     let orig_s = h.clone().to_string();
     let rev = h.reversed();
@@ -114,33 +124,33 @@ unsafe extern "C" fn get_block_hash_by_height_(block_height: u32, _context: *con
     }
 }
 
-#[test]
-fn test_llmq_rotation_3() {
-    let bytes = message_from_file("QRINFO_0125771d2f9419377aebc77e3b880afaa6f3438ccf247919ce4e9bd450a029343fe9f3a8caf3845251ee9002770cb0f2e1c6f6c43fdff480f7a59f8e29c000000001".to_string());
-    let length = bytes.len();
-    let c_array = bytes.as_ptr();
-    let merkle_root = [0u8; 32].as_ptr();
-    let use_insight_as_backup= false;
-    let base_masternode_list_hash = null_mut();
-    let context = &mut (FFIContext { chain: ChainType::DevNet, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
-    println!("test_llmq_rotation_3 {:?}", bytes.to_hex());
-    let result = llmq_rotation_info_process2(
-        c_array,
-        length,
-        base_masternode_list_hash,
-        merkle_root,
-        use_insight_as_backup,
-        block_height_lookup_,
-        get_block_hash_by_height_default,
-        get_llmq_snapshot_by_block_hash_default,
-        get_masternode_list_by_block_hash_default,
-        masternode_list_destroy_default,
-        add_insight_lookup_default,
-        should_process_llmq_of_type,
-        validate_llmq_callback,
-        context,
-    );
-}
+// #[test]
+// fn test_llmq_rotation_3() {
+//     let bytes = message_from_file("QRINFO_0125771d2f9419377aebc77e3b880afaa6f3438ccf247919ce4e9bd450a029343fe9f3a8caf3845251ee9002770cb0f2e1c6f6c43fdff480f7a59f8e29c000000001".to_string());
+//     let length = bytes.len();
+//     let c_array = bytes.as_ptr();
+//     let merkle_root = [0u8; 32].as_ptr();
+//     let use_insight_as_backup= false;
+//     let base_masternode_list_hash = null_mut();
+//     let context = &mut (FFIContext { chain: ChainType::DevNet, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
+//     println!("test_llmq_rotation_3 {:?}", bytes.to_hex());
+//     let result = llmq_rotation_info_process2(
+//         c_array,
+//         length,
+//         base_masternode_list_hash,
+//         merkle_root,
+//         use_insight_as_backup,
+//         block_height_lookup_,
+//         get_block_hash_by_height_default,
+//         get_llmq_snapshot_by_block_hash_default,
+//         get_masternode_list_by_block_hash_default,
+//         masternode_list_destroy_default,
+//         add_insight_lookup_default,
+//         should_process_llmq_of_type,
+//         validate_llmq_callback,
+//         context,
+//     );
+// }
 
 
 unsafe extern "C" fn block_height_lookup_333(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> u32 {
@@ -391,39 +401,48 @@ unsafe extern "C" fn block_height_lookup_333_2(block_hash: *mut [u8; 32], _conte
 
 }
 
+unsafe extern "C" fn get_merkle_root_by_hash_default_333(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const u8 {
+    let merkle_root = UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap();
+    merkle_root.0.as_ptr()
+}
+
+
 #[test]
 fn test_devnet_333() {
     // let bytes = message_from_file("qrinfo--1-20737.dat".to_string());
     let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
     let context = &mut (FFIContext { chain: ChainType::DevNet, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
-    let merkle_root = UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap();
-    let result = llmq_rotation_info_process2(
+    let cache = unsafe { processor_create_cache() };
+    let processor = unsafe {
+        register_processor(
+            get_merkle_root_by_hash_default_333,
+            block_height_lookup_333,
+            get_block_hash_by_height_default,
+            get_llmq_snapshot_by_block_hash_default,
+            save_llmq_snapshot_default,
+            get_masternode_list_by_block_hash_default,
+            masternode_list_save_default,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
+            should_process_llmq_of_type,
+            validate_llmq_callback,
+        )
+    };
+    let result = process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
-        null_mut(),
-        merkle_root.0.as_ptr(),
         false,
-        block_height_lookup_333,
-        get_block_hash_by_height_default,
-        get_llmq_snapshot_by_block_hash_default,
-        get_masternode_list_by_block_hash_default,
-        masternode_list_destroy_default,
-        add_insight_lookup_default,
-        should_process_llmq_of_type,
-        validate_llmq_callback,
+        processor,
+        cache,
         context
     );
-}
-
-unsafe extern "C" fn get_merkle_root_by_hash(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const u8 {
-    UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap().0.as_ptr()
 }
 
 #[test]
 fn test_processor_devnet_333() {
     let processor = unsafe {
         register_processor(
-            get_merkle_root_by_hash,
+            get_merkle_root_by_hash_default_333,
             block_height_lookup_333,
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
@@ -454,7 +473,7 @@ fn test_processor_devnet_333() {
 fn test_processor_devnet_manual() {
     let processor = unsafe {
         register_processor(
-            get_merkle_root_by_hash,
+            get_merkle_root_by_hash_default_333,
             block_height_lookup_333,
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
@@ -628,7 +647,7 @@ fn test_processor_devnet_manual() {
 fn test_processor_devnet_333_2() {
     let processor = unsafe {
         register_processor(
-            get_merkle_root_by_hash,
+            get_merkle_root_by_hash_default_333,
             block_height_lookup_333_2,
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,

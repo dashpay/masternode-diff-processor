@@ -11,11 +11,10 @@ pub mod tests {
     use dash_spv_ffi::ffi::unboxer::unbox_any;
     use dash_spv_ffi::types;
     use dash_spv_models::common::chain_type::ChainType;
-    use dash_spv_models::masternode;
+    use dash_spv_models::common::LLMQType;
     use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384, UInt768};
     use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
-    use crate::{LLMQType, MasternodeProcessorCache};
-    use crate::mnl_diff_process;
+    use crate::{MasternodeProcessorCache, process_mnlistdiff_from_message, processor_create_cache, register_processor};
 
     #[derive(Debug)]
     pub struct FFIContext {
@@ -368,6 +367,9 @@ pub mod tests {
     pub unsafe extern "C" fn block_height_lookup_5078(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> u32 {
         5078
     }
+    pub unsafe extern "C" fn block_height_lookup_122088(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> u32 {
+        122088
+    }
     pub unsafe extern "C" fn get_block_hash_by_height_default(_block_height: u32, _context: *const std::ffi::c_void) -> *const u8 {
         null_mut()
     }
@@ -383,9 +385,32 @@ pub mod tests {
     pub unsafe extern "C" fn get_masternode_list_by_block_hash_default(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const types::MasternodeList {
         null_mut()
     }
+
+    pub unsafe extern "C" fn get_masternode_list_by_block_hash_from_cache(block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> *const types::MasternodeList {
+        let h = UInt256(*(block_hash));
+        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+        if let Some(list) = data.cache.mn_lists.get(&h) {
+            println!("get_masternode_list_by_block_hash_from_cache: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
+            let encoded = list.encode();
+            &encoded as *const types::MasternodeList
+        } else {
+            null_mut()
+        }
+    }
+
     pub unsafe extern "C" fn masternode_list_save_default(_block_hash: *mut [u8; 32], _masternode_list: *const types::MasternodeList, _context: *const std::ffi::c_void) -> bool {
         true
     }
+    pub unsafe extern "C" fn masternode_list_save_in_cache(block_hash: *mut [u8; 32], masternode_list: *const types::MasternodeList, context: *const std::ffi::c_void) -> bool {
+        let h = UInt256(*(block_hash));
+        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+        let masternode_list = *masternode_list;
+        let masternode_list_decoded = masternode_list.decode();
+        println!("masternode_list_save_in_cache: {}", h);
+        data.cache.mn_lists.insert(h, masternode_list_decoded);
+        true
+    }
+
     pub unsafe extern "C" fn masternode_list_destroy_default(_masternode_list: *const types::MasternodeList) {
 
     }
@@ -438,14 +463,13 @@ pub mod tests {
         hex_string: &str,
         should_be_total_transactions: u32,
         verify_string_hashes: Vec<&str>,
-        verify_string_smle_hashes: Vec<&str>,
-        chain: ChainType) {
+        verify_string_smle_hashes: Vec<&str>) {
         println!("perform_mnlist_diff_test_for_message...");
         let bytes = Vec::from_hex(&hex_string).unwrap();
         let length = bytes.len();
         let c_array = bytes.as_ptr();
         let message: &[u8] = unsafe { slice::from_raw_parts(c_array, length) };
-
+        let chain = ChainType::TestNet;
         let merkle_root = [0u8; 32].as_ptr();
         let offset = &mut 0;
         assert!(length - *offset >= 32);
@@ -459,20 +483,30 @@ pub mod tests {
         let use_insight_as_backup = false;
         let base_masternode_list_hash: *const u8 = null_mut();
         let context = &mut FFIContext { chain, cache: MasternodeProcessorCache::default() } as *mut _ as *mut std::ffi::c_void;
-        let result = mnl_diff_process(
+
+        let cache = unsafe { processor_create_cache() };
+        let processor = unsafe {
+            register_processor(
+                get_merkle_root_by_hash_default,
+                block_height_lookup_122088,
+                get_block_hash_by_height_default,
+                get_llmq_snapshot_by_block_hash_default,
+                save_llmq_snapshot_default,
+                get_masternode_list_by_block_hash_default,
+                masternode_list_save_default,
+                masternode_list_destroy_default,
+                add_insight_lookup_default,
+                should_process_llmq_of_type,
+                validate_llmq_callback,
+            )
+        };
+
+        let result = process_mnlistdiff_from_message(
             c_array,
             length,
-            base_masternode_list_hash,
-            merkle_root,
             use_insight_as_backup,
-            |block_hash| 122088,
-            |height| null_mut(),
-            get_llmq_snapshot_by_block_hash_default,
-            |block_hash| null_mut(),
-            masternode_list_destroy_default,
-            add_insight_lookup_default,
-            should_process_llmq_of_type,
-            validate_llmq_callback,
+            processor,
+            cache,
             context
         );
         println!("result: {:?}", result);
@@ -511,54 +545,6 @@ pub mod tests {
         assert_eq!(masternode_list_hashes, verify_smle_hashes, "SMLE transaction hashes");
         assert!(result.has_found_coinbase, "The coinbase was not part of provided hashes");
     }
-
-    pub fn load_masternode_lists_for_files
-    <'a, BlockHeightByHash: Fn(UInt256) -> u32 + Copy>(
-        files: Vec<String>, chain: ChainType,
-        get_block_height_by_hash: BlockHeightByHash)
-        -> (bool, HashMap<UInt256, masternode::MasternodeList>) {
-        let mut lists: HashMap<UInt256, masternode::MasternodeList> = HashMap::new();
-        let mut base_masternode_list_hash: Option<UInt256> = None;
-        for file in files {
-            println!("load_masternode_lists_for_files: [{}]", file);
-            let bytes = message_from_file(file);
-            let result = mnl_diff_process(
-                bytes.as_ptr(),
-                bytes.len(),
-                match base_masternode_list_hash { Some(data) => data.0.as_ptr(), None => null_mut() },
-                [0u8; 32].as_ptr(),
-                false,
-                get_block_height_by_hash,
-                |height| null_mut(),
-                get_llmq_snapshot_by_block_hash_default,
-                |hash| match lists.get(&hash) {
-                    Some(list) => {
-                        let list_encoded = list.clone().encode();
-                        let list_encoded_ref = &list_encoded as *const types::MasternodeList;
-                        println!("masternode_list_lookup___: {} {:#?}", hash, list_encoded_ref);
-                        list_encoded_ref
-                    },
-                    None => null_mut()
-                },
-                masternode_list_destroy_default,
-                add_insight_lookup_default,
-                should_process_llmq_of_type,
-                validate_llmq_callback,
-                &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void
-            );
-            let result = unsafe { *result };
-            println!("result: [{:?}]", result);
-            //println!("MNDiff: {} added, {} modified", result.added_masternodes_count, result.modified_masternodes_count);
-            assert_diff_result(chain, result);
-            let block_hash = UInt256(unsafe { *result.block_hash });
-            let masternode_list = unsafe { *result.masternode_list };
-            let masternode_list_decoded = unsafe { masternode_list.decode() };
-            base_masternode_list_hash = Some(block_hash);
-            lists.insert(block_hash.clone(), masternode_list_decoded);
-        }
-        (true, lists)
-    }
-
 }
 
 
