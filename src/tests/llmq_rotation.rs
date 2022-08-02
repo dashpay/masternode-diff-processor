@@ -1,7 +1,6 @@
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
-use byte::BytesExt;
 use dash_spv_ffi::ffi::boxer::boxed;
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::ToFFI;
@@ -14,7 +13,7 @@ use dash_spv_models::masternode::llmq_entry::{LLMQ_DEFAULT_VERSION, LLMQ_INDEXED
 use dash_spv_primitives::consensus::encode::VarInt;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256};
 use dash_spv_primitives::crypto::var_array::VarArray;
-use dash_spv_primitives::crypto::{UInt128, UInt160, UInt384, UInt768, VarBytes};
+use dash_spv_primitives::crypto::{UInt128, UInt160, UInt384, UInt768};
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 use dash_spv_primitives::util::base58;
 use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, masternode_list_destroy_default, get_masternode_list_by_block_hash_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
@@ -416,23 +415,6 @@ fn test_devnet_333() {
     );
 }
 
-#[test]
-fn parse_partial_merkle_tree() {
-    let bytes = b"01000000010e45d82414995ed1c23f546c35afa316499c09b870dd0a3c15796c4ccfdc00c40101";
-    let merkle_hashes = Vec::from_hex("0e45d82414995ed1c23f546c35afa316499c09b870dd0a3c15796c4ccfdc00c4").unwrap();
-    let merkle_hashes = VarArray::<UInt256>::from_bytes(b"010e45d82414995ed1c23f546c35afa316499c09b870dd0a3c15796c4ccfdc00c4", &mut 0).unwrap();
-    let merkle_flags_bytes = VarBytes::from_bytes(b"0101", &mut 0).unwrap();
-    let offset = &mut 0;
-    let total_transactions = bytes.read_with::<u32>(offset, byte::LE).unwrap();
-    println!("total_transactions: {}", total_transactions);
-    let merkle_hashes_count = bytes.read_with::<dash_spv_primitives::consensus::encode::VarInt>(offset, byte::LE).unwrap().0 as usize;
-    println!("merkle_hashes_count: {}", merkle_hashes_count);
-    let merkle_hashes: &[u8] = bytes.read_with(offset, byte::ctx::Bytes::Len(32 * merkle_hashes_count)).unwrap(); //c400dccf4c6c79153c0add70b8099c4916a3af356c543fc2d15e991424d8450e
-    println!("merkle_hashes: {:?}", merkle_hashes);
-    let merkle_flags_bytes = bytes.read_with::<dash_spv_primitives::crypto::VarBytes>(offset, byte::LE).unwrap();
-    println!("merkle_flags_bytes: {:?}", merkle_flags_bytes);
-}
-
 unsafe extern "C" fn get_merkle_root_by_hash(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const u8 {
     UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap().0.as_ptr()
 }
@@ -468,7 +450,7 @@ fn test_processor_devnet_333() {
         context
     );
 }
-#[test]
+// #[test]
 fn test_processor_devnet_manual() {
     let processor = unsafe {
         register_processor(
