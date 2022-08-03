@@ -501,7 +501,7 @@ fn test_processor_devnet_manual() {
     let tip_llmq_hash_3 = UInt256::from_hex("0e66f9273a2de1905244de60faf55bb6ec795cc6c66607f2c0cf9264e224d02d").unwrap();
     let tip_llmq_hash_4 = UInt256::from_hex("0e66f9273a2de1905244de60faf55bb6ec795cc6c66607f2c0cf9264e224d02d").unwrap();
 
-    let info = types::LLMQRotationInfo {
+    let info = types::QRInfo {
         snapshot_at_h_c: boxed(types::LLMQSnapshot::from_data(vec![1, 1, 1, 1, 1], vec![1, 1], LLMQSnapshotSkipMode::SkipFirst)),
         snapshot_at_h_2c: boxed(types::LLMQSnapshot::from_data(vec![0, 1, 1, 1, 1], vec![], LLMQSnapshotSkipMode::NoSkipping)),
         snapshot_at_h_3c: boxed(types::LLMQSnapshot::from_data(vec![0, 0, 0, 1, 1], vec![], LLMQSnapshotSkipMode::NoSkipping)),

@@ -18,7 +18,7 @@ use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
 use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback, MerkleRootLookup, MasternodeListSave, SaveLLMQSnapshot, GetLLMQSnapshotByBlockHash};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::ToFFI;
-use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_llmq_rotation_info, unbox_llmq_rotation_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_result};
+use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_qr_info, unbox_qr_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_result};
 use dash_spv_ffi::types;
 use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
@@ -44,16 +44,16 @@ pub unsafe extern fn processor_destroy_mnlistdiff_result(result: *mut types::MNL
     unbox_result(result);
 }
 
-/// Destroys types::LLMQRotationInfo
+/// Destroys types::QRInfo
 #[no_mangle]
-pub unsafe extern fn processor_destroy_llmq_rotation_info(result: *mut types::LLMQRotationInfo) {
-    unbox_llmq_rotation_info(result);
+pub unsafe extern fn processor_destroy_qr_info(result: *mut types::QRInfo) {
+    unbox_qr_info(result);
 }
 
 /// Destroys types::LLMQRotationInfoResult
 #[no_mangle]
-pub unsafe extern fn processor_destroy_llmq_rotation_info_result(result: *mut types::LLMQRotationInfoResult) {
-    unbox_llmq_rotation_info_result(result);
+pub unsafe extern fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
+    unbox_qr_info_result(result);
 }
 
 /// Destroys types::LLMQSnapshot
@@ -159,7 +159,7 @@ pub extern "C" fn read_qrinfo(
     message_length: usize,
     processor: *mut MasternodeProcessor,
     context: *const std::ffi::c_void,
-) -> *mut types::LLMQRotationInfo {
+) -> *mut types::QRInfo {
     println!("read_qrinfo.start: {:?}", std::time::Instant::now());
     let processor = unsafe { &mut *processor };
     processor.context = context;
@@ -199,7 +199,7 @@ pub extern "C" fn read_qrinfo(
     for _i in 0..mn_list_diff_list_count {
         mn_list_diff_list_vec.push(boxed(unwrap_or_qr_failure!(read_list_diff(offset)).encode()));
     }
-    let result = types::LLMQRotationInfo {
+    let result = types::QRInfo {
         snapshot_at_h_c,
         snapshot_at_h_2c,
         snapshot_at_h_3c,
@@ -226,12 +226,12 @@ pub extern "C" fn read_qrinfo(
 /// See https://github.com/dashpay/dips/blob/master/dip-0024.md
 #[no_mangle]
 pub extern "C" fn process_qrinfo(
-    info: *mut types::LLMQRotationInfo,
+    info: *mut types::QRInfo,
     use_insight_as_backup: bool,
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
-) -> *mut types::LLMQRotationInfoResult {
+) -> *mut types::QRInfoResult {
     println!("process_qrinfo.start: {:?}", std::time::Instant::now());
     let llmq_rotation_info = unsafe { *info };
     let extra_share = llmq_rotation_info.extra_share;
@@ -257,7 +257,7 @@ pub extern "C" fn process_qrinfo(
             let list_diff = (*(*llmq_rotation_info.mn_list_diff_list.offset(i as isize))).decode();
             boxed(process_list_diff(list_diff))
         }).collect::<Vec<*mut types::MNListDiffResult>>());
-    let result = types::LLMQRotationInfoResult {
+    let result = types::QRInfoResult {
         result_at_tip,
         result_at_h,
         result_at_h_c,
@@ -293,7 +293,7 @@ pub extern "C" fn process_qrinfo_from_message(
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
-) -> *mut types::LLMQRotationInfoResult {
+) -> *mut types::QRInfoResult {
     println!("process_qrinfo_from_message.start: {:?}", std::time::Instant::now());
     let message: &[u8] = unsafe { slice::from_raw_parts(message, message_length as usize) };
     let processor = unsafe { &mut *processor };
@@ -353,7 +353,7 @@ pub extern "C" fn process_qrinfo_from_message(
     } else {
         null_mut()
     };
-    let result = types::LLMQRotationInfoResult {
+    let result = types::QRInfoResult {
         result_at_tip,
         result_at_h,
         result_at_h_c,
