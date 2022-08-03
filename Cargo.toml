@@ -23,7 +23,7 @@ branch = "master"
 version = "0.1.13"
 [dependencies.dash-spv-models]
 git = "https://github.com/pankcuf/dash-spv-models"
-branch = "core-v0.18"
+branch = "master"
 version = "0.1.17"
 [dependencies.dash-spv-ffi]
 git = "https://github.com/pankcuf/dash-spv-ffi"
