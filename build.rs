@@ -18,6 +18,6 @@ fn main() {
     config.parse = parse_config;
     cbindgen::generate_with_config(&crate_dir, config)
         .unwrap()
-        .write_to_file("target/dash_mndiff.h");
+        .write_to_file("target/dash_spv_masternode_processor.h");
 
 }

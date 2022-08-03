@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # run tests
-cargo test --package dash_mndiff --lib tests --verbose
+cargo test --package dash_spv_masternode_processor --lib tests --verbose
 
 # shellcheck disable=SC2181
 if [ $? -eq 0 ]
@@ -16,11 +16,11 @@ fi
 cargo +nightly lipo --release
 cargo +nightly build --target=x86_64-apple-darwin --release
 cargo +nightly build --target=aarch64-apple-darwin --release
-lipo -create target/aarch64-apple-darwin/release/libdash_mndiff.a target/x86_64-apple-darwin/release/libdash_mndiff.a -output target/universal/release/libdash_mndiff_macos.a
+lipo -create target/aarch64-apple-darwin/release/libdash_spv_masternode_processor.a target/x86_64-apple-darwin/release/libdash_spv_masternode_processor.a -output target/universal/release/libdash_spv_masternode_processor_macos.a
 
 # Assume we have structure like this:
 # dash/masternodes-diff-processor/...
 # dash/DashSync/...
-cp -p target/universal/release/libdash_mndiff.a ../DashSync/DashSync/lib/libdash_mndiff_ios.a
-cp -p target/universal/release/libdash_mndiff_macos.a ../DashSync/DashSync/lib/libdash_mndiff_macos.a
-cp -p target/dash_mndiff.h ../DashSync/DashSync/shared/crypto/
+cp -p target/universal/release/libdash_spv_masternode_processor.a ../DashSync/DashSync/lib/libdash_spv_masternode_processor_ios.a
+cp -p target/universal/release/libdash_spv_masternode_processor_macos.a ../DashSync/DashSync/lib/libdash_spv_masternode_processor_macos.a
+cp -p target/dash_spv_masternode_processor.h ../DashSync/DashSync/shared/crypto/

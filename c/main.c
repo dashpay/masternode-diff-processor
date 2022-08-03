@@ -1,7 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "../target/dash_mndiff.h"
+#include "../target/dash_spv_masternode_processor.h"
 #include <assert.h>
 
 uint32_t getBlockHeightByHash(uint8_t (*block_hash)[32], const void *context) {
@@ -66,4 +66,4 @@ int main (void) {
     printf("\n");
 
 }
-// clang c/main.c target/universal/release/libdash_mndiff_macos.a -o test && ./test
+// clang c/main.c target/universal/release/libdash_spv_masternode_processor_macos.a -o test && ./test

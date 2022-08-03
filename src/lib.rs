@@ -18,7 +18,7 @@ use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
 use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback, MerkleRootLookup, MasternodeListSave, SaveLLMQSnapshot, GetLLMQSnapshotByBlockHash};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::ToFFI;
-use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_qr_info, unbox_qr_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_result};
+use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_qr_info, unbox_llmq_rotation_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_result};
 use dash_spv_ffi::types;
 use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
@@ -53,7 +53,7 @@ pub unsafe extern fn processor_destroy_qr_info(result: *mut types::QRInfo) {
 /// Destroys types::LLMQRotationInfoResult
 #[no_mangle]
 pub unsafe extern fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
-    unbox_qr_info_result(result);
+    unbox_llmq_rotation_info_result(result);
 }
 
 /// Destroys types::LLMQSnapshot
