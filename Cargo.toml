@@ -1,6 +1,6 @@
 [package]
 name = "dash-spv-masternode-processor"
-version = "0.2.12"
+version = "0.2.13"
 edition = "2021"
 build = "build.rs"
 publish = false
@@ -20,15 +20,15 @@ byte = "0.2"
 [dependencies.dash-spv-primitives]
 git = "https://github.com/pankcuf/dash-spv-primitives"
 branch = "master"
-version = "0.1.13"
+version = "0.2.1"
 [dependencies.dash-spv-models]
 git = "https://github.com/pankcuf/dash-spv-models"
 branch = "master"
-version = "0.1.17"
+version = "0.2.1"
 [dependencies.dash-spv-ffi]
 git = "https://github.com/pankcuf/dash-spv-ffi"
 branch = "master"
-version = "0.1.17"
+version = "0.2.1"
 
 
 [build-dependencies]
