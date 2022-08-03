@@ -25,10 +25,10 @@ macro_rules! unwrap_or_qr_result_failure {
 
 #[macro_export]
 macro_rules! unwrap_or_qr_processing_failure {
-    ($e: expr) => { unwrap_or_return!($e, || crate::processing::processor::QRProcessingResult::default()) }
+    ($e: expr) => { unwrap_or_return!($e, || crate::processing::QRInfoResult::default()) }
 }
 
 #[macro_export]
 macro_rules! unwrap_or_diff_processing_failure {
-    ($e: expr) => { unwrap_or_return!($e, || crate::processing::processor::DiffProcessingResult::default()) }
+    ($e: expr) => { unwrap_or_return!($e, || crate::processing::MNListDiffResult::default()) }
 }

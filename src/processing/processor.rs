@@ -13,125 +13,12 @@ use dash_spv_primitives::crypto::byte_util::{Reversable, Zeroable};
 use dash_spv_primitives::crypto::data_ops::{Data, inplace_intersection};
 use dash_spv_primitives::crypto::UInt256;
 use dash_spv_primitives::hashes::{Hash, sha256d};
+use crate::processing::MNListDiffResult;
+use crate::processing::processor_cache::MasternodeProcessorCache;
 
 #[derive(Copy, Clone, Debug)]
 pub struct ProcessorContext {
     pub use_insight_as_backup: bool,
-}
-
-
-#[derive(Clone, Debug)]
-pub struct MasternodeProcessorCache {
-    pub llmq_members: BTreeMap<LLMQType, BTreeMap<UInt256, Vec<masternode::MasternodeEntry>>>,
-    pub llmq_indexed_members: BTreeMap<LLMQType, BTreeMap<llmq::LLMQIndexedHash, Vec<masternode::MasternodeEntry>>>,
-    pub mn_lists: BTreeMap<UInt256, masternode::MasternodeList>,
-    pub llmq_snapshots: BTreeMap<UInt256, llmq::LLMQSnapshot>,
-}
-impl Default for MasternodeProcessorCache {
-    fn default() -> Self {
-        MasternodeProcessorCache {
-            llmq_members: BTreeMap::new(),
-            llmq_indexed_members: BTreeMap::new(),
-            llmq_snapshots: BTreeMap::new(),
-            mn_lists: BTreeMap::new(),
-        }
-    }
-}
-
-impl MasternodeProcessorCache {
-    pub fn add_masternode_list(&mut self, block_hash: UInt256, list: masternode::MasternodeList) {
-        self.mn_lists.insert(block_hash, list);
-    }
-    pub fn get_quorum_members_of_type(&mut self, r#type: LLMQType) -> Option<&mut BTreeMap<UInt256, Vec<masternode::MasternodeEntry>>> {
-        self.llmq_members.get_mut(&r#type)
-    }
-
-    pub fn get_indexed_quorum_members_of_type(&mut self, r#type: LLMQType) -> Option<&mut BTreeMap<llmq::LLMQIndexedHash, Vec<masternode::MasternodeEntry>>> {
-        self.llmq_indexed_members.get_mut(&r#type)
-    }
-
-    pub fn get_quorum_members(&mut self, r#type: LLMQType, block_hash: UInt256) -> Option<Vec<masternode::MasternodeEntry>> {
-        let map_by_type_opt = self.get_quorum_members_of_type(r#type);
-        if map_by_type_opt.is_some() {
-            if let Some(members) = map_by_type_opt.as_ref().unwrap().get(&block_hash) {
-                return Some(members.clone());
-            }
-        }
-        None
-    }
-}
-
-#[derive(Debug)]
-pub struct DiffProcessingResult {
-    pub block_hash: UInt256,
-    pub has_found_coinbase: bool, //1 byte
-    pub has_valid_coinbase: bool, //1 byte
-    pub has_valid_mn_list_root: bool, //1 byte
-    pub has_valid_llmq_list_root: bool, //1 byte
-    pub has_valid_quorums: bool, //1 byte
-    pub masternode_list: masternode::MasternodeList,
-    pub added_masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>,
-    pub modified_masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>,
-    pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
-    pub needed_masternode_lists:  Vec<UInt256>,
-}
-
-impl Default for DiffProcessingResult {
-    fn default() -> Self {
-        Self {
-            block_hash: UInt256::MAX,
-            has_found_coinbase: false,
-            has_valid_coinbase: false,
-            has_valid_mn_list_root: false,
-            has_valid_llmq_list_root: false,
-            has_valid_quorums: false,
-            masternode_list: masternode::MasternodeList::default(),
-            added_masternodes: Default::default(),
-            modified_masternodes: Default::default(),
-            added_quorums: Default::default(),
-            needed_masternode_lists: vec![]
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct QRProcessingResult {
-    pub result_at_tip: DiffProcessingResult,
-    pub result_at_h: DiffProcessingResult,
-    pub result_at_h_c: DiffProcessingResult,
-    pub result_at_h_2c: DiffProcessingResult,
-    pub result_at_h_3c: DiffProcessingResult,
-    pub result_at_h_4c: Option<DiffProcessingResult>,
-
-    pub snapshot_at_h_c: llmq::LLMQSnapshot,
-    pub snapshot_at_h_2c: llmq::LLMQSnapshot,
-    pub snapshot_at_h_3c: llmq::LLMQSnapshot,
-    pub snapshot_at_h_4c: Option<llmq::LLMQSnapshot>,
-
-    pub extra_share: bool,
-    pub last_quorum_per_index: Vec<masternode::LLMQEntry>,
-    pub quorum_snapshot_list: Vec<llmq::LLMQSnapshot>,
-    pub mn_list_diff_list: Vec<DiffProcessingResult>,
-}
-impl Default for QRProcessingResult {
-    fn default() -> Self {
-        Self {
-            result_at_tip: DiffProcessingResult::default(),
-            result_at_h: DiffProcessingResult::default(),
-            result_at_h_c: DiffProcessingResult::default(),
-            result_at_h_2c: DiffProcessingResult::default(),
-            result_at_h_3c: DiffProcessingResult::default(),
-            result_at_h_4c: None,
-            snapshot_at_h_c: llmq::LLMQSnapshot::default(),
-            snapshot_at_h_2c: llmq::LLMQSnapshot::default(),
-            snapshot_at_h_3c: llmq::LLMQSnapshot::default(),
-            snapshot_at_h_4c: None,
-            extra_share: false,
-            last_quorum_per_index: vec![],
-            quorum_snapshot_list: vec![],
-            mn_list_diff_list: vec![]
-        }
-    }
 }
 
 // https://github.com/rust-lang/rfcs/issues/2770
@@ -234,7 +121,7 @@ impl MasternodeProcessor {
                                                         list_diff: llmq::MNListDiff,
                                                         processor_context: ProcessorContext,
                                                         cache: &mut MasternodeProcessorCache)
-                                                        -> DiffProcessingResult {
+                                                        -> MNListDiffResult {
         let base_list = self.find_masternode_list(list_diff.base_block_hash, &cache.mn_lists);
         self.get_list_diff_result_internal(base_list, list_diff, processor_context, cache)
     }
@@ -280,7 +167,7 @@ impl MasternodeProcessor {
                                        list_diff: llmq::MNListDiff,
                                        processor_context: ProcessorContext,
                                        cache: &mut MasternodeProcessorCache)
-                                       -> DiffProcessingResult {
+                                       -> MNListDiffResult {
         let block_hash = list_diff.block_hash;
         let block_height = list_diff.block_height;
         println!("get_list_diff_result_internal: {}: {}", block_height, block_hash);
@@ -315,7 +202,7 @@ impl MasternodeProcessor {
         let merkle_tree = common::MerkleTree { tree_element_count: list_diff.total_transactions, hashes: list_diff.merkle_hashes.1, flags: list_diff.merkle_flags };
         self.cache_masternode_list(block_hash, masternode_list.clone(), cache);
 
-        DiffProcessingResult {
+        MNListDiffResult {
             block_hash,
             has_found_coinbase: coinbase_transaction.has_found_coinbase(&merkle_tree.hashes),
             has_valid_coinbase: merkle_tree.has_root(self.lookup_merkle_root_by_hash(block_hash).unwrap_or(UInt256::MIN)),

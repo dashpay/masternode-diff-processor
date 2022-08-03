@@ -3,14 +3,14 @@ use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_primitives::crypto::byte_util::UInt256;
 use dash_spv_primitives::hashes::hex::FromHex;
 use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_lookup_122088, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, masternode_list_destroy_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
-use crate::{MasternodeProcessorCache, process_mnlistdiff_from_message, processor_create_cache, register_processor};
+use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
+use crate::processing::MasternodeProcessorCache;
 
 #[test]
 fn test_mnl_saving_to_disk() { // testMNLSavingToDisk
     let chain = ChainType::TestNet;
     let bytes = message_from_file("ML_at_122088.dat".to_string());
     let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
-
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
@@ -27,7 +27,6 @@ fn test_mnl_saving_to_disk() { // testMNLSavingToDisk
             validate_llmq_callback,
         )
     };
-
     let result = process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),

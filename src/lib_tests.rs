@@ -14,7 +14,8 @@ pub mod tests {
     use dash_spv_models::common::LLMQType;
     use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384, UInt768};
     use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
-    use crate::{MasternodeProcessorCache, process_mnlistdiff_from_message, processor_create_cache, register_processor};
+    use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
+    use crate::processing::processor_cache::MasternodeProcessorCache;
 
     #[derive(Debug)]
     pub struct FFIContext {

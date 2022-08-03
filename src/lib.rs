@@ -24,7 +24,7 @@ use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable};
-use crate::processing::processor::{MasternodeProcessor, MasternodeProcessorCache, DiffProcessingResult, ProcessorContext, QRProcessingResult};
+use crate::processing::{MasternodeProcessor, MNListDiffResult, MasternodeProcessorCache, ProcessorContext, QRInfoResult};
 
 /// Destroys anonymous internal holder for UInt256
 #[no_mangle]
@@ -384,7 +384,7 @@ pub fn process_mnlistdiff_from_message_internal(
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
-) -> DiffProcessingResult {
+) -> MNListDiffResult {
     let processor = unsafe { &mut *processor };
     let cache = unsafe { &mut *cache };
     println!("process_mnlistdiff_from_message_internal.start: {:?}", std::time::Instant::now());
@@ -407,7 +407,7 @@ pub fn process_qrinfo_from_message_internal(
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
-) -> QRProcessingResult {
+) -> QRInfoResult {
     println!("process_qrinfo_from_message: {:?} {:?}", processor, cache);
     let message: &[u8] = unsafe { slice::from_raw_parts(message, message_length as usize) };
     let processor = unsafe { &mut *processor };
@@ -461,7 +461,7 @@ pub fn process_qrinfo_from_message_internal(
         quorum_snapshot_list.push(unwrap_or_qr_processing_failure!(read_snapshot(offset)));
     }
     let mn_list_diff_list_count = unwrap_or_qr_processing_failure!(read_var_int(offset)).0 as usize;
-    let mut mn_list_diff_list: Vec<DiffProcessingResult> = Vec::with_capacity(mn_list_diff_list_count);
+    let mut mn_list_diff_list: Vec<MNListDiffResult> = Vec::with_capacity(mn_list_diff_list_count);
 
     for _i in 0..mn_list_diff_list_count {
         let list_diff = unwrap_or_qr_processing_failure!(read_list_diff(offset));
@@ -480,7 +480,7 @@ pub fn process_qrinfo_from_message_internal(
     let result_at_h = process_list_diff(diff_h);
     let result_at_tip = process_list_diff(diff_tip);
 
-    QRProcessingResult {
+    QRInfoResult {
         result_at_tip,
         result_at_h,
         result_at_h_c,
