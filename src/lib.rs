@@ -26,66 +26,53 @@ use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable};
 use crate::processing::processor::{MasternodeProcessor, MasternodeProcessorCache, DiffProcessingResult, ProcessorContext, QRProcessingResult};
 
+/// Destroys anonymous internal holder for UInt256
 #[no_mangle]
-pub unsafe extern fn mndiff_block_hash_destroy(block_hash: *mut [u8; 32]) {
+pub unsafe extern fn processor_destroy_block_hash(block_hash: *mut [u8; 32]) {
     unbox_any(block_hash);
 }
 
+/// Destroys types::LLMQValidationData
 #[no_mangle]
-pub unsafe extern fn mndiff_quorum_validation_data_destroy(data: *mut types::LLMQValidationData) {
+pub unsafe extern fn processor_destroy_llmq_validation_data(data: *mut types::LLMQValidationData) {
     unbox_llmq_validation_data(data);
 }
 
+/// Destroys types::MNListDiffResult
 #[no_mangle]
-pub unsafe extern fn mndiff_destroy(result: *mut types::MNListDiffResult) {
+pub unsafe extern fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
     unbox_result(result);
 }
 
-/// Core v0.18
-
+/// Destroys types::LLMQRotationInfo
 #[no_mangle]
-pub unsafe extern fn llmq_rotation_info_destroy(result: *mut types::LLMQRotationInfo) {
+pub unsafe extern fn processor_destroy_llmq_rotation_info(result: *mut types::LLMQRotationInfo) {
     unbox_llmq_rotation_info(result);
 }
 
+/// Destroys types::LLMQRotationInfoResult
 #[no_mangle]
-pub unsafe extern fn llmq_rotation_info_result_destroy(result: *mut types::LLMQRotationInfoResult) {
+pub unsafe extern fn processor_destroy_llmq_rotation_info_result(result: *mut types::LLMQRotationInfoResult) {
     unbox_llmq_rotation_info_result(result);
 }
 
+/// Destroys types::LLMQSnapshot
 #[no_mangle]
-pub unsafe extern fn llmq_snapshot_destroy(result: *mut types::LLMQSnapshot) {
+pub unsafe extern fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
     unbox_llmq_snapshot(result);
 }
 
+/// Destroys types::Block
 #[no_mangle]
-pub unsafe extern fn block_destroy(result: *mut types::Block) {
+pub unsafe extern fn processor_destroy_block(result: *mut types::Block) {
     unbox_block(result);
 }
 
 
 
 
-/// Experimental FFI API with saving context
 
-pub fn get_mnl_diff_processing_result_internal(
-    message_arr: *const u8,
-    message_length: usize,
-    use_insight_as_backup: bool,
-    processor: &mut MasternodeProcessor,
-    cache: &mut MasternodeProcessorCache,
-    context: *const std::ffi::c_void
-)
-    -> DiffProcessingResult {
-    println!("get_mnl_diff_processing_result_internal.start: {:?}", std::time::Instant::now());
-    processor.context = context;
-    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
-    let processor_context = ProcessorContext { use_insight_as_backup };
-    let list_diff = unwrap_or_diff_processing_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
-    let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, processor_context, cache);
-    println!("get_mnl_diff_processing_result_internal.finish: {:?}", std::time::Instant::now());
-    result
-}
+/// Register all the callbacks for use across FFI
 
 #[no_mangle]
 pub unsafe extern fn register_processor(
@@ -118,12 +105,14 @@ pub unsafe extern fn register_processor(
     boxed(processor)
 }
 
+/// Unregister all the callbacks for use across FFI
 #[no_mangle]
 pub unsafe extern fn unregister_processor(processor: *mut MasternodeProcessor) {
     println!("unregister_processor: {:?}", processor);
     unbox_any(processor);
 }
 
+/// Initialize opaque cache to store needed information between FFI calls
 #[no_mangle]
 pub unsafe extern fn processor_create_cache() -> *mut MasternodeProcessorCache {
     let cache = MasternodeProcessorCache::default();
@@ -131,12 +120,16 @@ pub unsafe extern fn processor_create_cache() -> *mut MasternodeProcessorCache {
     boxed(cache)
 }
 
+/// Destroy opaque cache
 #[no_mangle]
 pub unsafe extern fn processor_destroy_cache(cache: *mut MasternodeProcessorCache) {
     println!("processor_destroy_cache: {:?}", cache);
     let cache = unbox_any(cache);
 }
 
+/// Read and process message received as a response for 'GETMNLISTDIFF' call
+/// Here we calculate quorums according to Core v0.17
+/// See https://github.com/dashpay/dips/blob/master/dip-0004.md
 #[no_mangle]
 pub extern "C" fn process_mnlistdiff_from_message(
     message_arr: *const u8,
@@ -146,7 +139,7 @@ pub extern "C" fn process_mnlistdiff_from_message(
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
 ) -> *mut types::MNListDiffResult {
-    println!("process_mnlistdiff_from_message.start: {:?} {:?}", std::time::Instant::now(), processor);
+    println!("process_mnlistdiff_from_message.start: {:?}", std::time::Instant::now());
     let cache = unsafe { &mut *cache };
     let processor = unsafe { &mut *processor };
     processor.context = context;
@@ -159,6 +152,7 @@ pub extern "C" fn process_mnlistdiff_from_message(
 
 }
 
+/// Read message received as a response for 'GETQRINFO' call
 #[no_mangle]
 pub extern "C" fn read_qrinfo(
     message_arr: *const u8,
@@ -166,10 +160,9 @@ pub extern "C" fn read_qrinfo(
     processor: *mut MasternodeProcessor,
     context: *const std::ffi::c_void,
 ) -> *mut types::LLMQRotationInfo {
-    println!("process_llmq_rotation_info_read: {:?}", processor);
+    println!("read_qrinfo.start: {:?}", std::time::Instant::now());
     let processor = unsafe { &mut *processor };
     processor.context = context;
-    println!("process_llmq_rotation_info_read --: {:?} {:?}", processor, context);
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let block_height_lookup = |hash| processor.lookup_block_height_by_hash(hash);
     let read_list_diff = |offset: &mut usize| llmq::MNListDiff::new(message, offset, block_height_lookup);
@@ -206,7 +199,7 @@ pub extern "C" fn read_qrinfo(
     for _i in 0..mn_list_diff_list_count {
         mn_list_diff_list_vec.push(boxed(unwrap_or_qr_failure!(read_list_diff(offset)).encode()));
     }
-    boxed(types::LLMQRotationInfo {
+    let result = types::LLMQRotationInfo {
         snapshot_at_h_c,
         snapshot_at_h_2c,
         snapshot_at_h_3c,
@@ -224,9 +217,13 @@ pub extern "C" fn read_qrinfo(
         quorum_snapshot_list: boxed_vec(quorum_snapshot_list_vec),
         mn_list_diff_list_count,
         mn_list_diff_list: boxed_vec(mn_list_diff_list_vec),
-    })
+    };
+    println!("read_qrinfo.finish: {:?}", std::time::Instant::now());
+    boxed(result)
 }
 
+/// Here we calculate quorums according to Core v0.18
+/// See https://github.com/dashpay/dips/blob/master/dip-0024.md
 #[no_mangle]
 pub extern "C" fn process_qrinfo(
     info: *mut types::LLMQRotationInfo,
@@ -235,14 +232,13 @@ pub extern "C" fn process_qrinfo(
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
 ) -> *mut types::LLMQRotationInfoResult {
-    println!("process_llmq_rotation_info_result: processor: {:?} cache: {:?}", processor, cache);
+    println!("process_qrinfo.start: {:?}", std::time::Instant::now());
     let llmq_rotation_info = unsafe { *info };
     let extra_share = llmq_rotation_info.extra_share;
     let processor_context = ProcessorContext { use_insight_as_backup };
     let processor = unsafe { &mut *processor };
     processor.context = context;
     let cache = unsafe { &mut *cache };
-    println!("process_llmq_rotation_info_result --: {:?} {:?} {:?}", processor, processor.context, cache);
     let mut process_list_diff = |list_diff: llmq::MNListDiff| processor.get_list_diff_result_with_base_lookup(list_diff, processor_context, cache);
     let mut get_list_diff_result = |list_diff: *mut types::MNListDiff| boxed(process_list_diff(unsafe { (*(list_diff)).decode() }));
     let result_at_tip = get_list_diff_result(llmq_rotation_info.mn_list_diff_tip);
@@ -261,8 +257,7 @@ pub extern "C" fn process_qrinfo(
             let list_diff = (*(*llmq_rotation_info.mn_list_diff_list.offset(i as isize))).decode();
             boxed(process_list_diff(list_diff))
         }).collect::<Vec<*mut types::MNListDiffResult>>());
-
-    boxed(types::LLMQRotationInfoResult {
+    let result = types::LLMQRotationInfoResult {
         result_at_tip,
         result_at_h,
         result_at_h_c,
@@ -280,10 +275,16 @@ pub extern "C" fn process_qrinfo(
         quorum_snapshot_list: llmq_rotation_info.quorum_snapshot_list,
         mn_list_diff_list_count,
         mn_list_diff_list,
-    })
+    };
+    println!("process_qrinfo.finish: {:?}", std::time::Instant::now());
+    boxed(result)
 }
 
 
+/// Here we read & calculate quorums according to Core v0.18
+/// See https://github.com/dashpay/dips/blob/master/dip-0024.md
+/// The reason behind we have multiple methods for this is that:
+/// in objc we need 2 separate calls to incorporate additional logics between reading and processing
 #[no_mangle]
 pub extern "C" fn process_qrinfo_from_message(
     message: *const u8,
@@ -293,12 +294,11 @@ pub extern "C" fn process_qrinfo_from_message(
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
 ) -> *mut types::LLMQRotationInfoResult {
-    println!("process_qrinfo_from_message: {:?} {:?}", processor, cache);
+    println!("process_qrinfo_from_message.start: {:?}", std::time::Instant::now());
     let message: &[u8] = unsafe { slice::from_raw_parts(message, message_length as usize) };
     let processor = unsafe { &mut *processor };
     processor.context = context;
     let cache = unsafe { &mut *cache };
-    println!("process_qrinfo_from_message --: {:?} {:?} {:?}", processor, processor.context, cache);
     let processor_context = ProcessorContext { use_insight_as_backup };
     let offset = &mut 0;
     let read_list_diff = |offset: &mut usize|
@@ -353,7 +353,7 @@ pub extern "C" fn process_qrinfo_from_message(
     } else {
         null_mut()
     };
-    boxed(types::LLMQRotationInfoResult {
+    let result = types::LLMQRotationInfoResult {
         result_at_tip,
         result_at_h,
         result_at_h_c,
@@ -371,13 +371,12 @@ pub extern "C" fn process_qrinfo_from_message(
         quorum_snapshot_list_count,
         mn_list_diff_list,
         mn_list_diff_list_count
-    })
+    };
+    println!("process_qrinfo_from_message.finish: {:?}", std::time::Instant::now());
+    boxed(result)
 }
 
-
-
-
-
+/// This is convenience Core v0.17 method for use in tests which doesn't involve cross-FFI calls
 pub fn process_mnlistdiff_from_message_internal(
     message_arr: *const u8,
     message_length: usize,
@@ -386,19 +385,21 @@ pub fn process_mnlistdiff_from_message_internal(
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
 ) -> DiffProcessingResult {
-    println!("process_mnlistdiff_from_message_internal: {:?}", processor);
-    unsafe {
-        get_mnl_diff_processing_result_internal(
-            message_arr,
-            message_length,
-            use_insight_as_backup,
-            &mut *processor,
-            &mut *cache,
-            context
-        )
-    }
+    let processor = unsafe { &mut *processor };
+    let cache = unsafe { &mut *cache };
+    println!("process_mnlistdiff_from_message_internal.start: {:?}", std::time::Instant::now());
+    processor.context = context;
+    let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
+    let processor_context = ProcessorContext { use_insight_as_backup };
+    let list_diff = unwrap_or_diff_processing_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
+    let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, processor_context, cache);
+    println!("process_mnlistdiff_from_message_internal.finish: {:?}", std::time::Instant::now());
+    result
+
+
 }
 
+/// This is convenience Core v0.18 method for use in tests which doesn't involve cross-FFI calls
 pub fn process_qrinfo_from_message_internal(
     message: *const u8,
     message_length: usize,
