@@ -218,7 +218,7 @@ pub extern "C" fn read_qrinfo(
         mn_list_diff_list_count,
         mn_list_diff_list: boxed_vec(mn_list_diff_list_vec),
     };
-    println!("read_qrinfo.finish: {:?}", std::time::Instant::now());
+    println!("read_qrinfo.finish: {:?} {:#?}", std::time::Instant::now(), result);
     boxed(result)
 }
 
@@ -276,7 +276,7 @@ pub extern "C" fn process_qrinfo(
         mn_list_diff_list_count,
         mn_list_diff_list,
     };
-    println!("process_qrinfo.finish: {:?}", std::time::Instant::now());
+    println!("process_qrinfo.finish: {:?} {:#?}", std::time::Instant::now(), result);
     boxed(result)
 }
 
@@ -393,7 +393,7 @@ pub fn process_mnlistdiff_from_message_internal(
     let processor_context = ProcessorContext { use_insight_as_backup };
     let list_diff = unwrap_or_diff_processing_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
     let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, processor_context, cache);
-    println!("process_mnlistdiff_from_message_internal.finish: {:?}", std::time::Instant::now());
+    println!("process_mnlistdiff_from_message_internal.finish: {:?} {:#?}", std::time::Instant::now(), result);
     result
 
 

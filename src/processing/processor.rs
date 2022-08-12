@@ -132,8 +132,8 @@ impl MasternodeProcessor {
                                        processor_context: ProcessorContext,
                                        cache: &mut MasternodeProcessorCache)
         -> types::MNListDiffResult {
-
         let result = self.get_list_diff_result_internal(base_list, list_diff, processor_context, cache);
+        // println!("get_list_diff_result: {:#?}", result);
         types::MNListDiffResult {
             block_hash: boxed(result.block_hash.0),
             has_found_coinbase: result.has_found_coinbase,
@@ -339,7 +339,7 @@ impl MasternodeProcessor {
                 });
             }
         });
-        println!("classify_quorums: valid: {}, added: {:#?}, quorums: {:#?}", has_valid_quorums, added, quorums, );
+        //println!("classify_quorums: valid: {}, added: {:#?}, quorums: {:#?}", has_valid_quorums, added, quorums, );
         (added, quorums, has_valid_quorums, needed_masternode_lists)
     }
 
@@ -427,7 +427,7 @@ impl MasternodeProcessor {
     }
 
     // Same as in LLMQEntry
-// TODO: migrate to LLMQEntry
+    // TODO: migrate to LLMQEntry
     fn build_llmq_modifier(llmq_type: LLMQType, block_hash: UInt256) -> UInt256 {
         let mut buffer: Vec<u8> = Vec::with_capacity(33);
         let offset: &mut usize = &mut 0;
@@ -620,7 +620,7 @@ impl MasternodeProcessor {
         rotated_members
     }
 
-    // Determine masternodes which is responsible for signing at this quorum index
+    /// Determine masternodes which is responsible for signing at this quorum index
     pub fn get_rotated_masternodes_for_quorum(&self,
                                               llmq_type: LLMQType,
                                               llmq_base_hash: UInt256,
@@ -664,7 +664,8 @@ impl MasternodeProcessor {
         }
     }
 
-
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    /// FFI-callbacks
     ///////////////////////////////////////////////////////////////////////////////////////////
 
     pub fn lookup_masternode_list(&self, block_hash: UInt256) -> Option<masternode::MasternodeList> {
@@ -697,10 +698,6 @@ impl MasternodeProcessor {
         unsafe { (self.get_block_height_by_hash)(boxed(block_hash.0), self.context) }
     }
 
-    // pub fn lookup_snapshot(&self, block_height: u32) -> Option<llmq::LLMQSnapshot> {
-    //     callbacks::lookup_snapshot(block_height, |h: u32| unsafe { (self.get_llmq_snapshot_by_block_height)(h, self.context) })
-    // }
-    //
     pub fn lookup_snapshot_by_block_hash(&self, block_hash: UInt256) -> Option<llmq::LLMQSnapshot> {
         callbacks::lookup_snapshot_by_block_hash(block_hash, |h: UInt256| unsafe { (self.get_llmq_snapshot_by_block_hash)(boxed(h.0), self.context) })
     }
