@@ -153,7 +153,7 @@ impl MasternodeProcessor {
                                        -> MNListDiffResult {
         let block_hash = list_diff.block_hash;
         let block_height = list_diff.block_height;
-        println!("get_list_diff_result_internal: {}: {}", block_height, block_hash);
+        //println!("get_list_diff_result_internal: {}: {}", block_height, block_hash);
         let (base_masternodes,
             base_quorums) = match base_list {
             Some(list) => (list.masternodes, list.quorums),
@@ -437,7 +437,7 @@ impl MasternodeProcessor {
             None => panic!("missing hash for block at height: {}", work_block_height),
             Some(work_block_hash) =>
                 match self.find_snapshot(work_block_hash, &cached_snapshots) {
-                    None => panic!("missing snapshot for block at height: {}", work_block_height),
+                    None => panic!("missing snapshot for block at height: {}: {}", work_block_height, work_block_hash),
                     Some(snapshot) => {
                         let quorum_modifier = Self::build_llmq_modifier(llmq_type, work_block_hash);
                         let (used_at_h, unused_at_h) = match self.find_masternode_list(work_block_hash, &cached_lists) {
@@ -688,6 +688,11 @@ impl MasternodeProcessor {
     pub fn save_snapshot(&self, block_hash: UInt256, snapshot: llmq::LLMQSnapshot) -> bool {
         println!("save_snapshot: {}: {:?} {:?}", block_hash, snapshot, self.context);
         unsafe { (self.save_llmq_snapshot)(boxed(block_hash.0), boxed(snapshot.encode()), self.context) }
+    }
+
+    pub fn save_snapshot_raw(&self, block_hash: UInt256, snapshot: types::LLMQSnapshot) -> bool {
+        println!("save_snapshot_raw: {}: {:?} {:?}", block_hash, snapshot, self.context);
+        unsafe { (self.save_llmq_snapshot)(boxed(block_hash.0), boxed(snapshot), self.context) }
     }
 
     pub fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Option<UInt256> {

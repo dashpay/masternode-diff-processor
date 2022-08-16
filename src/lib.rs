@@ -240,23 +240,54 @@ pub extern "C" fn process_qrinfo(
     processor.context = context;
     let cache = unsafe { &mut *cache };
     let mut process_list_diff = |list_diff: llmq::MNListDiff| processor.get_list_diff_result_with_base_lookup(list_diff, processor_context, cache);
-    let mut get_list_diff_result = |list_diff: *mut types::MNListDiff| boxed(process_list_diff(unsafe { (*(list_diff)).decode() }));
-    let result_at_tip = get_list_diff_result(llmq_rotation_info.mn_list_diff_tip);
-    let result_at_h = get_list_diff_result(llmq_rotation_info.mn_list_diff_at_h);
-    let result_at_h_c = get_list_diff_result(llmq_rotation_info.mn_list_diff_at_h_c);
-    let result_at_h_2c = get_list_diff_result(llmq_rotation_info.mn_list_diff_at_h_2c);
-    let result_at_h_3c = get_list_diff_result(llmq_rotation_info.mn_list_diff_at_h_3c);
-    let result_at_h_4c = if extra_share { get_list_diff_result(llmq_rotation_info.mn_list_diff_at_h_4c) } else { null_mut() };
+    let decode_diff = |list_diff: *mut types::MNListDiff| unsafe { (*(list_diff)).decode() };
+    let decode_snapshot = |snapshot: *mut types::LLMQSnapshot| unsafe { (*(snapshot)).decode() };
+    let mut get_list_diff_result = |list_diff: llmq::MNListDiff| boxed(process_list_diff(list_diff));
+
+    let diff_at_tip = decode_diff(llmq_rotation_info.mn_list_diff_tip);
+    let diff_at_h = decode_diff(llmq_rotation_info.mn_list_diff_at_h);
+    let diff_at_h_c = decode_diff(llmq_rotation_info.mn_list_diff_at_h_c);
+    let diff_at_h_2c = decode_diff(llmq_rotation_info.mn_list_diff_at_h_2c);
+    let diff_at_h_3c = decode_diff(llmq_rotation_info.mn_list_diff_at_h_3c);
+    let diff_at_h_4c = if extra_share { Some(decode_diff(llmq_rotation_info.mn_list_diff_at_h_4c)) } else { None };
+
+    let snapshot_at_h_c = decode_snapshot(llmq_rotation_info.snapshot_at_h_c);
+    let snapshot_at_h_2c = decode_snapshot(llmq_rotation_info.snapshot_at_h_2c);
+    let snapshot_at_h_3c = decode_snapshot(llmq_rotation_info.snapshot_at_h_3c);
+    let snapshot_at_h_4c = if extra_share { Some(decode_snapshot(llmq_rotation_info.snapshot_at_h_4c)) } else { None };
+
+    processor.save_snapshot(diff_at_h_c.block_hash, snapshot_at_h_c.clone());
+    processor.save_snapshot(diff_at_h_2c.block_hash, snapshot_at_h_2c.clone());
+    processor.save_snapshot(diff_at_h_3c.block_hash, snapshot_at_h_3c.clone());
+
+    if extra_share {
+        processor.save_snapshot(diff_at_h_4c.as_ref().unwrap().block_hash, snapshot_at_h_4c.as_ref().unwrap().clone());
+    }
+
+    let result_at_tip = get_list_diff_result(diff_at_tip);
+    let result_at_h = get_list_diff_result(diff_at_h);
+    let result_at_h_c = get_list_diff_result(diff_at_h_c);
+    let result_at_h_2c = get_list_diff_result(diff_at_h_2c);
+    let result_at_h_3c = get_list_diff_result(diff_at_h_3c);
+    let result_at_h_4c = if extra_share { get_list_diff_result(diff_at_h_4c.unwrap()) } else { null_mut() };
+
     let last_quorum_per_index_count = llmq_rotation_info.last_quorum_per_index_count;
     let quorum_snapshot_list_count = llmq_rotation_info.quorum_snapshot_list_count;
     let mn_list_diff_list_count = llmq_rotation_info.mn_list_diff_list_count;
     let last_quorum_per_index = llmq_rotation_info.last_quorum_per_index;
-    let mn_list_diff_list = boxed_vec((0..mn_list_diff_list_count)
-        .into_iter()
-        .map(|i| unsafe {
-            let list_diff = (*(*llmq_rotation_info.mn_list_diff_list.offset(i as isize))).decode();
-            boxed(process_list_diff(list_diff))
-        }).collect::<Vec<*mut types::MNListDiffResult>>());
+
+    let mut diffs = Vec::<*mut types::MNListDiffResult>::with_capacity(mn_list_diff_list_count);
+    for i in 0..mn_list_diff_list_count {
+        let list_diff_encoded = unsafe { *llmq_rotation_info.mn_list_diff_list.offset(i as isize) };
+        let list_diff = decode_diff(list_diff_encoded);
+        let list_diff_block_hash = list_diff.block_hash;
+        let list_diff_result = get_list_diff_result(list_diff);
+        diffs.push(list_diff_result);
+        let snapshot_encoded = unsafe { *llmq_rotation_info.quorum_snapshot_list.offset(i as isize) };
+        let snapshot_encoded = decode_snapshot(snapshot_encoded);
+        processor.save_snapshot(list_diff_block_hash, snapshot_encoded);
+    }
+
     let result = types::QRInfoResult {
         result_at_tip,
         result_at_h,
@@ -274,7 +305,7 @@ pub extern "C" fn process_qrinfo(
         quorum_snapshot_list_count,
         quorum_snapshot_list: llmq_rotation_info.quorum_snapshot_list,
         mn_list_diff_list_count,
-        mn_list_diff_list,
+        mn_list_diff_list: boxed_vec(diffs),
     };
     println!("process_qrinfo.finish: {:?} {:#?}", std::time::Instant::now(), result);
     boxed(result)
