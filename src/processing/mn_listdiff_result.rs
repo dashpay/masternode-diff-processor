@@ -6,7 +6,7 @@ use dash_spv_models::common::LLMQType;
 use dash_spv_models::masternode::{LLMQEntry, MasternodeEntry, MasternodeList};
 use dash_spv_primitives::crypto::UInt256;
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct MNListDiffResult {
     pub block_hash: UInt256,
     pub has_found_coinbase: bool, //1 byte
@@ -20,6 +20,27 @@ pub struct MNListDiffResult {
     pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
     pub needed_masternode_lists:  Vec<UInt256>,
 }
+
+impl std::fmt::Debug for MNListDiffResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MNListDiffResult")
+            .field("block_hash", &self.block_hash)
+            .field("validation", &format!("{}{}{}{}{}",
+                                          if self.has_found_coinbase { 1 } else { 0 },
+                                          if self.has_valid_coinbase { 1 } else { 0 },
+                                          if self.has_valid_mn_list_root { 1 } else { 0 },
+                                          if self.has_valid_llmq_list_root { 1 } else { 0 },
+                                          if self.has_valid_quorums { 1 } else { 0 }
+            ))
+            .field("masternode_list", &self.masternode_list)
+            .field("added_masternodes", &self.added_masternodes)
+            .field("modified_masternodes", &self.modified_masternodes)
+            .field("added_quorums", &self.added_quorums)
+            .field("needed_masternode_lists", &self.needed_masternode_lists)
+            .finish()
+    }
+}
+
 
 impl Default for MNListDiffResult {
     fn default() -> Self {

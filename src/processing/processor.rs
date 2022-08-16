@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
 use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
-use dash_spv_ffi::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
+use dash_spv_ffi::ffi::to::ToFFI;
 use dash_spv_ffi::types;
 use dash_spv_ffi::ffi::callbacks;
 use dash_spv_models::common::{LLMQParams, LLMQType};
