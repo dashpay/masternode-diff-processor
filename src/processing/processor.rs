@@ -133,25 +133,8 @@ impl MasternodeProcessor {
                                        cache: &mut MasternodeProcessorCache)
         -> types::MNListDiffResult {
         let result = self.get_list_diff_result_internal(base_list, list_diff, processor_context, cache);
-        // println!("get_list_diff_result: {:#?}", result);
-        types::MNListDiffResult {
-            block_hash: boxed(result.block_hash.0),
-            has_found_coinbase: result.has_found_coinbase,
-            has_valid_coinbase: result.has_valid_coinbase,
-            has_valid_mn_list_root: result.has_valid_mn_list_root,
-            has_valid_llmq_list_root: result.has_valid_llmq_list_root,
-            has_valid_quorums: result.has_valid_quorums,
-            masternode_list: boxed(result.masternode_list.encode()),
-            added_masternodes: encode_masternodes_map(&result.added_masternodes),
-            added_masternodes_count: result.added_masternodes.len(),
-            modified_masternodes: encode_masternodes_map(&result.modified_masternodes),
-            modified_masternodes_count: result.modified_masternodes.len(),
-            added_llmq_type_maps: encode_quorums_map(&result.added_quorums),
-            added_llmq_type_maps_count: result.added_quorums.len(),
-            needed_masternode_lists: boxed_vec(result.needed_masternode_lists.iter().map(|h|boxed(h.0)).collect()),
-            needed_masternode_lists_count: result.needed_masternode_lists.len()
-        }
-
+        println!("get_list_diff_result: {:#?}", result);
+        result.encode()
     }
 
     fn cache_masternode_list(&self, block_hash: UInt256, list: masternode::MasternodeList, cache: &mut MasternodeProcessorCache) {
