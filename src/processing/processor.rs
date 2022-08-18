@@ -431,36 +431,37 @@ impl MasternodeProcessor {
         match self.lookup_block_hash_by_height(work_block_height) {
             None => panic!("missing hash for block at height: {}", work_block_height),
             Some(work_block_hash) =>
-                match self.find_snapshot(work_block_hash, &cached_snapshots) {
-                    None => panic!("missing snapshot for block at height: {}: {}", work_block_height, work_block_hash),
-                    Some(snapshot) => {
-                        let quorum_modifier = Self::build_llmq_modifier(llmq_type, work_block_hash);
-                        let (used_at_h, unused_at_h) = match self.find_masternode_list(work_block_hash, &cached_lists) {
-                            None => panic!("missing masternode_list for block at height: {} with hash: {}", work_block_height, work_block_hash),
-                            Some(masternode_list) => {
-                                let nodes = Self::valid_masternodes_for(
-                                    masternode_list.masternodes,
-                                    quorum_modifier,
-                                    quorum_count,
-                                    work_block_height);
-                                let mut i: u32 = 0;
-                                // TODO: partition with enumeration doesn't work here (why?)
-                                nodes
-                                    .into_iter()
-                                    .partition(|_| {
-                                        let is_true = snapshot.member_list.bit_is_true_at_le_index(i);
-                                        i += 1;
-                                        is_true
-                                    })
-                            }
-                        };
-                        let mut sorted_combined_mns_list = Self::valid_masternodes_for_quorum(
-                            unused_at_h, quorum_modifier, quorum_count, work_block_height);
-                        sorted_combined_mns_list.extend(Self::valid_masternodes_for_quorum(
-                            used_at_h, quorum_modifier, quorum_count, work_block_height));
+                if let Some(snapshot) = self.find_snapshot(work_block_hash, &cached_snapshots) {
+                    let quorum_modifier = Self::build_llmq_modifier(llmq_type, work_block_hash);
+                    let (used_at_h, unused_at_h) = match self.find_masternode_list(work_block_hash, &cached_lists) {
+                        None => panic!("missing masternode_list for block at height: {} with hash: {}", work_block_height, work_block_hash),
+                        Some(masternode_list) => {
+                            let nodes = Self::valid_masternodes_for(
+                                masternode_list.masternodes,
+                                quorum_modifier,
+                                quorum_count,
+                                work_block_height);
+                            let mut i: u32 = 0;
+                            // TODO: partition with enumeration doesn't work here, so need to change
+                            // nodes.into_iter().enumerate().partition(|&(i, _)| snapshot.member_list.bit_is_true_at_le_index(i as u32))
+                            nodes
+                                .into_iter()
+                                .partition(|_| {
+                                    let is_true = snapshot.member_list.bit_is_true_at_le_index(i);
+                                    i += 1;
+                                    is_true
+                                })
+                        }
+                    };
+                    let mut sorted_combined_mns_list = Self::valid_masternodes_for_quorum(
+                        unused_at_h, quorum_modifier, quorum_count, work_block_height);
+                    sorted_combined_mns_list.extend(Self::valid_masternodes_for_quorum(
+                        used_at_h, quorum_modifier, quorum_count, work_block_height));
 
-                        snapshot.apply_skip_strategy(sorted_combined_mns_list, quorum_count as usize, quarter_size)
-                    }
+                    snapshot.apply_skip_strategy(sorted_combined_mns_list, quorum_count as usize, quarter_size)
+                } else {
+                    println!("missing snapshot for block at height: {}: {}", work_block_height, work_block_hash);
+                    vec![]
                 }
         }
     }
