@@ -340,12 +340,7 @@ impl MasternodeProcessor {
         let quorum_count = quorum.llmq_type.size();
         println!("validate_quorum: {}:{} {:?}:{}:{:?}", block_height, block_hash, quorum.llmq_type, quorum.llmq_hash, quorum.index);
         let valid_masternodes = if quorum.index.is_some() {
-            self.get_rotated_masternodes_for_quorum(
-                quorum.llmq_type,
-                block_hash,
-                block_height,
-                cache
-            )
+            self.get_rotated_masternodes_for_quorum(quorum.llmq_type, block_hash, block_height, cache)
         } else {
             Self::valid_masternodes_for(masternodes, quorum_modifier, quorum_count, block_height)
         };
@@ -489,7 +484,7 @@ impl MasternodeProcessor {
             Some(work_block_hash) =>
                 match self.lookup_masternode_list(work_block_hash) {
                     None => panic!("missing masternode list for height: {} / -8:{}", quorum_base_block_height, work_block_height),
-                    Some(masternode_list) => {
+                    Some(masternode_list) =>
                         if masternode_list.masternodes.len() < quarter_size {
                             quarter_quorum_members
                         } else {
@@ -547,7 +542,7 @@ impl MasternodeProcessor {
                             });
                             quarter_quorum_members
                         }
-                    }
+
                 }
         }
     }
@@ -606,13 +601,13 @@ impl MasternodeProcessor {
     /// Determine masternodes which is responsible for signing at this quorum index
     pub fn get_rotated_masternodes_for_quorum(&self,
                                               llmq_type: LLMQType,
-                                              llmq_base_hash: UInt256,
-                                              llmq_base_block_height: u32,
+                                              block_hash: UInt256,
+                                              block_height: u32,
                                               cache: &mut MasternodeProcessorCache)
                                               -> Vec<masternode::MasternodeEntry> {
         let map_by_type_opt = cache.llmq_members.get_mut(&llmq_type);
         if map_by_type_opt.is_some() {
-            if let Some(members) = map_by_type_opt.as_ref().unwrap().get(&llmq_base_hash) {
+            if let Some(members) = map_by_type_opt.as_ref().unwrap().get(&block_hash) {
                 return members.clone();
             }
         } else {
@@ -620,26 +615,25 @@ impl MasternodeProcessor {
         }
         let map_by_type = cache.llmq_members.get_mut(&llmq_type).unwrap();
         let llmq_params = llmq_type.params();
-        let quorum_index = llmq_base_block_height % llmq_params.dkg_params.interval;
-        let cycle_base_height = llmq_base_block_height - quorum_index;
+        let quorum_index = block_height % llmq_params.dkg_params.interval;
+        let cycle_base_height = block_height - quorum_index;
         match self.lookup_block_hash_by_height(cycle_base_height) {
             None => panic!("missing hash for block at height: {}", cycle_base_height),
             Some(cycle_base_hash) => {
                 let map_by_type_indexed_opt = cache.llmq_indexed_members.get_mut(&llmq_type);
                 if let Some(ref map_by_type_indexed) = map_by_type_indexed_opt {
                     if let Some(members) = map_by_type_indexed.get(&llmq::LLMQIndexedHash::new(cycle_base_hash, quorum_index)) {
-                        map_by_type.insert(llmq_base_hash, members.clone());
+                        map_by_type.insert(block_hash, members.clone());
                         return members.clone();
                     }
                 }
                 let rotated_members = self.rotate_members(cycle_base_height, llmq_params, &cache.mn_lists, &cache.llmq_snapshots);
-
                 let map_indexed_quorum_members_of_type = map_by_type_indexed_opt.unwrap();
                 rotated_members.iter().enumerate().for_each(|(i, members)| {
                     map_indexed_quorum_members_of_type.insert(llmq::LLMQIndexedHash::new(cycle_base_hash, i as u32), members.clone());
                 });
                 if let Some(members) = rotated_members.get(quorum_index as usize) {
-                    map_by_type.insert(llmq_base_hash, members.clone());
+                    map_by_type.insert(block_hash, members.clone());
                     return members.clone();
                 }
                 vec![]
