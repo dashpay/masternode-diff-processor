@@ -25,7 +25,8 @@ pub struct ProcessorContext {
 #[repr(C)]
 pub struct MasternodeProcessor {
     /// External Masternode Manager Diff Message Context
-    pub context: *const std::ffi::c_void,
+    pub opaque_context: *const std::ffi::c_void,
+    pub processor_context: ProcessorContext,
     pub get_block_height_by_hash: GetBlockHeightByHash,
     pub get_merkle_root_by_hash: MerkleRootLookup,
     get_block_hash_by_height: GetBlockHashByHeight,
@@ -41,7 +42,7 @@ pub struct MasternodeProcessor {
 impl std::fmt::Debug for MasternodeProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MasternodeProcessor")
-            .field("context", &self.context)
+            .field("context", &self.opaque_context)
             .finish()
     }
 }
@@ -58,8 +59,9 @@ impl MasternodeProcessor {
         destroy_masternode_list: MasternodeListDestroy,
         add_insight: AddInsightBlockingLookup,
         should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-        validate_llmq: ValidateLLMQCallback/*,
-        context: *const std::ffi::c_void*/) -> Self {
+        validate_llmq: ValidateLLMQCallback,
+        processor_context: ProcessorContext/*,
+        opaque_context: *const std::ffi::c_void*/) -> Self {
         Self {
             get_merkle_root_by_hash,
             get_block_height_by_hash,
@@ -72,11 +74,12 @@ impl MasternodeProcessor {
             add_insight,
             should_process_llmq_of_type,
             validate_llmq,
-            context: null(),
+            opaque_context: null(),
+            processor_context
         }
     }
 
-    pub(crate) fn find_masternode_list(&self, block_hash: UInt256, cached_lists: &BTreeMap<UInt256, masternode::MasternodeList>) -> Option<masternode::MasternodeList> {
+    pub(crate) fn find_masternode_list(&self, block_hash: UInt256, cached_lists: &BTreeMap<UInt256, masternode::MasternodeList>, unknown_lists: &mut Vec<UInt256>) -> Option<masternode::MasternodeList> {
         if let Some(cached) = cached_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
             println!("find_masternode_list: (Cached) {}", block_hash);
@@ -87,6 +90,14 @@ impl MasternodeProcessor {
             Some(looked)
         } else {
             println!("find_masternode_list: (None) {}", block_hash);
+            if self.lookup_block_height_by_hash(block_hash) != u32::MAX {
+                unknown_lists.push(block_hash);
+            } else if self.processor_context.use_insight_as_backup {
+                self.add_insight(block_hash);
+                if self.lookup_block_height_by_hash(block_hash) != u32::MAX {
+                    unknown_lists.push(block_hash);
+                }
+            }
             None
         }
     }
@@ -105,34 +116,41 @@ impl MasternodeProcessor {
         }
     }
 
-
+    pub(crate) fn find_block_hash_and_masternode_list(&self, block_height: u32, cached_lists: &BTreeMap<UInt256, masternode::MasternodeList>, unknown_lists: &mut Vec<UInt256>) -> (UInt256, masternode::MasternodeList) {
+        match self.lookup_block_hash_by_height(block_height) {
+            None => panic!("missing block for height: {}", block_height),
+            Some(block_hash) =>
+                match self.find_masternode_list(block_hash, &cached_lists, unknown_lists) {
+                    None => panic!("missing masternode list for height: {}", block_height),
+                    Some(masternode_list) => (block_hash, masternode_list)
+                }
+        }
+    }
 
     pub(crate) fn get_list_diff_result_with_base_lookup(&self,
                                        list_diff: llmq::MNListDiff,
-                                       processor_context: ProcessorContext,
                                        cache: &mut MasternodeProcessorCache)
                                        -> types::MNListDiffResult {
-        let base_list = self.find_masternode_list(list_diff.base_block_hash, &cache.mn_lists);
-        self.get_list_diff_result(base_list, list_diff, processor_context, cache)
+        let base_block_hash = list_diff.base_block_hash;
+        let base_list = self.find_masternode_list(base_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists);
+        self.get_list_diff_result(base_list, list_diff, cache)
     }
 
 
     pub(crate) fn get_list_diff_result_internal_with_base_lookup(&self,
                                                         list_diff: llmq::MNListDiff,
-                                                        processor_context: ProcessorContext,
                                                         cache: &mut MasternodeProcessorCache)
                                                         -> MNListDiffResult {
-        let base_list = self.find_masternode_list(list_diff.base_block_hash, &cache.mn_lists);
-        self.get_list_diff_result_internal(base_list, list_diff, processor_context, cache)
+        let base_list = self.find_masternode_list(list_diff.base_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists);
+        self.get_list_diff_result_internal(base_list, list_diff, cache)
     }
 
     pub(crate) fn get_list_diff_result(&self,
                                        base_list: Option<masternode::MasternodeList>,
                                        list_diff: llmq::MNListDiff,
-                                       processor_context: ProcessorContext,
                                        cache: &mut MasternodeProcessorCache)
         -> types::MNListDiffResult {
-        let result = self.get_list_diff_result_internal(base_list, list_diff, processor_context, cache);
+        let result = self.get_list_diff_result_internal(base_list, list_diff, cache);
         println!("get_list_diff_result: {:#?}", result);
         result.encode()
     }
@@ -148,7 +166,6 @@ impl MasternodeProcessor {
     pub(crate) fn get_list_diff_result_internal(&self,
                                        base_list: Option<masternode::MasternodeList>,
                                        list_diff: llmq::MNListDiff,
-                                       processor_context: ProcessorContext,
                                        cache: &mut MasternodeProcessorCache)
                                        -> MNListDiffResult {
         let block_hash = list_diff.block_hash;
@@ -173,18 +190,17 @@ impl MasternodeProcessor {
         //println!("MNListDiffResult.from_diff.base_quorums: \n[{:?}] \nadded_quorums:\n [{:?}]", base_quorums.clone(), list_diff.added_quorums.clone());
         let (added_quorums,
             quorums,
-            has_valid_quorums,
-            needed_masternode_lists) = self.classify_quorums(
+            has_valid_quorums) = self.classify_quorums(
             base_quorums,
             list_diff.added_quorums,
             list_diff.deleted_quorums,
-            processor_context,
             cache
         );
         let masternode_list = masternode::MasternodeList::new(masternodes, quorums, block_hash, block_height, quorums_active);
         let merkle_tree = common::MerkleTree { tree_element_count: list_diff.total_transactions, hashes: list_diff.merkle_hashes.1, flags: list_diff.merkle_flags };
         self.cache_masternode_list(block_hash, masternode_list.clone(), cache);
-
+        let needed_masternode_lists = cache.needed_masternode_lists.clone();
+        cache.needed_masternode_lists.clear();
         MNListDiffResult {
             block_hash,
             has_found_coinbase: coinbase_transaction.has_found_coinbase(&merkle_tree.hashes),
@@ -267,39 +283,25 @@ impl MasternodeProcessor {
                             base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
                             added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
                             deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
-                            processor_context: ProcessorContext,
                             cache: &mut MasternodeProcessorCache)
                             -> (BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
                                 BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
-                                bool,
-                                Vec<UInt256>) {
+                                bool) {
         let has_valid_quorums = true;
-        let mut needed_masternode_lists: Vec<UInt256> = Vec::new();
         let mut added = added_quorums.clone();
         added
             .iter_mut()
             .for_each(|(&llmq_type, llmqs_of_type)| {
                 if self.should_process_quorum(llmq_type) {
                     (*llmqs_of_type).iter_mut().for_each(|(&llmq_block_hash, quorum)| {
-                        match self.find_masternode_list(llmq_block_hash, &cache.mn_lists) {
-                            Some(llmq_masternode_list) =>
-                                self.validate_quorum(
-                                    quorum,
-                                    has_valid_quorums,
-                                    llmq_block_hash,
-                                    llmq_masternode_list.masternodes,
-                                    processor_context,
-                                    cache
-                                ),
-                            None =>
-                                if self.lookup_block_height_by_hash(llmq_block_hash) != u32::MAX {
-                                    needed_masternode_lists.push(llmq_block_hash);
-                                } else if processor_context.use_insight_as_backup {
-                                    self.add_insight(llmq_block_hash);
-                                    if self.lookup_block_height_by_hash(llmq_block_hash) != u32::MAX {
-                                        needed_masternode_lists.push(llmq_block_hash);
-                                    }
-                                }
+                        if let Some(masternode::MasternodeList { masternodes, .. }) = self.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists) {
+                            self.validate_quorum(
+                                quorum,
+                                has_valid_quorums,
+                                llmq_block_hash,
+                                masternodes,
+                                cache
+                            )
                         }
                     });
                 }
@@ -323,7 +325,7 @@ impl MasternodeProcessor {
             }
         });
         //println!("classify_quorums: valid: {}, added: {:#?}, quorums: {:#?}", has_valid_quorums, added, quorums, );
-        (added, quorums, has_valid_quorums, needed_masternode_lists)
+        (added, quorums, has_valid_quorums)
     }
 
     pub fn validate_quorum(
@@ -332,7 +334,6 @@ impl MasternodeProcessor {
         has_valid_quorums: bool,
         block_hash: UInt256,
         masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>,
-        processor_context: ProcessorContext,
         cache: &mut MasternodeProcessorCache,
     ) {
         let block_height = self.lookup_block_height_by_hash(block_hash);
@@ -420,7 +421,9 @@ impl MasternodeProcessor {
         llmq_params: LLMQParams,
         quorum_base_block_height: u32,
         cached_lists: &BTreeMap<UInt256, masternode::MasternodeList>,
-        cached_snapshots: &BTreeMap<UInt256, llmq::LLMQSnapshot>)
+        cached_snapshots: &BTreeMap<UInt256, llmq::LLMQSnapshot>,
+        unknown_lists: &mut Vec<UInt256>
+    )
         -> Vec<Vec<masternode::MasternodeEntry>> {
         let work_block_height = quorum_base_block_height - 8;
         let llmq_type = llmq_params.r#type;
@@ -428,41 +431,27 @@ impl MasternodeProcessor {
         let quorum_size = llmq_params.size;
         let quarter_size = (quorum_size / 4) as usize;
         // Quorum members dichotomy in snapshot
-        match self.lookup_block_hash_by_height(work_block_height) {
-            None => panic!("missing hash for block at height: {}", work_block_height),
-            Some(work_block_hash) =>
-                if let Some(snapshot) = self.find_snapshot(work_block_hash, &cached_snapshots) {
-                    let quorum_modifier = Self::build_llmq_modifier(llmq_type, work_block_hash);
-                    let (used_at_h, unused_at_h) = match self.find_masternode_list(work_block_hash, &cached_lists) {
-                        None => panic!("missing masternode_list for block at height: {} with hash: {}", work_block_height, work_block_hash),
-                        Some(masternode_list) => {
-                            let nodes = Self::valid_masternodes_for(
-                                masternode_list.masternodes,
-                                quorum_modifier,
-                                quorum_count,
-                                work_block_height);
-                            let mut i: u32 = 0;
-                            // TODO: partition with enumeration doesn't work here, so need to change
-                            // nodes.into_iter().enumerate().partition(|&(i, _)| snapshot.member_list.bit_is_true_at_le_index(i as u32))
-                            nodes
-                                .into_iter()
-                                .partition(|_| {
-                                    let is_true = snapshot.member_list.bit_is_true_at_le_index(i);
-                                    i += 1;
-                                    is_true
-                                })
-                        }
-                    };
-                    let mut sorted_combined_mns_list = Self::valid_masternodes_for_quorum(
-                        unused_at_h, quorum_modifier, quorum_count, work_block_height);
-                    sorted_combined_mns_list.extend(Self::valid_masternodes_for_quorum(
-                        used_at_h, quorum_modifier, quorum_count, work_block_height));
-
-                    snapshot.apply_skip_strategy(sorted_combined_mns_list, quorum_count as usize, quarter_size)
-                } else {
-                    println!("missing snapshot for block at height: {}: {}", work_block_height, work_block_hash);
-                    vec![]
-                }
+        let (work_block_hash, masternode_list) = self.find_block_hash_and_masternode_list(work_block_height, cached_lists, unknown_lists);
+        if let Some(snapshot) = self.find_snapshot(work_block_hash, &cached_snapshots) {
+            let mut i: u32 = 0;
+            // TODO: partition with enumeration doesn't work here, so need to change
+            // nodes.into_iter().enumerate().partition(|&(i, _)| snapshot.member_list.bit_is_true_at_le_index(i as u32))
+            let quorum_modifier = Self::build_llmq_modifier(llmq_type, work_block_hash);
+            let (used_at_h, unused_at_h) = Self::valid_masternodes_for( masternode_list.masternodes, quorum_modifier, quorum_count, work_block_height)
+                .into_iter()
+                .partition(|_| {
+                    let is_true = snapshot.member_list.bit_is_true_at_le_index(i);
+                    i += 1;
+                    is_true
+                });
+            let mut sorted_combined_mns_list = Self::valid_masternodes_for_quorum(
+                unused_at_h, quorum_modifier, quorum_count, work_block_height);
+            sorted_combined_mns_list.extend(Self::valid_masternodes_for_quorum(
+                used_at_h, quorum_modifier, quorum_count, work_block_height));
+            snapshot.apply_skip_strategy(sorted_combined_mns_list, quorum_count as usize, quarter_size)
+        } else {
+            println!("missing snapshot for block at height: {}: {}", work_block_height, work_block_hash);
+            vec![]
         }
     }
 
@@ -471,7 +460,10 @@ impl MasternodeProcessor {
         &self,
         params: LLMQParams,
         quorum_base_block_height: u32,
-        previous_quarters: [Vec<Vec<masternode::MasternodeEntry>>; 3])
+        previous_quarters: [Vec<Vec<masternode::MasternodeEntry>>; 3],
+        cached_lists: &BTreeMap<UInt256, masternode::MasternodeList>,
+        unknown_lists: &mut Vec<UInt256>
+    )
         -> Vec<Vec<masternode::MasternodeEntry>> {
         let quorum_count = params.signing_active_quorum_count;
         let num_quorums = quorum_count as usize;
@@ -479,72 +471,63 @@ impl MasternodeProcessor {
         let quorum_size = params.size as usize;
         let quarter_size = quorum_size / 4;
         let work_block_height = quorum_base_block_height - 8;
-
-        match self.lookup_block_hash_by_height(work_block_height) {
-            None => panic!("missing block for height: {}", work_block_height),
-            Some(work_block_hash) =>
-                match self.lookup_masternode_list(work_block_hash) {
-                    None => panic!("missing masternode list for height: {} / -8:{}", quorum_base_block_height, work_block_height),
-                    Some(masternode_list) =>
-                        if masternode_list.masternodes.len() < quarter_size {
-                            quarter_quorum_members
-                        } else {
-                            let mut masternodes_used_at_h = Vec::<masternode::MasternodeEntry>::new();
-                            let mut masternodes_unused_at_h = Vec::<masternode::MasternodeEntry>::new();
-                            let mut masternodes_used_at_h_index = Vec::<Vec<masternode::MasternodeEntry>>::with_capacity(num_quorums);
-                            (0..num_quorums).into_iter().for_each(|i| {
-                                // for quarters h - c, h -2c, h -3c
-                                previous_quarters.iter().for_each(|q| {
-                                    q.get(i).unwrap().iter().for_each(|node| {
-                                        if node.is_valid {
-                                            masternodes_used_at_h.push(node.clone());
-                                            masternodes_used_at_h_index[i].push(node.clone());
-                                        }
-                                    });
-                                });
-                            });
-                            masternode_list.masternodes.into_values().for_each(|mn| {
-                                if mn.is_valid &&
-                                    masternodes_unused_at_h
-                                        .iter()
-                                        .filter(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash)
-                                        .count() == 0 {
-                                    masternodes_unused_at_h.push(mn);
-                                }
-                            });
-                            let modifier = Self::build_llmq_modifier(params.r#type, work_block_hash);
-                            let mut sorted_combined_mns_list = Self::valid_masternodes_for_quorum(masternodes_unused_at_h, modifier, quorum_count, work_block_height);
-                            sorted_combined_mns_list.extend(Self::valid_masternodes_for_quorum(masternodes_used_at_h, modifier, quorum_count, work_block_height));
-                            let mut skip_list = Vec::<usize>::new();
-                            let mut first_skipped_index = 0;
-                            let mut idx = 0;
-                            (0..num_quorums).for_each(|i| {
-                                while quarter_quorum_members.get(i).unwrap().len() < quarter_size {
-                                    let mn = sorted_combined_mns_list.get(idx).unwrap();
-                                    if masternodes_used_at_h_index
-                                        .get(i)
-                                        .unwrap()
-                                        .into_iter()
-                                        .filter(|&node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash)
-                                        .count() == 0 {
-                                        quarter_quorum_members.get_mut(i).unwrap().push(mn.clone());
-                                    } else {
-                                        let skip_index = idx - first_skipped_index;
-                                        if first_skipped_index == 0 {
-                                            first_skipped_index = idx;
-                                        }
-                                        skip_list.push(idx);
-                                    }
-                                    idx += 1;
-                                    if idx == sorted_combined_mns_list.len() {
-                                        idx = 0;
-                                    }
-                                }
-                            });
-                            quarter_quorum_members
+        let (work_block_hash, masternode_list) = self.find_block_hash_and_masternode_list(work_block_height, cached_lists, unknown_lists);
+        if masternode_list.masternodes.len() < quarter_size {
+            quarter_quorum_members
+        } else {
+            let mut masternodes_used_at_h = Vec::<masternode::MasternodeEntry>::new();
+            let mut masternodes_unused_at_h = Vec::<masternode::MasternodeEntry>::new();
+            let mut masternodes_used_at_h_index = Vec::<Vec<masternode::MasternodeEntry>>::with_capacity(num_quorums);
+            (0..num_quorums).into_iter().for_each(|i| {
+                // for quarters h - c, h -2c, h -3c
+                previous_quarters.iter().for_each(|q| {
+                    q.get(i).unwrap().iter().for_each(|node| {
+                        if node.is_valid {
+                            masternodes_used_at_h.push(node.clone());
+                            masternodes_used_at_h_index[i].push(node.clone());
                         }
-
+                    });
+                });
+            });
+            masternode_list.masternodes.into_values().for_each(|mn| {
+                if mn.is_valid &&
+                    masternodes_unused_at_h
+                        .iter()
+                        .filter(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash)
+                        .count() == 0 {
+                    masternodes_unused_at_h.push(mn);
                 }
+            });
+            let modifier = Self::build_llmq_modifier(params.r#type, work_block_hash);
+            let mut sorted_combined_mns_list = Self::valid_masternodes_for_quorum(masternodes_unused_at_h, modifier, quorum_count, work_block_height);
+            sorted_combined_mns_list.extend(Self::valid_masternodes_for_quorum(masternodes_used_at_h, modifier, quorum_count, work_block_height));
+            let mut skip_list = Vec::<usize>::new();
+            let mut first_skipped_index = 0;
+            let mut idx = 0;
+            (0..num_quorums).for_each(|i| {
+                while quarter_quorum_members.get(i).unwrap().len() < quarter_size {
+                    let mn = sorted_combined_mns_list.get(idx).unwrap();
+                    if masternodes_used_at_h_index
+                        .get(i)
+                        .unwrap()
+                        .into_iter()
+                        .filter(|&node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash)
+                        .count() == 0 {
+                        quarter_quorum_members.get_mut(i).unwrap().push(mn.clone());
+                    } else {
+                        let skip_index = idx - first_skipped_index;
+                        if first_skipped_index == 0 {
+                            first_skipped_index = idx;
+                        }
+                        skip_list.push(idx);
+                    }
+                    idx += 1;
+                    if idx == sorted_combined_mns_list.len() {
+                        idx = 0;
+                    }
+                }
+            });
+            quarter_quorum_members
         }
     }
 
@@ -562,24 +545,29 @@ impl MasternodeProcessor {
 
     fn rotate_members(&self, cycle_quorum_base_block_height: u32, llmq_params: LLMQParams,
                       cached_lists: &BTreeMap<UInt256, masternode::MasternodeList>,
-                      cached_snapshots: &BTreeMap<UInt256, llmq::LLMQSnapshot>) -> Vec<Vec<masternode::MasternodeEntry>> {
+                      cached_snapshots: &BTreeMap<UInt256, llmq::LLMQSnapshot>,
+                        unknown_lists: &mut Vec<UInt256>
+    ) -> Vec<Vec<masternode::MasternodeEntry>> {
         let num_quorums = llmq_params.signing_active_quorum_count as usize;
         let cycle_length = llmq_params.dkg_params.interval;
         let prev_q_h_m_c = self.quorum_quarter_members_by_snapshot(
             llmq_params,
             cycle_quorum_base_block_height - cycle_length,
             cached_lists,
-            cached_snapshots);
+            cached_snapshots,
+            unknown_lists);
         let prev_q_h_m_2c = self.quorum_quarter_members_by_snapshot(
             llmq_params,
             cycle_quorum_base_block_height - 2 * cycle_length,
             cached_lists,
-            cached_snapshots);
+            cached_snapshots,
+            unknown_lists);
         let prev_q_h_m_3c = self.quorum_quarter_members_by_snapshot(
             llmq_params,
             cycle_quorum_base_block_height - 3 * cycle_length,
             cached_lists,
-            cached_snapshots);
+            cached_snapshots,
+            unknown_lists);
 
         let mut rotated_members = Vec::<Vec<masternode::MasternodeEntry>>::with_capacity(num_quorums);
         let new_quarter_members = self.new_quorum_quarter_members(
@@ -589,7 +577,9 @@ impl MasternodeProcessor {
                 prev_q_h_m_c.clone(),
                 prev_q_h_m_2c.clone(),
                 prev_q_h_m_3c.clone()
-            ]);
+            ],
+            cached_lists,
+            unknown_lists);
         (0..num_quorums).for_each(|i| {
             Self::add_quorum_members_from_quarter(&mut rotated_members, &prev_q_h_m_3c, i);
             Self::add_quorum_members_from_quarter(&mut rotated_members, &prev_q_h_m_2c, i);
@@ -628,7 +618,7 @@ impl MasternodeProcessor {
                         return members.clone();
                     }
                 }
-                let rotated_members = self.rotate_members(cycle_base_height, llmq_params, &cache.mn_lists, &cache.llmq_snapshots);
+                let rotated_members = self.rotate_members(cycle_base_height, llmq_params, &cache.mn_lists, &cache.llmq_snapshots, &mut cache.needed_masternode_lists);
                 let map_indexed_quorum_members_of_type = map_by_type_indexed_opt.unwrap();
                 rotated_members.iter().enumerate().for_each(|(i, members)| {
                     map_indexed_quorum_members_of_type.insert(llmq::LLMQIndexedHash::new(cycle_base_hash, i as u32), members.clone());
@@ -650,7 +640,7 @@ impl MasternodeProcessor {
         // First look at the local cache
         let result = callbacks::lookup_masternode_list(
             block_hash,
-            |h: UInt256| unsafe { (self.get_masternode_list_by_block_hash)(boxed(h.0), self.context) },
+            |h: UInt256| unsafe { (self.get_masternode_list_by_block_hash)(boxed(h.0), self.opaque_context) },
             |list: *const types::MasternodeList| unsafe { (self.destroy_masternode_list)(list) }
         );
         if let Some(result) = &result {
@@ -663,43 +653,43 @@ impl MasternodeProcessor {
 
     pub fn save_masternode_list(&self, block_hash: UInt256, masternode_list: &masternode::MasternodeList) -> bool {
         println!("save_masternode_list: {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash);
-        unsafe { (self.save_masternode_list)(boxed(block_hash.0), boxed(masternode_list.encode()), self.context) }
+        unsafe { (self.save_masternode_list)(boxed(block_hash.0), boxed(masternode_list.encode()), self.opaque_context) }
     }
 
     pub fn lookup_block_hash_by_height(&self, block_height: u32) -> Option<UInt256> {
-        println!("lookup_block_hash_by_height: {:?} {:?}", block_height, self.context);
-        callbacks::lookup_block_hash_by_height(block_height, |h: u32| unsafe { (self.get_block_hash_by_height)(h, self.context) })
+        println!("lookup_block_hash_by_height: {:?} {:?}", block_height, self.opaque_context);
+        callbacks::lookup_block_hash_by_height(block_height, |h: u32| unsafe { (self.get_block_hash_by_height)(h, self.opaque_context) })
     }
 
     pub fn lookup_block_height_by_hash(&self, block_hash: UInt256) -> u32 {
         // println!("lookup_block_height_by_hash: {:?} {:?}", block_hash, self.context);
-        unsafe { (self.get_block_height_by_hash)(boxed(block_hash.0), self.context) }
+        unsafe { (self.get_block_height_by_hash)(boxed(block_hash.0), self.opaque_context) }
     }
 
     pub fn lookup_snapshot_by_block_hash(&self, block_hash: UInt256) -> Option<llmq::LLMQSnapshot> {
-        callbacks::lookup_snapshot_by_block_hash(block_hash, |h: UInt256| unsafe { (self.get_llmq_snapshot_by_block_hash)(boxed(h.0), self.context) })
+        callbacks::lookup_snapshot_by_block_hash(block_hash, |h: UInt256| unsafe { (self.get_llmq_snapshot_by_block_hash)(boxed(h.0), self.opaque_context) })
     }
 
     pub fn save_snapshot(&self, block_hash: UInt256, snapshot: llmq::LLMQSnapshot) -> bool {
-        println!("save_snapshot: {}: {:?} {:?}", block_hash, snapshot, self.context);
-        unsafe { (self.save_llmq_snapshot)(boxed(block_hash.0), boxed(snapshot.encode()), self.context) }
+        println!("save_snapshot: {}: {:?} {:?}", block_hash, snapshot, self.opaque_context);
+        unsafe { (self.save_llmq_snapshot)(boxed(block_hash.0), boxed(snapshot.encode()), self.opaque_context) }
     }
 
     pub fn save_snapshot_raw(&self, block_hash: UInt256, snapshot: types::LLMQSnapshot) -> bool {
-        println!("save_snapshot_raw: {}: {:?} {:?}", block_hash, snapshot, self.context);
-        unsafe { (self.save_llmq_snapshot)(boxed(block_hash.0), boxed(snapshot), self.context) }
+        println!("save_snapshot_raw: {}: {:?} {:?}", block_hash, snapshot, self.opaque_context);
+        unsafe { (self.save_llmq_snapshot)(boxed(block_hash.0), boxed(snapshot), self.opaque_context) }
     }
 
     pub fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Option<UInt256> {
-        callbacks::lookup_merkle_root_by_hash(block_hash, |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(h.0), self.context) })
+        callbacks::lookup_merkle_root_by_hash(block_hash, |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(h.0), self.opaque_context) })
     }
 
     pub fn should_process_quorum(&self, llmq_type: LLMQType) -> bool {
-        unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.context) }
+        unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.opaque_context) }
     }
 
     pub fn add_insight(&self, block_hash: UInt256) {
-        unsafe { (self.add_insight)(boxed(block_hash.0), self.context) }
+        unsafe { (self.add_insight)(boxed(block_hash.0), self.opaque_context) }
     }
 
     /// Calls c++ BLS lib via FFI
@@ -720,7 +710,7 @@ impl MasternodeProcessor {
             all_commitment_aggregated_signature: boxed(quorum.all_commitment_aggregated_signature.0),
             threshold_signature: boxed(quorum.threshold_signature.0),
             public_key: boxed(quorum.public_key.0)
-        }), self.context) };
+        }), self.opaque_context) };
         let is_valid_payload = quorum.validate_payload();
         has_valid_quorums &= is_valid_payload && is_valid_signature;
         println!("validate_signature: {}: signature: {} payload: {}, has_valid_quorums: {}", quorum.llmq_hash, is_valid_signature, is_valid_payload, has_valid_quorums);

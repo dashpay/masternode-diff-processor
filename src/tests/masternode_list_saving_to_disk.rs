@@ -25,12 +25,12 @@ fn test_mnl_saving_to_disk() { // testMNLSavingToDisk
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            false
         )
     };
     let result = process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
-        false,
         processor,
         cache,
         context

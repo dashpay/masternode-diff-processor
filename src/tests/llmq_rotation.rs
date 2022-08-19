@@ -43,12 +43,12 @@ fn test_llmq_rotation() {
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            use_insight_as_backup,
         )
     };
     let result = process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
-        use_insight_as_backup,
         processor,
         cache,
         context
@@ -83,12 +83,12 @@ fn test_llmq_rotation_2() {
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            use_insight_as_backup,
         )
     };
     let result = process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
-        use_insight_as_backup,
         processor,
         cache,
         context
@@ -427,12 +427,12 @@ fn test_devnet_333() {
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            false
         )
     };
     let result = process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
-        false,
         processor,
         cache,
         context
@@ -454,6 +454,7 @@ fn test_processor_devnet_333() {
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            false,
         )
     };
     let cache = unsafe { processor_create_cache() };
@@ -463,8 +464,6 @@ fn test_processor_devnet_333() {
     let result = process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
-        // merkle_root: UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap().0.as_ptr(),
-        false,
         processor,
         cache,
         context
@@ -485,6 +484,7 @@ fn test_processor_devnet_manual() {
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            false
         )
     };
     let cache = unsafe { processor_create_cache() };
@@ -633,7 +633,6 @@ fn test_processor_devnet_manual() {
 
     let result = process_qrinfo(
         boxed(info),
-        false,
         processor,
         cache,
         context);
@@ -659,6 +658,7 @@ fn test_processor_devnet_333_2() {
             add_insight_lookup_default,
             should_process_llmq_of_type_333_2,
             validate_llmq_callback,
+            false
         )
     };
     let cache = unsafe { processor_create_cache() };
@@ -669,7 +669,6 @@ fn test_processor_devnet_333_2() {
     let result = process_mnlistdiff_from_message_internal(
         mnldiff_bytes.as_ptr(),
         mnldiff_bytes.len(),
-        false,
         processor,
         cache,
         context
@@ -681,7 +680,6 @@ fn test_processor_devnet_333_2() {
     let result = process_qrinfo_from_message_internal(
         bytes.as_ptr(),
         bytes.len(),
-        false,
         processor,
         cache,
         context

@@ -10,6 +10,7 @@ pub struct MasternodeProcessorCache {
     pub llmq_indexed_members: BTreeMap<LLMQType, BTreeMap<LLMQIndexedHash, Vec<MasternodeEntry>>>,
     pub mn_lists: BTreeMap<UInt256, MasternodeList>,
     pub llmq_snapshots: BTreeMap<UInt256, LLMQSnapshot>,
+    pub needed_masternode_lists: Vec<UInt256>,
 }
 impl Default for MasternodeProcessorCache {
     fn default() -> Self {
@@ -18,6 +19,7 @@ impl Default for MasternodeProcessorCache {
             llmq_indexed_members: BTreeMap::new(),
             llmq_snapshots: BTreeMap::new(),
             mn_lists: BTreeMap::new(),
+            needed_masternode_lists: vec![]
         }
     }
 }

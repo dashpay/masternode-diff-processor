@@ -87,6 +87,7 @@ pub fn load_masternode_lists_for_files_new(files: Vec<String>, chain: ChainType)
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            false
         )
     };
     for file in files {
@@ -96,7 +97,6 @@ pub fn load_masternode_lists_for_files_new(files: Vec<String>, chain: ChainType)
         let result = process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
-            false,
             processor,
             cache,
             context as *mut _ as *mut std::ffi::c_void
