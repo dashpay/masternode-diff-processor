@@ -35,12 +35,12 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
-            use_insight_as_backup,
         )
     };
     let result = process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
+        use_insight_as_backup,
         processor,
         cache,
         context
@@ -59,6 +59,7 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
         let result = process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
+            use_insight_as_backup,
             processor,
             cache,
             context
@@ -134,15 +135,14 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
         masternode_list_destroy_default,
         add_insight_lookup_default,
         should_process_llmq_of_type,
-        validate_llmq_callback,
-        use_insight_as_backup
-    )
+        validate_llmq_callback)
     };
     let cache = unsafe { processor_create_cache() };
 
     let result = process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
+        use_insight_as_backup,
         processor,
         cache,
         context as *mut _ as *mut std::ffi::c_void
@@ -164,6 +164,8 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
         let result = process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
+            // block_hash_119064.0.as_ptr(),
+            use_insight_as_backup,
             processor,
             cache,
             context as *mut _ as *mut std::ffi::c_void

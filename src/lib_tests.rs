@@ -499,13 +499,13 @@ pub mod tests {
                 add_insight_lookup_default,
                 should_process_llmq_of_type,
                 validate_llmq_callback,
-                use_insight_as_backup
             )
         };
 
         let result = process_mnlistdiff_from_message(
             c_array,
             length,
+            use_insight_as_backup,
             processor,
             cache,
             context

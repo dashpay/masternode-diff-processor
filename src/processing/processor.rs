@@ -55,8 +55,7 @@ impl MasternodeProcessor {
         add_insight: AddInsightBlockingLookup,
         should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
         validate_llmq: ValidateLLMQCallback,
-        use_insight_as_backup: bool/*,
-        opaque_context: *const std::ffi::c_void*/) -> Self {
+        /*opaque_context: *const std::ffi::c_void*/) -> Self {
         Self {
             get_merkle_root_by_hash,
             get_block_height_by_hash,
@@ -70,7 +69,7 @@ impl MasternodeProcessor {
             should_process_llmq_of_type,
             validate_llmq,
             opaque_context: null(),
-            use_insight_as_backup
+            use_insight_as_backup: false
         }
     }
 
@@ -457,7 +456,7 @@ impl MasternodeProcessor {
         quorum_base_block_height: u32,
         previous_quarters: [Vec<Vec<masternode::MasternodeEntry>>; 3],
         cached_lists: &BTreeMap<UInt256, masternode::MasternodeList>,
-        unknown_lists: &mut Vec<UInt256>
+        unknown_lists: &mut Vec<UInt256>,
     )
         -> Vec<Vec<masternode::MasternodeEntry>> {
         let quorum_count = params.signing_active_quorum_count;
