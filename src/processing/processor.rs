@@ -487,12 +487,14 @@ impl MasternodeProcessor {
                         (0..num_quorums).into_iter().for_each(|i| {
                             // for quarters h - c, h -2c, h -3c
                             previous_quarters.iter().for_each(|q| {
-                                q.get(i).unwrap().iter().for_each(|node| {
-                                    if node.is_valid {
-                                        masternodes_used_at_h.push(node.clone());
-                                        masternodes_used_at_h_index[i].push(node.clone());
-                                    }
-                                });
+                                if let Some(quarter) = q.get(i) {
+                                    quarter.iter().for_each(|node| {
+                                        if node.is_valid {
+                                            masternodes_used_at_h.push(node.clone());
+                                            masternodes_used_at_h_index[i].push(node.clone());
+                                        }
+                                    });
+                                }
                             });
                         });
                         masternode_list.masternodes.into_values().for_each(|mn| {
