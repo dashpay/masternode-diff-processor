@@ -484,6 +484,9 @@ impl MasternodeProcessor {
                         let mut masternodes_used_at_h = Vec::<masternode::MasternodeEntry>::new();
                         let mut masternodes_unused_at_h = Vec::<masternode::MasternodeEntry>::new();
                         let mut masternodes_used_at_h_index = Vec::<Vec<masternode::MasternodeEntry>>::with_capacity(num_quorums);
+                        for i in 0..num_quorums {
+                            masternodes_used_at_h_index.insert(i, vec![]);
+                        }
                         (0..num_quorums).into_iter().for_each(|i| {
                             // for quarters h - c, h -2c, h -3c
                             previous_quarters.iter().for_each(|q| {
