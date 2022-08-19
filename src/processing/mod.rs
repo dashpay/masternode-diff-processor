@@ -4,7 +4,6 @@ pub mod mn_listdiff_result;
 pub mod qr_info_result;
 
 pub use self::processor::MasternodeProcessor;
-pub use self::processor::ProcessorContext;
 pub use self::processor_cache::MasternodeProcessorCache;
 pub use self::mn_listdiff_result::MNListDiffResult;
 pub use self::qr_info_result::QRInfoResult;

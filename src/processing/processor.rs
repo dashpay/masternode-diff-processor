@@ -16,17 +16,12 @@ use dash_spv_primitives::hashes::{Hash, sha256d};
 use crate::processing::MNListDiffResult;
 use crate::processing::processor_cache::MasternodeProcessorCache;
 
-#[derive(Copy, Clone, Debug)]
-pub struct ProcessorContext {
-    pub use_insight_as_backup: bool,
-}
-
 // https://github.com/rust-lang/rfcs/issues/2770
 #[repr(C)]
 pub struct MasternodeProcessor {
     /// External Masternode Manager Diff Message Context
     pub opaque_context: *const std::ffi::c_void,
-    pub processor_context: ProcessorContext,
+    pub use_insight_as_backup: bool,
     pub get_block_height_by_hash: GetBlockHeightByHash,
     pub get_merkle_root_by_hash: MerkleRootLookup,
     get_block_hash_by_height: GetBlockHashByHeight,
@@ -60,7 +55,7 @@ impl MasternodeProcessor {
         add_insight: AddInsightBlockingLookup,
         should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
         validate_llmq: ValidateLLMQCallback,
-        processor_context: ProcessorContext/*,
+        use_insight_as_backup: bool/*,
         opaque_context: *const std::ffi::c_void*/) -> Self {
         Self {
             get_merkle_root_by_hash,
@@ -75,7 +70,7 @@ impl MasternodeProcessor {
             should_process_llmq_of_type,
             validate_llmq,
             opaque_context: null(),
-            processor_context
+            use_insight_as_backup
         }
     }
 
@@ -92,7 +87,7 @@ impl MasternodeProcessor {
             println!("find_masternode_list: (None) {}", block_hash);
             if self.lookup_block_height_by_hash(block_hash) != u32::MAX {
                 unknown_lists.push(block_hash);
-            } else if self.processor_context.use_insight_as_backup {
+            } else if self.use_insight_as_backup {
                 self.add_insight(block_hash);
                 if self.lookup_block_height_by_hash(block_hash) != u32::MAX {
                     unknown_lists.push(block_hash);

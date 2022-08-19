@@ -24,7 +24,7 @@ use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable};
-use crate::processing::{MasternodeProcessor, MNListDiffResult, MasternodeProcessorCache, ProcessorContext, QRInfoResult};
+use crate::processing::{MasternodeProcessor, MNListDiffResult, MasternodeProcessorCache, QRInfoResult};
 
 /// Destroys anonymous internal holder for UInt256
 #[no_mangle]
@@ -101,8 +101,7 @@ pub unsafe extern fn register_processor(
         add_insight,
         should_process_llmq_of_type,
         validate_llmq,
-        ProcessorContext { use_insight_as_backup }
-    );
+        use_insight_as_backup);
     println!("register_processor: {:?}", processor);
     boxed(processor)
 }
