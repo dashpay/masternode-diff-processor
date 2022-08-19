@@ -623,14 +623,16 @@ impl MasternodeProcessor {
             None => panic!("missing hash for block at height: {}", cycle_base_height),
             Some(cycle_base_hash) => {
                 let map_by_type_indexed_opt = cache.llmq_indexed_members.get_mut(&llmq_type);
-                if let Some(ref map_by_type_indexed) = map_by_type_indexed_opt {
-                    if let Some(members) = map_by_type_indexed.get(&llmq::LLMQIndexedHash::new(cycle_base_hash, quorum_index)) {
+                if map_by_type_indexed_opt.is_some() {
+                    if let Some(members) = map_by_type_indexed_opt.as_ref().unwrap().get(&llmq::LLMQIndexedHash::new(cycle_base_hash, quorum_index)) {
                         map_by_type.insert(block_hash, members.clone());
                         return members.clone();
                     }
+                } else {
+                    cache.llmq_indexed_members.insert(llmq_type, BTreeMap::new());
                 }
                 let rotated_members = self.rotate_members(cycle_base_height, llmq_params, &cache.mn_lists, &cache.llmq_snapshots, &mut cache.needed_masternode_lists);
-                let map_indexed_quorum_members_of_type = map_by_type_indexed_opt.unwrap();
+                let map_indexed_quorum_members_of_type = cache.llmq_indexed_members.get_mut(&llmq_type).unwrap();
                 rotated_members.iter().enumerate().for_each(|(i, members)| {
                     map_indexed_quorum_members_of_type.insert(llmq::LLMQIndexedHash::new(cycle_base_hash, i as u32), members.clone());
                 });
