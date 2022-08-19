@@ -513,6 +513,9 @@ impl MasternodeProcessor {
                         let mut first_skipped_index = 0;
                         let mut idx = 0;
                         (0..num_quorums).for_each(|i| {
+                            if quarter_quorum_members.get(i).is_none() {
+                                quarter_quorum_members.insert(i, vec![]);
+                            }
                             while quarter_quorum_members.get(i).unwrap().len() < quarter_size {
                                 let mn = sorted_combined_mns_list.get(idx).unwrap();
                                 if masternodes_used_at_h_index
