@@ -5,3 +5,4 @@ pub mod masternode_list_diff_1;
 pub mod masternode_list_diff_2;
 pub mod masternode_list_saving_to_disk;
 pub mod multiple_merkle_hashes;
+pub mod llmq_rotation_testnet;

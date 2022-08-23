@@ -1,6 +1,6 @@
 #[cfg(test)]
 pub mod tests {
-
+    extern crate libc;
     use std::{env, fs, slice};
     use std::collections::HashMap;
     use std::io::Read;
@@ -422,6 +422,12 @@ pub mod tests {
         true
     }
 
+    pub unsafe extern "C" fn log_default(message: *const libc::c_char, _context: *const std::ffi::c_void) {
+        let c_str = std::ffi::CStr::from_ptr(message);
+        println!("{:?}", c_str.to_str().unwrap());
+    }
+
+
     pub unsafe extern "C" fn get_merkle_root_by_hash_default(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const u8 {
         UInt256::MIN.0.as_ptr()
     }
@@ -499,6 +505,7 @@ pub mod tests {
                 add_insight_lookup_default,
                 should_process_llmq_of_type,
                 validate_llmq_callback,
+                log_default,
             )
         };
 

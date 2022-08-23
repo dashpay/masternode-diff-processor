@@ -16,7 +16,7 @@ use dash_spv_primitives::crypto::var_array::VarArray;
 use dash_spv_primitives::crypto::{UInt128, UInt160, UInt384, UInt768};
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 use dash_spv_primitives::util::base58;
-use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, masternode_list_destroy_default, get_masternode_list_by_block_hash_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback, get_merkle_root_by_hash_default};
+use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, masternode_list_destroy_default, get_masternode_list_by_block_hash_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback, get_merkle_root_by_hash_default, log_default};
 use crate::{process_mnlistdiff_from_message_internal, process_qrinfo, process_qrinfo_from_message, process_qrinfo_from_message_internal, processor_create_cache, register_processor};
 use crate::processing::MasternodeProcessorCache;
 
@@ -43,6 +43,7 @@ fn test_llmq_rotation() {
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            log_default,
         )
     };
     let result = process_qrinfo_from_message(
@@ -83,6 +84,7 @@ fn test_llmq_rotation_2() {
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            log_default,
         )
     };
     let result = process_qrinfo_from_message(
@@ -427,6 +429,7 @@ fn test_devnet_333() {
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            log_default,
         )
     };
     let result = process_qrinfo_from_message(
@@ -454,6 +457,7 @@ fn test_processor_devnet_333() {
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            log_default,
         )
     };
     let cache = unsafe { processor_create_cache() };
@@ -485,6 +489,7 @@ fn test_processor_devnet_manual() {
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            log_default,
         )
     };
     let cache = unsafe { processor_create_cache() };
@@ -659,6 +664,7 @@ fn test_processor_devnet_333_2() {
             add_insight_lookup_default,
             should_process_llmq_of_type_333_2,
             validate_llmq_callback,
+            log_default,
         )
     };
     let cache = unsafe { processor_create_cache() };

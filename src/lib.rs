@@ -15,7 +15,7 @@ use std::slice;
 use std::ptr::null_mut;
 use byte::BytesExt;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback, MerkleRootLookup, MasternodeListSave, SaveLLMQSnapshot, GetLLMQSnapshotByBlockHash};
+use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback, MerkleRootLookup, MasternodeListSave, SaveLLMQSnapshot, GetLLMQSnapshotByBlockHash, LogMessage};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::ToFFI;
 use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_qr_info, unbox_qr_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_mn_list_diff_result};
@@ -87,6 +87,7 @@ pub unsafe extern fn register_processor(
     add_insight: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq: ValidateLLMQCallback,
+    log_message: LogMessage
 ) -> *mut MasternodeProcessor {
     let processor = MasternodeProcessor::new(
         get_merkle_root_by_hash,
@@ -99,7 +100,9 @@ pub unsafe extern fn register_processor(
         destroy_masternode_list,
         add_insight,
         should_process_llmq_of_type,
-        validate_llmq);
+        validate_llmq,
+        log_message
+    );
     println!("register_processor: {:?}", processor);
     boxed(processor)
 }
@@ -138,15 +141,15 @@ pub extern "C" fn process_mnlistdiff_from_message(
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
 ) -> *mut types::MNListDiffResult {
-    println!("process_mnlistdiff_from_message.start: {:?}", std::time::Instant::now());
     let cache = unsafe { &mut *cache };
     let processor = unsafe { &mut *processor };
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
+    processor.log(format!("process_mnlistdiff_from_message.start: {:?}", std::time::Instant::now()));
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
     let result = processor.get_list_diff_result_with_base_lookup(list_diff, cache);
-    println!("process_mnlistdiff_from_message.finish: {:?}", std::time::Instant::now());
+    processor.log(format!("process_mnlistdiff_from_message.finish: {:?}", std::time::Instant::now()));
     boxed(result)
 
 }
@@ -159,9 +162,9 @@ pub extern "C" fn read_qrinfo(
     processor: *mut MasternodeProcessor,
     context: *const std::ffi::c_void,
 ) -> *mut types::QRInfo {
-    println!("read_qrinfo.start: {:?}", std::time::Instant::now());
     let processor = unsafe { &mut *processor };
     processor.opaque_context = context;
+    processor.log(format!("read_qrinfo.start: {:?}", std::time::Instant::now()));
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let block_height_lookup = |hash| processor.lookup_block_height_by_hash(hash);
     let read_list_diff = |offset: &mut usize| llmq::MNListDiff::new(message, offset, block_height_lookup);
@@ -217,7 +220,7 @@ pub extern "C" fn read_qrinfo(
         mn_list_diff_list_count,
         mn_list_diff_list: boxed_vec(mn_list_diff_list_vec),
     };
-    println!("read_qrinfo.finish: {:?} {:#?}", std::time::Instant::now(), result);
+    processor.log(format!("read_qrinfo.finish: {:?} {:#?}", std::time::Instant::now(), result));
     boxed(result)
 }
 
@@ -231,12 +234,12 @@ pub extern "C" fn process_qrinfo(
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
 ) -> *mut types::QRInfoResult {
-    println!("process_qrinfo.start: {:?}", std::time::Instant::now());
     let llmq_rotation_info = unsafe { *info };
     let extra_share = llmq_rotation_info.extra_share;
     let processor = unsafe { &mut *processor };
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
+    processor.log(format!("process_qrinfo.start: {:?}", std::time::Instant::now()));
     let cache = unsafe { &mut *cache };
     let mut process_list_diff = |list_diff: llmq::MNListDiff| processor.get_list_diff_result_with_base_lookup(list_diff, cache);
     let decode_diff = |list_diff: *mut types::MNListDiff| unsafe { (*(list_diff)).decode() };
@@ -306,7 +309,7 @@ pub extern "C" fn process_qrinfo(
         mn_list_diff_list_count,
         mn_list_diff_list: boxed_vec(diffs),
     };
-    println!("process_qrinfo.finish: {:?} {:#?}", std::time::Instant::now(), result);
+    processor.log(format!("process_qrinfo.finish: {:?} {:#?}", std::time::Instant::now(), result));
     boxed(result)
 }
 
@@ -324,11 +327,11 @@ pub extern "C" fn process_qrinfo_from_message(
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
 ) -> *mut types::QRInfoResult {
-    println!("process_qrinfo_from_message.start: {:?}", std::time::Instant::now());
     let message: &[u8] = unsafe { slice::from_raw_parts(message, message_length as usize) };
     let processor = unsafe { &mut *processor };
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
+    processor.log(format!("process_qrinfo_from_message.start: {:?}", std::time::Instant::now()));
     let cache = unsafe { &mut *cache };
     let offset = &mut 0;
     let read_list_diff = |offset: &mut usize|
@@ -402,7 +405,7 @@ pub extern "C" fn process_qrinfo_from_message(
         mn_list_diff_list,
         mn_list_diff_list_count
     };
-    println!("process_qrinfo_from_message.finish: {:?}", std::time::Instant::now());
+    processor.log(format!("process_qrinfo_from_message.finish: {:?} {:#?}", std::time::Instant::now(), result));
     boxed(result)
 }
 

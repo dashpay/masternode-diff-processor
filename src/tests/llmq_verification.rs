@@ -9,7 +9,7 @@ use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::ToHex;
 use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_for, block_height_lookup_default, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_for, block_height_lookup_default, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
 use crate::processing::MasternodeProcessorCache;
 
 
@@ -35,6 +35,7 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            log_default,
         )
     };
     let result = process_mnlistdiff_from_message(
@@ -135,7 +136,8 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
         masternode_list_destroy_default,
         add_insight_lookup_default,
         should_process_llmq_of_type,
-        validate_llmq_callback)
+        validate_llmq_callback,
+        log_default)
     };
     let cache = unsafe { processor_create_cache() };
 
