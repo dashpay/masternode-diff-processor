@@ -688,8 +688,9 @@ impl MasternodeProcessor {
     }
 
     pub fn log(&self, message: String) {
-        let c_string = std::ffi::CString::new(message).unwrap();
-        unsafe  { (self.log_message)(c_string.as_ptr(), self.opaque_context)}
+        println!("{}", message);
+        // let c_string = std::ffi::CString::new(message).unwrap();
+        // unsafe  { (self.log_message)(c_string.as_ptr(), self.opaque_context)}
     }
 
     pub fn should_process_quorum(&self, llmq_type: LLMQType) -> bool {
