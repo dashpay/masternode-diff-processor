@@ -9,7 +9,7 @@ use dash_spv_ffi::ffi::callbacks;
 use dash_spv_models::common::{LLMQParams, LLMQType};
 use dash_spv_models::{common, llmq, masternode};
 use dash_spv_primitives::consensus::{Encodable, encode};
-use dash_spv_primitives::crypto::byte_util::{ConstDecodable, Reversable, Zeroable};
+use dash_spv_primitives::crypto::byte_util::{Reversable, Zeroable};
 use dash_spv_primitives::crypto::data_ops::{Data, inplace_intersection};
 use dash_spv_primitives::crypto::UInt256;
 use dash_spv_primitives::hashes::{Hash, sha256d};
@@ -88,7 +88,7 @@ impl MasternodeProcessor {
             // Getting it from FFI directly
             self.log(format!("find_masternode_list: (Looked) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             Some(looked)
-        } else if block_hash.eq(&UInt256::from_const(self.genesis_hash).unwrap()) {
+        } else if block_hash.0.as_ptr().eq(&self.genesis_hash) {
             self.log(format!("find_masternode_list: (It's a genesis) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             None
         } else {

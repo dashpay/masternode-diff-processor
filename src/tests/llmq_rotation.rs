@@ -935,9 +935,10 @@ unsafe extern "C" fn get_merkle_root_by_hash_333_2(block_hash: *mut [u8; 32], _c
 #[test]
 fn test_jack_daniels() {
     let chain = ChainType::DevNet;
+    let genesis = UInt256::from_hex("79ee40288949fd61132c025761d4f065e161d60a88aab4c03e613ca8718d1d26").unwrap();
     let processor = unsafe {
         register_processor(
-            chain.genesis_hash().0.as_ptr(),
+            genesis.0.as_ptr(),
             get_merkle_root_by_hash_jack_daniels,
             block_height_lookup_jack_daniels,
             get_block_hash_by_height_default,
