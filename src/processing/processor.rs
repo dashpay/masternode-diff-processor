@@ -9,7 +9,7 @@ use dash_spv_ffi::ffi::callbacks;
 use dash_spv_models::common::{LLMQParams, LLMQType};
 use dash_spv_models::{common, llmq, masternode};
 use dash_spv_primitives::consensus::{Encodable, encode};
-use dash_spv_primitives::crypto::byte_util::{Reversable, Zeroable};
+use dash_spv_primitives::crypto::byte_util::{ConstDecodable, Reversable, Zeroable};
 use dash_spv_primitives::crypto::data_ops::{Data, inplace_intersection};
 use dash_spv_primitives::crypto::UInt256;
 use dash_spv_primitives::hashes::{Hash, sha256d};
@@ -21,7 +21,7 @@ use crate::processing::processor_cache::MasternodeProcessorCache;
 pub struct MasternodeProcessor {
     /// External Masternode Manager Diff Message Context
     pub opaque_context: *const std::ffi::c_void,
-    pub genesis_hash: UInt256,
+    pub genesis_hash: *const u8,
     pub use_insight_as_backup: bool,
     pub get_block_height_by_hash: GetBlockHeightByHash,
     pub get_merkle_root_by_hash: MerkleRootLookup,
@@ -46,7 +46,7 @@ impl std::fmt::Debug for MasternodeProcessor {
 
 impl MasternodeProcessor {
     pub fn new(
-        genesis_hash: UInt256,
+        genesis_hash: *const u8,
         get_merkle_root_by_hash: MerkleRootLookup,
         get_block_height_by_hash: GetBlockHeightByHash,
         get_block_hash_by_height: GetBlockHashByHeight,
@@ -88,7 +88,7 @@ impl MasternodeProcessor {
             // Getting it from FFI directly
             self.log(format!("find_masternode_list: (Looked) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             Some(looked)
-        } else if block_hash.eq(&self.genesis_hash) {
+        } else if block_hash.eq(&UInt256::from_const(self.genesis_hash).unwrap()) {
             self.log(format!("find_masternode_list: (It's a genesis) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             None
         } else {

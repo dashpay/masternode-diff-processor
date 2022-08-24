@@ -91,7 +91,6 @@ pub unsafe extern fn register_processor(
     validate_llmq: ValidateLLMQCallback,
     log_message: LogMessage
 ) -> *mut MasternodeProcessor {
-    let genesis_hash = UInt256::from_const(genesis_hash).unwrap();
     let processor = MasternodeProcessor::new(
         genesis_hash,
         get_merkle_root_by_hash,
@@ -107,7 +106,7 @@ pub unsafe extern fn register_processor(
         validate_llmq,
         log_message
     );
-    println!("register_processor: {:?} genesis: {}", processor, genesis_hash);
+    println!("register_processor: {:?} genesis: {:?}", processor, UInt256::from_const(genesis_hash).unwrap());
     boxed(processor)
 }
 
