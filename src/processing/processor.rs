@@ -80,6 +80,9 @@ impl MasternodeProcessor {
     }
 
     pub(crate) fn find_masternode_list(&self, block_hash: UInt256, cached_lists: &BTreeMap<UInt256, masternode::MasternodeList>, unknown_lists: &mut Vec<UInt256>) -> Option<masternode::MasternodeList> {
+        let genesis = UInt256::from_const(self.genesis_hash).unwrap();
+        let is_genesis = block_hash.eq(&genesis);
+        println!("find_masternode_list: (check for genesis) {} == {} ({})", block_hash, genesis, is_genesis);
         if let Some(cached) = cached_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
             self.log(format!("find_masternode_list: (Cached) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
@@ -88,7 +91,7 @@ impl MasternodeProcessor {
             // Getting it from FFI directly
             self.log(format!("find_masternode_list: (Looked) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             Some(looked)
-        } else if block_hash.eq(&UInt256::from_const(self.genesis_hash).unwrap()) {
+        } else if is_genesis {
             self.log(format!("find_masternode_list: (It's a genesis) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             None
         } else {
