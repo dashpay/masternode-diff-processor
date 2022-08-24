@@ -1,12 +1,9 @@
 use std::collections::BTreeMap;
-use std::ptr::null_mut;
 use dash_spv_ffi::ffi::from::FromFFI;
-use dash_spv_ffi::ffi::to::ToFFI;
-use dash_spv_ffi::types;
 use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_models::masternode;
 use dash_spv_primitives::crypto::byte_util::UInt256;
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_lookup_default, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, log_default, masternode_list_destroy_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_lookup_default, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
 use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
 use crate::processing::MasternodeProcessorCache;
 
@@ -49,40 +46,18 @@ fn test_mainnet_reload_with_processor() {
     assert_eq!(lists.len(), 29, "There should be 29 masternode lists");
 }
 
-unsafe extern "C" fn masternode_list_lookup(block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> *const types::MasternodeList {
-    let h = UInt256(*(block_hash));
-    let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-    if let Some(list) = data.cache.mn_lists.get(&h) {
-        println!("masternode_list_lookup: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
-        let encoded = list.encode();
-        &encoded as *const types::MasternodeList
-    } else {
-        null_mut()
-    }
-}
-
-
-unsafe extern "C" fn masternode_list_save(block_hash: *mut [u8; 32], masternode_list: *const types::MasternodeList, context: *const std::ffi::c_void) -> bool {
-    let h = UInt256(*(block_hash));
-    let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-    let masternode_list = *masternode_list;
-    let masternode_list_decoded = masternode_list.decode();
-    println!("masternode_list_save: {}", h);
-    data.cache.mn_lists.insert(h, masternode_list_decoded);
-    true
-}
-
 pub fn load_masternode_lists_for_files_new(files: Vec<String>, chain: ChainType) -> (bool, BTreeMap<UInt256, masternode::MasternodeList>) {
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
+            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default,
             block_height_lookup_default,
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
-            masternode_list_lookup,
-            masternode_list_save,
+            get_masternode_list_by_block_hash_from_cache,
+            masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_llmq_of_type,

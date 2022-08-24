@@ -16,7 +16,6 @@ use crate::processing::MasternodeProcessorCache;
 #[test]
 fn testnet_llmq_verification() { //testTestnetQuorumVerification
     let bytes = message_from_file("MNL_0_122928.dat".to_string());
-    let merkle_root = [0u8; 32].as_ptr();
     let use_insight_as_backup= false;
     let chain = ChainType::TestNet;
     let base_masternode_list_hash: *const u8 = null_mut();
@@ -24,6 +23,7 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
+            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default,
             block_height_lookup_default,
             get_block_hash_by_height_default,
@@ -100,17 +100,6 @@ unsafe extern "C" fn get_block_height_by_hash(block_hash: *mut [u8; 32], context
     block_height_for((&mut *(context as *mut FFIContext)).chain, UInt256(*(block_hash)).reversed().0.to_hex().as_str())
 }
 
-unsafe extern "C" fn get_masternode_list_by_block_hash_119064(block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> *const types::MasternodeList {
-    let ctx = &mut *(context as *mut FFIContext);
-    let h = UInt256(*(block_hash));
-    if let Some(list) = ctx.cache.mn_lists.get(&h) {
-        let encoded = list.encode();
-        &encoded as *const types::MasternodeList
-    } else {
-        null_mut()
-    }
-}
-
 pub unsafe extern "C" fn masternode_list_save_119064(block_hash: *mut [u8; 32], masternode_list: *const types::MasternodeList, context: *const std::ffi::c_void) -> bool {
     let ctx = &mut *(context as *mut FFIContext);
     let h = UInt256(*(block_hash));
@@ -126,12 +115,13 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
     let chain = ChainType::TestNet;
     let context = &mut FFIContext { chain, cache: MasternodeProcessorCache::default() };
     let processor = unsafe { register_processor(
+        chain.genesis_hash().0.as_ptr(),
         get_merkle_root_by_hash_default,
         get_block_height_by_hash,
         get_block_hash_by_height_default,
         get_llmq_snapshot_by_block_hash_default,
         save_llmq_snapshot_default,
-        get_masternode_list_by_block_hash_119064,
+        get_masternode_list_by_block_hash_from_cache,
         masternode_list_save_119064,
         masternode_list_destroy_default,
         add_insight_lookup_default,

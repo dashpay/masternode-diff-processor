@@ -21,6 +21,7 @@ use crate::processing::processor_cache::MasternodeProcessorCache;
 pub struct MasternodeProcessor {
     /// External Masternode Manager Diff Message Context
     pub opaque_context: *const std::ffi::c_void,
+    pub genesis_hash: UInt256,
     pub use_insight_as_backup: bool,
     pub get_block_height_by_hash: GetBlockHeightByHash,
     pub get_merkle_root_by_hash: MerkleRootLookup,
@@ -45,6 +46,7 @@ impl std::fmt::Debug for MasternodeProcessor {
 
 impl MasternodeProcessor {
     pub fn new(
+        genesis_hash: UInt256,
         get_merkle_root_by_hash: MerkleRootLookup,
         get_block_height_by_hash: GetBlockHeightByHash,
         get_block_hash_by_height: GetBlockHashByHeight,
@@ -59,6 +61,7 @@ impl MasternodeProcessor {
         log_message: LogMessage,
         /*opaque_context: *const std::ffi::c_void*/) -> Self {
         Self {
+            genesis_hash,
             get_merkle_root_by_hash,
             get_block_height_by_hash,
             get_block_hash_by_height,
@@ -85,6 +88,9 @@ impl MasternodeProcessor {
             // Getting it from FFI directly
             self.log(format!("find_masternode_list: (Looked) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             Some(looked)
+        } else if block_hash.eq(&self.genesis_hash) {
+            self.log(format!("find_masternode_list: (It's a genesis) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
+            None
         } else {
             self.log(format!("find_masternode_list: (None) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             if self.lookup_block_height_by_hash(block_hash) != u32::MAX {
@@ -684,6 +690,7 @@ impl MasternodeProcessor {
     }
 
     pub fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Option<UInt256> {
+        self.log(format!("lookup_merkle_root_by_hash: {}: {:?}", block_hash, self.opaque_context));
         callbacks::lookup_merkle_root_by_hash(block_hash, |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(h.0), self.opaque_context) })
     }
 

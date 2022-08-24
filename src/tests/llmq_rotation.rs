@@ -16,7 +16,7 @@ use dash_spv_primitives::crypto::var_array::VarArray;
 use dash_spv_primitives::crypto::{UInt128, UInt160, UInt384, UInt768};
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 use dash_spv_primitives::util::base58;
-use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, masternode_list_destroy_default, get_masternode_list_by_block_hash_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback, get_merkle_root_by_hash_default, log_default};
+use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, masternode_list_destroy_default, get_masternode_list_by_block_hash_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback, get_merkle_root_by_hash_default, log_default, get_masternode_list_by_block_hash_from_cache, masternode_list_save_in_cache, save_llmq_snapshot_in_cache};
 use crate::{process_mnlistdiff_from_message_internal, process_qrinfo, process_qrinfo_from_message, process_qrinfo_from_message_internal, processor_create_cache, register_processor};
 use crate::processing::MasternodeProcessorCache;
 
@@ -26,12 +26,13 @@ fn test_llmq_rotation() {
     let bytes = message_from_file("qrinfo--1-5078.dat".to_string());
     let length = bytes.len();
     let c_array = bytes.as_ptr();
-    let merkle_root = [0u8; 32].as_ptr();
     let use_insight_as_backup= false;
-    let context = &mut (FFIContext { chain: ChainType::DevNet, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
+    let chain = ChainType::DevNet;
+    let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
+            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default,
             block_height_lookup_5078,
             get_block_hash_by_height_default,
@@ -68,11 +69,13 @@ fn test_llmq_rotation() {
 fn test_llmq_rotation_2() {
     let bytes = message_from_file("QRINFO_1_8344.dat".to_string());
     let use_insight_as_backup= false;
-    let context = &mut (FFIContext { chain: ChainType::DevNet, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
+    let chain = ChainType::DevNet;
+    let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
     println!("test_llmq_rotation_2 {:?}", bytes.to_hex());
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
+            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default,
             block_height_lookup_,
             get_block_hash_by_height_default,
@@ -412,12 +415,13 @@ unsafe extern "C" fn get_merkle_root_by_hash_default_333(block_hash: *mut [u8; 3
 
 #[test]
 fn test_devnet_333() {
-    // let bytes = message_from_file("qrinfo--1-20737.dat".to_string());
     let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
-    let context = &mut (FFIContext { chain: ChainType::DevNet, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
+    let chain = ChainType::DevNet;
+    let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
+            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default_333,
             block_height_lookup_333,
             get_block_hash_by_height_default,
@@ -444,8 +448,10 @@ fn test_devnet_333() {
 
 #[test]
 fn test_processor_devnet_333() {
+    let chain = ChainType::DevNet;
     let processor = unsafe {
         register_processor(
+            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default_333,
             block_height_lookup_333,
             get_block_hash_by_height_default,
@@ -462,7 +468,7 @@ fn test_processor_devnet_333() {
     };
     let cache = unsafe { processor_create_cache() };
     let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
-    let context = &mut (FFIContext { chain: ChainType::DevNet, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
+    let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
 
     let result = process_qrinfo_from_message(
         bytes.as_ptr(),
@@ -476,8 +482,10 @@ fn test_processor_devnet_333() {
 }
 // #[test]
 fn test_processor_devnet_manual() {
+    let chain = ChainType::DevNet;
     let processor = unsafe {
         register_processor(
+            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default_333,
             block_height_lookup_333,
             get_block_hash_by_height_default,
@@ -493,7 +501,7 @@ fn test_processor_devnet_manual() {
         )
     };
     let cache = unsafe { processor_create_cache() };
-    let context = &mut (FFIContext { chain: ChainType::DevNet, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
+    let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
     let creation_height = 1008;
 
     let tip_pro_reg_tx_hash_1 = UInt256::from_hex("663b2fb8bb620db387f7268ccdf261d0739b3b734080487736560536f9da67c0").unwrap();
@@ -651,15 +659,17 @@ fn test_processor_devnet_manual() {
 
 #[test]
 fn test_processor_devnet_333_2() {
+    let chain = ChainType::DevNet;
     let processor = unsafe {
         register_processor(
+            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default_333,
             block_height_lookup_333_2,
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
-            llmq_snapshot_save_333_2,
-            masternode_list_lookup_333_2,
-            masternode_list_save_333_2,
+            save_llmq_snapshot_in_cache,
+            get_masternode_list_by_block_hash_from_cache,
+            masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_llmq_of_type_333_2,
@@ -698,37 +708,6 @@ fn test_processor_devnet_333_2() {
 }
 
 pub unsafe extern "C" fn should_process_llmq_of_type_333_2(llmq_type: u8, context: *const std::ffi::c_void) -> bool {
-    true
-}
-
-pub unsafe extern "C" fn masternode_list_lookup_333_2(block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> *const types::MasternodeList {
-    let h = UInt256(*(block_hash));
-    let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-    if let Some(list) = data.cache.mn_lists.get(&h) {
-        println!("masternode_list_lookup_333_2: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
-        &list.encode() as *const types::MasternodeList
-    } else {
-        null_mut()
-    }
-}
-
-pub unsafe extern "C" fn masternode_list_save_333_2(block_hash: *mut [u8; 32], masternode_list: *const types::MasternodeList, context: *const std::ffi::c_void) -> bool {
-    let h = UInt256(*(block_hash));
-    let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-    let masternode_list = *masternode_list;
-    let masternode_list_decoded = masternode_list.decode();
-    println!("masternode_list_save_333_2: {}", h);
-    data.cache.mn_lists.insert(h, masternode_list_decoded);
-    true
-}
-
-pub unsafe extern "C" fn llmq_snapshot_save_333_2(block_hash: *mut [u8; 32], snapshot: *const types::LLMQSnapshot, context: *const std::ffi::c_void) -> bool {
-    let h = UInt256(*(block_hash));
-    let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-    let snapshot = *snapshot;
-    let snapshot_decoded = snapshot.decode();
-    println!("snapshot_save_333_2: {} {:?}", h, snapshot_decoded);
-    data.cache.llmq_snapshots.insert(h, snapshot_decoded);
     true
 }
 
@@ -950,4 +929,70 @@ unsafe extern "C" fn get_merkle_root_by_hash_333_2(block_hash: *mut [u8; 32], _c
         _ => "0000000000000000000000000000000000000000000000000000000000000000"
     };
     UInt256::from_hex(root).unwrap().0.as_ptr()
+}
+
+
+#[test]
+fn test_jack_daniels() {
+    let chain = ChainType::DevNet;
+    let processor = unsafe {
+        register_processor(
+            chain.genesis_hash().0.as_ptr(),
+            get_merkle_root_by_hash_jack_daniels,
+            block_height_lookup_jack_daniels,
+            get_block_hash_by_height_default,
+            get_llmq_snapshot_by_block_hash_default,
+            save_llmq_snapshot_in_cache,
+            get_masternode_list_by_block_hash_from_cache,
+            masternode_list_save_in_cache,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
+            should_process_llmq_of_type_jack_daniels,
+            validate_llmq_callback,
+            log_default,
+        )
+    };
+    let cache = unsafe { processor_create_cache() };
+    let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
+
+    let mnldiff_bytes = message_from_file("MNL_1_74221.dat".to_string());
+
+    let result = process_mnlistdiff_from_message_internal(
+        mnldiff_bytes.as_ptr(),
+        mnldiff_bytes.len(),
+        false,
+        processor,
+        cache,
+        context
+    );
+
+
+    println!("Result: {:#?}", &result);
+}
+
+unsafe extern "C" fn block_height_lookup_jack_daniels(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> u32 {
+    let h = UInt256(*(block_hash));
+    let orig_s = h.clone().to_string();
+    match orig_s.as_str() {
+        "55cea87c22849891b4e8819a8504605cc54314d03dacb97e6fa2aeb3d8000000" => 74221, // getBlockHeightByHash
+        "79ee40288949fd61132c025761d4f065e161d60a88aab4c03e613ca8718d1d26" => 1, // getBlockHeightByHash
+        "132bfe2ab16f6fab18e1c4d64deb8a748b12c4bd92fdc660e222ab2a21050000" => 74160, // getBlockHeightByHash
+        "3ad221f88a172adb8aca647f3a059b008d55fb0dd07f918412620178d2030000" => 74136, // getBlockHeightByHash
+        "8d80307b7fd5728799e62e1d461948331dd4b543a330deaf2d98576eb6050000" => 74184, // getBlockHeightByHash
+        "97bceb2e855f80bf4f8617ce9cb9206682171a3e1b92d2160ad799d2cd040000" => 74208, // getBlockHeightByHash
+        "34336e375eb5f6eefb147479d4c1a4823ca47282bab8a5eaf85aa3b3e4010000" => 74209, // getBlockHeightByHash
+        _ => u32::MAX
+    }
+}
+
+unsafe extern "C" fn get_merkle_root_by_hash_jack_daniels(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const u8 {
+    // 74221: 55cea87c22849891b4e8819a8504605cc54314d03dacb97e6fa2aeb3d8000000 -> 601bb47971ab483aec1ee77074a785036edbb7ce543d868881aa4e04a39490c0
+    let h = UInt256(*(block_hash));
+    let merkle_root = UInt256::from_hex("601bb47971ab483aec1ee77074a785036edbb7ce543d868881aa4e04a39490c0").unwrap();
+    println!("get_merkle_root_by_hash_jack_daniels: {}: {}", h, merkle_root);
+    merkle_root.0.as_ptr()
+}
+
+pub unsafe extern "C" fn should_process_llmq_of_type_jack_daniels(llmq_type: u8, context: *const std::ffi::c_void) -> bool {
+    true
 }

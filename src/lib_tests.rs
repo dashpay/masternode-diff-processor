@@ -421,6 +421,15 @@ pub mod tests {
     pub unsafe extern "C" fn save_llmq_snapshot_default(block_hash: *mut [u8; 32], snapshot: *const types::LLMQSnapshot, _context: *const std::ffi::c_void) -> bool {
         true
     }
+    pub unsafe extern "C" fn save_llmq_snapshot_in_cache(block_hash: *mut [u8; 32], snapshot: *const types::LLMQSnapshot, context: *const std::ffi::c_void) -> bool {
+        let h = UInt256(*(block_hash));
+        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+        let snapshot = *snapshot;
+        let snapshot_decoded = snapshot.decode();
+        println!("save_llmq_snapshot_in_cache: {}: {:?}", h, snapshot_decoded);
+        data.cache.llmq_snapshots.insert(h, snapshot_decoded);
+        true
+    }
 
     pub unsafe extern "C" fn log_default(message: *const libc::c_char, _context: *const std::ffi::c_void) {
         let c_str = std::ffi::CStr::from_ptr(message);
@@ -477,7 +486,6 @@ pub mod tests {
         let c_array = bytes.as_ptr();
         let message: &[u8] = unsafe { slice::from_raw_parts(c_array, length) };
         let chain = ChainType::TestNet;
-        let merkle_root = [0u8; 32].as_ptr();
         let offset = &mut 0;
         assert!(length - *offset >= 32);
         let base_block_hash = UInt256::from_bytes(message, offset).unwrap();
@@ -494,6 +502,7 @@ pub mod tests {
         let cache = unsafe { processor_create_cache() };
         let processor = unsafe {
             register_processor(
+                chain.genesis_hash().0.as_ptr(),
                 get_merkle_root_by_hash_default,
                 block_height_lookup_122088,
                 get_block_hash_by_height_default,

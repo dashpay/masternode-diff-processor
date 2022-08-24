@@ -14,6 +14,7 @@ fn test_mnl_saving_to_disk() { // testMNLSavingToDisk
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
+            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default,
             block_height_lookup_122088,
             get_block_hash_by_height_default,

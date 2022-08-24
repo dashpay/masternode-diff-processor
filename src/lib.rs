@@ -23,7 +23,8 @@ use dash_spv_ffi::types;
 use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::consensus::encode;
-use dash_spv_primitives::crypto::byte_util::{BytesDecodable};
+use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable};
+use dash_spv_primitives::crypto::UInt256;
 use crate::processing::{MasternodeProcessor, MNListDiffResult, MasternodeProcessorCache, QRInfoResult};
 
 /// Destroys anonymous internal holder for UInt256
@@ -76,6 +77,7 @@ pub unsafe extern fn processor_destroy_block(result: *mut types::Block) {
 
 #[no_mangle]
 pub unsafe extern fn register_processor(
+    genesis_hash: *const u8,
     get_merkle_root_by_hash: MerkleRootLookup,
     get_block_height_by_hash: GetBlockHeightByHash,
     get_block_hash_by_height: GetBlockHashByHeight,
@@ -90,6 +92,7 @@ pub unsafe extern fn register_processor(
     log_message: LogMessage
 ) -> *mut MasternodeProcessor {
     let processor = MasternodeProcessor::new(
+        UInt256::from_const(genesis_hash).unwrap(),
         get_merkle_root_by_hash,
         get_block_height_by_hash,
         get_block_hash_by_height,
@@ -111,7 +114,8 @@ pub unsafe extern fn register_processor(
 #[no_mangle]
 pub unsafe extern fn unregister_processor(processor: *mut MasternodeProcessor) {
     println!("unregister_processor: {:?}", processor);
-    unbox_any(processor);
+    let unboxed = unbox_any(processor);
+    // unbox_any(unboxed.genesis_hash);
 }
 
 /// Initialize opaque cache to store needed information between FFI calls
