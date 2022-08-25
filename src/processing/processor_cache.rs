@@ -4,7 +4,7 @@ use dash_spv_models::llmq::{LLMQIndexedHash, LLMQSnapshot};
 use dash_spv_models::masternode::{MasternodeEntry, MasternodeList};
 use dash_spv_primitives::crypto::UInt256;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct MasternodeProcessorCache {
     pub llmq_members: BTreeMap<LLMQType, BTreeMap<UInt256, Vec<MasternodeEntry>>>,
     pub llmq_indexed_members: BTreeMap<LLMQType, BTreeMap<LLMQIndexedHash, Vec<MasternodeEntry>>>,
@@ -23,6 +23,19 @@ impl Default for MasternodeProcessorCache {
         }
     }
 }
+
+impl std::fmt::Debug for MasternodeProcessorCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MasternodeProcessorCache")
+            .field("llmq_members", &self.llmq_members)
+            .field("llmq_indexed_members", &self.llmq_indexed_members)
+            .field("llmq_snapshots", &self.llmq_snapshots)
+            .field("mn_lists", &self.mn_lists)
+            .field("needed_masternode_lists", &self.needed_masternode_lists)
+            .finish()
+    }
+}
+
 
 impl MasternodeProcessorCache {
     pub fn add_masternode_list(&mut self, block_hash: UInt256, list: MasternodeList) {
