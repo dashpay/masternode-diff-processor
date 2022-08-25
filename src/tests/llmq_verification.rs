@@ -23,7 +23,6 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
-            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default,
             block_height_lookup_default,
             get_block_hash_by_height_default,
@@ -42,6 +41,7 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
         bytes.as_ptr(),
         bytes.len(),
         use_insight_as_backup,
+        chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
         context
@@ -61,6 +61,7 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
             bytes.as_ptr(),
             bytes.len(),
             use_insight_as_backup,
+            chain.genesis_hash().0.as_ptr(),
             processor,
             cache,
             context
@@ -115,7 +116,6 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
     let chain = ChainType::TestNet;
     let context = &mut FFIContext { chain, cache: MasternodeProcessorCache::default() };
     let processor = unsafe { register_processor(
-        chain.genesis_hash().0.as_ptr(),
         get_merkle_root_by_hash_default,
         get_block_height_by_hash,
         get_block_hash_by_height_default,
@@ -135,6 +135,7 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
         bytes.as_ptr(),
         bytes.len(),
         use_insight_as_backup,
+        chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
         context as *mut _ as *mut std::ffi::c_void
@@ -158,6 +159,7 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
             bytes.len(),
             // block_hash_119064.0.as_ptr(),
             use_insight_as_backup,
+            chain.genesis_hash().0.as_ptr(),
             processor,
             cache,
             context as *mut _ as *mut std::ffi::c_void

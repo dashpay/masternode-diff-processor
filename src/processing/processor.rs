@@ -46,7 +46,6 @@ impl std::fmt::Debug for MasternodeProcessor {
 
 impl MasternodeProcessor {
     pub fn new(
-        genesis_hash: *const u8,
         get_merkle_root_by_hash: MerkleRootLookup,
         get_block_height_by_hash: GetBlockHeightByHash,
         get_block_hash_by_height: GetBlockHashByHeight,
@@ -61,7 +60,6 @@ impl MasternodeProcessor {
         log_message: LogMessage,
         /*opaque_context: *const std::ffi::c_void*/) -> Self {
         Self {
-            genesis_hash,
             get_merkle_root_by_hash,
             get_block_height_by_hash,
             get_block_hash_by_height,
@@ -75,14 +73,12 @@ impl MasternodeProcessor {
             validate_llmq,
             log_message,
             opaque_context: null(),
+            genesis_hash: null(),
             use_insight_as_backup: false
         }
     }
 
     pub(crate) fn find_masternode_list(&self, block_hash: UInt256, cached_lists: &BTreeMap<UInt256, masternode::MasternodeList>, unknown_lists: &mut Vec<UInt256>) -> Option<masternode::MasternodeList> {
-        let genesis = UInt256::from_const(self.genesis_hash).unwrap();
-        let is_genesis = block_hash.eq(&genesis);
-        println!("find_masternode_list: (check for genesis) {} == {} ({})", block_hash, genesis, is_genesis);
         if let Some(cached) = cached_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
             self.log(format!("find_masternode_list: (Cached) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
@@ -91,7 +87,7 @@ impl MasternodeProcessor {
             // Getting it from FFI directly
             self.log(format!("find_masternode_list: (Looked) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             Some(looked)
-        } else if is_genesis {
+        } else if block_hash.eq(&UInt256::from_const(self.genesis_hash).unwrap()) {
             self.log(format!("find_masternode_list: (It's a genesis) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             None
         } else {

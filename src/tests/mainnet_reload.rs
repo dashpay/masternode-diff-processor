@@ -50,7 +50,6 @@ pub fn load_masternode_lists_for_files_new(files: Vec<String>, chain: ChainType)
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
-            chain.genesis_hash().0.as_ptr(),
             get_merkle_root_by_hash_default,
             block_height_lookup_default,
             get_block_hash_by_height_default,
@@ -73,6 +72,7 @@ pub fn load_masternode_lists_for_files_new(files: Vec<String>, chain: ChainType)
             bytes.as_ptr(),
             bytes.len(),
             false,
+            chain.genesis_hash().0.as_ptr(),
             processor,
             cache,
             context as *mut _ as *mut std::ffi::c_void
