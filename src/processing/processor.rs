@@ -80,7 +80,11 @@ impl MasternodeProcessor {
 
     pub(crate) fn find_masternode_list(&self, block_hash: UInt256, cached_lists: &BTreeMap<UInt256, masternode::MasternodeList>, unknown_lists: &mut Vec<UInt256>) -> Option<masternode::MasternodeList> {
         let genesis_hash = UInt256::from_const(self.genesis_hash).unwrap();
-        if block_hash.eq(&genesis_hash) {
+        if block_hash.is_zero() {
+            // If it's a zero block we don't expect masternode list here
+            self.log(format!("find_masternode_list: (None: It's a zero hash) {}: {}", UInt256::MAX, block_hash));
+            None
+        } else if block_hash.eq(&genesis_hash) {
             // If it's a genesis block we don't expect masternode list here
             self.log(format!("find_masternode_list: (None: It's a genesis) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             None
