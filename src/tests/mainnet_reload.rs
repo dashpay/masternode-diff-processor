@@ -5,7 +5,6 @@ use dash_spv_models::masternode;
 use dash_spv_primitives::crypto::byte_util::UInt256;
 use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_lookup_default, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
 use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
-use crate::processing::MasternodeProcessorCache;
 
 #[test]
 fn test_mainnet_reload_with_processor() {
@@ -41,12 +40,12 @@ fn test_mainnet_reload_with_processor() {
         "MNL_1092864_1092888.dat".to_string(),
         "MNL_1092888_1092916.dat".to_string(),
     ];
-    let (success, lists) = load_masternode_lists_for_files_new(files, chain);
+    let (success, lists) = load_masternode_lists_for_files(files, chain, true);
     assert!(success, "Unsuccessful");
     assert_eq!(lists.len(), 29, "There should be 29 masternode lists");
 }
 
-pub fn load_masternode_lists_for_files_new(files: Vec<String>, chain: ChainType) -> (bool, BTreeMap<UInt256, masternode::MasternodeList>) {
+pub fn load_masternode_lists_for_files(files: Vec<String>, chain: ChainType, assert_validity: bool) -> (bool, BTreeMap<UInt256, masternode::MasternodeList>) {
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
@@ -67,7 +66,7 @@ pub fn load_masternode_lists_for_files_new(files: Vec<String>, chain: ChainType)
     for file in files {
         println!("load_masternode_lists_for_files: [{}]", file);
         let bytes = message_from_file(file);
-        let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) ;
+        let context = &mut (FFIContext { chain, cache: unsafe { (*cache).clone() } }) ;
         let result = process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
@@ -80,7 +79,10 @@ pub fn load_masternode_lists_for_files_new(files: Vec<String>, chain: ChainType)
         let result = unsafe { *result };
         println!("result: [{:?}]", result);
         //println!("MNDiff: {} added, {} modified", result.added_masternodes_count, result.modified_masternodes_count);
-        assert_diff_result(chain, result);
+        // println!("")
+        if assert_validity {
+            assert_diff_result(chain, result);
+        }
         let block_hash = UInt256(unsafe { *result.block_hash });
         let masternode_list = unsafe { *result.masternode_list };
         let masternode_list_decoded = unsafe { masternode_list.decode() };
