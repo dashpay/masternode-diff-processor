@@ -15,7 +15,7 @@ use std::slice;
 use std::ptr::null_mut;
 use byte::BytesExt;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback, MerkleRootLookup, MasternodeListSave, SaveLLMQSnapshot, GetLLMQSnapshotByBlockHash, LogMessage, HashDestroy};
+use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback, MerkleRootLookup, MasternodeListSave, SaveLLMQSnapshot, GetLLMQSnapshotByBlockHash, LogMessage, HashDestroy, LLMQSnapshotDestroy};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::ToFFI;
 use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_qr_info, unbox_qr_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_mn_list_diff_result};
@@ -91,6 +91,7 @@ pub unsafe extern fn register_processor(
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq: ValidateLLMQCallback,
     destroy_hash: HashDestroy,
+    destroy_snapshot: LLMQSnapshotDestroy,
     log_message: LogMessage
 ) -> *mut MasternodeProcessor {
     let processor = MasternodeProcessor::new(
@@ -106,6 +107,7 @@ pub unsafe extern fn register_processor(
         should_process_llmq_of_type,
         validate_llmq,
         destroy_hash,
+        destroy_snapshot,
         log_message
     );
     println!("register_processor: {:?}", processor);

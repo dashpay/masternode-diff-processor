@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LogMessage, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
+use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, LogMessage, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
 use dash_spv_ffi::ffi::to::ToFFI;
 use dash_spv_ffi::types;
 use dash_spv_ffi::ffi::callbacks;
@@ -35,6 +35,7 @@ pub struct MasternodeProcessor {
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq: ValidateLLMQCallback,
     destroy_hash: HashDestroy,
+    destroy_snapshot: LLMQSnapshotDestroy,
     log_message: LogMessage,
 }
 impl std::fmt::Debug for MasternodeProcessor {
@@ -59,6 +60,7 @@ impl MasternodeProcessor {
         should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
         validate_llmq: ValidateLLMQCallback,
         destroy_hash: HashDestroy,
+        destroy_snapshot: LLMQSnapshotDestroy,
         log_message: LogMessage,
         /*opaque_context: *const std::ffi::c_void*/) -> Self {
         Self {
@@ -74,6 +76,7 @@ impl MasternodeProcessor {
             should_process_llmq_of_type,
             validate_llmq,
             destroy_hash,
+            destroy_snapshot,
             log_message,
             opaque_context: null(),
             genesis_hash: null(),
@@ -693,7 +696,11 @@ impl MasternodeProcessor {
     }
 
     pub fn lookup_snapshot_by_block_hash(&self, block_hash: UInt256) -> Option<llmq::LLMQSnapshot> {
-        callbacks::lookup_snapshot_by_block_hash(block_hash, |h: UInt256| unsafe { (self.get_llmq_snapshot_by_block_hash)(boxed(h.0), self.opaque_context) })
+        callbacks::lookup_snapshot_by_block_hash(
+            block_hash,
+            |h: UInt256| unsafe { (self.get_llmq_snapshot_by_block_hash)(boxed(h.0), self.opaque_context) },
+            |snapshot: *const types::LLMQSnapshot| unsafe { (self.destroy_snapshot)(snapshot) }
+        )
     }
 
     pub fn save_snapshot(&self, block_hash: UInt256, snapshot: llmq::LLMQSnapshot) -> bool {
