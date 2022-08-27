@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, LogMessage, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
+use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LogMessage, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
 use dash_spv_ffi::ffi::to::ToFFI;
 use dash_spv_ffi::types;
 use dash_spv_ffi::ffi::callbacks;
@@ -34,6 +34,7 @@ pub struct MasternodeProcessor {
     add_insight: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     validate_llmq: ValidateLLMQCallback,
+    destroy_hash: HashDestroy,
     log_message: LogMessage,
 }
 impl std::fmt::Debug for MasternodeProcessor {
@@ -57,6 +58,7 @@ impl MasternodeProcessor {
         add_insight: AddInsightBlockingLookup,
         should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
         validate_llmq: ValidateLLMQCallback,
+        destroy_hash: HashDestroy,
         log_message: LogMessage,
         /*opaque_context: *const std::ffi::c_void*/) -> Self {
         Self {
@@ -71,6 +73,7 @@ impl MasternodeProcessor {
             add_insight,
             should_process_llmq_of_type,
             validate_llmq,
+            destroy_hash,
             log_message,
             opaque_context: null(),
             genesis_hash: null(),
@@ -677,7 +680,11 @@ impl MasternodeProcessor {
 
     pub fn lookup_block_hash_by_height(&self, block_height: u32) -> Option<UInt256> {
         self.log(format!("lookup_block_hash_by_height: {}", block_height));
-        callbacks::lookup_block_hash_by_height(block_height, |h: u32| unsafe { (self.get_block_hash_by_height)(h, self.opaque_context) })
+        callbacks::lookup_block_hash_by_height(
+            block_height,
+            |h: u32| unsafe { (self.get_block_hash_by_height)(h, self.opaque_context) },
+            |hash: *const u8| unsafe { (self.destroy_hash)(hash) }
+        )
     }
 
     pub fn lookup_block_height_by_hash(&self, block_hash: UInt256) -> u32 {
@@ -696,7 +703,11 @@ impl MasternodeProcessor {
 
     pub fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Option<UInt256> {
         self.log(format!("lookup_merkle_root_by_hash: {}: {:?}", block_hash, self.opaque_context));
-        callbacks::lookup_merkle_root_by_hash(block_hash, |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(h.0), self.opaque_context) })
+        callbacks::lookup_merkle_root_by_hash(
+            block_hash,
+            |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(h.0), self.opaque_context) },
+            |hash: *const u8| unsafe { (self.destroy_hash)(hash) }
+        )
     }
 
     pub fn log(&self, message: String) {

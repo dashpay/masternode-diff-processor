@@ -2,7 +2,7 @@ use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_primitives::crypto::byte_util::UInt256;
 use dash_spv_primitives::hashes::hex::FromHex;
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_lookup_122088, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, log_default, masternode_list_destroy_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_lookup_122088, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback};
 use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
 use crate::processing::MasternodeProcessorCache;
 
@@ -25,6 +25,7 @@ fn test_mnl_saving_to_disk() { // testMNLSavingToDisk
             add_insight_lookup_default,
             should_process_llmq_of_type,
             validate_llmq_callback,
+            hash_destroy_default,
             log_default,
         )
     };

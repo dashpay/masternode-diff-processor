@@ -544,6 +544,9 @@ pub mod tests {
     pub unsafe extern "C" fn masternode_list_destroy_default(_masternode_list: *const types::MasternodeList) {
 
     }
+    pub unsafe extern "C" fn hash_destroy_default(_hash: *const u8) {
+
+    }
     pub unsafe extern "C" fn add_insight_lookup_default(_hash: *mut [u8; 32], _context: *const std::ffi::c_void) {
 
     }
@@ -642,6 +645,7 @@ pub mod tests {
                 add_insight_lookup_default,
                 should_process_llmq_of_type,
                 validate_llmq_callback,
+                hash_destroy_default,
                 log_default,
             )
         };
