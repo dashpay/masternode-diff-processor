@@ -29,21 +29,18 @@ use crate::processing::{MasternodeProcessor, MNListDiffResult, MasternodeProcess
 /// Destroys anonymous internal holder for UInt256
 #[no_mangle]
 pub unsafe extern fn processor_destroy_block_hash(block_hash: *mut [u8; 32]) {
-    println!("processor_destroy_block_hash: {:?}", block_hash);
     unbox_any(block_hash);
 }
 
 /// Destroys types::LLMQValidationData
 #[no_mangle]
 pub unsafe extern fn processor_destroy_llmq_validation_data(data: *mut types::LLMQValidationData) {
-    println!("processor_destroy_llmq_validation_data: {:?}", data);
     unbox_llmq_validation_data(data);
 }
 
 /// Destroys types::MNListDiffResult
 #[no_mangle]
 pub unsafe extern fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
-    println!("processor_destroy_mnlistdiff_result: {:?}", result);
     unbox_mn_list_diff_result(result);
 }
 

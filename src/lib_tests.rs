@@ -500,7 +500,7 @@ pub mod tests {
     pub unsafe extern "C" fn block_height_lookup_122088(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> u32 {
         122088
     }
-    pub unsafe extern "C" fn get_block_hash_by_height_default(_block_height: u32, _context: *const std::ffi::c_void) -> *const u8 {
+    pub unsafe extern "C" fn get_block_hash_by_height_default(_block_height: u32, _context: *const std::ffi::c_void) -> *mut u8 {
         null_mut()
     }
 
@@ -544,7 +544,7 @@ pub mod tests {
     pub unsafe extern "C" fn masternode_list_destroy_default(_masternode_list: *const types::MasternodeList) {
 
     }
-    pub unsafe extern "C" fn hash_destroy_default(_hash: *const u8) {
+    pub unsafe extern "C" fn hash_destroy_default(_hash: *mut u8) {
 
     }
     pub unsafe extern "C" fn snapshot_destroy_default(_snapshot: *const types::LLMQSnapshot) {
@@ -572,8 +572,8 @@ pub mod tests {
     }
 
 
-    pub unsafe extern "C" fn get_merkle_root_by_hash_default(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const u8 {
-        UInt256::MIN.0.as_ptr()
+    pub unsafe extern "C" fn get_merkle_root_by_hash_default(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *mut u8 {
+        UInt256::MIN.clone().0.as_mut_ptr()
     }
 
     pub unsafe extern "C" fn should_process_llmq_of_type(llmq_type: u8, context: *const std::ffi::c_void) -> bool {

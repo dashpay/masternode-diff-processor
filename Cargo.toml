@@ -15,13 +15,14 @@ libc = "0.2.132"
 #path = "../dash-spv-models"
 #[dependencies.dash-spv-ffi]
 #path = "../dash-spv-ffi"
+
 #[dependencies.dash-spv-storage]
 #path = "../dash-spv-storage"
 
 [dependencies.dash-spv-primitives]
 git = "https://github.com/pankcuf/dash-spv-primitives"
 branch = "master"
-version = "0.2.1"
+version = "0.2.2"
 [dependencies.dash-spv-models]
 git = "https://github.com/pankcuf/dash-spv-models"
 branch = "master"

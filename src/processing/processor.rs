@@ -686,7 +686,7 @@ impl MasternodeProcessor {
         callbacks::lookup_block_hash_by_height(
             block_height,
             |h: u32| unsafe { (self.get_block_hash_by_height)(h, self.opaque_context) },
-            |hash: *const u8| unsafe { (self.destroy_hash)(hash) }
+            |hash: *mut u8| unsafe { (self.destroy_hash)(hash) }
         )
     }
 
@@ -713,7 +713,7 @@ impl MasternodeProcessor {
         callbacks::lookup_merkle_root_by_hash(
             block_hash,
             |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(h.0), self.opaque_context) },
-            |hash: *const u8| unsafe { (self.destroy_hash)(hash) }
+            |hash: *mut u8| unsafe { (self.destroy_hash)(hash) }
         )
     }
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # run tests
-cargo test --package dash_spv_masternode_processor --lib tests --verbose
+cargo test --package dash-spv-masternode-processor --lib tests --verbose
 
 # shellcheck disable=SC2181
 if [ $? -eq 0 ]
@@ -21,6 +21,6 @@ lipo -create target/aarch64-apple-darwin/release/libdash_spv_masternode_processo
 # Assume we have structure like this:
 # dash/masternodes-diff-processor/...
 # dash/DashSync/...
-cp -p target/universal/release/libdash_spv_masternode_processor.a ../DashSync/DashSync/lib/libdash_spv_masternode_processor_ios.a
-cp -p target/universal/release/libdash_spv_masternode_processor_macos.a ../DashSync/DashSync/lib/libdash_spv_masternode_processor_macos.a
-cp -p target/dash_spv_masternode_processor.h ../DashSync/DashSync/shared/crypto/
+#cp -p target/universal/release/libdash_spv_masternode_processor.a ../DashSync/DashSync/lib/libdash_spv_masternode_processor_ios.a
+#cp -p target/universal/release/libdash_spv_masternode_processor_macos.a ../DashSync/DashSync/lib/libdash_spv_masternode_processor_macos.a
+#cp -p target/dash_spv_masternode_processor.h ../DashSync/DashSync/shared/crypto/
