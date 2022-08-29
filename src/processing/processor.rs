@@ -671,7 +671,7 @@ impl MasternodeProcessor {
         let result = callbacks::lookup_masternode_list(
             block_hash,
             |h: UInt256| unsafe { (self.get_masternode_list_by_block_hash)(boxed(h.0), self.opaque_context) },
-            |list: *const types::MasternodeList| unsafe { (self.destroy_masternode_list)(list) }
+            |list: *mut types::MasternodeList| unsafe { (self.destroy_masternode_list)(list) }
         );
         result
     }
@@ -699,7 +699,7 @@ impl MasternodeProcessor {
         callbacks::lookup_snapshot_by_block_hash(
             block_hash,
             |h: UInt256| unsafe { (self.get_llmq_snapshot_by_block_hash)(boxed(h.0), self.opaque_context) },
-            |snapshot: *const types::LLMQSnapshot| unsafe { (self.destroy_snapshot)(snapshot) }
+            |snapshot: *mut types::LLMQSnapshot| unsafe { (self.destroy_snapshot)(snapshot) }
         )
     }
 

@@ -6,6 +6,7 @@ pub mod tests {
     use std::io::Read;
     use std::ptr::null_mut;
     use byte::BytesExt;
+    use dash_spv_ffi::ffi::boxer::boxed;
     use dash_spv_ffi::ffi::from::FromFFI;
     use dash_spv_ffi::ffi::to::ToFFI;
     use dash_spv_ffi::ffi::unboxer::unbox_any;
@@ -504,34 +505,35 @@ pub mod tests {
         null_mut()
     }
 
-    pub unsafe extern "C" fn get_llmq_snapshot_by_block_height_default(_block_height: u32, _context: *const std::ffi::c_void) -> *const types::LLMQSnapshot {
+    pub unsafe extern "C" fn get_llmq_snapshot_by_block_height_default(_block_height: u32, _context: *const std::ffi::c_void) -> *mut types::LLMQSnapshot {
         null_mut()
     }
 
-    pub unsafe extern "C" fn get_llmq_snapshot_by_block_hash_default(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const types::LLMQSnapshot {
+    pub unsafe extern "C" fn get_llmq_snapshot_by_block_hash_default(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *mut types::LLMQSnapshot {
         null_mut()
     }
 
-    pub unsafe extern "C" fn get_masternode_list_by_block_hash_default(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *const types::MasternodeList {
+    pub unsafe extern "C" fn get_masternode_list_by_block_hash_default(_block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *mut types::MasternodeList {
         null_mut()
     }
 
-    pub unsafe extern "C" fn get_masternode_list_by_block_hash_from_cache(block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> *const types::MasternodeList {
+    pub unsafe extern "C" fn get_masternode_list_by_block_hash_from_cache(block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> *mut types::MasternodeList {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         if let Some(list) = data.cache.mn_lists.get(&h) {
             println!("get_masternode_list_by_block_hash_from_cache: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
             let encoded = list.encode();
-            &encoded as *const types::MasternodeList
+            boxed(encoded)
+            // &encoded as *const types::MasternodeList
         } else {
             null_mut()
         }
     }
 
-    pub unsafe extern "C" fn masternode_list_save_default(_block_hash: *mut [u8; 32], _masternode_list: *const types::MasternodeList, _context: *const std::ffi::c_void) -> bool {
+    pub unsafe extern "C" fn masternode_list_save_default(_block_hash: *mut [u8; 32], _masternode_list: *mut types::MasternodeList, _context: *const std::ffi::c_void) -> bool {
         true
     }
-    pub unsafe extern "C" fn masternode_list_save_in_cache(block_hash: *mut [u8; 32], masternode_list: *const types::MasternodeList, context: *const std::ffi::c_void) -> bool {
+    pub unsafe extern "C" fn masternode_list_save_in_cache(block_hash: *mut [u8; 32], masternode_list: *mut types::MasternodeList, context: *const std::ffi::c_void) -> bool {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let masternode_list = *masternode_list;
@@ -541,22 +543,22 @@ pub mod tests {
         true
     }
 
-    pub unsafe extern "C" fn masternode_list_destroy_default(_masternode_list: *const types::MasternodeList) {
+    pub unsafe extern "C" fn masternode_list_destroy_default(_masternode_list: *mut types::MasternodeList) {
 
     }
     pub unsafe extern "C" fn hash_destroy_default(_hash: *mut u8) {
 
     }
-    pub unsafe extern "C" fn snapshot_destroy_default(_snapshot: *const types::LLMQSnapshot) {
+    pub unsafe extern "C" fn snapshot_destroy_default(_snapshot: *mut types::LLMQSnapshot) {
 
     }
     pub unsafe extern "C" fn add_insight_lookup_default(_hash: *mut [u8; 32], _context: *const std::ffi::c_void) {
 
     }
-    pub unsafe extern "C" fn save_llmq_snapshot_default(block_hash: *mut [u8; 32], snapshot: *const types::LLMQSnapshot, _context: *const std::ffi::c_void) -> bool {
+    pub unsafe extern "C" fn save_llmq_snapshot_default(block_hash: *mut [u8; 32], snapshot: *mut types::LLMQSnapshot, _context: *const std::ffi::c_void) -> bool {
         true
     }
-    pub unsafe extern "C" fn save_llmq_snapshot_in_cache(block_hash: *mut [u8; 32], snapshot: *const types::LLMQSnapshot, context: *const std::ffi::c_void) -> bool {
+    pub unsafe extern "C" fn save_llmq_snapshot_in_cache(block_hash: *mut [u8; 32], snapshot: *mut types::LLMQSnapshot, context: *const std::ffi::c_void) -> bool {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let snapshot = *snapshot;

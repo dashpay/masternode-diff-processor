@@ -103,7 +103,7 @@ unsafe extern "C" fn get_block_height_by_hash(block_hash: *mut [u8; 32], context
     block_height_for((&mut *(context as *mut FFIContext)).chain, UInt256(*(block_hash)).reversed().0.to_hex().as_str())
 }
 
-pub unsafe extern "C" fn masternode_list_save_119064(block_hash: *mut [u8; 32], masternode_list: *const types::MasternodeList, context: *const std::ffi::c_void) -> bool {
+pub unsafe extern "C" fn masternode_list_save_119064(block_hash: *mut [u8; 32], masternode_list: *mut types::MasternodeList, context: *const std::ffi::c_void) -> bool {
     let ctx = &mut *(context as *mut FFIContext);
     let h = UInt256(*(block_hash));
     let list = (*masternode_list).decode();

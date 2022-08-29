@@ -29,18 +29,21 @@ use crate::processing::{MasternodeProcessor, MNListDiffResult, MasternodeProcess
 /// Destroys anonymous internal holder for UInt256
 #[no_mangle]
 pub unsafe extern fn processor_destroy_block_hash(block_hash: *mut [u8; 32]) {
+    println!("processor_destroy_block_hash: {:?}", block_hash);
     unbox_any(block_hash);
 }
 
 /// Destroys types::LLMQValidationData
 #[no_mangle]
 pub unsafe extern fn processor_destroy_llmq_validation_data(data: *mut types::LLMQValidationData) {
+    println!("processor_destroy_llmq_validation_data: {:?}", data);
     unbox_llmq_validation_data(data);
 }
 
 /// Destroys types::MNListDiffResult
 #[no_mangle]
 pub unsafe extern fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
+    println!("processor_destroy_mnlistdiff_result: {:?}", result);
     unbox_mn_list_diff_result(result);
 }
 
@@ -152,7 +155,7 @@ pub extern "C" fn process_mnlistdiff_from_message(
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
-    processor.log(format!("process_mnlistdiff_from_message.start: {:?} {:?} {:?} {:?} {:?}", std::time::Instant::now(), genesis_hash, processor, cache, context));
+    processor.log(format!("process_mnlistdiff_from_message.start: {:?} {:?} {:p} {:p} {:?}", std::time::Instant::now(), genesis_hash, processor, cache, context));
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
     let result = processor.get_list_diff_result_with_base_lookup(list_diff, cache);
@@ -171,7 +174,7 @@ pub extern "C" fn read_qrinfo(
 ) -> *mut types::QRInfo {
     let processor = unsafe { &mut *processor };
     processor.opaque_context = context;
-    processor.log(format!("read_qrinfo.start: {:?} {:?} {:?}", std::time::Instant::now(), processor, context));
+    processor.log(format!("read_qrinfo.start: {:?} {:p} {:?}", std::time::Instant::now(), processor, context));
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let block_height_lookup = |hash| processor.lookup_block_height_by_hash(hash);
     let read_list_diff = |offset: &mut usize| llmq::MNListDiff::new(message, offset, block_height_lookup);
@@ -249,7 +252,7 @@ pub extern "C" fn process_qrinfo(
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
-    processor.log(format!("process_qrinfo.start: {:?} {:?} {:?} {:?} {:?}", std::time::Instant::now(), genesis_hash, processor, cache, context));
+    processor.log(format!("process_qrinfo.start: {:?} {:?} {:p} {:p} {:?}", std::time::Instant::now(), genesis_hash, processor, cache, context));
     let mut process_list_diff = |list_diff: llmq::MNListDiff| processor.get_list_diff_result_with_base_lookup(list_diff, cache);
     let decode_diff = |list_diff: *mut types::MNListDiff| unsafe { (*(list_diff)).decode() };
     let decode_snapshot = |snapshot: *mut types::LLMQSnapshot| unsafe { (*(snapshot)).decode() };
@@ -534,3 +537,13 @@ pub fn process_qrinfo_from_message_internal(
         mn_list_diff_list
     }
 }
+
+// #[no_mangle]
+// pub extern "C" fn test_func(get_masternode_list_by_block_hash: MasternodeListLookup, destroy_masternode_list: MasternodeListDestroy, opaque_context: *const std::ffi::c_void) {
+//     let block_hash = UInt256::MIN;
+//     dash_spv_ffi::ffi::callbacks::lookup_masternode_list(
+//         block_hash,
+//         |h: UInt256| unsafe { (get_masternode_list_by_block_hash)(boxed(h.0), opaque_context) },
+//         |list: *mut types::MasternodeList| unsafe { (destroy_masternode_list)(list) });
+//
+// }
