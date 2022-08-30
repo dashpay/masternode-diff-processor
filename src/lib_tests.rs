@@ -15,7 +15,7 @@ pub mod tests {
     use dash_spv_models::common::LLMQType;
     use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384, UInt768};
     use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
-    use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
+    use crate::{process_mnlistdiff_from_message, ProcessingError, processor_create_cache, register_processor};
     use crate::processing::processor_cache::MasternodeProcessorCache;
 
     #[derive(Debug)]
@@ -550,8 +550,8 @@ pub mod tests {
 
     }
 
-    pub unsafe extern "C" fn should_process_diff_with_range_default(base_block_hash: *mut [u8; 32], block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> bool {
-        true
+    pub unsafe extern "C" fn should_process_diff_with_range_default(base_block_hash: *mut [u8; 32], block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> u8 {
+        ProcessingError::None.into()
     }
     pub unsafe extern "C" fn send_error_default(error: u8, context: *const std::ffi::c_void) {
         println!("send_error_default: {}", error);

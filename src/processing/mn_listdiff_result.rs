@@ -5,9 +5,11 @@ use dash_spv_ffi::types;
 use dash_spv_models::common::LLMQType;
 use dash_spv_models::masternode::{LLMQEntry, MasternodeEntry, MasternodeList};
 use dash_spv_primitives::crypto::UInt256;
+use crate::processing::ProcessingError;
 
 // #[derive(Debug)]
 pub struct MNListDiffResult {
+    pub error_status: ProcessingError,
     pub base_block_hash: UInt256,
     pub block_hash: UInt256,
     pub has_found_coinbase: bool, //1 byte
@@ -25,6 +27,7 @@ pub struct MNListDiffResult {
 impl std::fmt::Debug for MNListDiffResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MNListDiffResult")
+            .field("error_status", &self.error_status)
             .field("base_block_hash", &self.base_block_hash)
             .field("block_hash", &self.block_hash)
             .field("validation", &format!("{}{}{}{}{}",
@@ -47,6 +50,7 @@ impl std::fmt::Debug for MNListDiffResult {
 impl Default for MNListDiffResult {
     fn default() -> Self {
         Self {
+            error_status: ProcessingError::None,
             base_block_hash: UInt256::MIN,
             block_hash: UInt256::MAX,
             has_found_coinbase: false,
@@ -64,8 +68,17 @@ impl Default for MNListDiffResult {
 }
 
 impl MNListDiffResult {
+    pub fn default_with_error(error: ProcessingError) -> Self {
+        let mut result = Self::default();
+        result.error_status = error;
+        result
+    }
+}
+
+impl MNListDiffResult {
     pub fn encode(&self) -> types::MNListDiffResult {
         types::MNListDiffResult {
+            error_status: self.error_status.into(),
             base_block_hash: boxed(self.base_block_hash.0),
             block_hash: boxed(self.block_hash.0),
             has_found_coinbase: self.has_found_coinbase,

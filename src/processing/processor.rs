@@ -212,6 +212,7 @@ impl MasternodeProcessor {
         let needed_masternode_lists = cache.needed_masternode_lists.clone();
         cache.needed_masternode_lists.clear();
         MNListDiffResult {
+            error_status: ProcessingError::None,
             base_block_hash,
             block_hash,
             has_found_coinbase: coinbase_transaction.has_found_coinbase(&merkle_tree.hashes),
@@ -735,7 +736,7 @@ impl MasternodeProcessor {
         unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.opaque_context) }
     }
 
-    pub fn should_process_diff_with_range(&self, base_block_hash: UInt256, block_hash:UInt256) -> bool {
+    pub fn should_process_diff_with_range(&self, base_block_hash: UInt256, block_hash:UInt256) -> u8 {
         unsafe { (self.should_process_diff_with_range)(boxed(base_block_hash.0), boxed(block_hash.0), self.opaque_context) }
     }
 

@@ -23,7 +23,7 @@ use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::BytesDecodable;
-use crate::processing::{MasternodeProcessor, MNListDiffResult, MasternodeProcessorCache, QRInfoResult};
+use crate::processing::{MasternodeProcessor, MNListDiffResult, MasternodeProcessorCache, QRInfoResult, ProcessingError};
 
 /// Destroys anonymous internal holder for UInt256
 #[no_mangle]
@@ -161,13 +161,13 @@ pub extern "C" fn process_mnlistdiff_from_message(
     processor.log(format!("process_mnlistdiff_from_message.start: {:?} {:?} {:p} {:p} {:?}", std::time::Instant::now(), genesis_hash, processor, cache, context));
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
-    boxed(if processor.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash) {
-        let result = processor.get_list_diff_result_with_base_lookup(list_diff, cache);
-        processor.log(format!("process_mnlistdiff_from_message.finish: {:?}", std::time::Instant::now()));
-        result
-    } else {
-        types::MNListDiffResult::default()
-    })
+    let error = processor.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
+    if error != ProcessingError::None.into() {
+        return boxed(types::MNListDiffResult::default_with_error(error));
+    }
+    let result = processor.get_list_diff_result_with_base_lookup(list_diff, cache);
+    processor.log(format!("process_mnlistdiff_from_message.finish: {:?}", std::time::Instant::now()));
+    boxed(result)
 }
 
 /*
@@ -365,8 +365,9 @@ pub extern "C" fn process_qrinfo_from_message(
     let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let diff_tip = unwrap_or_qr_result_failure!(read_list_diff(offset));
-    if !processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash) {
-        return boxed(types::QRInfoResult::default());
+    let error = processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
+    if error != ProcessingError::None.into() {
+        return boxed(types::QRInfoResult::default_with_error(error));
     }
     let diff_h = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_c = unwrap_or_qr_result_failure!(read_list_diff(offset));
@@ -421,6 +422,7 @@ pub extern "C" fn process_qrinfo_from_message(
     }
 
     let result = types::QRInfoResult {
+        error_status: ProcessingError::None.into(),
         result_at_tip,
         result_at_h,
         result_at_h_c,
@@ -541,6 +543,7 @@ pub fn process_qrinfo_from_message_internal(
     let result_at_h = process_list_diff(diff_h);
     let result_at_tip = process_list_diff(diff_tip);
     QRInfoResult {
+        error_status: ProcessingError::None,
         result_at_tip,
         result_at_h,
         result_at_h_c,

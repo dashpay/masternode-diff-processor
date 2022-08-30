@@ -1,9 +1,10 @@
 use dash_spv_models::llmq::LLMQSnapshot;
 use dash_spv_models::masternode::LLMQEntry;
-use crate::processing::MNListDiffResult;
+use crate::processing::{MNListDiffResult, ProcessingError};
 
 #[derive(Debug)]
 pub struct QRInfoResult {
+    pub error_status: ProcessingError,
     pub result_at_tip: MNListDiffResult,
     pub result_at_h: MNListDiffResult,
     pub result_at_h_c: MNListDiffResult,
@@ -24,6 +25,7 @@ pub struct QRInfoResult {
 impl Default for QRInfoResult {
     fn default() -> Self {
         Self {
+            error_status: ProcessingError::None,
             result_at_tip: Default::default(),
             result_at_h: Default::default(),
             result_at_h_c: Default::default(),
@@ -41,3 +43,12 @@ impl Default for QRInfoResult {
         }
     }
 }
+
+impl QRInfoResult {
+    pub fn default_with_error(error: ProcessingError) -> Self {
+        let mut result = Self::default();
+        result.error_status = error;
+        result
+    }
+}
+
