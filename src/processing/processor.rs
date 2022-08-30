@@ -177,6 +177,7 @@ impl MasternodeProcessor {
                                        list_diff: llmq::MNListDiff,
                                        cache: &mut MasternodeProcessorCache)
                                        -> MNListDiffResult {
+        let base_block_hash = list_diff.base_block_hash;
         let block_hash = list_diff.block_hash;
         let block_height = list_diff.block_height;
         //println!("get_list_diff_result_internal: {}: {}", block_height, block_hash);
@@ -211,6 +212,7 @@ impl MasternodeProcessor {
         let needed_masternode_lists = cache.needed_masternode_lists.clone();
         cache.needed_masternode_lists.clear();
         MNListDiffResult {
+            base_block_hash,
             block_hash,
             has_found_coinbase: coinbase_transaction.has_found_coinbase(&merkle_tree.hashes),
             has_valid_coinbase: merkle_tree.has_root(self.lookup_merkle_root_by_hash(block_hash).unwrap_or(UInt256::MIN)),
