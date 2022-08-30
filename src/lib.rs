@@ -15,8 +15,7 @@ use std::slice;
 use std::ptr::null_mut;
 use byte::BytesExt;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback, MerkleRootLookup, MasternodeListSave, SaveLLMQSnapshot, GetLLMQSnapshotByBlockHash, LogMessage, HashDestroy, LLMQSnapshotDestroy};
-use dash_spv_ffi::ffi::from::FromFFI;
+use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback, MerkleRootLookup, MasternodeListSave, SaveLLMQSnapshot, GetLLMQSnapshotByBlockHash, LogMessage, HashDestroy, LLMQSnapshotDestroy, SendError, ShouldProcessDiffWithRange};
 use dash_spv_ffi::ffi::to::ToFFI;
 use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_qr_info, unbox_qr_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_mn_list_diff_result};
 use dash_spv_ffi::types;
@@ -92,6 +91,8 @@ pub unsafe extern fn register_processor(
     validate_llmq: ValidateLLMQCallback,
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
+    should_process_diff_with_range: ShouldProcessDiffWithRange,
+    send_error: SendError,
     log_message: LogMessage
 ) -> *mut MasternodeProcessor {
     let processor = MasternodeProcessor::new(
@@ -108,6 +109,8 @@ pub unsafe extern fn register_processor(
         validate_llmq,
         destroy_hash,
         destroy_snapshot,
+        should_process_diff_with_range,
+        send_error,
         log_message
     );
     println!("register_processor: {:?}", processor);
@@ -158,12 +161,16 @@ pub extern "C" fn process_mnlistdiff_from_message(
     processor.log(format!("process_mnlistdiff_from_message.start: {:?} {:?} {:p} {:p} {:?}", std::time::Instant::now(), genesis_hash, processor, cache, context));
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
-    let result = processor.get_list_diff_result_with_base_lookup(list_diff, cache);
-    processor.log(format!("process_mnlistdiff_from_message.finish: {:?}", std::time::Instant::now()));
-    boxed(result)
-
+    boxed(if processor.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash) {
+        let result = processor.get_list_diff_result_with_base_lookup(list_diff, cache);
+        processor.log(format!("process_mnlistdiff_from_message.finish: {:?}", std::time::Instant::now()));
+        result
+    } else {
+        types::MNListDiffResult::default()
+    })
 }
 
+/*
 /// Read message received as a response for 'GETQRINFO' call
 #[no_mangle]
 pub extern "C" fn read_qrinfo(
@@ -324,7 +331,7 @@ pub extern "C" fn process_qrinfo(
     processor.log(format!("process_qrinfo.finish: {:?} {:#?}", std::time::Instant::now(), result));
     boxed(result)
 }
-
+*/
 
 /// Here we read & calculate quorums according to Core v0.18
 /// See https://github.com/dashpay/dips/blob/master/dip-0024.md
@@ -348,58 +355,71 @@ pub extern "C" fn process_qrinfo_from_message(
     processor.log(format!("process_qrinfo_from_message.start: {:?}", std::time::Instant::now()));
     let cache = unsafe { &mut *cache };
     let offset = &mut 0;
-    let read_list_diff = |offset: &mut usize|
-        processor.read_list_diff_from_message(message, offset);
-    let mut process_list_diff = |list_diff: llmq::MNListDiff|
-        processor.get_list_diff_result_with_base_lookup(list_diff, cache);
-    let read_snapshot = |offset: &mut usize| types::LLMQSnapshot::from_bytes(message, offset);
+    let mut process_list_diff = |list_diff: llmq::MNListDiff| processor.get_list_diff_result_with_base_lookup(list_diff, cache);
+    let read_list_diff = |offset: &mut usize| processor.read_list_diff_from_message(message, offset);
+    let read_snapshot = |offset: &mut usize| llmq::LLMQSnapshot::from_bytes(message, offset);
     let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
+    let mut get_list_diff_result = |list_diff: llmq::MNListDiff| boxed(process_list_diff(list_diff));
 
-    let snapshot_at_h_c = boxed(unwrap_or_qr_result_failure!(read_snapshot(offset)));
-    let snapshot_at_h_2c = boxed(unwrap_or_qr_result_failure!(read_snapshot(offset)));
-    let snapshot_at_h_3c = boxed(unwrap_or_qr_result_failure!(read_snapshot(offset)));
-
+    let snapshot_at_h_c = unwrap_or_qr_result_failure!(read_snapshot(offset));
+    let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
+    let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let diff_tip = unwrap_or_qr_result_failure!(read_list_diff(offset));
+    if !processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash) {
+        return boxed(types::QRInfoResult::default());
+    }
     let diff_h = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_2c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_3c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
-    let (snapshot_at_h_4c, diff_h_4c) = if extra_share {
-        (boxed(unwrap_or_qr_result_failure!(read_snapshot(offset))), Some(unwrap_or_qr_result_failure!(read_list_diff(offset))))
+    let snapshot_at_h_4c = if extra_share { Some(unwrap_or_qr_result_failure!(read_snapshot(offset))) } else { None };
+    let diff_h_4c = if extra_share { Some(unwrap_or_qr_result_failure!(read_list_diff(offset))) } else { None };
+
+    processor.save_snapshot(diff_h_c.block_hash, snapshot_at_h_c.clone());
+    processor.save_snapshot(diff_h_2c.block_hash, snapshot_at_h_2c.clone());
+    processor.save_snapshot(diff_h_3c.block_hash, snapshot_at_h_3c.clone());
+    if extra_share {
+        processor.save_snapshot(diff_h_4c.as_ref().unwrap().block_hash, snapshot_at_h_4c.clone().unwrap());
+    }
+
+    let result_at_tip = get_list_diff_result(diff_tip);
+    let result_at_h = get_list_diff_result(diff_h);
+    let result_at_h_c = get_list_diff_result(diff_h_c);
+    let result_at_h_2c = get_list_diff_result(diff_h_2c);
+    let result_at_h_3c = get_list_diff_result(diff_h_3c);
+    let result_at_h_4c = if extra_share {
+        get_list_diff_result(diff_h_4c.unwrap())
     } else {
-        (null_mut(), None)
+        null_mut()
     };
+
+
     let last_quorum_per_index_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
     for _i in 0..last_quorum_per_index_count {
         last_quorum_per_index_vec.push(boxed(unwrap_or_qr_result_failure!(LLMQEntry::from_bytes(message, offset)).encode()));
     }
-    let last_quorum_per_index = boxed_vec(last_quorum_per_index_vec);
     let quorum_snapshot_list_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
+    let mut snapshots: Vec<llmq::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
     for _i in 0..quorum_snapshot_list_count {
-        quorum_snapshot_list_vec.push(boxed(unwrap_or_qr_result_failure!(read_snapshot(offset))));
+        let snapshot = unwrap_or_qr_result_failure!(read_snapshot(offset));
+        snapshots.push(snapshot.clone());
     }
-    let quorum_snapshot_list = boxed_vec(quorum_snapshot_list_vec);
     let mn_list_diff_list_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> = Vec::with_capacity(mn_list_diff_list_count);
-
-    for _i in 0..mn_list_diff_list_count {
+    assert_eq!(quorum_snapshot_list_count, mn_list_diff_list_count, "'quorum_snapshot_list_count' must be equal 'mn_list_diff_list_count'");
+    for i in 0..mn_list_diff_list_count {
         let list_diff = unwrap_or_qr_result_failure!(read_list_diff(offset));
-        mn_list_diff_list_vec.push(boxed(process_list_diff(list_diff)));
+        let block_hash = list_diff.block_hash.clone();
+        let list_diff_result = process_list_diff(list_diff);
+        mn_list_diff_list_vec.push(boxed(list_diff_result));
+        let snapshot = snapshots.get(i).unwrap();
+        quorum_snapshot_list_vec.push(boxed(snapshot.encode()));
+        processor.save_snapshot(block_hash, snapshot.clone());
     }
-    let mn_list_diff_list = boxed_vec(mn_list_diff_list_vec);
-    let result_at_tip = boxed(process_list_diff(diff_tip));
-    let result_at_h = boxed(process_list_diff(diff_h));
-    let result_at_h_c = boxed(process_list_diff(diff_h_c));
-    let result_at_h_2c = boxed(process_list_diff(diff_h_2c));
-    let result_at_h_3c = boxed(process_list_diff(diff_h_3c));
-    let result_at_h_4c = if extra_share {
-        boxed(process_list_diff(diff_h_4c.unwrap()))
-    } else {
-        null_mut()
-    };
+
     let result = types::QRInfoResult {
         result_at_tip,
         result_at_h,
@@ -407,16 +427,16 @@ pub extern "C" fn process_qrinfo_from_message(
         result_at_h_2c,
         result_at_h_3c,
         result_at_h_4c,
-        snapshot_at_h_c,
-        snapshot_at_h_2c,
-        snapshot_at_h_3c,
-        snapshot_at_h_4c,
+        snapshot_at_h_c: boxed(snapshot_at_h_c.encode()),
+        snapshot_at_h_2c: boxed(snapshot_at_h_2c.encode()),
+        snapshot_at_h_3c: boxed(snapshot_at_h_3c.encode()),
+        snapshot_at_h_4c: if extra_share { boxed(snapshot_at_h_4c.unwrap().encode()) } else { null_mut() },
         extra_share,
-        last_quorum_per_index,
+        last_quorum_per_index: boxed_vec(last_quorum_per_index_vec),
         last_quorum_per_index_count,
-        quorum_snapshot_list,
+        quorum_snapshot_list: boxed_vec(quorum_snapshot_list_vec),
         quorum_snapshot_list_count,
-        mn_list_diff_list,
+        mn_list_diff_list: boxed_vec(mn_list_diff_list_vec),
         mn_list_diff_list_count
     };
     processor.log(format!("process_qrinfo_from_message.finish: {:?} {:#?}", std::time::Instant::now(), result));

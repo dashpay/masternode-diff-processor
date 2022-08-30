@@ -549,6 +549,14 @@ pub mod tests {
     pub unsafe extern "C" fn hash_destroy_default(_hash: *mut u8) {
 
     }
+
+    pub unsafe extern "C" fn should_process_diff_with_range_default(base_block_hash: *mut [u8; 32], block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> bool {
+        true
+    }
+    pub unsafe extern "C" fn send_error_default(error: u8, context: *const std::ffi::c_void) {
+        println!("send_error_default: {}", error);
+    }
+
     pub unsafe extern "C" fn snapshot_destroy_default(_snapshot: *mut types::LLMQSnapshot) {
 
     }
@@ -652,6 +660,8 @@ pub mod tests {
                 validate_llmq_callback,
                 hash_destroy_default,
                 snapshot_destroy_default,
+                should_process_diff_with_range_default,
+                send_error_default,
                 log_default,
             )
         };

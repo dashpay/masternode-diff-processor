@@ -1,23 +1,8 @@
-use std::borrow::Borrow;
-use std::collections::BTreeMap;
-use std::ptr::null_mut;
-use dash_spv_ffi::ffi::boxer::boxed;
-use dash_spv_ffi::ffi::from::FromFFI;
-use dash_spv_ffi::ffi::to::ToFFI;
-use dash_spv_ffi::types;
 use dash_spv_models::common::chain_type::ChainType;
-use dash_spv_models::common::{LLMQSnapshotSkipMode, LLMQType, SocketAddress};
-use dash_spv_models::{llmq, tx};
-use dash_spv_models::masternode::{LLMQEntry, MasternodeEntry};
-use dash_spv_models::masternode::llmq_entry::{LLMQ_DEFAULT_VERSION, LLMQ_INDEXED_VERSION};
-use dash_spv_primitives::consensus::encode::VarInt;
-use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256};
-use dash_spv_primitives::crypto::var_array::VarArray;
-use dash_spv_primitives::crypto::{UInt128, UInt160, UInt384, UInt768};
+use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
-use dash_spv_primitives::util::base58;
-use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, masternode_list_destroy_default, get_masternode_list_by_block_hash_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback, get_merkle_root_by_hash_default, log_default, get_masternode_list_by_block_hash_from_cache, masternode_list_save_in_cache, save_llmq_snapshot_in_cache, hash_destroy_default, snapshot_destroy_default};
-use crate::{process_mnlistdiff_from_message_internal, process_qrinfo, process_qrinfo_from_message, process_qrinfo_from_message_internal, processor_create_cache, register_processor};
+use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, masternode_list_destroy_default, get_masternode_list_by_block_hash_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_llmq_of_type, validate_llmq_callback, get_merkle_root_by_hash_default, log_default, get_masternode_list_by_block_hash_from_cache, masternode_list_save_in_cache, save_llmq_snapshot_in_cache, hash_destroy_default, snapshot_destroy_default, should_process_diff_with_range_default, send_error_default};
+use crate::{process_mnlistdiff_from_message_internal, process_qrinfo_from_message, process_qrinfo_from_message_internal, processor_create_cache, register_processor};
 use crate::processing::MasternodeProcessorCache;
 
 // #[test]
@@ -45,6 +30,8 @@ fn test_llmq_rotation() {
             validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
+            should_process_diff_with_range_default,
+            send_error_default,
             log_default,
         )
     };
@@ -90,6 +77,8 @@ fn test_llmq_rotation_2() {
             validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
+            should_process_diff_with_range_default,
+            send_error_default,
             log_default,
         )
     };
@@ -408,6 +397,8 @@ fn test_devnet_333() {
             validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
+            should_process_diff_with_range_default,
+            send_error_default,
             log_default,
         )
     };
@@ -440,6 +431,8 @@ fn test_processor_devnet_333() {
             validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
+            should_process_diff_with_range_default,
+            send_error_default,
             log_default,
         )
     };
@@ -459,182 +452,184 @@ fn test_processor_devnet_333() {
     );
 }
 // #[test]
-fn test_processor_devnet_manual() {
-    let chain = ChainType::DevNet;
-    let processor = unsafe {
-        register_processor(
-            get_merkle_root_by_hash_default_333,
-            block_height_lookup_333,
-            get_block_hash_by_height_default,
-            get_llmq_snapshot_by_block_hash_default,
-            save_llmq_snapshot_default,
-            get_masternode_list_by_block_hash_default,
-            masternode_list_save_default,
-            masternode_list_destroy_default,
-            add_insight_lookup_default,
-            should_process_llmq_of_type,
-            validate_llmq_callback,
-            hash_destroy_default,
-            snapshot_destroy_default,
-            log_default,
-        )
-    };
-    let cache = unsafe { processor_create_cache() };
-    let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
-    let creation_height = 1008;
-
-    let tip_pro_reg_tx_hash_1 = UInt256::from_hex("663b2fb8bb620db387f7268ccdf261d0739b3b734080487736560536f9da67c0").unwrap();
-    let tip_pro_reg_tx_hash_2 = UInt256::from_hex("beba26ecf8a70d13898cdf463dc2b29b3111999d9ad7bb3b1bd270c38ec64a46").unwrap();
-    let tip_pro_reg_tx_hash_3 = UInt256::from_hex("67eb2b533192cd354e9571cb361c5fb2f3a40847aed1b0983a18164f650542d4").unwrap();
-    let tip_pro_reg_tx_hash_4 = UInt256::from_hex("f4bb17991ade54751bae0d192102ffa1fe9428085f459acf22a34f061e5b2a18").unwrap();
-
-    let tip_llmq_hash_1 = UInt256::from_hex("0e66f9273a2de1905244de60faf55bb6ec795cc6c66607f2c0cf9264e224d02d").unwrap();
-    let tip_llmq_hash_2 = UInt256::from_hex("6a8908985dac8faaf2edeeb5fc581ca8cfd13ab8a0d054283b10241d9cd74ee7").unwrap();
-    let tip_llmq_hash_3 = UInt256::from_hex("0e66f9273a2de1905244de60faf55bb6ec795cc6c66607f2c0cf9264e224d02d").unwrap();
-    let tip_llmq_hash_4 = UInt256::from_hex("0e66f9273a2de1905244de60faf55bb6ec795cc6c66607f2c0cf9264e224d02d").unwrap();
-
-    let info = types::QRInfo {
-        snapshot_at_h_c: boxed(types::LLMQSnapshot::from_data(vec![1, 1, 1, 1, 1], vec![1, 1], LLMQSnapshotSkipMode::SkipFirst)),
-        snapshot_at_h_2c: boxed(types::LLMQSnapshot::from_data(vec![0, 1, 1, 1, 1], vec![], LLMQSnapshotSkipMode::NoSkipping)),
-        snapshot_at_h_3c: boxed(types::LLMQSnapshot::from_data(vec![0, 0, 0, 1, 1], vec![], LLMQSnapshotSkipMode::NoSkipping)),
-        snapshot_at_h_4c: null_mut(),
-        mn_list_diff_tip: boxed(llmq::MNListDiff {
-            base_block_hash: UInt256::from_hex("663b2fb8bb620db387f7268ccdf261d0739b3b734080487736560536f9da67c0").unwrap(),
-            block_hash: UInt256::from_hex("5fcef4606b48e92b611df852b12974e549fc385a7097d2370a7bd0bad8cbb055").unwrap(),
-            total_transactions: 1,
-            merkle_hashes: VarArray::<UInt256>::from_bytes(b"010e45d82414995ed1c23f546c35afa316499c09b870dd0a3c15796c4ccfdc00c4", &mut 0).unwrap(),
-            merkle_flags: b"01",
-            merkle_flags_count: 1,
-            coinbase_transaction: tx::CoinbaseTransaction::from_bytes("03000500010000000000000000000000000000000000000000000000000000000000000000ffffffff050205040101ffffffff038d0cb75b0300000023210285c760cb2fd04fc7ff217cfd1c66594ba47247c29eed85949f43e80f57b53727acd94e854a030000001976a91471d69c816b5ad8718c800607fef3a47221078d6088acb0bd3111000000001976a914a73955c08d561a22a399513e1c5d3983d110701d88ac000000004602000504000042696f1f2db709cde94efa6f8de3e5c5ffda082fcb3f9d81b5929849385667bd3394b4b77e40afd081094fb55b49a94f39bc6910146b5010b9d6af082f15545a".as_bytes(), &mut 0).unwrap(),
-            deleted_masternode_hashes: Vec::new(),
-            added_or_modified_masternodes: BTreeMap::from([
-                (tip_pro_reg_tx_hash_1, MasternodeEntry::new(
-                    tip_pro_reg_tx_hash_1.clone(),
-                    UInt256::from_hex("5fcef4606b48e92b611df852b12974e549fc385a7097d2370a7bd0bad8cbb055").unwrap(),
-                    SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13998 },
-                    UInt160::from_bytes(base58::from("yhedxEwiZ162jKCd3WpvWgWWocDiciJuKk").unwrap().borrow(), &mut 0).unwrap(),
-                    UInt384::from_hex("8c3a4249f6e1597ac13fce64b91361ebf6d0837d5a95736549b88826868c34c7c8ede2da665e2702708fc431c9eb231b").unwrap(),
-                    1u8
-                )), (
-                    tip_pro_reg_tx_hash_2, MasternodeEntry::new(
-                        tip_pro_reg_tx_hash_2,
-                        UInt256::from_hex("63f2bb5920d1a0c27c9689d62c6834a314584fcd7b2bf52388c1dcc2c987f2ec").unwrap(),
-                        SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13999 },
-                        UInt160::from_bytes(base58::from("yZLegVnDt5t4KZAiXiH2M88LbvkHxRnXL5").unwrap().borrow(), &mut 0).unwrap(),
-                        UInt384::from_hex("1185482390215003acac18979f4090b5cb4f2a7abd54a0e25b676d681bb6b53853488a74a014863403eab95b47afa017").unwrap(),
-                        1u8
-                    )), (
-                    tip_pro_reg_tx_hash_3, MasternodeEntry::new(
-                        tip_pro_reg_tx_hash_3,
-                        UInt256::from_hex("17ac84060b137d5e2c19bc4f2fa030fd4c49aedc77c64380251d7c22bf78e560").unwrap(),
-                        SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13995 },
-                        UInt160::from_bytes(base58::from("ygo4ZEACuXGWygecqexNvLR2ryPV6LJBXh").unwrap().borrow(), &mut 0).unwrap(),
-                        UInt384::from_hex("1904bd1b479ff9fb5d99996575e4bdad5fefad11adf58de8e75d1b6e4964adf8b55d9e4f9432d56df6bef67f2ad68cda").unwrap(),
-                        1u8
-                    )), (
-                    tip_pro_reg_tx_hash_4, MasternodeEntry::new(
-                        tip_pro_reg_tx_hash_4,
-                        UInt256::from_hex("50cc1bc3de661f923afd38e608a5b4fbd1b608cba85d050e7380cbbbe4fc41ff").unwrap(),
-                        SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13997 },
-                        UInt160::from_bytes(base58::from("yiyRqpgyVXTw3SGyWMVNeWS5YMNC56MMnW").unwrap().borrow(), &mut 0).unwrap(),
-                        UInt384::from_hex("0579dccf1de4e4bbf5f69bd1ccf5df2dd327d32b49e3789ec823858bb4fc3fef32c214461ca16151e7c5176573291429").unwrap(),
-                        1u8
-                    ))]),
-            deleted_quorums: BTreeMap::new(),
-            added_quorums: BTreeMap::from([
-                (LLMQType::LlmqtypeTest, BTreeMap::from([
-                    (tip_llmq_hash_1,
-                     LLMQEntry::new(
-                         LLMQ_INDEXED_VERSION,
-                         LLMQType::LlmqtypeTest,
-                         tip_llmq_hash_1,
-                         Some(0),
-                         VarInt(4),
-                         VarInt(4),
-                         b"0f".to_vec(),
-                         b"0f".to_vec(),
-                         UInt384::from_hex("0f10444bd28d6a0993224baef8ad9b5c6fcdb246b268ef36928e9b9594e1e0e8679b867a16914c55d129007b07169767").unwrap(),
-                         UInt256::from_hex("a689bbe717b3e6ad6ea82d56dcd39cac0fc59b78849277519916be7422e2656c").unwrap(),
-                         UInt768::from_hex("0ab9c10a55e71608c4adb77e7fcf3aa060d26ee243c8bee3fa0a5af04e79a628974444a68c3bdc289d5a4141c7e5ba5c15a3f0f40c4f16dd4cdb2cb42223ecd842a238c9937ce6c5b065dfebc35fd4a0c64aac0358a1095cfae7c3fedf6063eb").unwrap(),
-                         UInt768::from_hex("10a116918d6d5e44732178c68076cc640b884ea91a83072b4205056af2682c6ee65b32d7f49bd38e349cdbd5b2292f3904d1e1c4a17e45bd94d4d1d5c89a9eaade467dd208d8878cb4fed3afb8b2eada4b5cd10ba65c9c8356c5bc54fdd22834").unwrap(),
-                     )),
-                    (tip_llmq_hash_2,
-                     LLMQEntry::new(
-                         LLMQ_INDEXED_VERSION,
-                         LLMQType::LlmqtypeTest,
-                         tip_llmq_hash_2,
-                         Some(1),
-                         VarInt(4),
-                         VarInt(4),
-                         b"0f".to_vec(),
-                         b"0f".to_vec(),
-                         UInt384::from_hex("01debc67e536f44b62b0558b6c3a15e7b0ea96b31b284875a9ca8d29ed7b214a75586095bdaf587daac6db781341512c").unwrap(),
-                         UInt256::from_hex("1283ed47e65a4a6b8696baee4e58982db52f2cc8a2b9f49ae45fdad31f6d5e8f").unwrap(),
-                         UInt768::from_hex("0b0f242f2c157df7a6b86d6de735088c230f654787cb45a23d299e9b9adb17b2382e14160f4181108198a3efe50ca3351298186b2be82c622ffda6c2cfde2007c080db44ef97e088b1127f3286f7220c1ed87993d6f186a5085764cc911a4c48").unwrap(),
-                         UInt768::from_hex("82035bfe76e6ddf3a88d141512e5624ab3cd04596d7afaf928352e76d55bb819a5183a9aeb9a604bb23a40f371dc34f500c2738f4e3147c909d8ba384ce26c13b5695fca04e16e59064b2e53632fd8314a08bc81b49a7555eeda5cdc79f71a7c").unwrap(),
-                     ))
-                ])),
-                (LLMQType::LlmqtypeTestV17, BTreeMap::from([
-                    (tip_llmq_hash_3,
-                     LLMQEntry::new(
-                         LLMQ_DEFAULT_VERSION,
-                         LLMQType::LlmqtypeTestV17,
-                         tip_llmq_hash_3,
-                         None,
-                         VarInt(3),
-                         VarInt(3),
-                         b"07".to_vec(),
-                         b"07".to_vec(),
-                         UInt384::from_hex("05a55e3fea0341d7f1985a1d5cefa20536bbe56df49c3bddff19ba8ec23ae20956cd1bf4718c6c33b8901583de3b5455").unwrap(),
-                         UInt256::from_hex("bb78ee19643d2bc92334e4d630edab7fde7be90549525121b6db97ecace5524a").unwrap(),
-                         UInt768::from_hex("94a41ea4095cd7d4ca5db33018eb2df3abb9f51ea74653db1dc2832a45f683d96cd0cd209458ece30c6f6b908c53687a0e428b6763db9c65bcc753509fb919e4643d52c759ff8285724840677be35e7db3f9981bb93c36ba41f51afeb386a511").unwrap(),
-                         UInt768::from_hex("89befef3e3c509192d843c426df9c7316c6cb63ec4bc2c50744d0ac33a769283df7b645a965c3dba9e008b258bbe8bb7016774fc81d31e85ac34cb844a8c572dc6b2d6576b65df0fb09114c964c315fc66ea22b1911ed26fb82d39b9635b18b9").unwrap(),
-                     )),
-                    (tip_llmq_hash_4,
-                     LLMQEntry::new(
-                         LLMQ_DEFAULT_VERSION,
-                         LLMQType::LlmqtypeTestV17,
-                         tip_llmq_hash_4,
-                         None,
-                         VarInt(3),
-                         VarInt(3),
-                         b"07".to_vec(),
-                         b"07".to_vec(),
-                         UInt384::from_hex("92470c6e0268b1cd8f326e673c952fcbb5b0dd8f7f28dd0bb4a7d14023f69bab475f2aff3930b00bc040c211e0363272").unwrap(),
-                         UInt256::from_hex("c82cbf83d68d2a9598ebd14798d7544485659884dad31d0305c9e01969031769").unwrap(),
-                         UInt768::from_hex("94c3181a766833b06ce5b4d4c83534da6665974f81e2d9fe6e4eb644ea9c033fcaf62cdc244a82a8453261043cb55f4006d62f310dfe918c292663a2abb19df253ddf67db2c4df126edaa2b21a61dbc9af8fc0a36fce55b8bf14a57f7edb60ca").unwrap(),
-                         UInt768::from_hex("94be970450945d578263d08ab524d995e253db865d7195671f2c48a0baff7d2b6c9f17f79abf8247244459c60104d8da0efe78a709db8e85e1047fa620365bcf31f9f488aaf27a46cf1ba33d768cf6ea66ee02777ef0b42b2d92e16011517438").unwrap(),
-                     ))
-                ]))
-            ]),
-            block_height: creation_height
-        }.encode()),
-        mn_list_diff_at_h: null_mut(),
-        mn_list_diff_at_h_c: null_mut(),
-        mn_list_diff_at_h_2c: null_mut(),
-        mn_list_diff_at_h_3c: null_mut(),
-        mn_list_diff_at_h_4c: null_mut(),
-        extra_share: false,
-        last_quorum_per_index: null_mut(),
-        last_quorum_per_index_count: 0,
-        quorum_snapshot_list: null_mut(),
-        quorum_snapshot_list_count: 0,
-        mn_list_diff_list: null_mut(),
-        mn_list_diff_list_count: 0
-    };
-
-    let result = process_qrinfo(
-        boxed(info),
-        false,
-        chain.genesis_hash().0.as_ptr(),
-        processor,
-        cache,
-        context);
-    //let masternode_list_decoded = unsafe { masternode_list.decode() };
-
-    let result_unboxed = unsafe { *result };
-    let list_diff = unsafe { (*result_unboxed.snapshot_at_h_c).decode() };
-}
+// fn test_processor_devnet_manual() {
+//     let chain = ChainType::DevNet;
+//     let processor = unsafe {
+//         register_processor(
+//             get_merkle_root_by_hash_default_333,
+//             block_height_lookup_333,
+//             get_block_hash_by_height_default,
+//             get_llmq_snapshot_by_block_hash_default,
+//             save_llmq_snapshot_default,
+//             get_masternode_list_by_block_hash_default,
+//             masternode_list_save_default,
+//             masternode_list_destroy_default,
+//             add_insight_lookup_default,
+//             should_process_llmq_of_type,
+//             validate_llmq_callback,
+//             hash_destroy_default,
+//             snapshot_destroy_default,
+//             should_process_diff_with_range_default,
+//             send_error_default,
+//             log_default,
+//         )
+//     };
+//     let cache = unsafe { processor_create_cache() };
+//     let context = &mut (FFIContext { chain, cache: MasternodeProcessorCache::default() }) as *mut _ as *mut std::ffi::c_void;
+//     let creation_height = 1008;
+//
+//     let tip_pro_reg_tx_hash_1 = UInt256::from_hex("663b2fb8bb620db387f7268ccdf261d0739b3b734080487736560536f9da67c0").unwrap();
+//     let tip_pro_reg_tx_hash_2 = UInt256::from_hex("beba26ecf8a70d13898cdf463dc2b29b3111999d9ad7bb3b1bd270c38ec64a46").unwrap();
+//     let tip_pro_reg_tx_hash_3 = UInt256::from_hex("67eb2b533192cd354e9571cb361c5fb2f3a40847aed1b0983a18164f650542d4").unwrap();
+//     let tip_pro_reg_tx_hash_4 = UInt256::from_hex("f4bb17991ade54751bae0d192102ffa1fe9428085f459acf22a34f061e5b2a18").unwrap();
+//
+//     let tip_llmq_hash_1 = UInt256::from_hex("0e66f9273a2de1905244de60faf55bb6ec795cc6c66607f2c0cf9264e224d02d").unwrap();
+//     let tip_llmq_hash_2 = UInt256::from_hex("6a8908985dac8faaf2edeeb5fc581ca8cfd13ab8a0d054283b10241d9cd74ee7").unwrap();
+//     let tip_llmq_hash_3 = UInt256::from_hex("0e66f9273a2de1905244de60faf55bb6ec795cc6c66607f2c0cf9264e224d02d").unwrap();
+//     let tip_llmq_hash_4 = UInt256::from_hex("0e66f9273a2de1905244de60faf55bb6ec795cc6c66607f2c0cf9264e224d02d").unwrap();
+//
+//     let info = types::QRInfo {
+//         snapshot_at_h_c: boxed(types::LLMQSnapshot::from_data(vec![1, 1, 1, 1, 1], vec![1, 1], LLMQSnapshotSkipMode::SkipFirst)),
+//         snapshot_at_h_2c: boxed(types::LLMQSnapshot::from_data(vec![0, 1, 1, 1, 1], vec![], LLMQSnapshotSkipMode::NoSkipping)),
+//         snapshot_at_h_3c: boxed(types::LLMQSnapshot::from_data(vec![0, 0, 0, 1, 1], vec![], LLMQSnapshotSkipMode::NoSkipping)),
+//         snapshot_at_h_4c: null_mut(),
+//         mn_list_diff_tip: boxed(llmq::MNListDiff {
+//             base_block_hash: UInt256::from_hex("663b2fb8bb620db387f7268ccdf261d0739b3b734080487736560536f9da67c0").unwrap(),
+//             block_hash: UInt256::from_hex("5fcef4606b48e92b611df852b12974e549fc385a7097d2370a7bd0bad8cbb055").unwrap(),
+//             total_transactions: 1,
+//             merkle_hashes: VarArray::<UInt256>::from_bytes(b"010e45d82414995ed1c23f546c35afa316499c09b870dd0a3c15796c4ccfdc00c4", &mut 0).unwrap(),
+//             merkle_flags: b"01",
+//             merkle_flags_count: 1,
+//             coinbase_transaction: tx::CoinbaseTransaction::from_bytes("03000500010000000000000000000000000000000000000000000000000000000000000000ffffffff050205040101ffffffff038d0cb75b0300000023210285c760cb2fd04fc7ff217cfd1c66594ba47247c29eed85949f43e80f57b53727acd94e854a030000001976a91471d69c816b5ad8718c800607fef3a47221078d6088acb0bd3111000000001976a914a73955c08d561a22a399513e1c5d3983d110701d88ac000000004602000504000042696f1f2db709cde94efa6f8de3e5c5ffda082fcb3f9d81b5929849385667bd3394b4b77e40afd081094fb55b49a94f39bc6910146b5010b9d6af082f15545a".as_bytes(), &mut 0).unwrap(),
+//             deleted_masternode_hashes: Vec::new(),
+//             added_or_modified_masternodes: BTreeMap::from([
+//                 (tip_pro_reg_tx_hash_1, MasternodeEntry::new(
+//                     tip_pro_reg_tx_hash_1.clone(),
+//                     UInt256::from_hex("5fcef4606b48e92b611df852b12974e549fc385a7097d2370a7bd0bad8cbb055").unwrap(),
+//                     SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13998 },
+//                     UInt160::from_bytes(base58::from("yhedxEwiZ162jKCd3WpvWgWWocDiciJuKk").unwrap().borrow(), &mut 0).unwrap(),
+//                     UInt384::from_hex("8c3a4249f6e1597ac13fce64b91361ebf6d0837d5a95736549b88826868c34c7c8ede2da665e2702708fc431c9eb231b").unwrap(),
+//                     1u8
+//                 )), (
+//                     tip_pro_reg_tx_hash_2, MasternodeEntry::new(
+//                         tip_pro_reg_tx_hash_2,
+//                         UInt256::from_hex("63f2bb5920d1a0c27c9689d62c6834a314584fcd7b2bf52388c1dcc2c987f2ec").unwrap(),
+//                         SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13999 },
+//                         UInt160::from_bytes(base58::from("yZLegVnDt5t4KZAiXiH2M88LbvkHxRnXL5").unwrap().borrow(), &mut 0).unwrap(),
+//                         UInt384::from_hex("1185482390215003acac18979f4090b5cb4f2a7abd54a0e25b676d681bb6b53853488a74a014863403eab95b47afa017").unwrap(),
+//                         1u8
+//                     )), (
+//                     tip_pro_reg_tx_hash_3, MasternodeEntry::new(
+//                         tip_pro_reg_tx_hash_3,
+//                         UInt256::from_hex("17ac84060b137d5e2c19bc4f2fa030fd4c49aedc77c64380251d7c22bf78e560").unwrap(),
+//                         SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13995 },
+//                         UInt160::from_bytes(base58::from("ygo4ZEACuXGWygecqexNvLR2ryPV6LJBXh").unwrap().borrow(), &mut 0).unwrap(),
+//                         UInt384::from_hex("1904bd1b479ff9fb5d99996575e4bdad5fefad11adf58de8e75d1b6e4964adf8b55d9e4f9432d56df6bef67f2ad68cda").unwrap(),
+//                         1u8
+//                     )), (
+//                     tip_pro_reg_tx_hash_4, MasternodeEntry::new(
+//                         tip_pro_reg_tx_hash_4,
+//                         UInt256::from_hex("50cc1bc3de661f923afd38e608a5b4fbd1b608cba85d050e7380cbbbe4fc41ff").unwrap(),
+//                         SocketAddress { ip_address: UInt128::from_hex("127.0.0.1").unwrap(), port: 13997 },
+//                         UInt160::from_bytes(base58::from("yiyRqpgyVXTw3SGyWMVNeWS5YMNC56MMnW").unwrap().borrow(), &mut 0).unwrap(),
+//                         UInt384::from_hex("0579dccf1de4e4bbf5f69bd1ccf5df2dd327d32b49e3789ec823858bb4fc3fef32c214461ca16151e7c5176573291429").unwrap(),
+//                         1u8
+//                     ))]),
+//             deleted_quorums: BTreeMap::new(),
+//             added_quorums: BTreeMap::from([
+//                 (LLMQType::LlmqtypeTest, BTreeMap::from([
+//                     (tip_llmq_hash_1,
+//                      LLMQEntry::new(
+//                          LLMQ_INDEXED_VERSION,
+//                          LLMQType::LlmqtypeTest,
+//                          tip_llmq_hash_1,
+//                          Some(0),
+//                          VarInt(4),
+//                          VarInt(4),
+//                          b"0f".to_vec(),
+//                          b"0f".to_vec(),
+//                          UInt384::from_hex("0f10444bd28d6a0993224baef8ad9b5c6fcdb246b268ef36928e9b9594e1e0e8679b867a16914c55d129007b07169767").unwrap(),
+//                          UInt256::from_hex("a689bbe717b3e6ad6ea82d56dcd39cac0fc59b78849277519916be7422e2656c").unwrap(),
+//                          UInt768::from_hex("0ab9c10a55e71608c4adb77e7fcf3aa060d26ee243c8bee3fa0a5af04e79a628974444a68c3bdc289d5a4141c7e5ba5c15a3f0f40c4f16dd4cdb2cb42223ecd842a238c9937ce6c5b065dfebc35fd4a0c64aac0358a1095cfae7c3fedf6063eb").unwrap(),
+//                          UInt768::from_hex("10a116918d6d5e44732178c68076cc640b884ea91a83072b4205056af2682c6ee65b32d7f49bd38e349cdbd5b2292f3904d1e1c4a17e45bd94d4d1d5c89a9eaade467dd208d8878cb4fed3afb8b2eada4b5cd10ba65c9c8356c5bc54fdd22834").unwrap(),
+//                      )),
+//                     (tip_llmq_hash_2,
+//                      LLMQEntry::new(
+//                          LLMQ_INDEXED_VERSION,
+//                          LLMQType::LlmqtypeTest,
+//                          tip_llmq_hash_2,
+//                          Some(1),
+//                          VarInt(4),
+//                          VarInt(4),
+//                          b"0f".to_vec(),
+//                          b"0f".to_vec(),
+//                          UInt384::from_hex("01debc67e536f44b62b0558b6c3a15e7b0ea96b31b284875a9ca8d29ed7b214a75586095bdaf587daac6db781341512c").unwrap(),
+//                          UInt256::from_hex("1283ed47e65a4a6b8696baee4e58982db52f2cc8a2b9f49ae45fdad31f6d5e8f").unwrap(),
+//                          UInt768::from_hex("0b0f242f2c157df7a6b86d6de735088c230f654787cb45a23d299e9b9adb17b2382e14160f4181108198a3efe50ca3351298186b2be82c622ffda6c2cfde2007c080db44ef97e088b1127f3286f7220c1ed87993d6f186a5085764cc911a4c48").unwrap(),
+//                          UInt768::from_hex("82035bfe76e6ddf3a88d141512e5624ab3cd04596d7afaf928352e76d55bb819a5183a9aeb9a604bb23a40f371dc34f500c2738f4e3147c909d8ba384ce26c13b5695fca04e16e59064b2e53632fd8314a08bc81b49a7555eeda5cdc79f71a7c").unwrap(),
+//                      ))
+//                 ])),
+//                 (LLMQType::LlmqtypeTestV17, BTreeMap::from([
+//                     (tip_llmq_hash_3,
+//                      LLMQEntry::new(
+//                          LLMQ_DEFAULT_VERSION,
+//                          LLMQType::LlmqtypeTestV17,
+//                          tip_llmq_hash_3,
+//                          None,
+//                          VarInt(3),
+//                          VarInt(3),
+//                          b"07".to_vec(),
+//                          b"07".to_vec(),
+//                          UInt384::from_hex("05a55e3fea0341d7f1985a1d5cefa20536bbe56df49c3bddff19ba8ec23ae20956cd1bf4718c6c33b8901583de3b5455").unwrap(),
+//                          UInt256::from_hex("bb78ee19643d2bc92334e4d630edab7fde7be90549525121b6db97ecace5524a").unwrap(),
+//                          UInt768::from_hex("94a41ea4095cd7d4ca5db33018eb2df3abb9f51ea74653db1dc2832a45f683d96cd0cd209458ece30c6f6b908c53687a0e428b6763db9c65bcc753509fb919e4643d52c759ff8285724840677be35e7db3f9981bb93c36ba41f51afeb386a511").unwrap(),
+//                          UInt768::from_hex("89befef3e3c509192d843c426df9c7316c6cb63ec4bc2c50744d0ac33a769283df7b645a965c3dba9e008b258bbe8bb7016774fc81d31e85ac34cb844a8c572dc6b2d6576b65df0fb09114c964c315fc66ea22b1911ed26fb82d39b9635b18b9").unwrap(),
+//                      )),
+//                     (tip_llmq_hash_4,
+//                      LLMQEntry::new(
+//                          LLMQ_DEFAULT_VERSION,
+//                          LLMQType::LlmqtypeTestV17,
+//                          tip_llmq_hash_4,
+//                          None,
+//                          VarInt(3),
+//                          VarInt(3),
+//                          b"07".to_vec(),
+//                          b"07".to_vec(),
+//                          UInt384::from_hex("92470c6e0268b1cd8f326e673c952fcbb5b0dd8f7f28dd0bb4a7d14023f69bab475f2aff3930b00bc040c211e0363272").unwrap(),
+//                          UInt256::from_hex("c82cbf83d68d2a9598ebd14798d7544485659884dad31d0305c9e01969031769").unwrap(),
+//                          UInt768::from_hex("94c3181a766833b06ce5b4d4c83534da6665974f81e2d9fe6e4eb644ea9c033fcaf62cdc244a82a8453261043cb55f4006d62f310dfe918c292663a2abb19df253ddf67db2c4df126edaa2b21a61dbc9af8fc0a36fce55b8bf14a57f7edb60ca").unwrap(),
+//                          UInt768::from_hex("94be970450945d578263d08ab524d995e253db865d7195671f2c48a0baff7d2b6c9f17f79abf8247244459c60104d8da0efe78a709db8e85e1047fa620365bcf31f9f488aaf27a46cf1ba33d768cf6ea66ee02777ef0b42b2d92e16011517438").unwrap(),
+//                      ))
+//                 ]))
+//             ]),
+//             block_height: creation_height
+//         }.encode()),
+//         mn_list_diff_at_h: null_mut(),
+//         mn_list_diff_at_h_c: null_mut(),
+//         mn_list_diff_at_h_2c: null_mut(),
+//         mn_list_diff_at_h_3c: null_mut(),
+//         mn_list_diff_at_h_4c: null_mut(),
+//         extra_share: false,
+//         last_quorum_per_index: null_mut(),
+//         last_quorum_per_index_count: 0,
+//         quorum_snapshot_list: null_mut(),
+//         quorum_snapshot_list_count: 0,
+//         mn_list_diff_list: null_mut(),
+//         mn_list_diff_list_count: 0
+//     };
+//
+//     let result = process_qrinfo(
+//         boxed(info),
+//         false,
+//         chain.genesis_hash().0.as_ptr(),
+//         processor,
+//         cache,
+//         context);
+//     //let masternode_list_decoded = unsafe { masternode_list.decode() };
+//
+//     let result_unboxed = unsafe { *result };
+//     let list_diff = unsafe { (*result_unboxed.snapshot_at_h_c).decode() };
+// }
 
 
 #[test]
@@ -655,6 +650,8 @@ fn test_processor_devnet_333_2() {
             validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
+            should_process_diff_with_range_default,
+            send_error_default,
             log_default,
         )
     };
@@ -934,6 +931,8 @@ fn test_jack_daniels() {
             validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
+            should_process_diff_with_range_default,
+            send_error_default,
             log_default,
         )
     };

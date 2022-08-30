@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, LogMessage, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
+use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, LogMessage, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, SendError, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
 use dash_spv_ffi::ffi::to::ToFFI;
 use dash_spv_ffi::types;
 use dash_spv_ffi::ffi::callbacks;
@@ -13,7 +13,7 @@ use dash_spv_primitives::crypto::byte_util::{ConstDecodable, Reversable, Zeroabl
 use dash_spv_primitives::crypto::data_ops::{Data, inplace_intersection};
 use dash_spv_primitives::crypto::UInt256;
 use dash_spv_primitives::hashes::{Hash, sha256d};
-use crate::processing::MNListDiffResult;
+use crate::processing::{MNListDiffResult, ProcessingError};
 use crate::processing::processor_cache::MasternodeProcessorCache;
 
 // https://github.com/rust-lang/rfcs/issues/2770
@@ -36,6 +36,8 @@ pub struct MasternodeProcessor {
     validate_llmq: ValidateLLMQCallback,
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
+    should_process_diff_with_range: ShouldProcessDiffWithRange,
+    send_error: SendError,
     log_message: LogMessage,
 }
 impl std::fmt::Debug for MasternodeProcessor {
@@ -61,6 +63,8 @@ impl MasternodeProcessor {
         validate_llmq: ValidateLLMQCallback,
         destroy_hash: HashDestroy,
         destroy_snapshot: LLMQSnapshotDestroy,
+        should_process_diff_with_range: ShouldProcessDiffWithRange,
+        send_error: SendError,
         log_message: LogMessage,
         /*opaque_context: *const std::ffi::c_void*/) -> Self {
         Self {
@@ -77,6 +81,8 @@ impl MasternodeProcessor {
             validate_llmq,
             destroy_hash,
             destroy_snapshot,
+            should_process_diff_with_range,
+            send_error,
             log_message,
             opaque_context: null(),
             genesis_hash: null(),
@@ -725,6 +731,14 @@ impl MasternodeProcessor {
 
     pub fn should_process_quorum(&self, llmq_type: LLMQType) -> bool {
         unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.opaque_context) }
+    }
+
+    pub fn should_process_diff_with_range(&self, base_block_hash: UInt256, block_hash:UInt256) -> bool {
+        unsafe { (self.should_process_diff_with_range)(boxed(base_block_hash.0), boxed(block_hash.0), self.opaque_context) }
+    }
+
+    pub fn send_error(&self, error: ProcessingError) {
+        unsafe { (self.send_error)(error.into(), self.opaque_context) }
     }
 
     pub fn add_insight(&self, block_hash: UInt256) {
