@@ -140,6 +140,7 @@ impl MasternodeProcessor {
                                        list_diff: llmq::MNListDiff,
                                        cache: &mut MasternodeProcessorCache)
                                        -> types::MNListDiffResult {
+        println!("get_list_diff_result_with_base_lookup: {:?}", list_diff);
         let base_block_hash = list_diff.base_block_hash;
         let base_list = self.find_masternode_list(base_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists);
         self.get_list_diff_result(base_list, list_diff, cache)
