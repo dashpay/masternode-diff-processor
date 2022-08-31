@@ -12,9 +12,9 @@ impl From<u8> for ProcessingError {
     fn from(orig: u8) -> Self {
         match orig {
             0 => ProcessingError::None,
-            1 => ProcessingError::ParseError,
-            2 => ProcessingError::HasNoBaseBlockHash,
-            3 => ProcessingError::Skipped,
+            1 => ProcessingError::Skipped,
+            2 => ProcessingError::ParseError,
+            3 => ProcessingError::HasNoBaseBlockHash,
             _ => ProcessingError::None,
         }
     }
