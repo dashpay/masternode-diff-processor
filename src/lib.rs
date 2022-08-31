@@ -359,7 +359,7 @@ pub extern "C" fn process_qrinfo_from_message(
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
-    processor.log(format!("process_qrinfo_from_message.start: {:?}", std::time::Instant::now()));
+    processor.log(format!("process_qrinfo_from_message.start: {:?} {:?} {:?} {:?} {:?}", std::time::Instant::now(), genesis_hash, processor, cache, context));
     let cache = unsafe { &mut *cache };
     let offset = &mut 0;
     let mut process_list_diff = |list_diff: llmq::MNListDiff| processor.get_list_diff_result_with_base_lookup(list_diff, cache);
@@ -421,8 +421,7 @@ pub extern "C" fn process_qrinfo_from_message(
     for i in 0..mn_list_diff_list_count {
         let list_diff = unwrap_or_qr_result_failure!(read_list_diff(offset));
         let block_hash = list_diff.block_hash.clone();
-        let list_diff_result = process_list_diff(list_diff);
-        mn_list_diff_list_vec.push(boxed(list_diff_result));
+        mn_list_diff_list_vec.push(get_list_diff_result(list_diff));
         let snapshot = snapshots.get(i).unwrap();
         quorum_snapshot_list_vec.push(boxed(snapshot.encode()));
         processor.save_snapshot(block_hash, snapshot.clone());
