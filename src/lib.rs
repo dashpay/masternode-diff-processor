@@ -17,7 +17,7 @@ use byte::BytesExt;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
 use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback, MerkleRootLookup, MasternodeListSave, SaveLLMQSnapshot, GetLLMQSnapshotByBlockHash, LogMessage, HashDestroy, LLMQSnapshotDestroy, SendError, ShouldProcessDiffWithRange};
 use dash_spv_ffi::ffi::to::ToFFI;
-use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_qr_info, unbox_qr_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_mn_list_diff_result};
+use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_qr_info, unbox_qr_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_mn_list_diff_result, unbox_masternode_list};
 use dash_spv_ffi::types;
 use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
@@ -37,6 +37,13 @@ pub unsafe extern fn processor_destroy_block_hash(block_hash: *mut [u8; 32]) {
 pub unsafe extern fn processor_destroy_llmq_validation_data(data: *mut types::LLMQValidationData) {
     println!("processor_destroy_llmq_validation_data: {:?}", data);
     unbox_llmq_validation_data(data);
+}
+
+/// Destroys types::MNListDiffResult
+#[no_mangle]
+pub unsafe extern fn processor_destroy_masternode_list(list: *mut types::MasternodeList) {
+    println!("processor_destroy_masternode_list: {:?}", list);
+    unbox_masternode_list(list);
 }
 
 /// Destroys types::MNListDiffResult
