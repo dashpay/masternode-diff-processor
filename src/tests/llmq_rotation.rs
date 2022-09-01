@@ -1,4 +1,3 @@
-use dash_spv_ffi::ffi::boxer::boxed;
 use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
@@ -372,8 +371,8 @@ unsafe extern "C" fn block_height_lookup_333_2(block_hash: *mut [u8; 32], _conte
 
 }
 
-unsafe extern "C" fn get_merkle_root_by_hash_default_333(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *mut [u8; 32] {
-    boxed(UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap().0)
+unsafe extern "C" fn get_merkle_root_by_hash_default_333(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *mut u8 {
+    UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap().0.as_mut_ptr()
 }
 
 
@@ -971,12 +970,12 @@ unsafe extern "C" fn block_height_lookup_jack_daniels(block_hash: *mut [u8; 32],
     }
 }
 
-unsafe extern "C" fn get_merkle_root_by_hash_jack_daniels(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *mut [u8; 32] {
+unsafe extern "C" fn get_merkle_root_by_hash_jack_daniels(block_hash: *mut [u8; 32], _context: *const std::ffi::c_void) -> *mut u8 {
     // 74221: 55cea87c22849891b4e8819a8504605cc54314d03dacb97e6fa2aeb3d8000000 -> 601bb47971ab483aec1ee77074a785036edbb7ce543d868881aa4e04a39490c0
     let h = UInt256(*(block_hash));
-    let merkle_root = UInt256::from_hex("601bb47971ab483aec1ee77074a785036edbb7ce543d868881aa4e04a39490c0").unwrap();
+    let mut merkle_root = UInt256::from_hex("601bb47971ab483aec1ee77074a785036edbb7ce543d868881aa4e04a39490c0").unwrap();
     println!("get_merkle_root_by_hash_jack_daniels: {}: {}", h, merkle_root);
-    boxed(merkle_root.0)
+    merkle_root.0.as_mut_ptr()
 }
 
 pub unsafe extern "C" fn should_process_llmq_of_type_jack_daniels(llmq_type: u8, context: *const std::ffi::c_void) -> bool {

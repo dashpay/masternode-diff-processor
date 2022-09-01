@@ -23,6 +23,7 @@ use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::BytesDecodable;
+use dash_spv_primitives::hashes::hex::FromHex;
 use crate::processing::{MasternodeProcessor, MNListDiffResult, MasternodeProcessorCache, QRInfoResult, ProcessingError};
 
 /// Destroys anonymous internal holder for UInt256
