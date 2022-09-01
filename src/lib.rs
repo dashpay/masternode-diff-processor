@@ -23,7 +23,6 @@ use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::BytesDecodable;
-use dash_spv_primitives::hashes::hex::FromHex;
 use crate::processing::{MasternodeProcessor, MNListDiffResult, MasternodeProcessorCache, QRInfoResult, ProcessingError};
 
 /// Destroys anonymous internal holder for UInt256
@@ -63,12 +62,14 @@ pub unsafe extern fn processor_destroy_qr_info(result: *mut types::QRInfo) {
 /// Destroys types::LLMQRotationInfoResult
 #[no_mangle]
 pub unsafe extern fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
+    println!("processor_destroy_qr_info_result: {:?}", result);
     unbox_qr_info_result(result);
 }
 
 /// Destroys types::LLMQSnapshot
 #[no_mangle]
 pub unsafe extern fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
+    println!("processor_destroy_llmq_snapshot: {:?}", result);
     unbox_llmq_snapshot(result);
 }
 
@@ -402,8 +403,6 @@ pub extern "C" fn process_qrinfo_from_message(
     } else {
         null_mut()
     };
-
-
 
     let last_quorum_per_index_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
