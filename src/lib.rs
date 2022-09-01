@@ -403,6 +403,7 @@ pub extern "C" fn process_qrinfo_from_message(
     };
 
 
+
     let last_quorum_per_index_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
     for _i in 0..last_quorum_per_index_count {
