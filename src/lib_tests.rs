@@ -13,10 +13,13 @@ pub mod tests {
     use dash_spv_ffi::types;
     use dash_spv_models::common::chain_type::ChainType;
     use dash_spv_models::common::LLMQType;
+    use dash_spv_models::{llmq, masternode};
+    use dash_spv_primitives::consensus::encode;
     use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384, UInt768};
     use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
-    use crate::{process_mnlistdiff_from_message, ProcessingError, processor_create_cache, register_processor};
+    use crate::{MasternodeProcessor, process_mnlistdiff_from_message, ProcessingError, processor_create_cache, register_processor, unwrap_or_diff_processing_failure, unwrap_or_qr_processing_failure, unwrap_or_return};
     use crate::processing::processor_cache::MasternodeProcessorCache;
+    use crate::processing::{MNListDiffResult, QRInfoResult};
 
     #[derive(Debug)]
     pub struct FFIContext {
@@ -27,6 +30,119 @@ pub mod tests {
     pub struct AggregationInfo {
         pub public_key: UInt384,
         pub digest: UInt256,
+    }
+    /// This is convenience Core v0.17 method for use in tests which doesn't involve cross-FFI calls
+    pub fn process_mnlistdiff_from_message_internal(
+        message_arr: *const u8,
+        message_length: usize,
+        use_insight_as_backup: bool,
+        genesis_hash: *const u8,
+        processor: *mut MasternodeProcessor,
+        cache: *mut MasternodeProcessorCache,
+        context: *const std::ffi::c_void,
+    ) -> MNListDiffResult {
+        let processor = unsafe { &mut *processor };
+        let cache = unsafe { &mut *cache };
+        println!("process_mnlistdiff_from_message_internal.start: {:?}", std::time::Instant::now());
+        processor.opaque_context = context;
+        processor.use_insight_as_backup = use_insight_as_backup;
+        processor.genesis_hash = genesis_hash;
+        let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
+        let list_diff = unwrap_or_diff_processing_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
+        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, cache);
+        println!("process_mnlistdiff_from_message_internal.finish: {:?} {:#?}", std::time::Instant::now(), result);
+        result
+    }
+
+    /// This is convenience Core v0.18 method for use in tests which doesn't involve cross-FFI calls
+    pub fn process_qrinfo_from_message_internal(
+        message: *const u8,
+        message_length: usize,
+        use_insight_as_backup: bool,
+        genesis_hash: *const u8,
+        processor: *mut MasternodeProcessor,
+        cache: *mut MasternodeProcessorCache,
+        context: *const std::ffi::c_void,
+    ) -> QRInfoResult {
+        println!("process_qrinfo_from_message: {:?} {:?}", processor, cache);
+        let message: &[u8] = unsafe { slice::from_raw_parts(message, message_length as usize) };
+        let processor = unsafe { &mut *processor };
+        processor.opaque_context = context;
+        processor.use_insight_as_backup = use_insight_as_backup;
+        processor.genesis_hash = genesis_hash;
+        let cache = unsafe { &mut *cache };
+        println!("process_qrinfo_from_message --: {:?} {:?} {:?}", processor, processor.opaque_context, cache);
+        let offset = &mut 0;
+        let read_list_diff = |offset: &mut usize|
+            processor.read_list_diff_from_message(message, offset);
+        let mut process_list_diff = |list_diff: llmq::MNListDiff|
+            processor.get_list_diff_result_internal_with_base_lookup(list_diff, cache);
+        let read_snapshot = |offset: &mut usize| llmq::LLMQSnapshot::from_bytes(message, offset);
+        let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
+        let snapshot_at_h_c = unwrap_or_qr_processing_failure!(read_snapshot(offset));
+        let snapshot_at_h_2c = unwrap_or_qr_processing_failure!(read_snapshot(offset));
+        let snapshot_at_h_3c = unwrap_or_qr_processing_failure!(read_snapshot(offset));
+        let diff_tip = unwrap_or_qr_processing_failure!(read_list_diff(offset));
+        let diff_h = unwrap_or_qr_processing_failure!(read_list_diff(offset));
+        let diff_h_c = unwrap_or_qr_processing_failure!(read_list_diff(offset));
+        let diff_h_2c = unwrap_or_qr_processing_failure!(read_list_diff(offset));
+        let diff_h_3c = unwrap_or_qr_processing_failure!(read_list_diff(offset));
+        let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
+        let (snapshot_at_h_4c, diff_h_4c) = if extra_share {
+            (Some(unwrap_or_qr_processing_failure!(read_snapshot(offset))),
+             Some(unwrap_or_qr_processing_failure!(read_list_diff(offset))))
+        } else {
+            (None, None)
+        };
+        processor.save_snapshot(diff_h_c.block_hash, snapshot_at_h_c.clone());
+        processor.save_snapshot(diff_h_2c.block_hash, snapshot_at_h_2c.clone());
+        processor.save_snapshot(diff_h_3c.block_hash, snapshot_at_h_3c.clone());
+        if extra_share {
+            processor.save_snapshot(diff_h_4c.as_ref().unwrap().block_hash, snapshot_at_h_4c.as_ref().unwrap().clone());
+        }
+        let last_quorum_per_index_count = unwrap_or_qr_processing_failure!(read_var_int(offset)).0 as usize;
+        let mut last_quorum_per_index: Vec<masternode::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
+        for _i in 0..last_quorum_per_index_count {
+            last_quorum_per_index.push(unwrap_or_qr_processing_failure!(masternode::LLMQEntry::from_bytes(message, offset)));
+        }
+        let quorum_snapshot_list_count = unwrap_or_qr_processing_failure!(read_var_int(offset)).0 as usize;
+        let mut quorum_snapshot_list: Vec<llmq::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
+        for _i in 0..quorum_snapshot_list_count {
+            quorum_snapshot_list.push(unwrap_or_qr_processing_failure!(read_snapshot(offset)));
+        }
+        let mn_list_diff_list_count = unwrap_or_qr_processing_failure!(read_var_int(offset)).0 as usize;
+        let mut mn_list_diff_list: Vec<MNListDiffResult> = Vec::with_capacity(mn_list_diff_list_count);
+        for _i in 0..mn_list_diff_list_count {
+            mn_list_diff_list.push(process_list_diff(unwrap_or_qr_processing_failure!(read_list_diff(offset))));
+        }
+        // The order is important since the each new one dependent on previous
+        let result_at_h_4c = if let Some(diff) = diff_h_4c {
+            Some(process_list_diff(diff))
+        } else {
+            None
+        };
+        let result_at_h_3c = process_list_diff(diff_h_3c);
+        let result_at_h_2c = process_list_diff(diff_h_2c);
+        let result_at_h_c = process_list_diff(diff_h_c);
+        let result_at_h = process_list_diff(diff_h);
+        let result_at_tip = process_list_diff(diff_tip);
+        QRInfoResult {
+            error_status: ProcessingError::None,
+            result_at_tip,
+            result_at_h,
+            result_at_h_c,
+            result_at_h_2c,
+            result_at_h_3c,
+            result_at_h_4c,
+            snapshot_at_h_c,
+            snapshot_at_h_2c,
+            snapshot_at_h_3c,
+            snapshot_at_h_4c,
+            extra_share,
+            last_quorum_per_index,
+            quorum_snapshot_list,
+            mn_list_diff_list
+        }
     }
 
     pub fn init_block_store() -> HashMap<ChainType, HashMap<&'static str, u32>> {
@@ -553,10 +669,6 @@ pub mod tests {
     pub unsafe extern "C" fn should_process_diff_with_range_default(base_block_hash: *mut [u8; 32], block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> u8 {
         ProcessingError::None.into()
     }
-    pub unsafe extern "C" fn send_error_default(error: u8, context: *const std::ffi::c_void) {
-        println!("send_error_default: {}", error);
-    }
-
     pub unsafe extern "C" fn snapshot_destroy_default(_snapshot: *mut types::LLMQSnapshot) {
 
     }
@@ -661,7 +773,6 @@ pub mod tests {
                 hash_destroy_default,
                 snapshot_destroy_default,
                 should_process_diff_with_range_default,
-                send_error_default,
                 log_default,
             )
         };

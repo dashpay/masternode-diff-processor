@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, LogMessage, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, SendError, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
+use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, LogMessage, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback};
 use dash_spv_ffi::ffi::to::ToFFI;
 use dash_spv_ffi::types;
 use dash_spv_ffi::ffi::callbacks;
@@ -37,7 +37,6 @@ pub struct MasternodeProcessor {
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
-    send_error: SendError,
     log_message: LogMessage,
 }
 impl std::fmt::Debug for MasternodeProcessor {
@@ -64,7 +63,6 @@ impl MasternodeProcessor {
         destroy_hash: HashDestroy,
         destroy_snapshot: LLMQSnapshotDestroy,
         should_process_diff_with_range: ShouldProcessDiffWithRange,
-        send_error: SendError,
         log_message: LogMessage,
         /*opaque_context: *const std::ffi::c_void*/) -> Self {
         Self {
@@ -82,7 +80,6 @@ impl MasternodeProcessor {
             destroy_hash,
             destroy_snapshot,
             should_process_diff_with_range,
-            send_error,
             log_message,
             opaque_context: null(),
             genesis_hash: null(),
@@ -732,10 +729,6 @@ impl MasternodeProcessor {
 
     pub fn should_process_diff_with_range(&self, base_block_hash: UInt256, block_hash:UInt256) -> u8 {
         unsafe { (self.should_process_diff_with_range)(boxed(base_block_hash.0), boxed(block_hash.0), self.opaque_context) }
-    }
-
-    pub fn send_error(&self, error: ProcessingError) {
-        unsafe { (self.send_error)(error.into(), self.opaque_context) }
     }
 
     pub fn add_insight(&self, block_hash: UInt256) {
