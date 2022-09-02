@@ -35,35 +35,30 @@ pub unsafe extern fn processor_destroy_block_hash(block_hash: *mut [u8; 32]) {
 /// Destroys types::LLMQValidationData
 #[no_mangle]
 pub unsafe extern fn processor_destroy_llmq_validation_data(data: *mut types::LLMQValidationData) {
-    println!("processor_destroy_llmq_validation_data: {:?}", data);
     unbox_llmq_validation_data(data);
 }
 
 /// Destroys types::MNListDiffResult
 #[no_mangle]
 pub unsafe extern fn processor_destroy_masternode_list(list: *mut types::MasternodeList) {
-    println!("processor_destroy_masternode_list: {:?}", list);
     unbox_masternode_list(list);
 }
 
 /// Destroys types::MNListDiffResult
 #[no_mangle]
 pub unsafe extern fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
-    println!("processor_destroy_mnlistdiff_result: {:?}", result);
     unbox_mn_list_diff_result(result);
 }
 
 /// Destroys types::LLMQRotationInfoResult
 #[no_mangle]
 pub unsafe extern fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
-    println!("processor_destroy_qr_info_result: {:?}", result);
     unbox_qr_info_result(result);
 }
 
 /// Destroys types::LLMQSnapshot
 #[no_mangle]
 pub unsafe extern fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
-    println!("processor_destroy_llmq_snapshot: {:?}", result);
     unbox_llmq_snapshot(result);
 }
 
