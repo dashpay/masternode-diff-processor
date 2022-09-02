@@ -404,29 +404,29 @@ pub extern "C" fn process_qrinfo_from_message(
         null_mut()
     };
 
-    let last_quorum_per_index_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
+    let last_quorum_per_index_count = 0;//unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
-    for _i in 0..last_quorum_per_index_count {
-        last_quorum_per_index_vec.push(boxed(unwrap_or_qr_result_failure!(LLMQEntry::from_bytes(message, offset)).encode()));
-    }
-    let quorum_snapshot_list_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
+    // for _i in 0..last_quorum_per_index_count {
+    //     last_quorum_per_index_vec.push(boxed(unwrap_or_qr_result_failure!(LLMQEntry::from_bytes(message, offset)).encode()));
+    // }
+    let quorum_snapshot_list_count = 0;//unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
-    let mut snapshots: Vec<llmq::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
-    for _i in 0..quorum_snapshot_list_count {
-        let snapshot = unwrap_or_qr_result_failure!(read_snapshot(offset));
-        snapshots.push(snapshot.clone());
-    }
-    let mn_list_diff_list_count = unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
+    // let mut snapshots: Vec<llmq::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
+    // for _i in 0..quorum_snapshot_list_count {
+    //     let snapshot = unwrap_or_qr_result_failure!(read_snapshot(offset));
+    //     snapshots.push(snapshot.clone());
+    // }
+    let mn_list_diff_list_count = 0;//unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> = Vec::with_capacity(mn_list_diff_list_count);
     assert_eq!(quorum_snapshot_list_count, mn_list_diff_list_count, "'quorum_snapshot_list_count' must be equal 'mn_list_diff_list_count'");
-    for i in 0..mn_list_diff_list_count {
-        let list_diff = unwrap_or_qr_result_failure!(read_list_diff(offset));
-        let block_hash = list_diff.block_hash.clone();
-        mn_list_diff_list_vec.push(get_list_diff_result(list_diff));
-        let snapshot = snapshots.get(i).unwrap();
-        quorum_snapshot_list_vec.push(boxed(snapshot.encode()));
-        processor.save_snapshot(block_hash, snapshot.clone());
-    }
+    // for i in 0..mn_list_diff_list_count {
+    //     let list_diff = unwrap_or_qr_result_failure!(read_list_diff(offset));
+    //     let block_hash = list_diff.block_hash.clone();
+    //     mn_list_diff_list_vec.push(get_list_diff_result(list_diff));
+    //     let snapshot = snapshots.get(i).unwrap();
+    //     quorum_snapshot_list_vec.push(boxed(snapshot.encode()));
+    //     processor.save_snapshot(block_hash, snapshot.clone());
+    // }
 
     let result = types::QRInfoResult {
         error_status: ProcessingError::None.into(),
