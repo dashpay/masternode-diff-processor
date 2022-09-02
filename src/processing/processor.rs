@@ -140,7 +140,6 @@ impl MasternodeProcessor {
                                        list_diff: llmq::MNListDiff,
                                        cache: &mut MasternodeProcessorCache)
                                        -> types::MNListDiffResult {
-        println!("get_list_diff_result_with_base_lookup: {:?}", list_diff);
         let base_block_hash = list_diff.base_block_hash;
         let base_list = self.find_masternode_list(base_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists);
         self.get_list_diff_result(base_list, list_diff, cache)
@@ -352,7 +351,6 @@ impl MasternodeProcessor {
         let block_height = self.lookup_block_height_by_hash(block_hash);
         let quorum_modifier = quorum.llmq_quorum_hash();
         let quorum_count = quorum.llmq_type.size();
-        self.log(format!("validate_quorum: {}:{} {:?}:{}:{:?}", block_height, block_hash, quorum.llmq_type, quorum.llmq_hash, quorum.index));
         let valid_masternodes = if quorum.index.is_some() {
             self.get_rotated_masternodes_for_quorum(quorum.llmq_type, block_hash, block_height, cache)
         } else {
@@ -687,12 +685,10 @@ impl MasternodeProcessor {
     }
 
     pub fn save_masternode_list(&self, block_hash: UInt256, masternode_list: &masternode::MasternodeList) -> bool {
-        self.log(format!("save_masternode_list: {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
         unsafe { (self.save_masternode_list)(boxed(block_hash.0), boxed(masternode_list.encode()), self.opaque_context) }
     }
 
     pub fn lookup_block_hash_by_height(&self, block_height: u32) -> Option<UInt256> {
-        self.log(format!("lookup_block_hash_by_height: {}", block_height));
         callbacks::lookup_block_hash_by_height(
             block_height,
             |h: u32| unsafe { (self.get_block_hash_by_height)(h, self.opaque_context) },
@@ -701,7 +697,6 @@ impl MasternodeProcessor {
     }
 
     pub fn lookup_block_height_by_hash(&self, block_hash: UInt256) -> u32 {
-        // println!("lookup_block_height_by_hash: {:?} {:?}", block_hash, self.context);
         unsafe { (self.get_block_height_by_hash)(boxed(block_hash.0), self.opaque_context) }
     }
 
@@ -714,12 +709,10 @@ impl MasternodeProcessor {
     }
 
     pub fn save_snapshot(&self, block_hash: UInt256, snapshot: llmq::LLMQSnapshot) -> bool {
-        self.log(format!("save_snapshot: {}: {:?} {:?}", block_hash, snapshot, self.opaque_context));
         unsafe { (self.save_llmq_snapshot)(boxed(block_hash.0), boxed(snapshot.encode()), self.opaque_context) }
     }
 
     pub fn lookup_merkle_root_by_hash(&self, block_hash: UInt256) -> Option<UInt256> {
-        self.log(format!("lookup_merkle_root_by_hash: {}: {:?}", block_hash, self.opaque_context));
         callbacks::lookup_merkle_root_by_hash(
             block_hash,
             |h: UInt256| unsafe { (self.get_merkle_root_by_hash)(boxed(h.0), self.opaque_context) },
@@ -770,7 +763,6 @@ impl MasternodeProcessor {
         }), self.opaque_context) };
         let is_valid_payload = quorum.validate_payload();
         has_valid_quorums &= is_valid_payload && is_valid_signature;
-        self.log(format!("validate_signature: {}: signature: {} payload: {}, has_valid_quorums: {}", quorum.llmq_hash, is_valid_signature, is_valid_payload, has_valid_quorums));
         if has_valid_quorums {
             quorum.verified = true;
         }
