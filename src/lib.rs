@@ -195,12 +195,12 @@ pub extern "C" fn process_qrinfo_from_message(
     let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let diff_tip = unwrap_or_qr_result_failure!(read_list_diff(offset));
-    let diff_h = unwrap_or_qr_result_failure!(read_list_diff(offset));
-    let error = processor.should_process_diff_with_range(diff_h.base_block_hash, diff_h.block_hash);
+    let error = processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
     if error != ProcessingError::None.into() {
         processor.log(format!("process_qrinfo_from_message.finish_with_error: {:?} {:#?}", std::time::Instant::now(), error));
         return boxed(types::QRInfoResult::default_with_error(error));
     }
+    let diff_h = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_2c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_3c = unwrap_or_qr_result_failure!(read_list_diff(offset));
