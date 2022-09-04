@@ -140,6 +140,7 @@ pub extern "C" fn process_mnlistdiff_from_message(
     message_arr: *const u8,
     message_length: usize,
     use_insight_as_backup: bool,
+    is_from_snapshot: bool,
     genesis_hash: *const u8,
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
@@ -153,10 +154,12 @@ pub extern "C" fn process_mnlistdiff_from_message(
     processor.log(format!("process_mnlistdiff_from_message.start: {:?} {:?} {:p} {:p} {:?}", std::time::Instant::now(), genesis_hash, processor, cache, context));
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
-    let error = processor.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
-    if error != ProcessingError::None.into() {
-        processor.log(format!("process_mnlistdiff_from_message.finish_with_error: {:?} {:?}", std::time::Instant::now(), error));
-        return boxed(types::MNListDiffResult::default_with_error(error));
+    if is_from_snapshot {
+        let error = processor.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
+        if error != ProcessingError::None.into() {
+            processor.log(format!("process_mnlistdiff_from_message.finish_with_error: {:?} {:?}", std::time::Instant::now(), error));
+            return boxed(types::MNListDiffResult::default_with_error(error));
+        }
     }
     let result = processor.get_list_diff_result_with_base_lookup(list_diff, cache);
     processor.log(format!("process_mnlistdiff_from_message.finish: {:?} {:#?}", std::time::Instant::now(), result));
@@ -172,6 +175,7 @@ pub extern "C" fn process_qrinfo_from_message(
     message: *const u8,
     message_length: usize,
     use_insight_as_backup: bool,
+    is_from_snapshot: bool,
     genesis_hash: *const u8,
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
@@ -195,10 +199,12 @@ pub extern "C" fn process_qrinfo_from_message(
     let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let diff_tip = unwrap_or_qr_result_failure!(read_list_diff(offset));
-    let error = processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
-    if error != ProcessingError::None.into() {
-        processor.log(format!("process_qrinfo_from_message.finish_with_error: {:?} {:#?}", std::time::Instant::now(), error));
-        return boxed(types::QRInfoResult::default_with_error(error));
+    if is_from_snapshot {
+        let error = processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
+        if error != ProcessingError::None.into() {
+            processor.log(format!("process_qrinfo_from_message.finish_with_error: {:?} {:#?}", std::time::Instant::now(), error));
+            return boxed(types::QRInfoResult::default_with_error(error));
+        }
     }
     let diff_h = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_c = unwrap_or_qr_result_failure!(read_list_diff(offset));

@@ -781,6 +781,7 @@ pub mod tests {
             c_array,
             length,
             use_insight_as_backup,
+            false,
             chain.genesis_hash().0.as_ptr(),
             processor,
             cache,

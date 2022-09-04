@@ -74,6 +74,7 @@ pub fn load_masternode_lists_for_files(files: Vec<String>, chain: ChainType, ass
             bytes.as_ptr(),
             bytes.len(),
             false,
+            false,
             chain.genesis_hash().0.as_ptr(),
             processor,
             cache,

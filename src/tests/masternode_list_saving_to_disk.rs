@@ -35,6 +35,7 @@ fn test_mnl_saving_to_disk() { // testMNLSavingToDisk
         bytes.as_ptr(),
         bytes.len(),
         false,
+        false,
         chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
