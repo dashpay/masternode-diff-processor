@@ -7,7 +7,9 @@ WORK IN PROGRESS!
 3. Increase code coverage
 
 Run tests: 
-cargo test --package dash_spv_masternode_processor --lib tests
+cargo test --package dash-spv-masternode-processor --lib tests
+Run c test-like functions:
+./build.sh && clang c/main.c target/universal/release/libdash_spv_masternode_processor_macos.a -o test && ./test
 
 For fast local testing:
 In 'dash-shared-core'
