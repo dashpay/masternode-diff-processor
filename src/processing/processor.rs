@@ -157,7 +157,6 @@ impl MasternodeProcessor {
                                        cache: &mut MasternodeProcessorCache)
         -> types::MNListDiffResult {
         let result = self.get_list_diff_result_internal(base_list, list_diff, cache);
-        self.log(format!("get_list_diff_result: {:#?}", result));
         result.encode()
     }
 
@@ -177,7 +176,6 @@ impl MasternodeProcessor {
         let base_block_hash = list_diff.base_block_hash;
         let block_hash = list_diff.block_hash;
         let block_height = list_diff.block_height;
-        //println!("get_list_diff_result_internal: {}: {}", block_height, block_hash);
         let (base_masternodes,
             base_quorums) = match base_list {
             Some(list) => (list.masternodes, list.quorums),
@@ -194,7 +192,6 @@ impl MasternodeProcessor {
             block_height,
             block_hash
         );
-        //println!("MNListDiffResult.from_diff.base_quorums: \n[{:?}] \nadded_quorums:\n [{:?}]", base_quorums.clone(), list_diff.added_quorums.clone());
         let (added_quorums,
             quorums,
             has_valid_quorums) = self.classify_quorums(
@@ -333,7 +330,6 @@ impl MasternodeProcessor {
                 });
             }
         });
-        //println!("classify_quorums: valid: {}, added: {:#?}, quorums: {:#?}", has_valid_quorums, added, quorums, );
         (added, quorums, has_valid_quorums)
     }
 
