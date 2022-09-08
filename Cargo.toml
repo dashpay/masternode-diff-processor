@@ -1,6 +1,6 @@
 [package]
 name = "dash-spv-masternode-processor"
-version = "0.2.13"
+version = "0.3.1"
 edition = "2021"
 build = "build.rs"
 publish = false
@@ -26,15 +26,15 @@ version = "0.2.2"
 [dependencies.dash-spv-models]
 git = "https://github.com/pankcuf/dash-spv-models"
 branch = "master"
-version = "0.2.1"
+version = "0.2.2"
 [dependencies.dash-spv-ffi]
 git = "https://github.com/pankcuf/dash-spv-ffi"
 branch = "master"
-version = "0.2.1"
+version = "0.2.2"
 
 
 [build-dependencies]
-cbindgen = "0.20.0"
+cbindgen = "0.24.3"
 
 [lib]
 name = "dash_spv_masternode_processor"
