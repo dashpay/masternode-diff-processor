@@ -103,7 +103,9 @@ pub mod tests {
         let last_quorum_per_index_count = unwrap_or_qr_processing_failure!(read_var_int(offset)).0 as usize;
         let mut last_quorum_per_index: Vec<masternode::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
         for _i in 0..last_quorum_per_index_count {
-            last_quorum_per_index.push(unwrap_or_qr_processing_failure!(masternode::LLMQEntry::from_bytes(message, offset)));
+            let entry = unwrap_or_qr_processing_failure!(masternode::LLMQEntry::from_bytes(message, offset));
+            println!("LLMQEntry::(last_quorum_per_index) validate_bitsets: {}", entry.validate_bitsets());
+            last_quorum_per_index.push(entry);
         }
         let quorum_snapshot_list_count = unwrap_or_qr_processing_failure!(read_var_int(offset)).0 as usize;
         let mut quorum_snapshot_list: Vec<llmq::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
