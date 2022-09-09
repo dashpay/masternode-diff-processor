@@ -295,6 +295,7 @@ impl MasternodeProcessor {
                                 bool) {
         let has_valid_quorums = true;
         let mut added = added_quorums.clone();
+        println!("classify_quorums. added: {:?}", added_quorums.clone());
         added
             .iter_mut()
             .for_each(|(&llmq_type, llmqs_of_type)| {
@@ -342,6 +343,7 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) {
         let block_height = self.lookup_block_height_by_hash(block_hash);
+        println!("validate_quorum: {}: {:?}", block_height, quorum);
         let quorum_modifier = quorum.llmq_quorum_hash();
         let quorum_count = quorum.llmq_type.size();
         let valid_masternodes = if quorum.index.is_some() {
