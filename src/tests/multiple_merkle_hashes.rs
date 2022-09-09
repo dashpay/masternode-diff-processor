@@ -54,12 +54,19 @@ fn test_bitwise() {
 
 #[test]
 fn test_long_bitsets() {
-    let short_bitset = Vec::from_hex("ffffffffffff03").unwrap();
-    let long_bitset = Vec::from_hex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3f000000000000000000000000").unwrap();
-    let short_count = VarInt(50);
-    let long_count = VarInt(400);
-    validate_bitset(short_bitset, short_count);
-    validate_bitset(long_bitset, long_count);
+    let bitset1 = Vec::from_hex("ffffffffffff03").unwrap();
+    let count1 = VarInt(50);
+
+    let bitset2 = Vec::from_hex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3f000000000000000000000000").unwrap();
+    let count2 = VarInt(400);
+    let bitset3 = Vec::from_hex("fffffffffbffff0f").unwrap();
+    let count3 = VarInt(60);
+
+    //Error: No out-of-range bits should be set in byte representation of the signers bitvector: "fffffffffbffff0f" [val: 60, len: 1] 15 254 14
+
+    validate_bitset(bitset1, count1);
+    validate_bitset(bitset2, count2);
+    validate_bitset(bitset3, count3);
 }
 
 fn validate_bitset(bitset: Vec<u8>, count: VarInt) {
