@@ -341,7 +341,6 @@ impl MasternodeProcessor {
         masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>,
         cache: &mut MasternodeProcessorCache,
     ) {
-        println!("validate_quorum. validate_bitsets: {}", quorum.validate_bitsets());
         let block_height = self.lookup_block_height_by_hash(block_hash);
         let quorum_modifier = quorum.llmq_quorum_hash();
         let quorum_count = quorum.llmq_type.size();

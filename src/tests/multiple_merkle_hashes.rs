@@ -1,5 +1,6 @@
 use byte::{BytesExt, LE};
 use dash_spv_models::common::merkle_tree::MerkleTree;
+use dash_spv_primitives::consensus::encode::VarInt;
 use dash_spv_primitives::crypto::byte_util::UInt256;
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 
@@ -23,3 +24,59 @@ fn test_multiple_merkle_hashes() {
     println!("merkle_tree: {:?} ({:?}) {:?} {}, has_valid_coinbase: {} {:?}", merkle_hashes.to_hex(), hashes.clone(), merkle_flags.to_hex(), tree_element_count, has_valid_coinbase, desired_merkle_root);
     assert!(has_valid_coinbase, "Invalid coinbase here");
 }
+#[test]
+fn test_bitwise() {
+    // Rust has own way...
+    // objc equivalent for  UINT8_MAX >> (8 - signersOffset) << (8 - signersOffset);
+    let test_values = vec![
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ];
+    let mut masks = vec![];
+    for i in 0..416 {
+        let mask = 255 >> (((8 - i) % 32) + 32) % 32 << (((8 - i) % 32) + 32) % 32;
+        masks.push(mask);
+    }
+    assert_eq!(test_values.len(), masks.len(), "length not match");
+    assert_eq!(test_values, masks, "bitwise hell");
+}
+
+#[test]
+fn test_long_bitsets() {
+    let short_bitset = Vec::from_hex("ffffffffffff03").unwrap();
+    let long_bitset = Vec::from_hex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff3f000000000000000000000000").unwrap();
+    let short_count = VarInt(50);
+    let long_count = VarInt(400);
+    validate_bitset(short_bitset, short_count);
+    validate_bitset(long_bitset, long_count);
+}
+
+fn validate_bitset(bitset: Vec<u8>, count: VarInt) {
+    // The byte size of the signers and validMembers bitvectors must match “(quorumSize + 7) / 8”
+    println!("validateBitsets: {:?}:{}:{}:{}", bitset.to_hex(), bitset.len(), count, count.0 / 8);
+    if bitset.len() != (count.0 as usize + 7) / 8 {
+        assert!(false, "Error: The byte size of the signers bitvectors ({}) must match “(quorumSize + 7) / 8 ({})", bitset.len(), (count.0 + 7) / 8);
+    }
+    // No out-of-range bits should be set in byte representation of the signers and validMembers bitvectors
+    let offset = (count.0 / 8) as i32;
+    let mut s_offset = offset.clone() as usize;
+    let last_byte = bitset.as_slice().read_with::<u8>(&mut s_offset, byte::LE).unwrap_or(0) as i32;
+
+    let mask = 255 >> (((8 - offset) % 32) + 32) % 32 << (((8 - offset) % 32) + 32) % 32;
+    println!("lastByte: {} mask: {}", last_byte, mask);
+    if last_byte & mask != 0 {
+        assert!(false, "Error: No out-of-range bits should be set in byte representation of the signers bitvector");
+    }
+}
+
