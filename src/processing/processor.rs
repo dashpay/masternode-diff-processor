@@ -91,22 +91,22 @@ impl MasternodeProcessor {
         let genesis_hash = UInt256::from_const(self.genesis_hash).unwrap();
         if block_hash.is_zero() {
             // If it's a zero block we don't expect masternode list here
-            self.log(format!("find_masternode_list: (None: It's a zero hash) {}: {}", UInt256::MAX, block_hash));
+            //self.log(format!("find_masternode_list: (None: It's a zero hash) {}: {}", UInt256::MAX, block_hash));
             None
         } else if block_hash.eq(&genesis_hash) {
             // If it's a genesis block we don't expect masternode list here
-            self.log(format!("find_masternode_list: (None: It's a genesis) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
+            //self.log(format!("find_masternode_list: (None: It's a genesis) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             None
         } else if let Some(cached) = cached_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
-            self.log(format!("find_masternode_list: (Cached) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
+            //self.log(format!("find_masternode_list: (Cached) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             Some(cached.clone())
         } else if let Some(looked) = self.lookup_masternode_list(block_hash) {
             // Getting it from FFI directly
-            self.log(format!("find_masternode_list: (Looked) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
+            //self.log(format!("find_masternode_list: (Looked) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             Some(looked)
         } else {
-            self.log(format!("find_masternode_list: (None) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
+            //self.log(format!("find_masternode_list: (None) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             if self.lookup_block_height_by_hash(block_hash) != u32::MAX {
                 unknown_lists.push(block_hash);
             } else if self.use_insight_as_backup {
@@ -121,14 +121,14 @@ impl MasternodeProcessor {
     pub(crate) fn find_snapshot(&self, block_hash: UInt256, cached_snapshots: &BTreeMap<UInt256, llmq::LLMQSnapshot>) -> Option<llmq::LLMQSnapshot> {
         if let Some(cached) = cached_snapshots.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
-            self.log(format!("find_snapshot: (Cached) {}", block_hash));
+            //self.log(format!("find_snapshot: (Cached) {}", block_hash));
             Some(cached.clone())
         } else if let Some(looked) = self.lookup_snapshot_by_block_hash(block_hash) {
             // Getting it from FFI directly
-            self.log(format!("find_snapshot: (Looked) {}", block_hash));
+            //self.log(format!("find_snapshot: (Looked) {}", block_hash));
             Some(looked)
         } else {
-            self.log(format!("find_snapshot: (None) {}", block_hash));
+            //self.log(format!("find_snapshot: (None) {}", block_hash));
             None
         }
     }
@@ -722,7 +722,9 @@ impl MasternodeProcessor {
     }
 
     pub fn should_process_quorum(&self, llmq_type: LLMQType) -> bool {
-        unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.opaque_context) }
+        let should = unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.opaque_context) };
+        println!("should_process_quorum: {:?} : {}", llmq_type, should);
+        should
     }
 
     pub fn should_process_diff_with_range(&self, base_block_hash: UInt256, block_hash:UInt256) -> u8 {
