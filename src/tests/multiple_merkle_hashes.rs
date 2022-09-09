@@ -1,7 +1,8 @@
 use byte::{BytesExt, LE};
 use dash_spv_models::common::merkle_tree::MerkleTree;
 use dash_spv_primitives::consensus::encode::VarInt;
-use dash_spv_primitives::crypto::byte_util::UInt256;
+use dash_spv_primitives::crypto::byte_util::{AsBytes, UInt256};
+use dash_spv_primitives::crypto::data_ops::Data;
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 
 #[test]
@@ -137,4 +138,25 @@ pub fn validate_bitset_new(bitset: Vec<u8>, count: VarInt) {
         }
     }
 }
+
+#[test]
+pub fn test_bits_are_true_operations() {
+    let number1 = UInt256::from_hex("0100000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let number50 = UInt256::from_hex("3200000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let number50_shifted = UInt256::from_hex("0000000000000000320000000000000000000000000000000000000000000000").unwrap();
+    let test_number50_shifted = UInt256::from_hex("0000000000000000320000000000000000000000000000000000000000000000").unwrap();
+    let test_number = UInt256::from_hex("0100000000000000320000000000000000000000000000000000000000000000").unwrap();
+
+    assert_eq!(number50_shifted, test_number50_shifted, "These numbers must be the same");
+
+    let data = test_number.as_bytes();
+    assert_eq!(data.true_bits_count(), 4, "Must be 6 bits here");
+    assert!(data.bit_is_true_at_le_index(0), "This must be true");
+    assert!(!data.bit_is_true_at_le_index(1), "This must be false");
+    assert!(data.bit_is_true_at_le_index(65), "This must be true");
+    assert!(!data.bit_is_true_at_le_index(67), "This must be false");
+    assert!(data.bit_is_true_at_le_index(68), "This must be true");
+
+}
+
 

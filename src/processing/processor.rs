@@ -447,7 +447,7 @@ impl MasternodeProcessor {
                         let (used_at_h, unused_at_h) = Self::valid_masternodes_for( masternode_list.masternodes, quorum_modifier, quorum_count, work_block_height)
                             .into_iter()
                             .partition(|_| {
-                                let is_true = snapshot.member_list.bit_is_true_at_le_index(i);
+                                let is_true = snapshot.member_list.as_slice().bit_is_true_at_le_index(i);
                                 i += 1;
                                 is_true
                             });
@@ -735,12 +735,12 @@ impl MasternodeProcessor {
     fn validate_signature(&self, valid_masternodes: Vec<masternode::MasternodeEntry>, quorum: &mut masternode::LLMQEntry, block_height: u32, mut has_valid_quorums: bool) {
         let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
             .into_iter()
-            .filter_map(|i| match quorum.signers_bitset.bit_is_true_at_le_index(i as u32) {
+            .filter_map(|i| match quorum.signers_bitset.as_slice().bit_is_true_at_le_index(i as u32) {
                 true => Some(boxed(valid_masternodes[i].operator_public_key_at(block_height).0)),
                 false => None
             })
             .collect();
-
+        println!("validate_signature: {:?} {:?} {:?}", valid_masternodes, quorum, operator_pks);
         let operator_public_keys_count = operator_pks.len();
         let is_valid_signature = unsafe { (self.validate_llmq)(boxed(types::LLMQValidationData {
             items: boxed_vec(operator_pks),
