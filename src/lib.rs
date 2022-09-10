@@ -7,71 +7,81 @@ extern crate dash_spv_models;
 
 #[cfg(test)]
 mod lib_tests;
+mod macros;
 #[cfg(test)]
 mod tests;
-mod macros;
 
-use std::slice;
-use std::ptr::null_mut;
+use crate::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
 use byte::BytesExt;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHeightByHash, GetBlockHashByHeight, MasternodeListDestroy, MasternodeListLookup, ShouldProcessLLMQTypeCallback, ValidateLLMQCallback, MerkleRootLookup, MasternodeListSave, SaveLLMQSnapshot, GetLLMQSnapshotByBlockHash, LogMessage, HashDestroy, LLMQSnapshotDestroy, ShouldProcessDiffWithRange};
+use dash_spv_ffi::ffi::callbacks::{
+    AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash,
+    GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, LogMessage,
+    MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup,
+    SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback,
+    ValidateLLMQCallback,
+};
 use dash_spv_ffi::ffi::to::ToFFI;
-use dash_spv_ffi::ffi::unboxer::{unbox_any, unbox_block, unbox_qr_info_result, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_mn_list_diff_result, unbox_masternode_list};
+use dash_spv_ffi::ffi::unboxer::{
+    unbox_any, unbox_block, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_masternode_list,
+    unbox_mn_list_diff_result, unbox_qr_info_result,
+};
 use dash_spv_ffi::types;
 use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::BytesDecodable;
-use crate::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
+use std::ptr::null_mut;
+use std::slice;
 
 /// Destroys anonymous internal holder for UInt256
 #[no_mangle]
-pub unsafe extern fn processor_destroy_block_hash(block_hash: *mut [u8; 32]) {
+pub unsafe extern "C" fn processor_destroy_block_hash(block_hash: *mut [u8; 32]) {
     unbox_any(block_hash);
 }
 
 /// Destroys types::LLMQValidationData
 #[no_mangle]
-pub unsafe extern fn processor_destroy_llmq_validation_data(data: *mut types::LLMQValidationData) {
+pub unsafe extern "C" fn processor_destroy_llmq_validation_data(
+    data: *mut types::LLMQValidationData,
+) {
     unbox_llmq_validation_data(data);
 }
 
 /// Destroys types::MNListDiffResult
 #[no_mangle]
-pub unsafe extern fn processor_destroy_masternode_list(list: *mut types::MasternodeList) {
+pub unsafe extern "C" fn processor_destroy_masternode_list(list: *mut types::MasternodeList) {
     unbox_masternode_list(list);
 }
 
 /// Destroys types::MNListDiffResult
 #[no_mangle]
-pub unsafe extern fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
+pub unsafe extern "C" fn processor_destroy_mnlistdiff_result(result: *mut types::MNListDiffResult) {
     unbox_mn_list_diff_result(result);
 }
 
 /// Destroys types::LLMQRotationInfoResult
 #[no_mangle]
-pub unsafe extern fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
+pub unsafe extern "C" fn processor_destroy_qr_info_result(result: *mut types::QRInfoResult) {
     unbox_qr_info_result(result);
 }
 
 /// Destroys types::LLMQSnapshot
 #[no_mangle]
-pub unsafe extern fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
+pub unsafe extern "C" fn processor_destroy_llmq_snapshot(result: *mut types::LLMQSnapshot) {
     unbox_llmq_snapshot(result);
 }
 
 /// Destroys types::Block
 #[no_mangle]
-pub unsafe extern fn processor_destroy_block(result: *mut types::Block) {
+pub unsafe extern "C" fn processor_destroy_block(result: *mut types::Block) {
     unbox_block(result);
 }
-
 
 /// Register all the callbacks for use across FFI
 
 #[no_mangle]
-pub unsafe extern fn register_processor(
+pub unsafe extern "C" fn register_processor(
     get_merkle_root_by_hash: MerkleRootLookup,
     get_block_height_by_hash: GetBlockHeightByHash,
     get_block_hash_by_height: GetBlockHashByHeight,
@@ -86,7 +96,7 @@ pub unsafe extern fn register_processor(
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
-    log_message: LogMessage
+    log_message: LogMessage,
 ) -> *mut MasternodeProcessor {
     let processor = MasternodeProcessor::new(
         get_merkle_root_by_hash,
@@ -103,7 +113,7 @@ pub unsafe extern fn register_processor(
         destroy_hash,
         destroy_snapshot,
         should_process_diff_with_range,
-        log_message
+        log_message,
     );
     println!("register_processor: {:?}", processor);
     boxed(processor)
@@ -111,7 +121,7 @@ pub unsafe extern fn register_processor(
 
 /// Unregister all the callbacks for use across FFI
 #[no_mangle]
-pub unsafe extern fn unregister_processor(processor: *mut MasternodeProcessor) {
+pub unsafe extern "C" fn unregister_processor(processor: *mut MasternodeProcessor) {
     println!("unregister_processor: {:?}", processor);
     let unboxed = unbox_any(processor);
     // unbox_any(unboxed.genesis_hash);
@@ -119,7 +129,7 @@ pub unsafe extern fn unregister_processor(processor: *mut MasternodeProcessor) {
 
 /// Initialize opaque cache to store needed information between FFI calls
 #[no_mangle]
-pub unsafe extern fn processor_create_cache() -> *mut MasternodeProcessorCache {
+pub unsafe extern "C" fn processor_create_cache() -> *mut MasternodeProcessorCache {
     let cache = MasternodeProcessorCache::default();
     println!("processor_create_cache: {:?}", cache);
     boxed(cache)
@@ -127,7 +137,7 @@ pub unsafe extern fn processor_create_cache() -> *mut MasternodeProcessorCache {
 
 /// Destroy opaque cache
 #[no_mangle]
-pub unsafe extern fn processor_destroy_cache(cache: *mut MasternodeProcessorCache) {
+pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessorCache) {
     println!("processor_destroy_cache: {:?}", cache);
     let cache = unbox_any(cache);
 }
@@ -151,18 +161,35 @@ pub extern "C" fn process_mnlistdiff_from_message(
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
-    processor.log(format!("process_mnlistdiff_from_message.start: {:?} {:?} {:p} {:p} {:?}", std::time::Instant::now(), genesis_hash, processor, cache, context));
+    processor.log(format!(
+        "process_mnlistdiff_from_message.start: {:?} {:?} {:p} {:p} {:?}",
+        std::time::Instant::now(),
+        genesis_hash,
+        processor,
+        cache,
+        context
+    ));
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
-    let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
+    let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor
+        .lookup_block_height_by_hash(hash)));
     if is_from_snapshot {
-        let error = processor.should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
+        let error = processor
+            .should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
         if error != ProcessingError::None.into() {
-            processor.log(format!("process_mnlistdiff_from_message.finish_with_error: {:?} {:?}", std::time::Instant::now(), error));
+            processor.log(format!(
+                "process_mnlistdiff_from_message.finish_with_error: {:?} {:?}",
+                std::time::Instant::now(),
+                error
+            ));
             return boxed(types::MNListDiffResult::default_with_error(error));
         }
     }
     let result = processor.get_list_diff_result_with_base_lookup(list_diff, cache);
-    processor.log(format!("process_mnlistdiff_from_message.finish: {:?} {:#?}", std::time::Instant::now(), result));
+    processor.log(format!(
+        "process_mnlistdiff_from_message.finish: {:?} {:#?}",
+        std::time::Instant::now(),
+        result
+    ));
     boxed(result)
 }
 
@@ -186,23 +213,39 @@ pub extern "C" fn process_qrinfo_from_message(
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
-    processor.log(format!("process_qrinfo_from_message.start: {:?} {:?} {:?} {:?} {:?}", std::time::Instant::now(), genesis_hash, processor, cache, context));
+    processor.log(format!(
+        "process_qrinfo_from_message.start: {:?} {:?} {:?} {:?} {:?}",
+        std::time::Instant::now(),
+        genesis_hash,
+        processor,
+        cache,
+        context
+    ));
     let cache = unsafe { &mut *cache };
     let offset = &mut 0;
-    let mut process_list_diff = |list_diff: llmq::MNListDiff| processor.get_list_diff_result_with_base_lookup(list_diff, cache);
-    let read_list_diff = |offset: &mut usize| processor.read_list_diff_from_message(message, offset);
+    let mut process_list_diff = |list_diff: llmq::MNListDiff| {
+        processor.get_list_diff_result_with_base_lookup(list_diff, cache)
+    };
+    let read_list_diff =
+        |offset: &mut usize| processor.read_list_diff_from_message(message, offset);
     let read_snapshot = |offset: &mut usize| llmq::LLMQSnapshot::from_bytes(message, offset);
     let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
-    let mut get_list_diff_result = |list_diff: llmq::MNListDiff| boxed(process_list_diff(list_diff));
+    let mut get_list_diff_result =
+        |list_diff: llmq::MNListDiff| boxed(process_list_diff(list_diff));
 
     let snapshot_at_h_c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let diff_tip = unwrap_or_qr_result_failure!(read_list_diff(offset));
     if is_from_snapshot {
-        let error = processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
+        let error =
+            processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
         if error != ProcessingError::None.into() {
-            processor.log(format!("process_qrinfo_from_message.finish_with_error: {:?} {:#?}", std::time::Instant::now(), error));
+            processor.log(format!(
+                "process_qrinfo_from_message.finish_with_error: {:?} {:#?}",
+                std::time::Instant::now(),
+                error
+            ));
             return boxed(types::QRInfoResult::default_with_error(error));
         }
     }
@@ -211,14 +254,25 @@ pub extern "C" fn process_qrinfo_from_message(
     let diff_h_2c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_3c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
-    let snapshot_at_h_4c = if extra_share { Some(unwrap_or_qr_result_failure!(read_snapshot(offset))) } else { None };
-    let diff_h_4c = if extra_share { Some(unwrap_or_qr_result_failure!(read_list_diff(offset))) } else { None };
+    let snapshot_at_h_4c = if extra_share {
+        Some(unwrap_or_qr_result_failure!(read_snapshot(offset)))
+    } else {
+        None
+    };
+    let diff_h_4c = if extra_share {
+        Some(unwrap_or_qr_result_failure!(read_list_diff(offset)))
+    } else {
+        None
+    };
 
     processor.save_snapshot(diff_h_c.block_hash, snapshot_at_h_c.clone());
     processor.save_snapshot(diff_h_2c.block_hash, snapshot_at_h_2c.clone());
     processor.save_snapshot(diff_h_3c.block_hash, snapshot_at_h_3c.clone());
     if extra_share {
-        processor.save_snapshot(diff_h_4c.as_ref().unwrap().block_hash, snapshot_at_h_4c.clone().unwrap());
+        processor.save_snapshot(
+            diff_h_4c.as_ref().unwrap().block_hash,
+            snapshot_at_h_4c.clone().unwrap(),
+        );
     }
 
     let result_at_tip = get_list_diff_result(diff_tip);
@@ -232,21 +286,29 @@ pub extern "C" fn process_qrinfo_from_message(
         null_mut()
     };
 
-    let last_quorum_per_index_count = 0;//unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
-    let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> = Vec::with_capacity(last_quorum_per_index_count);
+    let last_quorum_per_index_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
+    let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> =
+        Vec::with_capacity(last_quorum_per_index_count);
     for _i in 0..last_quorum_per_index_count {
-        last_quorum_per_index_vec.push(boxed(unwrap_or_qr_result_failure!(LLMQEntry::from_bytes(message, offset)).encode()));
+        last_quorum_per_index_vec.push(boxed(
+            unwrap_or_qr_result_failure!(LLMQEntry::from_bytes(message, offset)).encode(),
+        ));
     }
-    let quorum_snapshot_list_count = 0;//unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
-    let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
+    let quorum_snapshot_list_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
+    let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> =
+        Vec::with_capacity(quorum_snapshot_list_count);
     let mut snapshots: Vec<llmq::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
     for _i in 0..quorum_snapshot_list_count {
         let snapshot = unwrap_or_qr_result_failure!(read_snapshot(offset));
         snapshots.push(snapshot.clone());
     }
-    let mn_list_diff_list_count = 0;//unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
-    let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> = Vec::with_capacity(mn_list_diff_list_count);
-    assert_eq!(quorum_snapshot_list_count, mn_list_diff_list_count, "'quorum_snapshot_list_count' must be equal 'mn_list_diff_list_count'");
+    let mn_list_diff_list_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
+    let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> =
+        Vec::with_capacity(mn_list_diff_list_count);
+    assert_eq!(
+        quorum_snapshot_list_count, mn_list_diff_list_count,
+        "'quorum_snapshot_list_count' must be equal 'mn_list_diff_list_count'"
+    );
     for i in 0..mn_list_diff_list_count {
         let list_diff = unwrap_or_qr_result_failure!(read_list_diff(offset));
         let block_hash = list_diff.block_hash.clone();
@@ -267,19 +329,26 @@ pub extern "C" fn process_qrinfo_from_message(
         snapshot_at_h_c: boxed(snapshot_at_h_c.encode()),
         snapshot_at_h_2c: boxed(snapshot_at_h_2c.encode()),
         snapshot_at_h_3c: boxed(snapshot_at_h_3c.encode()),
-        snapshot_at_h_4c: if extra_share { boxed(snapshot_at_h_4c.unwrap().encode()) } else { null_mut() },
+        snapshot_at_h_4c: if extra_share {
+            boxed(snapshot_at_h_4c.unwrap().encode())
+        } else {
+            null_mut()
+        },
         extra_share,
         last_quorum_per_index: boxed_vec(last_quorum_per_index_vec),
         last_quorum_per_index_count,
         quorum_snapshot_list: boxed_vec(quorum_snapshot_list_vec),
         quorum_snapshot_list_count,
         mn_list_diff_list: boxed_vec(mn_list_diff_list_vec),
-        mn_list_diff_list_count
+        mn_list_diff_list_count,
     };
-    processor.log(format!("process_qrinfo_from_message.finish: {:?} {:#?}", std::time::Instant::now(), result));
+    processor.log(format!(
+        "process_qrinfo_from_message.finish: {:?} {:#?}",
+        std::time::Instant::now(),
+        result
+    ));
     boxed(result)
 }
-
 
 // #[no_mangle]
 // pub extern "C" fn test_func(get_masternode_list_by_block_hash: MasternodeListLookup, destroy_masternode_list: MasternodeListDestroy, opaque_context: *const std::ffi::c_void) {

@@ -9,7 +9,9 @@ use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 fn test_multiple_merkle_hashes() {
     let merkle_hashes = Vec::from_hex("78175171f830d9ea3e67170dfdec6bd805d31b22b19eaf783355adae06faa3539762500f0eca01a59f0e198522a0752f96be9032803fb21311a992089b9472bd1361a2db43a580e40f81bd5e17eabae8eebb02e9a651ae348d88d51ca824df19").unwrap();
     let merkle_flags = Vec::from_hex("07").unwrap();
-    let desired_merkle_root = UInt256::from_hex("bd6a344573ba1d6faf24f021324fa3360562404536246503c4cba372f94bfa4a").unwrap();
+    let desired_merkle_root =
+        UInt256::from_hex("bd6a344573ba1d6faf24f021324fa3360562404536246503c4cba372f94bfa4a")
+            .unwrap();
     let tree_element_count = 4;
     let flags = merkle_flags.as_slice();
     let mut hashes = Vec::<UInt256>::new();
@@ -20,9 +22,21 @@ fn test_multiple_merkle_hashes() {
             hashes.push(hash);
         }
     }
-    let merkle_tree = MerkleTree { tree_element_count, hashes: hashes.clone(), flags };
+    let merkle_tree = MerkleTree {
+        tree_element_count,
+        hashes: hashes.clone(),
+        flags,
+    };
     let has_valid_coinbase = merkle_tree.has_root(desired_merkle_root);
-    println!("merkle_tree: {:?} ({:?}) {:?} {}, has_valid_coinbase: {} {:?}", merkle_hashes.to_hex(), hashes.clone(), merkle_flags.to_hex(), tree_element_count, has_valid_coinbase, desired_merkle_root);
+    println!(
+        "merkle_tree: {:?} ({:?}) {:?} {}, has_valid_coinbase: {} {:?}",
+        merkle_hashes.to_hex(),
+        hashes.clone(),
+        merkle_flags.to_hex(),
+        tree_element_count,
+        has_valid_coinbase,
+        desired_merkle_root
+    );
     assert!(has_valid_coinbase, "Invalid coinbase here");
 }
 #[test]
@@ -30,19 +44,22 @@ fn test_bitwise() {
     // Rust has own way...
     // objc equivalent for  UINT8_MAX >> (8 - signersOffset) << (8 - signersOffset);
     let test_values = vec![
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 192, 224, 240, 248,
+        252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128,
+        192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 192, 224, 240, 248, 252, 254,
+        255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 192, 224,
+        240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 192, 224, 240, 248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 192, 224, 240, 248, 252, 254, 255, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 192, 224, 240,
+        248, 252, 254, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ];
     let mut masks = vec![];
     for i in 0..416 {
@@ -99,14 +116,23 @@ fn test_long_bitsets() {
 
 fn validate_bitset(bitset: Vec<u8>, count: VarInt) {
     // The byte size of the signers and validMembers bitvectors must match “(quorumSize + 7) / 8”
-    println!("validateBitsets: {:?}:{}:{}:{}", bitset.to_hex(), bitset.len(), count, count.0 / 8);
+    println!(
+        "validateBitsets: {:?}:{}:{}:{}",
+        bitset.to_hex(),
+        bitset.len(),
+        count,
+        count.0 / 8
+    );
     if bitset.len() != (count.0 as usize + 7) / 8 {
         assert!(false, "Error: The byte size of the signers bitvectors ({}) must match “(quorumSize + 7) / 8 ({})", bitset.len(), (count.0 + 7) / 8);
     }
     // No out-of-range bits should be set in byte representation of the signers and validMembers bitvectors
     let offset = (count.0 / 8) as i32;
     let mut s_offset = offset.clone() as usize;
-    let last_byte = bitset.as_slice().read_with::<u8>(&mut s_offset, byte::LE).unwrap_or(0) as i32;
+    let last_byte = bitset
+        .as_slice()
+        .read_with::<u8>(&mut s_offset, byte::LE)
+        .unwrap_or(0) as i32;
 
     let mask = 255 >> (((8 - offset) % 32) + 32) % 32 << (((8 - offset) % 32) + 32) % 32;
     // let mask = !(0xff >> rem);
@@ -119,7 +145,13 @@ fn validate_bitset(bitset: Vec<u8>, count: VarInt) {
 }
 
 pub fn validate_bitset_new(bitset: Vec<u8>, count: VarInt) {
-    println!("validateBitsets: {:?}:{}:{}:{}", bitset.to_hex(), bitset.len(), count, count.0 / 8);
+    println!(
+        "validateBitsets: {:?}:{}:{}:{}",
+        bitset.to_hex(),
+        bitset.len(),
+        count,
+        count.0 / 8
+    );
     if bitset.len() != (count.0 as usize + 7) / 8 {
         assert!(false, "Error: The byte size of the signers bitvectors ({}) must match “(quorumSize + 7) / 8 ({})", bitset.len(), (count.0 + 7) / 8);
     }
@@ -130,7 +162,7 @@ pub fn validate_bitset_new(bitset: Vec<u8>, count: VarInt) {
         let mask = !(0xff >> rem);
         let last_byte = match bitset.last() {
             Some(&last) => last as i32,
-            None => 0
+            None => 0,
         };
         println!("lastByte: {} mask: {}", last_byte, mask);
         if last_byte & mask != 0 {
@@ -141,13 +173,26 @@ pub fn validate_bitset_new(bitset: Vec<u8>, count: VarInt) {
 
 #[test]
 pub fn test_bits_are_true_operations() {
-    let number1 = UInt256::from_hex("0100000000000000000000000000000000000000000000000000000000000000").unwrap();
-    let number50 = UInt256::from_hex("3200000000000000000000000000000000000000000000000000000000000000").unwrap();
-    let number50_shifted = UInt256::from_hex("0000000000000000320000000000000000000000000000000000000000000000").unwrap();
-    let test_number50_shifted = UInt256::from_hex("0000000000000000320000000000000000000000000000000000000000000000").unwrap();
-    let test_number = UInt256::from_hex("0100000000000000320000000000000000000000000000000000000000000000").unwrap();
+    let number1 =
+        UInt256::from_hex("0100000000000000000000000000000000000000000000000000000000000000")
+            .unwrap();
+    let number50 =
+        UInt256::from_hex("3200000000000000000000000000000000000000000000000000000000000000")
+            .unwrap();
+    let number50_shifted =
+        UInt256::from_hex("0000000000000000320000000000000000000000000000000000000000000000")
+            .unwrap();
+    let test_number50_shifted =
+        UInt256::from_hex("0000000000000000320000000000000000000000000000000000000000000000")
+            .unwrap();
+    let test_number =
+        UInt256::from_hex("0100000000000000320000000000000000000000000000000000000000000000")
+            .unwrap();
 
-    assert_eq!(number50_shifted, test_number50_shifted, "These numbers must be the same");
+    assert_eq!(
+        number50_shifted, test_number50_shifted,
+        "These numbers must be the same"
+    );
 
     let data = test_number.as_bytes();
     assert_eq!(data.true_bits_count(), 4, "Must be 6 bits here");
@@ -156,7 +201,4 @@ pub fn test_bits_are_true_operations() {
     assert!(data.bit_is_true_at_le_index(65), "This must be true");
     assert!(!data.bit_is_true_at_le_index(67), "This must be false");
     assert!(data.bit_is_true_at_le_index(68), "This must be true");
-
 }
-
-

@@ -33,4 +33,3 @@ impl Into<u8> for ProcessingError {
         }
     }
 }
-

@@ -1,27 +1,27 @@
-use std::collections::BTreeMap;
+use crate::processing::ProcessingError;
 use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
 use dash_spv_ffi::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
 use dash_spv_ffi::types;
 use dash_spv_models::common::LLMQType;
 use dash_spv_models::masternode::{LLMQEntry, MasternodeEntry, MasternodeList};
 use dash_spv_primitives::crypto::UInt256;
-use crate::processing::ProcessingError;
+use std::collections::BTreeMap;
 
 // #[derive(Debug)]
 pub struct MNListDiffResult {
     pub error_status: ProcessingError,
     pub base_block_hash: UInt256,
     pub block_hash: UInt256,
-    pub has_found_coinbase: bool, //1 byte
-    pub has_valid_coinbase: bool, //1 byte
-    pub has_valid_mn_list_root: bool, //1 byte
+    pub has_found_coinbase: bool,       //1 byte
+    pub has_valid_coinbase: bool,       //1 byte
+    pub has_valid_mn_list_root: bool,   //1 byte
     pub has_valid_llmq_list_root: bool, //1 byte
-    pub has_valid_quorums: bool, //1 byte
+    pub has_valid_quorums: bool,        //1 byte
     pub masternode_list: MasternodeList,
     pub added_masternodes: BTreeMap<UInt256, MasternodeEntry>,
     pub modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
     pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
-    pub needed_masternode_lists:  Vec<UInt256>,
+    pub needed_masternode_lists: Vec<UInt256>,
 }
 
 impl std::fmt::Debug for MNListDiffResult {
@@ -30,13 +30,17 @@ impl std::fmt::Debug for MNListDiffResult {
             .field("error_status", &self.error_status)
             .field("base_block_hash", &self.base_block_hash)
             .field("block_hash", &self.block_hash)
-            .field("validation", &format!("{}{}{}{}{}",
-                                          if self.has_found_coinbase { 1 } else { 0 },
-                                          if self.has_valid_coinbase { 1 } else { 0 },
-                                          if self.has_valid_mn_list_root { 1 } else { 0 },
-                                          if self.has_valid_llmq_list_root { 1 } else { 0 },
-                                          if self.has_valid_quorums { 1 } else { 0 }
-            ))
+            .field(
+                "validation",
+                &format!(
+                    "{}{}{}{}{}",
+                    if self.has_found_coinbase { 1 } else { 0 },
+                    if self.has_valid_coinbase { 1 } else { 0 },
+                    if self.has_valid_mn_list_root { 1 } else { 0 },
+                    if self.has_valid_llmq_list_root { 1 } else { 0 },
+                    if self.has_valid_quorums { 1 } else { 0 }
+                ),
+            )
             .field("masternode_list", &self.masternode_list)
             .field("added_masternodes", &self.added_masternodes)
             .field("modified_masternodes", &self.modified_masternodes)
@@ -45,7 +49,6 @@ impl std::fmt::Debug for MNListDiffResult {
             .finish()
     }
 }
-
 
 impl Default for MNListDiffResult {
     fn default() -> Self {
@@ -62,7 +65,7 @@ impl Default for MNListDiffResult {
             added_masternodes: Default::default(),
             modified_masternodes: Default::default(),
             added_quorums: Default::default(),
-            needed_masternode_lists: vec![]
+            needed_masternode_lists: vec![],
         }
     }
 }
@@ -93,8 +96,13 @@ impl MNListDiffResult {
             modified_masternodes_count: self.modified_masternodes.len(),
             added_llmq_type_maps: encode_quorums_map(&self.added_quorums),
             added_llmq_type_maps_count: self.added_quorums.len(),
-            needed_masternode_lists: boxed_vec(self.needed_masternode_lists.iter().map(|h|boxed(h.0)).collect()),
-            needed_masternode_lists_count: self.needed_masternode_lists.len()
+            needed_masternode_lists: boxed_vec(
+                self.needed_masternode_lists
+                    .iter()
+                    .map(|h| boxed(h.0))
+                    .collect(),
+            ),
+            needed_masternode_lists_count: self.needed_masternode_lists.len(),
         }
     }
 }

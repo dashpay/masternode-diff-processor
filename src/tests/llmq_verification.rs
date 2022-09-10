@@ -1,5 +1,14 @@
-use std::collections::BTreeMap;
-use std::ptr::null_mut;
+use crate::lib_tests::tests::{
+    add_insight_lookup_default, assert_diff_result, block_height_for, block_height_lookup_default,
+    get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default,
+    get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default,
+    hash_destroy_default, log_default, masternode_list_destroy_default,
+    masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default,
+    should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default,
+    validate_llmq_callback, FFIContext,
+};
+use crate::processing::MasternodeProcessorCache;
+use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::ToFFI;
 use dash_spv_ffi::types;
@@ -8,18 +17,20 @@ use dash_spv_models::common::LLMQType;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
 use dash_spv_primitives::hashes::hex::ToHex;
-use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_for, block_height_lookup_default, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback};
-use crate::processing::MasternodeProcessorCache;
-
+use std::collections::BTreeMap;
+use std::ptr::null_mut;
 
 #[test]
-fn testnet_llmq_verification() { //testTestnetQuorumVerification
+fn testnet_llmq_verification() {
+    //testTestnetQuorumVerification
     let bytes = message_from_file("MNL_0_122928.dat".to_string());
-    let use_insight_as_backup= false;
+    let use_insight_as_backup = false;
     let chain = ChainType::TestNet;
     let base_masternode_list_hash: *const u8 = null_mut();
-    let context = &mut FFIContext { chain, cache: MasternodeProcessorCache::default() } as *mut _ as *mut std::ffi::c_void;
+    let context = &mut FFIContext {
+        chain,
+        cache: MasternodeProcessorCache::default(),
+    } as *mut _ as *mut std::ffi::c_void;
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
@@ -48,7 +59,7 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
         chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
-        context
+        context,
     );
     println!("{:?}", result);
     let result_119064 = unsafe { *result };
@@ -69,7 +80,7 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
             chain.genesis_hash().0.as_ptr(),
             processor,
             cache,
-            context
+            context,
         );
         println!("{:?}", result);
         let result_119200 = unsafe { *result };
@@ -92,7 +103,10 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
                 acc.insert(llmq_type, entry_map);
                 acc
             });
-        let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = added_quorums.into_iter().filter(|(_, map)| map.contains_key(&block_hash_119064)).collect();
+        let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = added_quorums
+            .into_iter()
+            .filter(|(_, map)| map.contains_key(&block_hash_119064))
+            .collect();
         assert!(hmm.len() > 0, "There should be a quorum using 119064");
         // assert!(added_quorums.contains_key(&block_hash_119064), "There should be a quorum using 119064");
         // TODO: verify with QuorumValidationData (need implement BLS before)
@@ -102,11 +116,21 @@ fn testnet_llmq_verification() { //testTestnetQuorumVerification
     }
 }
 
-unsafe extern "C" fn get_block_height_by_hash(block_hash: *mut [u8; 32], context: *const std::ffi::c_void) -> u32 {
-    block_height_for((&mut *(context as *mut FFIContext)).chain, UInt256(*(block_hash)).reversed().0.to_hex().as_str())
+unsafe extern "C" fn get_block_height_by_hash(
+    block_hash: *mut [u8; 32],
+    context: *const std::ffi::c_void,
+) -> u32 {
+    block_height_for(
+        (&mut *(context as *mut FFIContext)).chain,
+        UInt256(*(block_hash)).reversed().0.to_hex().as_str(),
+    )
 }
 
-pub unsafe extern "C" fn masternode_list_save_119064(block_hash: *mut [u8; 32], masternode_list: *mut types::MasternodeList, context: *const std::ffi::c_void) -> bool {
+pub unsafe extern "C" fn masternode_list_save_119064(
+    block_hash: *mut [u8; 32],
+    masternode_list: *mut types::MasternodeList,
+    context: *const std::ffi::c_void,
+) -> bool {
     let ctx = &mut *(context as *mut FFIContext);
     let h = UInt256(*(block_hash));
     let list = (*masternode_list).decode();
@@ -115,27 +139,33 @@ pub unsafe extern "C" fn masternode_list_save_119064(block_hash: *mut [u8; 32], 
 }
 
 #[test]
-fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVerification
+fn testnet_llmq_verification_using_processor_and_cache() {
+    //testTestnetQuorumVerification
     let bytes = message_from_file("MNL_0_122928.dat".to_string());
-    let use_insight_as_backup= false;
+    let use_insight_as_backup = false;
     let chain = ChainType::TestNet;
-    let context = &mut FFIContext { chain, cache: MasternodeProcessorCache::default() };
-    let processor = unsafe { register_processor(
-        get_merkle_root_by_hash_default,
-        get_block_height_by_hash,
-        get_block_hash_by_height_default,
-        get_llmq_snapshot_by_block_hash_default,
-        save_llmq_snapshot_default,
-        get_masternode_list_by_block_hash_from_cache,
-        masternode_list_save_119064,
-        masternode_list_destroy_default,
-        add_insight_lookup_default,
-        should_process_llmq_of_type,
-        validate_llmq_callback,
-        hash_destroy_default,
-        snapshot_destroy_default,
-        should_process_diff_with_range_default,
-        log_default)
+    let context = &mut FFIContext {
+        chain,
+        cache: MasternodeProcessorCache::default(),
+    };
+    let processor = unsafe {
+        register_processor(
+            get_merkle_root_by_hash_default,
+            get_block_height_by_hash,
+            get_block_hash_by_height_default,
+            get_llmq_snapshot_by_block_hash_default,
+            save_llmq_snapshot_default,
+            get_masternode_list_by_block_hash_from_cache,
+            masternode_list_save_119064,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
+            should_process_llmq_of_type,
+            validate_llmq_callback,
+            hash_destroy_default,
+            snapshot_destroy_default,
+            should_process_diff_with_range_default,
+            log_default,
+        )
     };
     let cache = unsafe { processor_create_cache() };
 
@@ -147,7 +177,7 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
         chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
-        context as *mut _ as *mut std::ffi::c_void
+        context as *mut _ as *mut std::ffi::c_void,
     );
 
     println!("{:?}", result);
@@ -172,7 +202,7 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
             chain.genesis_hash().0.as_ptr(),
             processor,
             cache,
-            context as *mut _ as *mut std::ffi::c_void
+            context as *mut _ as *mut std::ffi::c_void,
         );
 
         println!("{:?}", result);
@@ -196,7 +226,10 @@ fn testnet_llmq_verification_using_processor_and_cache() { //testTestnetQuorumVe
                 acc.insert(llmq_type, entry_map);
                 acc
             });
-        let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = added_quorums.into_iter().filter(|(_, map)| map.contains_key(&block_hash_119064)).collect();
+        let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = added_quorums
+            .into_iter()
+            .filter(|(_, map)| map.contains_key(&block_hash_119064))
+            .collect();
         assert!(hmm.len() > 0, "There should be a quorum using 119064");
         // assert!(added_quorums.contains_key(&block_hash_119064), "There should be a quorum using 119064");
         // TODO: verify with QuorumValidationData (need implement BLS before)
