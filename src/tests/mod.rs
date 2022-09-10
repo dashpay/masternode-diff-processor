@@ -7,3 +7,4 @@ pub mod masternode_list_saving_to_disk;
 pub mod multiple_merkle_hashes;
 pub mod llmq_rotation_testnet;
 pub mod quorum_issue;
+pub mod llmq_snapshot;

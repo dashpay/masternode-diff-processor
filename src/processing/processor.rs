@@ -446,7 +446,7 @@ impl MasternodeProcessor {
                         // TODO: partition with enumeration doesn't work here, so need to change
                         // nodes.into_iter().enumerate().partition(|&(i, _)| snapshot.member_list.bit_is_true_at_le_index(i as u32))
                         let quorum_modifier = Self::build_llmq_modifier(llmq_type, work_block_hash);
-                        let (used_at_h, unused_at_h) = Self::valid_masternodes_for( masternode_list.masternodes, quorum_modifier, quorum_count, work_block_height)
+                        let (used_at_h, unused_at_h) = Self::valid_masternodes_for(masternode_list.masternodes, quorum_modifier, quorum_count, work_block_height)
                             .into_iter()
                             .partition(|_| {
                                 let is_true = snapshot.member_list.as_slice().bit_is_true_at_le_index(i);
