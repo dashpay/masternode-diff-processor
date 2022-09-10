@@ -1,18 +1,13 @@
-use crate::lib_tests::tests::{
-    add_insight_lookup_default, block_height_lookup_5078, get_block_hash_by_height_default,
-    get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default,
-    get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default,
-    hash_destroy_default, log_default, masternode_list_destroy_default,
-    masternode_list_save_default, masternode_list_save_in_cache, message_from_file,
-    process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal,
-    save_llmq_snapshot_default, save_llmq_snapshot_in_cache,
-    should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default,
-    validate_llmq_callback, FFIContext,
-};
+use bls_signatures::{G1Element, G2Element, Scheme};
+use dash_spv_ffi::ffi::unboxer::unbox_any;
+use dash_spv_ffi::types;
+use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, AggregationInfo};
 use crate::processing::MasternodeProcessorCache;
 use crate::{process_qrinfo_from_message, processor_create_cache, register_processor};
 use dash_spv_models::common::chain_type::ChainType;
-use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
+use dash_spv_models::common::LLMQType::LlmqtypeDevnetDIP0024;
+use dash_spv_primitives::crypto::byte_util::{AsBytes, Reversable, UInt256};
+use dash_spv_primitives::crypto::{UInt384, UInt768};
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 
 // #[test]
@@ -1436,8 +1431,8 @@ fn test_jack_daniels() {
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_llmq_of_type_jack_daniels,
-            validate_llmq_callback,
+            should_process_isd_quorum,
+            validate_llmq_callback_throuh_rust_bls,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -1450,11 +1445,11 @@ fn test_jack_daniels() {
         cache: MasternodeProcessorCache::default(),
     }) as *mut _ as *mut std::ffi::c_void;
 
-    let mnldiff_bytes = message_from_file("MNL_1_74221.dat".to_string());
+    let qrinfo_bytes = message_from_file("QRINFO_1_107966.dat".to_string());
 
-    let result = process_mnlistdiff_from_message_internal(
-        mnldiff_bytes.as_ptr(),
-        mnldiff_bytes.len(),
+    let result = process_qrinfo_from_message_internal(
+        qrinfo_bytes.as_ptr(),
+        qrinfo_bytes.len(),
         false,
         genesis.0.as_ptr(),
         processor,
@@ -1463,6 +1458,69 @@ fn test_jack_daniels() {
     );
 
     println!("Result: {:#?}", &result);
+}
+pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
+    data: *mut types::LLMQValidationData,
+    _context: *const std::ffi::c_void,
+) -> bool {
+    let result = unbox_any(data);
+    let types::LLMQValidationData {
+        items,
+        count,
+        commitment_hash,
+        all_commitment_aggregated_signature,
+        threshold_signature,
+        public_key,
+    } = *result;
+
+
+    println!(
+        "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}",
+        items,
+        count,
+        commitment_hash,
+        all_commitment_aggregated_signature,
+        threshold_signature,
+        public_key
+    );
+    let all_commitment_aggregated_signature = UInt768(*all_commitment_aggregated_signature);
+    let threshold_signature = UInt768(*threshold_signature);
+    let public_key = UInt384(*public_key);
+    let commitment_hash = UInt256(*commitment_hash);
+    let keys = (0..count)
+        .into_iter()
+        .filter_map()
+        .map(|i| G1Element::from_bytes_legacy(UInt384(*(*(items.offset(i as isize)))).as_bytes()).unwrap())
+        .collect::<Vec<G1Element>>();
+
+    let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys);
+    if !all_commitment_aggregated_signature_validated {
+        println!("••• Issue with all_commitment_aggregated_signature_validated: {}", all_commitment_aggregated_signature);
+        return false;
+    }
+    // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
+    // This is an aggregated BLS signature verification.
+    let quorum_signature_validated = verify_quorum_signature(commitment_hash, threshold_signature, public_key);
+    if !quorum_signature_validated {
+        println!("••• Issue with quorum_signature_validated");
+        return false;
+    }
+    println!("••• Quorum validated");
+    true
+}
+
+fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>) -> bool {
+    let scheme = bls_signatures::LegacySchemeMPL::new();
+    let bls_signature = bls_signatures::G2Element::from_bytes(signature.as_bytes()).unwrap();
+    let is_verified = scheme.verify_secure(public_keys, message_digest.as_bytes(), &bls_signature);
+    is_verified
+}
+
+fn verify_quorum_signature(message_digest: UInt256, threshold_signature: UInt768, public_key: UInt384) -> bool {
+    let scheme = bls_signatures::LegacySchemeMPL::new();
+    let bls_public_key = G1Element::from_bytes_legacy(public_key.as_bytes()).unwrap();
+    let bls_signature = G2Element::from_bytes_legacy(threshold_signature.as_bytes()).unwrap();
+    scheme.verify(&bls_public_key, message_digest.as_bytes(), &bls_signature)
 }
 
 unsafe extern "C" fn block_height_lookup_jack_daniels(
@@ -1479,6 +1537,13 @@ unsafe extern "C" fn block_height_lookup_jack_daniels(
         "8d80307b7fd5728799e62e1d461948331dd4b543a330deaf2d98576eb6050000" => 74184, // getBlockHeightByHash
         "97bceb2e855f80bf4f8617ce9cb9206682171a3e1b92d2160ad799d2cd040000" => 74208, // getBlockHeightByHash
         "34336e375eb5f6eefb147479d4c1a4823ca47282bab8a5eaf85aa3b3e4010000" => 74209, // getBlockHeightByHash
+        "5c1d03d5dfecf9d5b467eb79d08af9eb4529d69f5590bc7b3c66779271030000" => 107512,
+        "45c100e3aa8c91998d7ba0fd9655f95ea93f892a6050679516b9f03f83010000" => 107560,
+        "2906e8b02c3aad1aa9176c87b06d5c19d94ab6ad15777a88017d70a4e8010000" => 107608,
+        "d7b56611622ebac1f98d11f5b567076459733da645b973581dc2342c95060000" => 107656,
+        "e8ae95b476453ef1514c590941616582f527bbde2464974239b32184c2010000" => 107704,
+        "8782b2192054460b20585848fc53f9a875e232bd4a4d7f7bfda4b9563a010000" => 107966,
+
         _ => u32::MAX,
     }
 }
@@ -1504,4 +1569,11 @@ pub unsafe extern "C" fn should_process_llmq_of_type_jack_daniels(
     context: *const std::ffi::c_void,
 ) -> bool {
     true
+}
+
+pub unsafe extern "C" fn should_process_isd_quorum(
+    llmq_type: u8,
+    context: *const std::ffi::c_void,
+) -> bool {
+    llmq_type == LlmqtypeDevnetDIP0024.into()
 }

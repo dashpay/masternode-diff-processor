@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 byte = "0.2"
 libc = "0.2.132"
+bls-signatures = { git = "https://github.com/dashevo/bls-signatures", branch = "rust-bindings" }
 
 #[dependencies.dash-spv-primitives]
 #path = "../dash-spv-primitives"
