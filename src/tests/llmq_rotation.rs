@@ -1,7 +1,7 @@
 use bls_signatures::{G1Element, G2Element, Scheme};
 use dash_spv_ffi::ffi::unboxer::unbox_any;
 use dash_spv_ffi::types;
-use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, AggregationInfo};
+use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext};
 use crate::processing::MasternodeProcessorCache;
 use crate::{process_qrinfo_from_message, processor_create_cache, register_processor};
 use dash_spv_models::common::chain_type::ChainType;
@@ -1489,7 +1489,6 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
     let commitment_hash = UInt256(*commitment_hash);
     let keys = (0..count)
         .into_iter()
-        .filter_map()
         .map(|i| G1Element::from_bytes_legacy(UInt384(*(*(items.offset(i as isize)))).as_bytes()).unwrap())
         .collect::<Vec<G1Element>>();
 
@@ -1512,7 +1511,8 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
 fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>) -> bool {
     let scheme = bls_signatures::LegacySchemeMPL::new();
     let bls_signature = bls_signatures::G2Element::from_bytes(signature.as_bytes()).unwrap();
-    let is_verified = scheme.verify_secure(public_keys, message_digest.as_bytes(), &bls_signature);
+    let keys = public_keys.iter().map(|k| k).collect::<Vec<&G1Element>>();
+    let is_verified = scheme.verify_secure(keys, message_digest.as_bytes(), &bls_signature);
     is_verified
 }
 
