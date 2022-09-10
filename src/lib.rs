@@ -175,7 +175,8 @@ pub extern "C" fn process_mnlistdiff_from_message(
     if !is_from_snapshot {
         let error = processor
             .should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
-        if error != ProcessingError::None.into() {
+        let none_error: u8 = ProcessingError::None.into();
+        if error != none_error {
             processor.log(format!(
                 "process_mnlistdiff_from_message.finish_with_error: {:?} {:?}",
                 std::time::Instant::now(),
@@ -240,7 +241,8 @@ pub extern "C" fn process_qrinfo_from_message(
     if !is_from_snapshot {
         let error =
             processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
-        if error != ProcessingError::None.into() {
+        let none_error: u8 = ProcessingError::None.into();
+        if error != none_error {
             processor.log(format!(
                 "process_qrinfo_from_message.finish_with_error: {:?} {:#?}",
                 std::time::Instant::now(),

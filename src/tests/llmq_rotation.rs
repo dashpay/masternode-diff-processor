@@ -1575,5 +1575,6 @@ pub unsafe extern "C" fn should_process_isd_quorum(
     llmq_type: u8,
     context: *const std::ffi::c_void,
 ) -> bool {
-    llmq_type == LlmqtypeDevnetDIP0024.into()
+    let quorum_type: u8 = LlmqtypeDevnetDIP0024.into();
+    llmq_type == quorum_type
 }

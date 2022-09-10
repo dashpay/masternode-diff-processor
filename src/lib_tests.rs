@@ -1220,12 +1220,13 @@ pub mod tests {
         context: *const std::ffi::c_void,
     ) -> bool {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        llmq_type
-            == match data.chain {
-                ChainType::MainNet => LLMQType::Llmqtype400_60.into(),
-                ChainType::TestNet => LLMQType::Llmqtype50_60.into(),
-                ChainType::DevNet => LLMQType::Llmqtype60_75.into(),
-            }
+
+        let quorum_type: u8 = match data.chain {
+            ChainType::MainNet => LLMQType::Llmqtype400_60.into(),
+            ChainType::TestNet => LLMQType::Llmqtype50_60.into(),
+            ChainType::DevNet => LLMQType::Llmqtype60_75.into(),
+        };
+        llmq_type == quorum_type
     }
     pub unsafe extern "C" fn validate_llmq_callback(
         data: *mut types::LLMQValidationData,
