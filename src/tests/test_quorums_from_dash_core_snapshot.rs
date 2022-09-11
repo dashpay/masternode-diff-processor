@@ -9,12 +9,13 @@ use dash_spv_primitives::consensus::encode::VarInt;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable};
 use dash_spv_primitives::crypto::{UInt160, UInt256, UInt384, UInt768, VarBytes};
 use dash_spv_primitives::crypto::var_array::VarArray;
-use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
+use dash_spv_primitives::hashes::hex::FromHex;
 use dash_spv_primitives::util::base58;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use crate::{MasternodeProcessorCache, processor_create_cache, register_processor};
-use crate::lib_tests::tests::{add_insight_lookup_default, block_height_for, block_height_lookup_default, FFIContext, get_block_hash_by_height_default, get_block_hash_by_height_from_context, get_block_hash_by_height_from_insight, get_block_height_by_hash_from_insight, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, get_merkle_root_by_hash_from_insight, hash_destroy_default, init_block_store, log_default, masternode_list_destroy_default, masternode_list_save_default, merkle_root_for, MerkleBlock, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default};
+use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::tests::block_store::init_testnet_store;
 use crate::tests::llmq_rotation::{should_process_isd_quorum, validate_llmq_callback_throuh_rust_bls};
 
 
@@ -28762,6 +28763,11 @@ pub fn test_from_snapshot() {
         .expect("file should have extraShare key");
 
     let chain = ChainType::TestNet;
+    let context = &mut (FFIContext {
+        chain,
+        cache: MasternodeProcessorCache::default(),
+        blocks: init_testnet_store()
+    });
 
     let quorum_snapshot_h_c = value_to_snapshot(&json.get("quorumSnapshotAtHMinusC").unwrap());
     let quorum_snapshot_h_2c = value_to_snapshot(&json.get("quorumSnapshotAtHMinus2C").unwrap());
@@ -28769,8 +28775,8 @@ pub fn test_from_snapshot() {
 
     let value: &Value = &json.get("mnListDiffTip").unwrap();
     let diff: ListDiff = serde_json::from_value(value.clone()).unwrap();
-    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap();
-    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap();
+    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reversed();
+    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reversed();
     let cb_tx_bytes = decode_hex(diff.cb_tx.as_str()).unwrap();
     let tree_bytes = decode_hex(diff.cb_tx_merkle_tree.as_str()).unwrap();
     let coinbase_transaction = CoinbaseTransaction::from_bytes(&cb_tx_bytes, &mut 0).unwrap();
@@ -28780,6 +28786,7 @@ pub fn test_from_snapshot() {
     // in that snapshot it's always empty
     let deleted_quorums = BTreeMap::default();
     let added_quorums = quorums_to_quorums(diff.new_quorums);
+    println!("block_hash_tip: {}", block_hash);
     let mn_list_diff_tip = MNListDiff {
         base_block_hash,
         block_hash,
@@ -28792,13 +28799,13 @@ pub fn test_from_snapshot() {
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        block_height: block_height_for(chain, block_hash.0.to_hex().as_str())
+        block_height: context.block_for_hash(block_hash.clone()).unwrap().height
     };
 
     let value: &Value = &json.get("mnListDiffH").unwrap();
     let diff: ListDiff = serde_json::from_value(value.clone()).unwrap();
-    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap();
-    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap();
+    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reversed();
+    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reversed();
     let cb_tx_bytes = decode_hex(diff.cb_tx.as_str()).unwrap();
     let tree_bytes = decode_hex(diff.cb_tx_merkle_tree.as_str()).unwrap();
     let coinbase_transaction = CoinbaseTransaction::from_bytes(&cb_tx_bytes, &mut 0).unwrap();
@@ -28808,6 +28815,7 @@ pub fn test_from_snapshot() {
     // in that snapshot it's always empty
     let deleted_quorums = BTreeMap::default();
     let added_quorums = quorums_to_quorums(diff.new_quorums);
+    println!("block_hash_h: {}", block_hash);
     let mn_list_diff_h = MNListDiff {
         base_block_hash,
         block_hash,
@@ -28820,13 +28828,13 @@ pub fn test_from_snapshot() {
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        block_height: block_height_for(chain, block_hash.0.to_hex().as_str())
+        block_height: context.block_for_hash(block_hash.clone()).unwrap().height
     };
 
     let value: &Value = &json.get("mnListDiffAtHMinusC").unwrap();
     let diff: ListDiff = serde_json::from_value(value.clone()).unwrap();
-    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap();
-    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap();
+    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reversed();
+    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reversed();
     let cb_tx_bytes = decode_hex(diff.cb_tx.as_str()).unwrap();
     let tree_bytes = decode_hex(diff.cb_tx_merkle_tree.as_str()).unwrap();
     let coinbase_transaction = CoinbaseTransaction::from_bytes(&cb_tx_bytes, &mut 0).unwrap();
@@ -28836,6 +28844,7 @@ pub fn test_from_snapshot() {
     // in that snapshot it's always empty
     let deleted_quorums = BTreeMap::default();
     let added_quorums = quorums_to_quorums(diff.new_quorums);
+    println!("block_hash_h_c: {}", block_hash);
     let mn_list_diff_h_c= MNListDiff {
         base_block_hash,
         block_hash,
@@ -28848,13 +28857,13 @@ pub fn test_from_snapshot() {
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        block_height: block_height_for(chain, block_hash.0.to_hex().as_str())
+        block_height: context.block_for_hash(block_hash.clone()).unwrap().height
     };
 
     let value: &Value = &json.get("mnListDiffAtHMinus2C").unwrap();
     let diff: ListDiff = serde_json::from_value(value.clone()).unwrap();
-    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap();
-    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap();
+    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reversed();
+    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reversed();
     let cb_tx_bytes = decode_hex(diff.cb_tx.as_str()).unwrap();
     let tree_bytes = decode_hex(diff.cb_tx_merkle_tree.as_str()).unwrap();
     let coinbase_transaction = CoinbaseTransaction::from_bytes(&cb_tx_bytes, &mut 0).unwrap();
@@ -28864,6 +28873,7 @@ pub fn test_from_snapshot() {
     // in that snapshot it's always empty
     let deleted_quorums = BTreeMap::default();
     let added_quorums = quorums_to_quorums(diff.new_quorums);
+    println!("block_hash_h_2c: {}", block_hash);
     let mn_list_diff_h_2c= MNListDiff {
         base_block_hash,
         block_hash,
@@ -28876,13 +28886,13 @@ pub fn test_from_snapshot() {
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        block_height: block_height_for(chain, block_hash.0.to_hex().as_str())
+        block_height: context.block_for_hash(block_hash.clone()).unwrap().height
     };
 
     let value: &Value = &json.get("mnListDiffAtHMinus3C").unwrap();
     let diff: ListDiff = serde_json::from_value(value.clone()).unwrap();
-    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap();
-    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap();
+    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reversed();
+    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reversed();
     let cb_tx_bytes = decode_hex(diff.cb_tx.as_str()).unwrap();
     let tree_bytes = decode_hex(diff.cb_tx_merkle_tree.as_str()).unwrap();
     let coinbase_transaction = CoinbaseTransaction::from_bytes(&cb_tx_bytes, &mut 0).unwrap();
@@ -28892,6 +28902,7 @@ pub fn test_from_snapshot() {
     // in that snapshot it's always empty
     let deleted_quorums = BTreeMap::default();
     let added_quorums = quorums_to_quorums(diff.new_quorums);
+    println!("block_hash_h_3c: {}", block_hash);
     let mn_list_diff_h_3c= MNListDiff {
         base_block_hash,
         block_hash,
@@ -28904,13 +28915,13 @@ pub fn test_from_snapshot() {
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        block_height: block_height_for(chain, block_hash.0.to_hex().as_str())
+        block_height: context.block_for_hash(block_hash.clone()).unwrap().height
     };
 
 
     let processor = unsafe { &mut *register_processor(
         get_merkle_root_by_hash_default,
-        block_height_lookup_default,
+        get_block_height_by_hash_from_context,
         get_block_hash_by_height_from_context,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
@@ -28925,30 +28936,17 @@ pub fn test_from_snapshot() {
             should_process_diff_with_range_default,
             log_default)
     };
-    let block_store = init_block_store();
-    let testnet_blocks = block_store.get(&chain).unwrap()
-        .into_iter()
-        .map(|(hash, height)| MerkleBlock {
-            hash: UInt256::from_hex(hash).unwrap().reversed(),
-            height: *height,
-            merkleroot: Default::default()
-        })
-        .collect::<Vec<MerkleBlock>>();
     let cache = unsafe { &mut *processor_create_cache() };
-    let context = &mut (FFIContext {
-        chain,
-        cache: MasternodeProcessorCache::default(),
-        blocks: testnet_blocks
-    }) as *mut _ as *mut std::ffi::c_void;
-
-    processor.opaque_context = context;
+    context.cache = cache.clone();
+    processor.opaque_context = context as *mut _ as *mut std::ffi::c_void;
     processor.use_insight_as_backup = true;
     processor.genesis_hash = chain.genesis_hash().0.as_ptr();
 
     println!("rotated_quorums at h ({}: {})", mn_list_diff_h.block_height, mn_list_diff_h.block_hash);
     if let Some(rotated_quorums_h) = mn_list_diff_h.added_quorums.get(&chain.isd_llmq_type()) {
         rotated_quorums_h.into_iter().for_each(|(&llmq_block_hash, entry)| {
-            let llmq_block_height = block_height_for(chain, llmq_block_hash.0.to_hex().as_str());
+            println!("rotated_quorum: ({}: {})", llmq_block_hash, llmq_block_hash.clone().reversed());
+            let llmq_block_height = context.block_for_hash(llmq_block_hash.clone().reversed()).unwrap().height;
             println!("rotated_quorum: ({}: {})\n {:#?}", llmq_block_height, llmq_block_hash, entry);
 
             let masternodes = processor.get_rotated_masternodes_for_quorum(entry.llmq_type, llmq_block_hash, llmq_block_height, cache);

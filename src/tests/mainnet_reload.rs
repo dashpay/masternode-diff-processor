@@ -1,18 +1,11 @@
-use crate::lib_tests::tests::{
-    add_insight_lookup_default, assert_diff_result, block_height_lookup_default,
-    get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default,
-    get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default,
-    hash_destroy_default, log_default, masternode_list_destroy_default,
-    masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default,
-    should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default,
-    validate_llmq_callback, FFIContext,
-};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext};
 use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_models::masternode;
 use dash_spv_primitives::crypto::byte_util::UInt256;
 use std::collections::BTreeMap;
+use crate::tests::block_store::init_mainnet_store;
 
 #[test]
 fn test_mainnet_reload_with_processor() {
@@ -48,15 +41,21 @@ fn test_mainnet_reload_with_processor() {
         "MNL_1092864_1092888.dat".to_string(),
         "MNL_1092888_1092916.dat".to_string(),
     ];
-    let (success, lists) = load_masternode_lists_for_files(files, chain, true);
+    let context = &mut (FFIContext {
+        chain,
+        cache: Default::default(),
+        blocks: init_mainnet_store()
+    });
+
+    let (success, lists) = load_masternode_lists_for_files(files, true, context);
     assert!(success, "Unsuccessful");
     assert_eq!(lists.len(), 29, "There should be 29 masternode lists");
 }
 
 pub fn load_masternode_lists_for_files(
     files: Vec<String>,
-    chain: ChainType,
     assert_validity: bool,
+    context: &mut FFIContext,
 ) -> (bool, BTreeMap<UInt256, masternode::MasternodeList>) {
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
@@ -78,20 +77,17 @@ pub fn load_masternode_lists_for_files(
             log_default,
         )
     };
+    context.cache = unsafe { (*cache).clone() };
+
     for file in files {
         println!("load_masternode_lists_for_files: [{}]", file);
         let bytes = message_from_file(file);
-        let context = &mut (FFIContext {
-            chain,
-            cache: unsafe { (*cache).clone() },
-            blocks: vec![]
-        });
         let result = process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
             false,
             false,
-            chain.genesis_hash().0.as_ptr(),
+            context.chain.genesis_hash().0.as_ptr(),
             processor,
             cache,
             context as *mut _ as *mut std::ffi::c_void,
@@ -101,7 +97,7 @@ pub fn load_masternode_lists_for_files(
         //println!("MNDiff: {} added, {} modified", result.added_masternodes_count, result.modified_masternodes_count);
         // println!("")
         if assert_validity {
-            assert_diff_result(chain, result);
+            assert_diff_result(context, result);
         }
         let block_hash = UInt256(unsafe { *result.block_hash });
         let masternode_list = unsafe { *result.masternode_list };

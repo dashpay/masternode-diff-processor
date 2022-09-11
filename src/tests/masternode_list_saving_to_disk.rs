@@ -1,18 +1,11 @@
-use crate::lib_tests::tests::{
-    add_insight_lookup_default, assert_diff_result, block_height_lookup_122088,
-    get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default,
-    get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default,
-    hash_destroy_default, log_default, masternode_list_destroy_default,
-    masternode_list_save_default, message_from_file, save_llmq_snapshot_default,
-    should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default,
-    validate_llmq_callback, FFIContext,
-};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, block_height_lookup_default};
 use crate::processing::MasternodeProcessorCache;
 use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_primitives::crypto::byte_util::UInt256;
 use dash_spv_primitives::hashes::hex::FromHex;
+use crate::tests::block_store::init_testnet_store;
 
 #[test]
 fn test_mnl_saving_to_disk() {
@@ -22,13 +15,13 @@ fn test_mnl_saving_to_disk() {
     let context = &mut (FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
-        blocks: vec![]
-    }) as *mut _ as *mut std::ffi::c_void;
+        blocks: init_testnet_store()
+    });
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_default,
-            block_height_lookup_122088,
+            block_height_lookup_default,
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
@@ -52,7 +45,7 @@ fn test_mnl_saving_to_disk() {
         chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
-        context,
+        context as *mut _ as *mut std::ffi::c_void,
     );
     println!("{:?}", result);
     let result = unsafe { *result };
@@ -65,5 +58,5 @@ fn test_mnl_saving_to_disk() {
         masternode_list_decoded.masternode_merkle_root.unwrap(),
         "MNList merkle root should be valid"
     );
-    assert_diff_result(chain, result);
+    assert_diff_result(context, result);
 }

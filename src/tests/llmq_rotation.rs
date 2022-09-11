@@ -1,7 +1,7 @@
 use bls_signatures::{G1Element, G2Element, Scheme};
 use dash_spv_ffi::ffi::unboxer::unbox_any;
 use dash_spv_ffi::types;
-use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_5078, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext};
+use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext};
 use crate::processing::MasternodeProcessorCache;
 use crate::{process_qrinfo_from_message, processor_create_cache, register_processor};
 use dash_spv_models::common::chain_type::ChainType;
@@ -66,6 +66,13 @@ fn test_llmq_rotation() {
     // assert!(result_at_h.has_valid_llmq_list_root, "LLMQ list root not valid at height {}", h);
     // assert!(result_at_h.has_valid_quorums, "validQuorums not valid at height {}", h);
 }
+pub unsafe extern "C" fn block_height_lookup_5078(
+    _block_hash: *mut [u8; 32],
+    _context: *const std::ffi::c_void,
+) -> u32 {
+    5078
+}
+
 #[test]
 fn test_llmq_rotation_2() {
     let bytes = message_from_file("QRINFO_1_8344.dat".to_string());

@@ -1,5 +1,5 @@
 use crate::lib_tests::tests::{
-    add_insight_lookup_default, assert_diff_result, block_height_for, block_height_lookup_default,
+    add_insight_lookup_default, assert_diff_result, block_height_lookup_default,
     get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default,
     get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default,
     hash_destroy_default, log_default, masternode_list_destroy_default,
@@ -15,10 +15,10 @@ use dash_spv_ffi::types;
 use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_models::common::LLMQType;
 use dash_spv_models::masternode::LLMQEntry;
-use dash_spv_primitives::crypto::byte_util::{Reversable, UInt256};
-use dash_spv_primitives::hashes::hex::ToHex;
+use dash_spv_primitives::crypto::byte_util::UInt256;
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
+use crate::tests::block_store::init_testnet_store;
 
 #[test]
 fn testnet_llmq_verification() {
@@ -30,8 +30,8 @@ fn testnet_llmq_verification() {
     let context = &mut FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
-        blocks: vec![]
-    } as *mut _ as *mut std::ffi::c_void;
+        blocks: init_testnet_store()
+    };
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
@@ -60,11 +60,11 @@ fn testnet_llmq_verification() {
         chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
-        context,
+        context as *mut _ as *mut std::ffi::c_void,
     );
     println!("{:?}", result);
     let result_119064 = unsafe { *result };
-    assert_diff_result(chain, result_119064);
+    assert_diff_result(context, result_119064);
     let is_valid = result_119064.is_valid();
     println!("is_valid: {}", is_valid);
     if is_valid {
@@ -81,11 +81,11 @@ fn testnet_llmq_verification() {
             chain.genesis_hash().0.as_ptr(),
             processor,
             cache,
-            context,
+            context as *mut _ as *mut std::ffi::c_void,
         );
         println!("{:?}", result);
         let result_119200 = unsafe { *result };
-        assert_diff_result(chain, result_119200);
+        assert_diff_result(context, result_119200);
         let masternode_list_119200 = unsafe { *result_119200.masternode_list };
         let masternode_list_119200_decoded = unsafe { masternode_list_119200.decode() };
         let added_quorums = (0..result_119200.added_llmq_type_maps_count)
@@ -121,10 +121,12 @@ unsafe extern "C" fn get_block_height_by_hash(
     block_hash: *mut [u8; 32],
     context: *const std::ffi::c_void,
 ) -> u32 {
-    block_height_for(
-        (&mut *(context as *mut FFIContext)).chain,
-        UInt256(*(block_hash)).reversed().0.to_hex().as_str(),
-    )
+    let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+    if let Some(block) = data.block_for_hash(UInt256(*(block_hash))) {
+        block.height
+    } else {
+        u32::MAX
+    }
 }
 
 pub unsafe extern "C" fn masternode_list_save_119064(
@@ -148,7 +150,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
     let context = &mut FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
-        blocks: vec![]
+        blocks: init_testnet_store()
     };
     let processor = unsafe {
         register_processor(
@@ -184,7 +186,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
 
     println!("{:?}", result);
     let result_119064 = unsafe { *result };
-    assert_diff_result(chain, result_119064);
+    assert_diff_result(context, result_119064);
     let is_valid = result_119064.is_valid();
     println!("is_valid: {}", is_valid);
     if is_valid {
@@ -209,7 +211,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
 
         println!("{:?}", result);
         let result_119200 = unsafe { *result };
-        assert_diff_result(chain, result_119200);
+        assert_diff_result(context, result_119200);
         let masternode_list_119200 = unsafe { *result_119200.masternode_list };
         let masternode_list_119200_decoded = unsafe { masternode_list_119200.decode() };
         let added_quorums = (0..result_119200.added_llmq_type_maps_count)
