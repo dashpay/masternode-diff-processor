@@ -21,6 +21,7 @@ fn test_llmq_rotation() {
     let context = &mut (FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
+        blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
@@ -73,6 +74,7 @@ fn test_llmq_rotation_2() {
     let context = &mut (FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
+        blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
     println!("test_llmq_rotation_2 {:?}", bytes.to_hex());
     let cache = unsafe { processor_create_cache() };
@@ -454,6 +456,7 @@ fn test_devnet_333() {
     let context = &mut (FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
+        blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
@@ -514,6 +517,7 @@ fn test_processor_devnet_333() {
     let context = &mut (FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
+        blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
 
     let result = process_qrinfo_from_message(
@@ -734,6 +738,7 @@ fn test_processor_devnet_333_2() {
     let context = &mut (FFIContext {
         chain: ChainType::DevNet,
         cache: MasternodeProcessorCache::default(),
+        blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
 
     let mnldiff_bytes = message_from_file("mnlistdiff--1-25480.dat".to_string());
@@ -1443,6 +1448,7 @@ fn test_jack_daniels() {
     let context = &mut (FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
+        blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
 
     let qrinfo_bytes = message_from_file("QRINFO_1_107966.dat".to_string());

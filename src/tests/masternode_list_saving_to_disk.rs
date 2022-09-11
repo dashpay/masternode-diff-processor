@@ -22,6 +22,7 @@ fn test_mnl_saving_to_disk() {
     let context = &mut (FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
+        blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {

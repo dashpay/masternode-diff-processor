@@ -28909,9 +28909,9 @@ pub fn test_from_snapshot() {
 
 
     let processor = unsafe { &mut *register_processor(
-        get_merkle_root_by_hash_default,
-        block_height_lookup_default,
-        get_block_hash_by_height_from_context,
+        get_merkle_root_by_hash_from_insight,
+        get_block_height_by_hash_from_insight,
+        get_block_hash_by_height_from_insight,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
             get_masternode_list_by_block_hash_default,
@@ -28925,20 +28925,20 @@ pub fn test_from_snapshot() {
             should_process_diff_with_range_default,
             log_default)
     };
-    let block_store = init_block_store();
-    let testnet_blocks = block_store.get(&chain).unwrap()
-        .into_iter()
-        .map(|(hash, height)| MerkleBlock {
-            hash: UInt256::from_hex(hash).unwrap().reversed(),
-            height: *height,
-            merkleroot: Default::default()
-        })
-        .collect::<Vec<MerkleBlock>>();
+    // let block_store = init_block_store();
+    // let testnet_blocks = block_store.get(&chain).unwrap()
+    //     .into_iter()
+    //     .map(|(hash, height)| MerkleBlock {
+    //         hash: UInt256::from_hex(hash).unwrap().reversed(),
+    //         height: *height,
+    //         merkleroot: Default::default()
+    //     })
+    //     .collect::<Vec<MerkleBlock>>();
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
-        blocks: testnet_blocks
+        blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
 
     processor.opaque_context = context;

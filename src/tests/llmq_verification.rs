@@ -30,6 +30,7 @@ fn testnet_llmq_verification() {
     let context = &mut FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
+        blocks: vec![]
     } as *mut _ as *mut std::ffi::c_void;
     let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
@@ -147,6 +148,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
     let context = &mut FFIContext {
         chain,
         cache: MasternodeProcessorCache::default(),
+        blocks: vec![]
     };
     let processor = unsafe {
         register_processor(

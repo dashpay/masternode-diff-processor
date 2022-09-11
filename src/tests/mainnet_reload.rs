@@ -84,6 +84,7 @@ pub fn load_masternode_lists_for_files(
         let context = &mut (FFIContext {
             chain,
             cache: unsafe { (*cache).clone() },
+            blocks: vec![]
         });
         let result = process_mnlistdiff_from_message(
             bytes.as_ptr(),

@@ -21,6 +21,7 @@ use dash_spv_primitives::hashes::{sha256d, Hash};
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
+use dash_spv_models::masternode::MasternodeList;
 
 // https://github.com/rust-lang/rfcs/issues/2770
 #[repr(C)]
@@ -116,7 +117,8 @@ impl MasternodeProcessor {
                 self.lookup_block_height_by_hash(block_hash),
                 block_hash
             ));
-            None
+            Some(MasternodeList::new(BTreeMap::default(), BTreeMap::default(), block_hash, self.lookup_block_height_by_hash(block_hash), false))
+            // None
         } else if let Some(cached) = cached_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
             self.log(format!(
@@ -958,7 +960,6 @@ impl MasternodeProcessor {
     pub fn should_process_quorum(&self, llmq_type: LLMQType) -> bool {
         let should =
             unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.opaque_context) };
-        println!("should_process_quorum: {:?} : {}", llmq_type, should);
         should
     }
 
