@@ -5,7 +5,7 @@ use crate::lib_tests::tests::{add_insight_lookup_default, block_height_lookup_50
 use crate::processing::MasternodeProcessorCache;
 use crate::{process_qrinfo_from_message, processor_create_cache, register_processor};
 use dash_spv_models::common::chain_type::ChainType;
-use dash_spv_models::common::LLMQType::LlmqtypeDevnetDIP0024;
+use dash_spv_models::common::LLMQType;
 use dash_spv_primitives::crypto::byte_util::{AsBytes, Reversable, UInt256};
 use dash_spv_primitives::crypto::{UInt384, UInt768};
 use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
@@ -1575,6 +1575,6 @@ pub unsafe extern "C" fn should_process_isd_quorum(
     llmq_type: u8,
     context: *const std::ffi::c_void,
 ) -> bool {
-    let quorum_type: u8 = LlmqtypeDevnetDIP0024.into();
-    llmq_type == quorum_type
+    let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+    LLMQType::from(llmq_type) == data.chain.isd_llmq_type()
 }

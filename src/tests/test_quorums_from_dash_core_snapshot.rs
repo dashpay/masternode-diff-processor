@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::num::ParseIntError;
-use dash_spv_models::common::{LLMQSnapshotSkipMode, LLMQType, MerkleTree, SocketAddress};
+use dash_spv_models::common::{ChainType, LLMQSnapshotSkipMode, LLMQType, MerkleTree, SocketAddress};
+use dash_spv_models::common::LLMQType::Llmqtype60_75;
 use dash_spv_models::llmq::{LLMQSnapshot, MNListDiff};
 use dash_spv_models::masternode::{LLMQEntry, MasternodeEntry};
 use dash_spv_models::tx::CoinbaseTransaction;
@@ -8,10 +9,13 @@ use dash_spv_primitives::consensus::encode::VarInt;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable};
 use dash_spv_primitives::crypto::{UInt160, UInt256, UInt384, UInt768, VarBytes};
 use dash_spv_primitives::crypto::var_array::VarArray;
-use dash_spv_primitives::hashes::hex::FromHex;
+use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
 use dash_spv_primitives::util::base58;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use crate::{MasternodeProcessorCache, processor_create_cache, register_processor};
+use crate::lib_tests::tests::{add_insight_lookup_default, block_height_for, block_height_lookup_default, FFIContext, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default};
+use crate::tests::llmq_rotation::{should_process_isd_quorum, validate_llmq_callback_throuh_rust_bls};
 
 #[derive(Serialize, Deserialize)]
 struct Snapshot {
@@ -99,7 +103,7 @@ fn value_to_snapshot(value: &Value) -> LLMQSnapshot {
 
 fn quorums_to_quorums(value: Vec<LLMQ>) -> BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> {
     let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = BTreeMap::new();
-    value.into_iter().for_each(|llmq| {
+    value.into_iter().filter(|llmq| LLMQType::from(llmq.llmq_type as u8) == Llmqtype60_75).for_each(|llmq| {
         let entry = LLMQEntry::new(
             llmq.version as u16,
             LLMQType::from(llmq.llmq_type as u8),
@@ -28754,6 +28758,8 @@ pub fn test_from_snapshot() {
     let extra_share = json.get("extraShare")
         .expect("file should have extraShare key");
 
+    let chain = ChainType::TestNet;
+
     let quorum_snapshot_h_c = value_to_snapshot(&json.get("quorumSnapshotAtHMinusC").unwrap());
     let quorum_snapshot_h_2c = value_to_snapshot(&json.get("quorumSnapshotAtHMinus2C").unwrap());
     let quorum_snapshot_h_3c = value_to_snapshot(&json.get("quorumSnapshotAtHMinus3C").unwrap());
@@ -28783,7 +28789,7 @@ pub fn test_from_snapshot() {
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        block_height: 0
+        block_height: block_height_for(chain, block_hash.0.to_hex().as_str())
     };
 
     let value: &Value = &json.get("mnListDiffH").unwrap();
@@ -28811,7 +28817,7 @@ pub fn test_from_snapshot() {
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        block_height: 0
+        block_height: block_height_for(chain, block_hash.0.to_hex().as_str())
     };
 
     let value: &Value = &json.get("mnListDiffAtHMinusC").unwrap();
@@ -28839,7 +28845,7 @@ pub fn test_from_snapshot() {
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        block_height: 0
+        block_height: block_height_for(chain, block_hash.0.to_hex().as_str())
     };
 
     let value: &Value = &json.get("mnListDiffAtHMinus2C").unwrap();
@@ -28867,7 +28873,7 @@ pub fn test_from_snapshot() {
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        block_height: 0
+        block_height: block_height_for(chain, block_hash.0.to_hex().as_str())
     };
 
     let value: &Value = &json.get("mnListDiffAtHMinus3C").unwrap();
@@ -28895,15 +28901,62 @@ pub fn test_from_snapshot() {
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        block_height: 0
+        block_height: block_height_for(chain, block_hash.0.to_hex().as_str())
     };
 
 
+    let processor = unsafe { &mut *register_processor(
+            get_merkle_root_by_hash_default,
+            block_height_lookup_default,
+            get_block_hash_by_height_default,
+            get_llmq_snapshot_by_block_hash_default,
+            save_llmq_snapshot_default,
+            get_masternode_list_by_block_hash_default,
+            masternode_list_save_default,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
+            should_process_isd_quorum,
+            validate_llmq_callback_throuh_rust_bls,
+            hash_destroy_default,
+            snapshot_destroy_default,
+            should_process_diff_with_range_default,
+            log_default)
+    };
+    let cache = unsafe { &mut *processor_create_cache() };
+    let context = &mut (FFIContext {
+        chain,
+        cache: MasternodeProcessorCache::default(),
+    }) as *mut _ as *mut std::ffi::c_void;
 
+    processor.opaque_context = context;
+    processor.use_insight_as_backup = true;
+    processor.genesis_hash = chain.genesis_hash().0.as_ptr();
+
+    let result_at_tip = processor.get_list_diff_result_internal_with_base_lookup(mn_list_diff_tip, cache);
+    let result_at_h = processor.get_list_diff_result_internal_with_base_lookup(mn_list_diff_h, cache);
+    let result_at_h_c = processor.get_list_diff_result_internal_with_base_lookup(mn_list_diff_h_c, cache);
+    let result_at_h_2c = processor.get_list_diff_result_internal_with_base_lookup(mn_list_diff_h_2c, cache);
+    let result_at_h_3c = processor.get_list_diff_result_internal_with_base_lookup(mn_list_diff_h_3c, cache);
+    println!("result_at_tip: {:#?}", result_at_tip);
+    println!("result_at_h: {:#?}", result_at_h);
+    println!("result_at_h_c: {:#?}", result_at_h_c);
+    println!("result_at_h_2c: {:#?}", result_at_h_2c);
+    println!("result_at_h_3c: {:#?}", result_at_h_3c);
 }
+
 pub fn decode_hex(s: &str) -> Result<Vec<u8>, ParseIntError> {
     (0..s.len())
         .step_by(2)
         .map(|i| u8::from_str_radix(&s[i..i + 2], 16))
         .collect()
+}
+
+pub unsafe extern "C" fn should_process_any_quorum(
+    llmq_type: u8,
+    context: *const std::ffi::c_void,
+) -> bool {
+    true
+
+    // let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+    // LLMQType::from(llmq_type) == data.chain.isd_llmq_type()
 }
