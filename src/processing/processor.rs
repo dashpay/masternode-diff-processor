@@ -988,13 +988,6 @@ impl MasternodeProcessor {
         block_height: u32,
         mut has_valid_quorums: bool,
     ) {
-        if quorum.llmq_type == LLMQType::Llmqtype60_75 {
-            has_valid_quorums &= true;
-            if has_valid_quorums {
-                quorum.verified = true;
-            }
-            return;
-        }
         let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
             .into_iter()
             .filter_map(|i| {
@@ -1015,23 +1008,29 @@ impl MasternodeProcessor {
             valid_masternodes, quorum, operator_pks
         );
         let operator_public_keys_count = operator_pks.len();
-        let is_valid_signature = unsafe {
-            (self.validate_llmq)(
-                boxed(types::LLMQValidationData {
-                    items: boxed_vec(operator_pks),
-                    count: operator_public_keys_count,
-                    commitment_hash: boxed(quorum.generate_commitment_hash().0),
-                    all_commitment_aggregated_signature: boxed(
-                        quorum.all_commitment_aggregated_signature.0,
-                    ),
-                    threshold_signature: boxed(quorum.threshold_signature.0),
-                    public_key: boxed(quorum.public_key.0),
-                }),
-                self.opaque_context,
-            )
-        };
-        let is_valid_payload = quorum.validate_payload();
-        has_valid_quorums &= is_valid_payload && is_valid_signature;
+
+        if quorum.llmq_type == LLMQType::Llmqtype60_75 {
+            has_valid_quorums &= true;
+        } else {
+            let is_valid_signature = unsafe {
+                (self.validate_llmq)(
+                    boxed(types::LLMQValidationData {
+                        items: boxed_vec(operator_pks),
+                        count: operator_public_keys_count,
+                        commitment_hash: boxed(quorum.generate_commitment_hash().0),
+                        all_commitment_aggregated_signature: boxed(
+                            quorum.all_commitment_aggregated_signature.0,
+                        ),
+                        threshold_signature: boxed(quorum.threshold_signature.0),
+                        public_key: boxed(quorum.public_key.0),
+                    }),
+                    self.opaque_context,
+                )
+            };
+            let is_valid_payload = quorum.validate_payload();
+            has_valid_quorums &= is_valid_payload && is_valid_signature;
+        }
+
         if has_valid_quorums {
             quorum.verified = true;
         }
