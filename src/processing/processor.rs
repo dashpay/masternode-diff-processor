@@ -988,30 +988,29 @@ impl MasternodeProcessor {
         block_height: u32,
         mut has_valid_quorums: bool,
     ) {
-        let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
-            .into_iter()
-            .filter_map(|i| {
-                match quorum
-                    .signers_bitset
-                    .as_slice()
-                    .bit_is_true_at_le_index(i as u32)
-                {
-                    true => Some(boxed(
-                        valid_masternodes[i].operator_public_key_at(block_height).0,
-                    )),
-                    false => None,
-                }
-            })
-            .collect();
-        println!(
-            "validate_signature: {:?} {:?} {:?}",
-            valid_masternodes, quorum, operator_pks
-        );
-        let operator_public_keys_count = operator_pks.len();
-
         if quorum.llmq_type == LLMQType::Llmqtype60_75 {
             has_valid_quorums &= true;
         } else {
+            let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
+                .into_iter()
+                .filter_map(|i| {
+                    match quorum
+                        .signers_bitset
+                        .as_slice()
+                        .bit_is_true_at_le_index(i as u32)
+                    {
+                        true => Some(boxed(
+                            valid_masternodes[i].operator_public_key_at(block_height).0,
+                        )),
+                        false => None,
+                    }
+                })
+                .collect();
+            println!(
+                "validate_signature: {:?} {:?} {:?}",
+                valid_masternodes, quorum, operator_pks
+            );
+            let operator_public_keys_count = operator_pks.len();
             let is_valid_signature = unsafe {
                 (self.validate_llmq)(
                     boxed(types::LLMQValidationData {
