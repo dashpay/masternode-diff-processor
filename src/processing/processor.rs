@@ -988,6 +988,13 @@ impl MasternodeProcessor {
         block_height: u32,
         mut has_valid_quorums: bool,
     ) {
+        if quorum.llmq_type == LLMQType::Llmqtype60_75 {
+            has_valid_quorums &= true;
+            if has_valid_quorums {
+                quorum.verified = true;
+            }
+            return;
+        }
         let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
             .into_iter()
             .filter_map(|i| {
