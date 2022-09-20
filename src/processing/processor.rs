@@ -154,14 +154,14 @@ impl MasternodeProcessor {
     ) -> Option<llmq::LLMQSnapshot> {
         if let Some(cached) = cached_snapshots.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
-            self.log(format!("find_snapshot: (Cached) {}", block_hash));
+            self.log(format!("find_snapshot: (Cached) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             Some(cached.clone())
         } else if let Some(looked) = self.lookup_snapshot_by_block_hash(block_hash) {
             // Getting it from FFI directly
-            self.log(format!("find_snapshot: (Looked) {}", block_hash));
+            self.log(format!("find_snapshot: (Looked) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             Some(looked)
         } else {
-            self.log(format!("find_snapshot: (None) {}", block_hash));
+            self.log(format!("find_snapshot: (None) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             None
         }
     }
@@ -254,7 +254,7 @@ impl MasternodeProcessor {
         let merkle_tree = common::MerkleTree {
             tree_element_count: list_diff.total_transactions,
             hashes: list_diff.merkle_hashes.1,
-            flags: list_diff.merkle_flags,
+            flags: list_diff.merkle_flags.as_slice(),
         };
         self.cache_masternode_list(block_hash, masternode_list.clone(), cache);
         let needed_masternode_lists = cache.needed_masternode_lists.clone();
@@ -429,7 +429,11 @@ impl MasternodeProcessor {
                 quorum.llmq_type,
                 block_hash,
                 block_height,
-                cache,
+                &mut cache.llmq_members,
+                &mut cache.llmq_indexed_members,
+                &cache.mn_lists,
+                &cache.llmq_snapshots,
+                &mut cache.needed_masternode_lists
             )
         } else {
             Self::valid_masternodes_for(masternodes, quorum_modifier, quorum_count, block_height)
@@ -569,6 +573,7 @@ impl MasternodeProcessor {
         match self.lookup_block_hash_by_height(work_block_height) {
             None => panic!("missing block for height: {}", work_block_height),
             Some(work_block_hash) => {
+                //println!("quorum_quarter_members_by_snapshot: find masternode list for: {}: {} (cached_snapshots: {:#?})", work_block_height, work_block_hash.clone().reversed(), cached_snapshots);
                 if let Some(masternode_list) =
                     self.find_masternode_list(work_block_hash, &cached_lists, unknown_lists)
                 {
@@ -617,7 +622,7 @@ impl MasternodeProcessor {
                 } else {
                     self.log(format!(
                         "missing masternode_list for block at height: {}: {}",
-                        work_block_height, work_block_hash
+                        work_block_height, work_block_hash.clone().reversed()
                     ));
                     vec![]
                 }
@@ -698,23 +703,20 @@ impl MasternodeProcessor {
                             quorum_count,
                             work_block_height,
                         ));
-                        let mut skip_list = Vec::<usize>::new();
-                        let mut first_skipped_index = 0;
-                        let mut idx = 0;
+                        let mut skip_list = Vec::<i32>::new();
+                        let mut first_skipped_index = 0i32;
+                        let mut idx = 0i32;
                         (0..num_quorums).for_each(|i| {
                             if quarter_quorum_members.get(i).is_none() {
                                 quarter_quorum_members.insert(i, vec![]);
                             }
                             while quarter_quorum_members.get(i).unwrap().len() < quarter_size {
-                                let mn = sorted_combined_mns_list.get(idx).unwrap();
+                                let mn = sorted_combined_mns_list.get(idx as usize).unwrap();
                                 if masternodes_used_at_h_index
                                     .get(i)
                                     .unwrap()
                                     .into_iter()
-                                    .filter(|&node| {
-                                        mn.provider_registration_transaction_hash
-                                            == node.provider_registration_transaction_hash
-                                    })
+                                    .filter(|&node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash)
                                     .count()
                                     == 0
                                 {
@@ -727,7 +729,7 @@ impl MasternodeProcessor {
                                     skip_list.push(idx);
                                 }
                                 idx += 1;
-                                if idx == sorted_combined_mns_list.len() {
+                                if idx == sorted_combined_mns_list.len() as i32 {
                                     idx = 0;
                                 }
                             }
@@ -821,24 +823,28 @@ impl MasternodeProcessor {
         llmq_type: LLMQType,
         block_hash: UInt256,
         block_height: u32,
-        cache: &mut MasternodeProcessorCache,
+        cached_llmq_members: &mut BTreeMap<LLMQType, BTreeMap<UInt256, Vec<masternode::MasternodeEntry>>>,
+        cached_llmq_indexed_members: &mut BTreeMap<LLMQType, BTreeMap<llmq::LLMQIndexedHash, Vec<masternode::MasternodeEntry>>>,
+        cached_mn_lists: &BTreeMap<UInt256, masternode::MasternodeList>,
+        cached_llmq_snapshots: &BTreeMap<UInt256, llmq::LLMQSnapshot>,
+        cached_needed_masternode_lists: &mut Vec<UInt256>,
     ) -> Vec<masternode::MasternodeEntry> {
-        let map_by_type_opt = cache.llmq_members.get_mut(&llmq_type);
+        let map_by_type_opt = cached_llmq_members.get_mut(&llmq_type);
         if map_by_type_opt.is_some() {
             if let Some(members) = map_by_type_opt.as_ref().unwrap().get(&block_hash) {
                 return members.clone();
             }
         } else {
-            cache.llmq_members.insert(llmq_type, BTreeMap::new());
+            cached_llmq_members.insert(llmq_type, BTreeMap::new());
         }
-        let map_by_type = cache.llmq_members.get_mut(&llmq_type).unwrap();
+        let map_by_type = cached_llmq_members.get_mut(&llmq_type).unwrap();
         let llmq_params = llmq_type.params();
         let quorum_index = block_height % llmq_params.dkg_params.interval;
         let cycle_base_height = block_height - quorum_index;
         match self.lookup_block_hash_by_height(cycle_base_height) {
             None => panic!("missing hash for block at height: {}", cycle_base_height),
             Some(cycle_base_hash) => {
-                let map_by_type_indexed_opt = cache.llmq_indexed_members.get_mut(&llmq_type);
+                let map_by_type_indexed_opt = cached_llmq_indexed_members.get_mut(&llmq_type);
                 if map_by_type_indexed_opt.is_some() {
                     if let Some(members) = map_by_type_indexed_opt
                         .as_ref()
@@ -849,19 +855,18 @@ impl MasternodeProcessor {
                         return members.clone();
                     }
                 } else {
-                    cache
-                        .llmq_indexed_members
+                    cached_llmq_indexed_members
                         .insert(llmq_type, BTreeMap::new());
                 }
                 let rotated_members = self.rotate_members(
                     cycle_base_height,
                     llmq_params,
-                    &cache.mn_lists,
-                    &cache.llmq_snapshots,
-                    &mut cache.needed_masternode_lists,
+                    cached_mn_lists,
+                    cached_llmq_snapshots,
+                    cached_needed_masternode_lists,
                 );
                 let map_indexed_quorum_members_of_type =
-                    cache.llmq_indexed_members.get_mut(&llmq_type).unwrap();
+                    cached_llmq_indexed_members.get_mut(&llmq_type).unwrap();
                 rotated_members.iter().enumerate().for_each(|(i, members)| {
                     map_indexed_quorum_members_of_type.insert(
                         llmq::LLMQIndexedHash::new(cycle_base_hash, i as u32),
@@ -933,6 +938,7 @@ impl MasternodeProcessor {
     }
 
     pub fn save_snapshot(&self, block_hash: UInt256, snapshot: llmq::LLMQSnapshot) -> bool {
+        println!("save_snapshot ==> {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash);
         unsafe {
             (self.save_llmq_snapshot)(
                 boxed(block_hash.0),
@@ -1039,7 +1045,7 @@ impl MasternodeProcessor {
         &self,
         message: &'a [u8],
         offset: &mut usize,
-    ) -> Option<llmq::MNListDiff<'a>> {
+    ) -> Option<llmq::MNListDiff> {
         llmq::MNListDiff::new(message, offset, |hash| {
             self.lookup_block_height_by_hash(hash)
         })

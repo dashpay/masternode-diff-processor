@@ -10,3 +10,4 @@ pub mod multiple_merkle_hashes;
 pub mod quorum_issue;
 pub mod test_quorums_from_dash_core_snapshot;
 pub mod block_store;
+pub mod json_from_core_snapshot;

@@ -1,5 +1,4 @@
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, block_height_lookup_default};
-use crate::processing::MasternodeProcessorCache;
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, get_block_height_by_hash_from_context};
 use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_models::common::chain_type::ChainType;
@@ -12,16 +11,16 @@ fn test_mnl_saving_to_disk() {
     // testMNLSavingToDisk
     let chain = ChainType::TestNet;
     let bytes = message_from_file("ML_at_122088.dat".to_string());
+    let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
-        cache: MasternodeProcessorCache::default(),
+        cache,
         blocks: init_testnet_store()
     });
-    let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_default,
-            block_height_lookup_default,
+            get_block_height_by_hash_from_context,
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
@@ -44,7 +43,7 @@ fn test_mnl_saving_to_disk() {
         false,
         chain.genesis_hash().0.as_ptr(),
         processor,
-        cache,
+        context.cache,
         context as *mut _ as *mut std::ffi::c_void,
     );
     println!("{:?}", result);

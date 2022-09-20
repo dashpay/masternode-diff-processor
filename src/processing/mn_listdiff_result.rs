@@ -42,9 +42,9 @@ impl std::fmt::Debug for MNListDiffResult {
                 ),
             )
             .field("masternode_list", &self.masternode_list)
-            .field("added_masternodes", &self.added_masternodes)
-            .field("modified_masternodes", &self.modified_masternodes)
-            .field("added_quorums", &self.added_quorums)
+            .field("added_masternodes", &self.added_masternodes.len())
+            .field("modified_masternodes", &self.modified_masternodes.len())
+            .field("added_quorums", &self.added_quorums.len())
             .field("needed_masternode_lists", &self.needed_masternode_lists)
             .finish()
     }

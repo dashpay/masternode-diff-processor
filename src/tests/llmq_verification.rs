@@ -1,13 +1,4 @@
-use crate::lib_tests::tests::{
-    add_insight_lookup_default, assert_diff_result, block_height_lookup_default,
-    get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default,
-    get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default,
-    hash_destroy_default, log_default, masternode_list_destroy_default,
-    masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default,
-    should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default,
-    validate_llmq_callback, FFIContext,
-};
-use crate::processing::MasternodeProcessorCache;
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, get_block_height_by_hash_from_context};
 use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_ffi::ffi::to::ToFFI;
@@ -27,16 +18,16 @@ fn testnet_llmq_verification() {
     let use_insight_as_backup = false;
     let chain = ChainType::TestNet;
     let base_masternode_list_hash: *const u8 = null_mut();
+    let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut FFIContext {
         chain,
-        cache: MasternodeProcessorCache::default(),
+        cache,
         blocks: init_testnet_store()
     };
-    let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_default,
-            block_height_lookup_default,
+            get_block_height_by_hash_from_context,
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
@@ -59,7 +50,7 @@ fn testnet_llmq_verification() {
         false,
         chain.genesis_hash().0.as_ptr(),
         processor,
-        cache,
+        context.cache,
         context as *mut _ as *mut std::ffi::c_void,
     );
     println!("{:?}", result);
@@ -80,7 +71,7 @@ fn testnet_llmq_verification() {
             false,
             chain.genesis_hash().0.as_ptr(),
             processor,
-            cache,
+            context.cache,
             context as *mut _ as *mut std::ffi::c_void,
         );
         println!("{:?}", result);
@@ -147,9 +138,10 @@ fn testnet_llmq_verification_using_processor_and_cache() {
     let bytes = message_from_file("MNL_0_122928.dat".to_string());
     let use_insight_as_backup = false;
     let chain = ChainType::TestNet;
+    let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut FFIContext {
         chain,
-        cache: MasternodeProcessorCache::default(),
+        cache,
         blocks: init_testnet_store()
     };
     let processor = unsafe {
@@ -171,7 +163,6 @@ fn testnet_llmq_verification_using_processor_and_cache() {
             log_default,
         )
     };
-    let cache = unsafe { processor_create_cache() };
 
     let result = process_mnlistdiff_from_message(
         bytes.as_ptr(),
@@ -180,7 +171,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
         false,
         chain.genesis_hash().0.as_ptr(),
         processor,
-        cache,
+        context.cache,
         context as *mut _ as *mut std::ffi::c_void,
     );
 
@@ -205,7 +196,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
             false,
             chain.genesis_hash().0.as_ptr(),
             processor,
-            cache,
+            context.cache,
             context as *mut _ as *mut std::ffi::c_void,
         );
 

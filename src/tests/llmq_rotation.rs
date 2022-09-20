@@ -2,7 +2,6 @@ use bls_signatures::{G1Element, G2Element, Scheme};
 use dash_spv_ffi::ffi::unboxer::unbox_any;
 use dash_spv_ffi::types;
 use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext};
-use crate::processing::MasternodeProcessorCache;
 use crate::{process_qrinfo_from_message, processor_create_cache, register_processor};
 use dash_spv_models::common::chain_type::ChainType;
 use dash_spv_models::common::LLMQType;
@@ -18,12 +17,12 @@ fn test_llmq_rotation() {
     let c_array = bytes.as_ptr();
     let use_insight_as_backup = false;
     let chain = ChainType::DevNet;
+    let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
-        cache: MasternodeProcessorCache::default(),
+        cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
-    let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_default,
@@ -78,13 +77,13 @@ fn test_llmq_rotation_2() {
     let bytes = message_from_file("QRINFO_1_8344.dat".to_string());
     let use_insight_as_backup = false;
     let chain = ChainType::DevNet;
+    let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
-        cache: MasternodeProcessorCache::default(),
+        cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
     println!("test_llmq_rotation_2 {:?}", bytes.to_hex());
-    let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_default,
@@ -460,12 +459,13 @@ unsafe extern "C" fn get_merkle_root_by_hash_default_333(
 fn test_devnet_333() {
     let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
     let chain = ChainType::DevNet;
+    let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
-        cache: MasternodeProcessorCache::default(),
+        cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
-    let cache = unsafe { processor_create_cache() };
+    // let cache = unsafe { processor_create_cache() };
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_default_333,
@@ -519,11 +519,11 @@ fn test_processor_devnet_333() {
             log_default,
         )
     };
-    let cache = unsafe { processor_create_cache() };
+    let cache = unsafe { &mut *processor_create_cache() };
     let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
     let context = &mut (FFIContext {
         chain,
-        cache: MasternodeProcessorCache::default(),
+        cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
 
@@ -741,10 +741,10 @@ fn test_processor_devnet_333_2() {
             log_default,
         )
     };
-    let cache = unsafe { processor_create_cache() };
+    let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain: ChainType::DevNet,
-        cache: MasternodeProcessorCache::default(),
+        cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
 
@@ -1451,10 +1451,10 @@ fn test_jack_daniels() {
             log_default,
         )
     };
-    let cache = unsafe { processor_create_cache() };
+    let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
-        cache: MasternodeProcessorCache::default(),
+        cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
 

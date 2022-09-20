@@ -1,4 +1,4 @@
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, block_height_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, get_block_height_by_hash_from_context};
 use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
 use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_models::common::chain_type::ChainType;
@@ -43,7 +43,7 @@ fn test_mainnet_reload_with_processor() {
     ];
     let context = &mut (FFIContext {
         chain,
-        cache: Default::default(),
+        cache: &mut Default::default(),
         blocks: init_mainnet_store()
     });
 
@@ -57,11 +57,11 @@ pub fn load_masternode_lists_for_files(
     assert_validity: bool,
     context: &mut FFIContext,
 ) -> (bool, BTreeMap<UInt256, masternode::MasternodeList>) {
-    let cache = unsafe { processor_create_cache() };
+    let cache = unsafe { &mut *processor_create_cache() };
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_default,
-            block_height_lookup_default,
+            get_block_height_by_hash_from_context,
             get_block_hash_by_height_default,
             get_llmq_snapshot_by_block_hash_default,
             save_llmq_snapshot_default,
@@ -77,7 +77,7 @@ pub fn load_masternode_lists_for_files(
             log_default,
         )
     };
-    context.cache = unsafe { (*cache).clone() };
+    context.cache = cache;
 
     for file in files {
         println!("load_masternode_lists_for_files: [{}]", file);
@@ -89,7 +89,7 @@ pub fn load_masternode_lists_for_files(
             false,
             context.chain.genesis_hash().0.as_ptr(),
             processor,
-            cache,
+            context.cache,
             context as *mut _ as *mut std::ffi::c_void,
         );
         let result = unsafe { *result };
@@ -103,6 +103,7 @@ pub fn load_masternode_lists_for_files(
         let masternode_list = unsafe { *result.masternode_list };
         let masternode_list_decoded = unsafe { masternode_list.decode() };
     }
-    let c = unsafe { (*cache).clone() };
-    (true, c.mn_lists)
+    // let c = unsafe { cache };
+    let lists = context.cache.mn_lists.clone();
+    (true, lists)
 }

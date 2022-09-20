@@ -42,14 +42,14 @@ pub mod tests {
     // ($1, $2),
 
     #[derive(Debug)]
-    pub struct FFIContext {
+    pub struct FFIContext<'a> {
         pub chain: ChainType,
-        pub cache: MasternodeProcessorCache,
+        pub cache: &'a mut MasternodeProcessorCache,
         // TODO:: make it initialized from json file with blocks
         pub blocks: Vec<MerkleBlock>,
     }
 
-    impl FFIContext {
+    impl<'a> FFIContext<'a> {
         pub fn block_for_hash(&self, hash: UInt256) -> Option<&MerkleBlock> {
             self.blocks.iter().find(|block| block.hash == hash)
         }
@@ -274,13 +274,20 @@ pub mod tests {
     }
 
     pub fn get_file_as_byte_vec(filename: &String) -> Vec<u8> {
-        println!("get_file_as_byte_vec: {}", filename);
+        //println!("get_file_as_byte_vec: {}", filename);
         let mut f = fs::File::open(&filename).expect("no file found");
         let metadata = fs::metadata(&filename).expect("unable to read metadata");
         let mut buffer = vec![0; metadata.len() as usize];
         f.read(&mut buffer).expect("buffer overflow");
         buffer
     }
+
+    // pub fn get_file_as_json<T: Deserialize<'static>>(filename: &String) -> T {
+    //     let vec: Vec<u8> = get_file_as_byte_vec(filename);
+    //     let json_string = serde_json::to_string(&vec).unwrap();
+    //     let value: T = serde_json::from_str(&json_string).unwrap();
+    //     value
+    // }
 
     pub fn message_from_file(name: String) -> Vec<u8> {
         let executable = env::current_exe().unwrap();
@@ -323,30 +330,17 @@ pub mod tests {
         );
     }
 
-    pub unsafe extern "C" fn block_height_lookup_default(
-        block_hash: *mut [u8; 32],
-        context: *const std::ffi::c_void,
-    ) -> u32 {
-        let block_hash = UInt256(*block_hash);
-        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        let block_hash_reversed = block_hash.clone().reversed();
-        let block = data.block_for_hash(block_hash).unwrap_or(&MerkleBlock { hash: UInt256::MIN, height: u32::MAX, merkleroot: UInt256::MIN });
-        let height = block.height;
-        println!("block_height_lookup_default {}: {} ({})", height, block_hash_reversed, block_hash);
-        height
-    }
-
     pub unsafe extern "C" fn get_block_height_by_hash_from_context(
         block_hash: *mut [u8; 32],
         context: *const std::ffi::c_void,
     ) -> u32 {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        let hash = UInt256(*block_hash);
-        if let Some(block) = data.blocks.iter().find(|block| block.hash == hash) {
-            block.height
-        } else {
-            u32::MIN
-        }
+        let block_hash = UInt256(*block_hash);
+        let block_hash_reversed = block_hash.clone().reversed();
+        let block = data.block_for_hash(block_hash).unwrap_or(&MerkleBlock { hash: UInt256::MIN, height: u32::MAX, merkleroot: UInt256::MIN });
+        let height = block.height;
+        // println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
+        height
     }
 
     pub unsafe extern "C" fn get_block_hash_by_height_default(
@@ -361,8 +355,11 @@ pub mod tests {
         context: *const std::ffi::c_void,
     ) -> *mut u8 {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        if let Some(block) = data.blocks.iter().find(|block| block.height == block_height) {
-            block.hash.clone().reversed().0.as_mut_ptr()
+        if let Some(block) = data.block_for_height(block_height) {
+            let block_hash = block.hash;
+            println!("get_block_hash_by_height_from_context: {}: {:?}", block_height, block_hash.clone().reversed());
+            block_hash.clone().0.as_mut_ptr()
+            // block.hash.clone().reversed().0.as_mut_ptr()
         } else {
             null_mut()
         }
@@ -382,6 +379,19 @@ pub mod tests {
         null_mut()
     }
 
+    pub unsafe extern "C" fn get_llmq_snapshot_by_block_hash_from_context(
+        block_hash: *mut [u8; 32],
+        context: *const std::ffi::c_void,
+    ) -> *mut types::LLMQSnapshot {
+        let h = UInt256(*(block_hash));
+        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+        if let Some(snapshot) = data.cache.llmq_snapshots.get(&h) {
+            println!("get_llmq_snapshot_by_block_hash_from_context: {}: {:?}", h, snapshot);
+            boxed(snapshot.encode())
+        } else {
+            null_mut()
+        }
+    }
 
     pub unsafe extern "C" fn get_masternode_list_by_block_hash_default(
         _block_hash: *mut [u8; 32],
@@ -399,8 +409,8 @@ pub mod tests {
         if let Some(list) = data.cache.mn_lists.get(&h) {
             println!("get_masternode_list_by_block_hash_from_cache: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
             let encoded = list.encode();
-            boxed(encoded)
             // &encoded as *const types::MasternodeList
+            boxed(encoded)
         } else {
             null_mut()
         }
@@ -462,7 +472,7 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let snapshot = *snapshot;
         let snapshot_decoded = snapshot.decode();
-        println!("save_llmq_snapshot_in_cache: {}: {:?}", h, snapshot_decoded);
+        println!("save_llmq_snapshot_in_cache: {}", h);
         data.cache.llmq_snapshots.insert(h, snapshot_decoded);
         true
     }
@@ -623,7 +633,7 @@ pub mod tests {
         let base_masternode_list_hash: *const u8 = null_mut();
         let context = &mut FFIContext {
             chain,
-            cache: MasternodeProcessorCache::default(),
+            cache: &mut MasternodeProcessorCache::default(),
             blocks: init_testnet_store()
         } as *mut _ as *mut std::ffi::c_void;
 
@@ -631,7 +641,7 @@ pub mod tests {
         let processor = unsafe {
             register_processor(
                 get_merkle_root_by_hash_default,
-                block_height_lookup_default,
+                get_block_height_by_hash_from_context,
                 get_block_hash_by_height_default,
                 get_llmq_snapshot_by_block_hash_default,
                 save_llmq_snapshot_default,
