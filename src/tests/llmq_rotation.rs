@@ -3,7 +3,7 @@ use dash_spv_ffi::ffi::unboxer::unbox_any;
 use dash_spv_ffi::types;
 use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext};
 use crate::{process_qrinfo_from_message, processor_create_cache, register_processor};
-use dash_spv_models::common::chain_type::ChainType;
+use dash_spv_models::common::chain_type::{ChainType, DevnetType, IHaveChainSettings};
 use dash_spv_models::common::LLMQType;
 use dash_spv_primitives::crypto::byte_util::{AsBytes, Reversable, UInt256};
 use dash_spv_primitives::crypto::{UInt384, UInt768};
@@ -16,7 +16,7 @@ fn test_llmq_rotation() {
     let length = bytes.len();
     let c_array = bytes.as_ptr();
     let use_insight_as_backup = false;
-    let chain = ChainType::DevNet;
+    let chain = ChainType::DevNet(DevnetType::Devnet333);
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
@@ -76,7 +76,7 @@ pub unsafe extern "C" fn block_height_lookup_5078(
 fn test_llmq_rotation_2() {
     let bytes = message_from_file("QRINFO_1_8344.dat".to_string());
     let use_insight_as_backup = false;
-    let chain = ChainType::DevNet;
+    let chain = ChainType::DevNet(DevnetType::Devnet333);
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
@@ -458,7 +458,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_default_333(
 #[test]
 fn test_devnet_333() {
     let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
-    let chain = ChainType::DevNet;
+    let chain = ChainType::DevNet(DevnetType::Devnet333);
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
@@ -499,7 +499,7 @@ fn test_devnet_333() {
 
 #[test]
 fn test_processor_devnet_333() {
-    let chain = ChainType::DevNet;
+    let chain = ChainType::DevNet(DevnetType::Devnet333);
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_default_333,
@@ -721,7 +721,7 @@ fn test_processor_devnet_333() {
 
 #[test]
 fn test_processor_devnet_333_2() {
-    let chain = ChainType::DevNet;
+    let chain = ChainType::DevNet(DevnetType::Devnet333);
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_default_333,
@@ -743,7 +743,7 @@ fn test_processor_devnet_333_2() {
     };
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
-        chain: ChainType::DevNet,
+        chain,
         cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
@@ -1428,7 +1428,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_333_2(
 
 #[test]
 fn test_jack_daniels() {
-    let chain = ChainType::DevNet;
+    let chain = ChainType::DevNet(DevnetType::JackDaniels);
     let genesis =
         UInt256::from_hex("79ee40288949fd61132c025761d4f065e161d60a88aab4c03e613ca8718d1d26")
             .unwrap();
@@ -1523,7 +1523,7 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
 
 fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>) -> bool {
     let scheme = bls_signatures::LegacySchemeMPL::new();
-    let bls_signature = bls_signatures::G2Element::from_bytes(signature.as_bytes()).unwrap();
+    let bls_signature = G2Element::from_bytes(signature.as_bytes()).unwrap();
     let keys = public_keys.iter().map(|k| k).collect::<Vec<&G1Element>>();
     let is_verified = scheme.verify_secure(keys, message_digest.as_bytes(), &bls_signature);
     is_verified

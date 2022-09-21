@@ -64,7 +64,7 @@ fn testnet_quorum_quarters() {
     let old_bytes2 = message_from_file("QRINFO_0_1740910.dat".to_string());
     processor.opaque_context = context as *mut _ as *mut std::ffi::c_void;
     processor.use_insight_as_backup = true;
-    processor.genesis_hash = chain.genesis_hash().0.as_ptr();
+    processor.genesis_hash = context.genesis_as_ptr();
 
     processor.save_masternode_list(block_hash_8792, &masternode_list_8792);
     processor.save_masternode_list(block_hash_8840, &masternode_list_8840);
@@ -111,25 +111,25 @@ fn testnet_quorum_quarters() {
     processor.save_snapshot(block_hash_8936_h_2c, snapshot_8936_h_2c);
     processor.save_snapshot(block_hash_8936_h_3c, snapshot_8936_h_3c);
 
-    let old_result = process_qrinfo_from_message_internal(old_bytes.as_ptr(), old_bytes.len(), false, chain.genesis_hash().0.as_ptr(), processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
-    let old_result2 = process_qrinfo_from_message_internal(old_bytes2.as_ptr(), old_bytes2.len(), false, chain.genesis_hash().0.as_ptr(), processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
-    println!("old_result tip: {}", old_result.result_at_tip.block_hash.clone().reversed()); // 1740902
-    println!("old_result h: {}", old_result.result_at_h.block_hash.clone().reversed()); // 1738648
-    println!("old_result h-c: {}", old_result.result_at_h_c.block_hash.clone().reversed()); // 1738360
-    println!("old_result h-2c: {}", old_result.result_at_h_2c.block_hash.clone().reversed()); // 1738072
-    println!("old_result h-3c: {}", old_result.result_at_h_3c.block_hash.clone().reversed()); // 1737784
-    println!("old_result2 tip: {}", old_result2.result_at_tip.block_hash.clone().reversed()); // 1740902
-    println!("old_result2 h: {}", old_result2.result_at_h.block_hash.clone().reversed()); // 1738648
-    println!("old_result2 h-c: {}", old_result2.result_at_h_c.block_hash.clone().reversed()); // 1738360
-    println!("old_result2 h-2c: {}", old_result2.result_at_h_2c.block_hash.clone().reversed()); // 1738072
-    println!("old_result2 h-3c: {}", old_result2.result_at_h_3c.block_hash.clone().reversed()); // 1737784
+    let old_result = process_qrinfo_from_message_internal(old_bytes.as_ptr(), old_bytes.len(), false, context.genesis_as_ptr(), processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
+    let old_result2 = process_qrinfo_from_message_internal(old_bytes2.as_ptr(), old_bytes2.len(), false, context.genesis_as_ptr(), processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
+    // println!("old_result tip: {}", old_result.result_at_tip.block_hash.clone().reversed()); // 1740902
+    // println!("old_result h: {}", old_result.result_at_h.block_hash.clone().reversed()); // 1738648
+    // println!("old_result h-c: {}", old_result.result_at_h_c.block_hash.clone().reversed()); // 1738360
+    // println!("old_result h-2c: {}", old_result.result_at_h_2c.block_hash.clone().reversed()); // 1738072
+    // println!("old_result h-3c: {}", old_result.result_at_h_3c.block_hash.clone().reversed()); // 1737784
+    // println!("old_result2 tip: {}", old_result2.result_at_tip.block_hash.clone().reversed()); // 1740902
+    // println!("old_result2 h: {}", old_result2.result_at_h.block_hash.clone().reversed()); // 1738648
+    // println!("old_result2 h-c: {}", old_result2.result_at_h_c.block_hash.clone().reversed()); // 1738360
+    // println!("old_result2 h-2c: {}", old_result2.result_at_h_2c.block_hash.clone().reversed()); // 1738072
+    // println!("old_result2 h-3c: {}", old_result2.result_at_h_3c.block_hash.clone().reversed()); // 1737784
     // println!("old_result h-4c: {}", old_result.result_at_h_4c.block_hash);
 
     let result = process_qrinfo_from_message_internal(
         bytes.as_ptr(),
         bytes.len(),
         false,
-        chain.genesis_hash().0.as_ptr(),
+        context.genesis_as_ptr(),
         processor,
         context.cache,
         context as *mut _ as *mut std::ffi::c_void

@@ -41,7 +41,7 @@ fn test_mnl_saving_to_disk() {
         bytes.len(),
         false,
         false,
-        chain.genesis_hash().0.as_ptr(),
+        context.genesis_as_ptr(),
         processor,
         context.cache,
         context as *mut _ as *mut std::ffi::c_void,

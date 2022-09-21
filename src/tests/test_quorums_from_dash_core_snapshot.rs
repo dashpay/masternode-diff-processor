@@ -1,3 +1,4 @@
+use dash_spv_models::common::chain_type::IHaveChainSettings;
 use dash_spv_models::common::ChainType;
 use dash_spv_primitives::crypto::byte_util::Reversable;
 use dash_spv_primitives::crypto::UInt256;
@@ -53,7 +54,7 @@ pub fn test_from_snapshot() {
     };
     processor.opaque_context = context as *mut _ as *mut std::ffi::c_void;
     processor.use_insight_as_backup = true;
-    processor.genesis_hash = chain.genesis_hash().0.as_ptr();
+    processor.genesis_hash = context.genesis_as_ptr();
 
     println!("rotated_quorums at h ({}: {})", mn_list_diff_h.block_height, mn_list_diff_h.block_hash);
     let cached_blocks = &context.blocks;

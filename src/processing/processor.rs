@@ -678,7 +678,7 @@ impl MasternodeProcessor {
                         });
                         masternode_list.masternodes.into_values().for_each(|mn| {
                             if mn.is_valid
-                                && masternodes_unused_at_h
+                                && masternodes_used_at_h
                                     .iter()
                                     .filter(|node| {
                                         mn.provider_registration_transaction_hash

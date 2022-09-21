@@ -15,7 +15,7 @@ pub mod tests {
     use dash_spv_ffi::ffi::to::ToFFI;
     use dash_spv_ffi::ffi::unboxer::unbox_any;
     use dash_spv_ffi::types;
-    use dash_spv_models::common::chain_type::ChainType;
+    use dash_spv_models::common::chain_type::{ChainType, IHaveChainSettings};
     use dash_spv_models::common::LLMQType;
     use dash_spv_models::{llmq, masternode};
     use dash_spv_primitives::consensus::encode;
@@ -55,6 +55,10 @@ pub mod tests {
         }
         pub fn block_for_height(&self, height: u32) -> Option<&MerkleBlock> {
             self.blocks.iter().find(|block| block.height == height)
+        }
+
+        pub fn genesis_as_ptr(&self) -> *const u8 {
+            self.chain.genesis_hash().0.as_ptr()
         }
     }
 
@@ -282,13 +286,6 @@ pub mod tests {
         buffer
     }
 
-    // pub fn get_file_as_json<T: Deserialize<'static>>(filename: &String) -> T {
-    //     let vec: Vec<u8> = get_file_as_byte_vec(filename);
-    //     let json_string = serde_json::to_string(&vec).unwrap();
-    //     let value: T = serde_json::from_str(&json_string).unwrap();
-    //     value
-    // }
-
     pub fn message_from_file(name: String) -> Vec<u8> {
         let executable = env::current_exe().unwrap();
         let path = match executable.parent() {
@@ -301,7 +298,6 @@ pub mod tests {
         file
     }
 
-    // pub fn assert_diff_result(chain: ChainType, result: types::MNListDiffResult) {
     pub fn assert_diff_result(context: &mut FFIContext, result: types::MNListDiffResult) {
         let masternode_list = unsafe { (*result.masternode_list).decode() };
         print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.clone().reversed());
@@ -472,7 +468,6 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let snapshot = *snapshot;
         let snapshot_decoded = snapshot.decode();
-        println!("save_llmq_snapshot_in_cache: {}", h);
         data.cache.llmq_snapshots.insert(h, snapshot_decoded);
         true
     }
@@ -510,7 +505,7 @@ pub mod tests {
         let quorum_type: u8 = match data.chain {
             ChainType::MainNet => LLMQType::Llmqtype400_60.into(),
             ChainType::TestNet => LLMQType::Llmqtype50_60.into(),
-            ChainType::DevNet => LLMQType::Llmqtype60_75.into(),
+            ChainType::DevNet(_) => LLMQType::LlmqtypeDevnetDIP0024.into(),
         };
         llmq_type == quorum_type
     }
@@ -537,10 +532,6 @@ pub mod tests {
             public_key
         );
 
-        // bool allCommitmentAggregatedSignatureValidated = [DSBLSKey verifySecureAggregated:commitmentHash signature:allCommitmentAggregatedSignature withPublicKeys:publicKeyArray];
-
-        // let mut inputs = Vec::new();
-        // let mut asig = AggregateSignature::new();
         let all_commitment_aggregated_signature = UInt768(*all_commitment_aggregated_signature);
         let threshold_signature = UInt768(*threshold_signature);
         let public_key = UInt384(*public_key);
@@ -607,7 +598,6 @@ pub mod tests {
         verify_string_hashes: Vec<&str>,
         verify_string_smle_hashes: Vec<&str>,
     ) {
-        println!("perform_mnlist_diff_test_for_message...");
         let bytes = Vec::from_hex(&hex_string).unwrap();
         let length = bytes.len();
         let c_array = bytes.as_ptr();
