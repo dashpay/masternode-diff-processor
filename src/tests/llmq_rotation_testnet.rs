@@ -216,7 +216,7 @@ fn testnet_quorum_quarters() {
     println!("##############");
     println!("{:#?}", needed_hashes);
     println!("##############");
-    //assert_eq!(node_hashes, needed_hashes, "Quorum Combo must be equal");
+    assert_eq!(node_hashes, needed_hashes, "Quorum Combo must be equal");
 
     let new_quarter_members = [
         UInt256::from_hex("168162f349bd2961fab43cd0a19a7e6a34c7a18d5dbe4805c06a4fcbcb138e78").unwrap().clone().reversed(),

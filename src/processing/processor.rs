@@ -473,11 +473,10 @@ impl MasternodeProcessor {
             .clone()
             .into_iter()
             .filter_map(|(_, entry)| {
-                let score = masternode::MasternodeList::masternode_score(
-                    entry.clone(),
-                    quorum_modifier,
-                    block_height,
-                );
+                if entry.confirmed_hash.is_zero() || !entry.is_valid {
+                    return None;
+                }
+                let score = masternode::MasternodeList::masternode_score(entry.clone(), quorum_modifier, block_height);
                 if score.is_some() && !score.unwrap().0.is_empty() {
                     Some((score.unwrap(), entry))
                 } else {
@@ -499,6 +498,7 @@ impl MasternodeProcessor {
         let count = min(masternodes_in_list_count, scores.len());
         for i in 0..count {
             if let Some(masternode) = scored_masternodes.get_mut(&scores[i]) {
+                //println!("get_valid_masternodes: {}: {}: {}", block_height, masternode.provider_registration_transaction_hash.clone().reversed(), masternode.is_valid_at(block_height));
                 if (*masternode).is_valid_at(block_height) {
                     valid_masternodes.push((*masternode).clone());
                 }
@@ -543,6 +543,32 @@ impl MasternodeProcessor {
         )
     }
 
+    fn sort_scored_masternodes(scored_masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>) -> Vec<masternode::MasternodeEntry> {
+        let mut v = Vec::from_iter(scored_masternodes);
+        v.sort_by(|(s1, _), (s2, _b)| s2.clone().reversed().cmp(&s1.clone().reversed()));
+        v.into_iter().map(|(s, node)| node).collect()
+    }
+
+    pub fn valid_masternodes_for_rotated_quorum_map(
+        masternodes: Vec<masternode::MasternodeEntry>,
+        quorum_modifier: UInt256,
+        quorum_count: u32,
+        block_height: u32,
+    ) -> Vec<masternode::MasternodeEntry> {
+        let scored_masternodes = Self::score_masternodes(masternodes, quorum_modifier, block_height);
+        Self::sort_scored_masternodes(scored_masternodes)
+    }
+
+    pub fn valid_masternodes_for_rotated_quorum(
+        masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>,
+        quorum_modifier: UInt256,
+        quorum_count: u32,
+        block_height: u32,
+    ) -> Vec<masternode::MasternodeEntry> {
+        let scored_masternodes = Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
+        Self::sort_scored_masternodes(scored_masternodes)
+    }
+
     // Same as in LLMQEntry
     // TODO: migrate to LLMQEntry
     fn build_llmq_modifier(llmq_type: LLMQType, block_hash: UInt256) -> UInt256 {
@@ -582,12 +608,9 @@ impl MasternodeProcessor {
                         // TODO: partition with enumeration doesn't work here, so need to change
                         // nodes.into_iter().enumerate().partition(|&(i, _)| snapshot.member_list.bit_is_true_at_le_index(i as u32))
                         let quorum_modifier = Self::build_llmq_modifier(llmq_type, work_block_hash);
-                        let (used_at_h, unused_at_h) = Self::valid_masternodes_for(
-                            masternode_list.masternodes,
-                            quorum_modifier,
-                            quorum_count,
-                            work_block_height,
-                        )
+                        let scored_masternodes = Self::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height);
+                        let scored_sorted_masternodes = Self::sort_scored_masternodes(scored_masternodes);
+                        let (used_at_h, unused_at_h) = scored_sorted_masternodes
                         .into_iter()
                         .partition(|_| {
                             let is_true =
@@ -595,18 +618,23 @@ impl MasternodeProcessor {
                             i += 1;
                             is_true
                         });
-                        let mut sorted_combined_mns_list = Self::valid_masternodes_for_quorum(
+                        let sorted_used_at_h = Self::valid_masternodes_for_rotated_quorum_map(
+                            used_at_h,
+                            quorum_modifier,
+                            quorum_count,
+                            work_block_height,
+                        );
+                        let sorted_unused_at_h = Self::valid_masternodes_for_rotated_quorum_map(
                             unused_at_h,
                             quorum_modifier,
                             quorum_count,
                             work_block_height,
                         );
-                        sorted_combined_mns_list.extend(Self::valid_masternodes_for_quorum(
-                            used_at_h,
-                            quorum_modifier,
-                            quorum_count,
-                            work_block_height,
-                        ));
+                        // println!("used_at_h: {:#?}", sorted_used_at_h.iter().map(|m|m.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
+                        // println!("unused_at_h: {:#?}", sorted_unused_at_h.iter().map(|m|m.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
+                        let mut sorted_combined_mns_list = sorted_unused_at_h;
+                        sorted_combined_mns_list.extend(sorted_used_at_h);
+                        // println!("sorted_combined_mns_list: {:#?}", sorted_combined_mns_list.iter().map(|m|m.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
                         snapshot.apply_skip_strategy(
                             sorted_combined_mns_list,
                             quorum_count as usize,
@@ -680,10 +708,10 @@ impl MasternodeProcessor {
                             if mn.is_valid
                                 && masternodes_used_at_h
                                     .iter()
-                                    .filter(|node| {
+                                    .filter(|node|
                                         mn.provider_registration_transaction_hash
                                             == node.provider_registration_transaction_hash
-                                    })
+                                    )
                                     .count()
                                     == 0
                             {
@@ -691,18 +719,25 @@ impl MasternodeProcessor {
                             }
                         });
                         let modifier = Self::build_llmq_modifier(params.r#type, work_block_hash);
-                        let mut sorted_combined_mns_list = Self::valid_masternodes_for_quorum(
+                        let sorted_used_mns_list = Self::valid_masternodes_for_rotated_quorum_map(
+                            masternodes_used_at_h,
+                            modifier,
+                            quorum_count,
+                            work_block_height,
+                        );
+                        let sorted_unused_mns_list = Self::valid_masternodes_for_rotated_quorum_map(
                             masternodes_unused_at_h,
                             modifier,
                             quorum_count,
                             work_block_height,
                         );
-                        sorted_combined_mns_list.extend(Self::valid_masternodes_for_quorum(
-                            masternodes_used_at_h,
-                            modifier,
-                            quorum_count,
-                            work_block_height,
-                        ));
+                        // println!("----------- buildNewQuorumQuarterMembers --------- ");
+                        // println!("sortedMnsUsedAtH: {:#?}", sorted_used_mns_list.iter().map(|m| m.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
+                        // println!("sortedMnsNotUsedAtH: {:#?}", sorted_unused_mns_list.iter().map(|m| m.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
+                        let mut sorted_combined_mns_list = sorted_unused_mns_list;
+                        sorted_combined_mns_list.extend(sorted_used_mns_list);
+                        // println!("sortedCombinedMnsList h[{}] {:#?}", quorum_base_block_height, sorted_combined_mns_list.iter().map(|n|n.provider_registration_transaction_hash.clone().reversed().to_string().chars().take(4).collect()).collect::<Vec<String>>());
+                        // println!("sortedCombinedMnsList h[{}] {:#?}", quorum_base_block_height, sorted_combined_mns_list.iter().map(|n|n.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
                         let mut skip_list = Vec::<i32>::new();
                         let mut first_skipped_index = 0i32;
                         let mut idx = 0i32;
@@ -794,7 +829,9 @@ impl MasternodeProcessor {
             cached_snapshots,
             unknown_lists,
         );
-
+        // println!("INFO: Quarter H-C {:#?}", prev_q_h_m_c.iter().flat_map(|v| v.iter().map(|m| m.provider_registration_transaction_hash.clone().reversed())).collect::<Vec<UInt256>>());
+        // println!("INFO: Quarter H-2C {:#?}", prev_q_h_m_2c.iter().flat_map(|v| v.iter().map(|m| m.provider_registration_transaction_hash.clone().reversed())).collect::<Vec<UInt256>>());
+        // println!("INFO: Quarter H-3C {:#?}", prev_q_h_m_3c.iter().flat_map(|v| v.iter().map(|m| m.provider_registration_transaction_hash.clone().reversed())).collect::<Vec<UInt256>>());
         let mut rotated_members =
             Vec::<Vec<masternode::MasternodeEntry>>::with_capacity(num_quorums);
         let new_quarter_members = self.new_quorum_quarter_members(
