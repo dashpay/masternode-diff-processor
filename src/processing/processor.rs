@@ -421,7 +421,6 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) {
         let block_height = self.lookup_block_height_by_hash(block_hash);
-        println!("validate_quorum: {}: {:?}", block_height, quorum);
         let quorum_modifier = quorum.llmq_quorum_hash();
         let quorum_count = quorum.llmq_type.size();
         let valid_masternodes = if quorum.index.is_some() {
@@ -975,7 +974,6 @@ impl MasternodeProcessor {
     }
 
     pub fn save_snapshot(&self, block_hash: UInt256, snapshot: llmq::LLMQSnapshot) -> bool {
-        println!("save_snapshot ==> {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash);
         unsafe {
             (self.save_llmq_snapshot)(
                 boxed(block_hash.0),
@@ -1049,10 +1047,6 @@ impl MasternodeProcessor {
                     }
                 })
                 .collect();
-            println!(
-                "validate_signature: {:?} {:?} {:?}",
-                valid_masternodes, quorum, operator_pks
-            );
             let operator_public_keys_count = operator_pks.len();
             let is_valid_signature = unsafe {
                 (self.validate_llmq)(
