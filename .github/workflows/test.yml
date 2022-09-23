@@ -38,4 +38,4 @@ jobs:
       - name: Run tests
         working-directory: ./mnldiffprocessor
         run: |
-          cargo test --package dash_mndiff --lib tests
+          cargo test --package dash_spv_masternode_processor --lib tests
