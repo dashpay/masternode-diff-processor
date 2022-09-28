@@ -997,10 +997,6 @@ impl MasternodeProcessor {
                     }
                 })
                 .collect();
-            println!(
-                "validate_signature: {:?} {:?} {:?}",
-                valid_masternodes, quorum, operator_pks
-            );
             let operator_public_keys_count = operator_pks.len();
             let is_valid_signature = unsafe {
                 (self.validate_llmq)(
