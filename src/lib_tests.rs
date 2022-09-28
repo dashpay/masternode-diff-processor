@@ -335,7 +335,7 @@ pub mod tests {
         let block_hash_reversed = block_hash.clone().reversed();
         let block = data.block_for_hash(block_hash).unwrap_or(&MerkleBlock { hash: UInt256::MIN, height: u32::MAX, merkleroot: UInt256::MIN });
         let height = block.height;
-        // println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
+        println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
         height
     }
 
@@ -355,7 +355,6 @@ pub mod tests {
             let block_hash = block.hash;
             println!("get_block_hash_by_height_from_context: {}: {:?}", block_height, block_hash.clone().reversed());
             block_hash.clone().0.as_mut_ptr()
-            // block.hash.clone().reversed().0.as_mut_ptr()
         } else {
             null_mut()
         }

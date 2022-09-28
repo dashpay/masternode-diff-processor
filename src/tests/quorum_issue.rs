@@ -42,7 +42,7 @@ fn test_quorum_issue() {
     let context = &mut (FFIContext {
         chain,
         cache: &mut Default::default(),
-        blocks: init_mainnet_store()
+        blocks: block_store
     });
 
     let (success, lists) = load_masternode_lists_for_files(files, false, context);

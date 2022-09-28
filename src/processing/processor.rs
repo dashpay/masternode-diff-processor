@@ -421,9 +421,6 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) {
         let block_height = self.lookup_block_height_by_hash(block_hash);
-        println!("validate_quorum: {}: {:?}", block_height, quorum);
-        let quorum_modifier = quorum.llmq_quorum_hash();
-        let quorum_count = quorum.llmq_type.size();
         let valid_masternodes = if quorum.index.is_some() {
             self.get_rotated_masternodes_for_quorum(
                 quorum.llmq_type,
@@ -436,69 +433,25 @@ impl MasternodeProcessor {
                 &mut cache.needed_masternode_lists
             )
         } else {
-            Self::valid_masternodes_for(masternodes, quorum_modifier, quorum_count, block_height)
+            Self::get_masternodes_for_quorum(
+                quorum.llmq_type,
+                masternodes,
+                quorum.llmq_quorum_hash(),
+                block_height)
         };
         self.validate_signature(valid_masternodes, quorum, block_height, has_valid_quorums);
     }
 
-    pub fn score_masternodes(
-        masternodes: Vec<masternode::MasternodeEntry>,
-        quorum_modifier: UInt256,
-        block_height: u32,
-    ) -> BTreeMap<UInt256, masternode::MasternodeEntry> {
-        masternodes
-            .into_iter()
-            .fold(BTreeMap::new(), |mut map, entry| {
-                match masternode::MasternodeList::masternode_score(
-                    entry.clone(),
-                    quorum_modifier,
-                    block_height,
-                ) {
-                    Some(score) => {
-                        if !score.0.is_empty() {
-                            map.insert(score, entry);
-                        }
-                    }
-                    None => {}
-                };
-                map
-            })
-    }
-    pub fn score_masternodes_map(
-        masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>,
-        quorum_modifier: UInt256,
-        block_height: u32,
-    ) -> BTreeMap<UInt256, masternode::MasternodeEntry> {
-        masternodes
-            .clone()
-            .into_iter()
-            .filter_map(|(_, entry)| {
-                if entry.confirmed_hash.is_zero() || !entry.is_valid {
-                    return None;
-                }
-                let score = masternode::MasternodeList::masternode_score(entry.clone(), quorum_modifier, block_height);
-                if score.is_some() && !score.unwrap().0.is_empty() {
-                    Some((score.unwrap(), entry))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    pub fn get_valid_masternodes(
-        mut scored_masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>,
-        quorum_count: u32,
-        masternodes_in_list_count: usize,
-        block_height: u32,
-    ) -> Vec<masternode::MasternodeEntry> {
-        let mut scores: Vec<UInt256> = scored_masternodes.clone().into_keys().collect();
+    pub fn get_masternodes_for_quorum(llmq_type: LLMQType, masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>, quorum_modifier: UInt256, block_height: u32) -> Vec<masternode::MasternodeEntry> {
+        let quorum_count = llmq_type.size();
+        let masternodes_in_list_count = masternodes.len();
+        let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
+        let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
         scores.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
         let mut valid_masternodes: Vec<masternode::MasternodeEntry> = Vec::new();
         let count = min(masternodes_in_list_count, scores.len());
         for i in 0..count {
-            if let Some(masternode) = scored_masternodes.get_mut(&scores[i]) {
-                //println!("get_valid_masternodes: {}: {}: {}", block_height, masternode.provider_registration_transaction_hash.clone().reversed(), masternode.is_valid_at(block_height));
+            if let Some(masternode) = score_dictionary.get_mut(&scores[i]) {
                 if (*masternode).is_valid_at(block_height) {
                     valid_masternodes.push((*masternode).clone());
                 }
@@ -510,37 +463,21 @@ impl MasternodeProcessor {
         valid_masternodes
     }
 
-    pub fn valid_masternodes_for_quorum(
-        masternodes: Vec<masternode::MasternodeEntry>,
-        quorum_modifier: UInt256,
-        quorum_count: u32,
-        block_height: u32,
-    ) -> Vec<masternode::MasternodeEntry> {
-        let masternodes_in_list_count = masternodes.len();
-        let score_dictionary = Self::score_masternodes(masternodes, quorum_modifier, block_height);
-        Self::get_valid_masternodes(
-            score_dictionary,
-            quorum_count,
-            masternodes_in_list_count,
-            block_height,
-        )
-    }
-
-    pub fn valid_masternodes_for(
+    pub fn score_masternodes_map(
         masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>,
         quorum_modifier: UInt256,
-        quorum_count: u32,
         block_height: u32,
-    ) -> Vec<masternode::MasternodeEntry> {
-        let masternodes_in_list_count = masternodes.len();
-        let score_dictionary =
-            Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
-        Self::get_valid_masternodes(
-            score_dictionary,
-            quorum_count,
-            masternodes_in_list_count,
-            block_height,
-        )
+    ) -> BTreeMap<UInt256, masternode::MasternodeEntry> {
+        masternodes
+            .clone()
+            .into_iter()
+            .filter_map(|(_, entry)| {
+                match masternode::MasternodeList::masternode_score(&entry, quorum_modifier, block_height) {
+                    Some(score) => Some((score, entry)),
+                    None => None
+                }
+            })
+            .collect()
     }
 
     fn sort_scored_masternodes(scored_masternodes: BTreeMap<UInt256, masternode::MasternodeEntry>) -> Vec<masternode::MasternodeEntry> {
@@ -555,7 +492,17 @@ impl MasternodeProcessor {
         quorum_count: u32,
         block_height: u32,
     ) -> Vec<masternode::MasternodeEntry> {
-        let scored_masternodes = Self::score_masternodes(masternodes, quorum_modifier, block_height);
+        let scored_masternodes = masternodes
+            .into_iter()
+            .fold(BTreeMap::new(), |mut map, entry| {
+                match masternode::MasternodeList::masternode_score(&entry, quorum_modifier, block_height) {
+                    Some(score) => {
+                        map.insert(score, entry);
+                    }
+                    None => {}
+                };
+                map
+            });
         Self::sort_scored_masternodes(scored_masternodes)
     }
 
@@ -566,7 +513,8 @@ impl MasternodeProcessor {
         block_height: u32,
     ) -> Vec<masternode::MasternodeEntry> {
         let scored_masternodes = Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
-        Self::sort_scored_masternodes(scored_masternodes)
+        let scored_sorted_masternodes = Self::sort_scored_masternodes(scored_masternodes);
+        scored_sorted_masternodes
     }
 
     // Same as in LLMQEntry

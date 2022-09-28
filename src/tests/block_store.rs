@@ -443,6 +443,7 @@ pub fn init_mainnet_store() -> Vec<MerkleBlock> {
         MerkleBlock { hash: UInt256::from_hex("0000000000000019bdc0fa77522b19001c727741df344102c0569a8f064a8f64").unwrap().reversed(), height: 1740902, merkleroot: UInt256::from_hex("570892f62df96efbfad1aaad64aa055a37a1feed359f4372875d6c3ada4e2098").unwrap() },
         MerkleBlock { hash: UInt256::from_hex("0000000000000017d3b4b21d66280ddc07a6580d7274629b99c37b203d564379").unwrap().reversed(), height: 1737784, merkleroot: UInt256::from_hex("2a332d1a40a95f24414dce2fa11dd5c88d57e614e663f8d990880cd5c924104b").unwrap() },
         MerkleBlock { hash: UInt256::from_hex("000000000000000fec667f9d87814a342eeaa664e3e488dd9d618aa4db256ee6").unwrap().reversed(), height: 1740910, merkleroot: UInt256::from_hex("83a7f8907599971694350b1e1b81a9aeb656d9edc7f0c5e89a818155daa1be05").unwrap() },
+        MerkleBlock { hash: UInt256::from_hex("0000000000000004518d548adb79e19e484e49ef573f4efc52065d551057e115").unwrap().reversed(), height: 1745187, merkleroot: UInt256::from_hex("787893ecd1a1c05a99076ebfc9602e2eafedab430dc7e398f37887178d51f324").unwrap() },
 
     ]
 }
