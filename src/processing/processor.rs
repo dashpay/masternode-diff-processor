@@ -129,9 +129,10 @@ impl MasternodeProcessor {
         } else if let Some(looked) = self.lookup_masternode_list(block_hash) {
             // Getting it from FFI directly
             self.log(format!(
-                "find_masternode_list: (Looked) {}: {}",
+                "find_masternode_list: (Looked) {}: {}: {:#?}",
                 self.lookup_block_height_by_hash(block_hash),
-                block_hash
+                block_hash,
+                looked
             ));
             Some(looked)
         } else {
