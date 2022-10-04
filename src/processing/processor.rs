@@ -293,8 +293,6 @@ impl MasternodeProcessor {
         BTreeMap<UInt256, masternode::MasternodeEntry>,
         BTreeMap<UInt256, masternode::MasternodeEntry>,
     ) {
-        let added_or_modified_masternodes = added_or_modified_masternodes;
-        let deleted_masternode_hashes = deleted_masternode_hashes;
         let mut added_masternodes = added_or_modified_masternodes.clone();
         let mut modified_masternode_keys: HashSet<UInt256> = HashSet::new();
         if base_masternodes.len() > 0 {

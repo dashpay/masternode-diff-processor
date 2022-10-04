@@ -133,6 +133,39 @@ pub struct ListDiff {
     pub merkle_root_quorums: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct MNList {
+    #[serde(rename = "blockHash")]
+    pub block_hash: String,
+    #[serde(rename = "knownHeight")]
+    pub known_height: u32,
+    #[serde(rename = "masternodeMerkleRoot")]
+    pub masternode_merkle_root: String,
+    #[serde(rename = "quorumMerkleRoot")]
+    pub quorum_merkle_root: String,
+    #[serde(rename = "mnList")]
+    pub mn_list: Vec<Node>,
+    #[serde(rename = "newQuorums")]
+    pub new_quorums: Vec<LLMQ>,
+}
+
+pub fn list_to_list(value: MNList) -> masternode::MasternodeList {
+    let block_hash = block_hash_to_block_hash(value.block_hash);
+    let known_height = value.known_height;
+    let masternode_merkle_root = Some(block_hash_to_block_hash(value.masternode_merkle_root));
+    let llmq_merkle_root = Some(block_hash_to_block_hash(value.quorum_merkle_root));
+    let masternodes = nodes_to_masternodes(value.mn_list);
+    let quorums = quorums_to_quorums(value.new_quorums);
+    masternode::MasternodeList {
+        block_hash,
+        known_height,
+        masternode_merkle_root,
+        llmq_merkle_root,
+        masternodes,
+        quorums
+    }
+}
+
 pub fn block_hash_to_block_hash(block_hash: String) -> UInt256 {
     UInt256::from_hex(block_hash.as_str()).unwrap()
 }
@@ -152,6 +185,18 @@ pub fn value_to_snapshot(value: &serde_json::Value) -> llmq::LLMQSnapshot {
     llmq::LLMQSnapshot::new(member_list, skip_list, skip_list_mode)
 }
 
+pub fn value_to_masternode_list(value: &serde_json::Value) -> masternode::MasternodeList {
+    let nodes: Vec<Node> = serde_json::from_value(value.clone()).unwrap();
+    let masternodes = nodes_to_masternodes(nodes);
+    masternode::MasternodeList {
+        block_hash: Default::default(),
+        known_height: 0,
+        masternode_merkle_root: None,
+        llmq_merkle_root: None,
+        masternodes,
+        quorums: Default::default()
+    }
+}
 
 pub fn quorums_to_quorums(value: Vec<LLMQ>) -> BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>> {
     let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>> = BTreeMap::new();

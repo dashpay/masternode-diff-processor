@@ -297,7 +297,6 @@ pub mod tests {
         let file = get_file_as_byte_vec(&filepath);
         file
     }
-
     pub fn assert_diff_result(context: &mut FFIContext, result: types::MNListDiffResult) {
         let masternode_list = unsafe { (*result.masternode_list).decode() };
         print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.clone().reversed());
