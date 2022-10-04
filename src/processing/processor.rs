@@ -178,6 +178,7 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
+        println!("get_list_diff_result_with_base_lookup: {:#?}", base_list);
         self.get_list_diff_result(base_list, list_diff, cache)
     }
 
@@ -377,6 +378,7 @@ impl MasternodeProcessor {
                                 &mut cache.needed_masternode_lists,
                             )
                         {
+                            println!("--> validate_quorum: {:#?}", masternodes);
                             self.validate_quorum(
                                 quorum,
                                 has_valid_quorums,
