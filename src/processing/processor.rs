@@ -116,8 +116,8 @@ impl MasternodeProcessor {
                 self.lookup_block_height_by_hash(block_hash),
                 block_hash
             ));
-            Some(masternode::MasternodeList::new(BTreeMap::default(), BTreeMap::default(), block_hash, self.lookup_block_height_by_hash(block_hash), false))
-            // None
+            //Some(masternode::MasternodeList::new(BTreeMap::default(), BTreeMap::default(), block_hash, self.lookup_block_height_by_hash(block_hash), false))
+            None
         } else if let Some(cached) = cached_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
             self.log(format!(
