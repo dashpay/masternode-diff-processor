@@ -314,6 +314,7 @@ impl MasternodeProcessor {
                     acc.insert(hash, added_or_modified_masternodes[&hash].clone());
                     acc
                 });
+
         let mut masternodes = if base_masternodes.len() > 0 {
             let mut old_mnodes = base_masternodes.clone();
             for hash in deleted_masternode_hashes {
@@ -327,27 +328,20 @@ impl MasternodeProcessor {
         modified_masternodes
             .iter_mut()
             .for_each(|(hash, modified)| {
-                if let Some(mut old) = masternodes.get_mut(hash) {
-                    if (*old).update_height < (*modified).update_height {
-                        if (*modified).provider_registration_transaction_hash
-                            == (*old).provider_registration_transaction_hash
-                        {
-                            (*modified).update_with_previous_entry(
-                                old,
-                                common::Block {
-                                    height: block_height,
-                                    hash: block_hash,
-                                },
-                            );
-                        }
-                        if !(*old).confirmed_hash.is_zero()
-                            && (*old).known_confirmed_at_height.is_some()
-                            && (*old).known_confirmed_at_height.unwrap() > block_height
-                        {
-                            (*old).known_confirmed_at_height = Some(block_height);
+                if let Some(old) = masternodes.get_mut(hash) {
+                    if old.update_height < modified.update_height {
+                        modified.update_with_previous_entry(old, common::Block {
+                            height: block_height,
+                            hash: block_hash,
+                        });
+                        if !old.confirmed_hash.is_zero() &&
+                            old.known_confirmed_at_height.is_some() &&
+                            old.known_confirmed_at_height.unwrap() > block_height {
+                            old.known_confirmed_at_height = Some(block_height);
                         }
                     }
-                    masternodes.insert((*hash).clone(), (*modified).clone());
+                    println!("MasternodeEntry: modified: {}: old: {:?}: modified: {:?}", hash, old, modified);
+                    masternodes.insert(hash.clone(), modified.clone());
                 }
             });
         (added_masternodes, modified_masternodes, masternodes)
