@@ -337,10 +337,11 @@ impl MasternodeProcessor {
                         if !old.confirmed_hash.is_zero() &&
                             old.known_confirmed_at_height.is_some() &&
                             old.known_confirmed_at_height.unwrap() > block_height {
+                            println!("MasternodeEntry: modified.update height: {}: old: ({}, {}): modified: ({}, {})", hash, old.update_height, old.known_confirmed_at_height.unwrap_or(0), modified.update_height, modified.known_confirmed_at_height.unwrap_or(0));
                             old.known_confirmed_at_height = Some(block_height);
                         }
                     }
-                    println!("MasternodeEntry: modified: {}: old: {:?}: modified: {:?}", hash, old, modified);
+                    //println!("MasternodeEntry: modified: {}: old: {:?}: modified: {:?}", hash, old, modified);
                     masternodes.insert(hash.clone(), modified.clone());
                 }
             });
