@@ -373,7 +373,7 @@ impl MasternodeProcessor {
                                 &mut cache.needed_masternode_lists,
                             )
                         {
-                            println!("--> validate_quorum: {:#?}", masternodes);
+                            //println!("--> validate_quorum: {:#?}", masternodes);
                             self.validate_quorum(
                                 quorum,
                                 has_valid_quorums,
