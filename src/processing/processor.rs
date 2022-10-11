@@ -268,7 +268,7 @@ impl MasternodeProcessor {
             has_found_coinbase: coinbase_transaction.has_found_coinbase(&merkle_tree.hashes),
             has_valid_coinbase: merkle_tree.has_root(
                 self.lookup_merkle_root_by_hash(block_hash)
-                    .unwrap_or(UInt256::MIN).reversed(),
+                    .unwrap_or(UInt256::MIN),
             ),
             has_valid_mn_list_root: masternode_list.has_valid_mn_list_root(&coinbase_transaction),
             has_valid_llmq_list_root: !quorums_active
