@@ -154,9 +154,7 @@ pub mod tests {
         processor.genesis_hash = genesis_hash;
         let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
         let list_diff =
-            unwrap_or_diff_processing_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| {
-                processor.lookup_block_height_by_hash(hash)
-            }));
+            unwrap_or_diff_processing_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
         let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",

@@ -1023,8 +1023,6 @@ impl MasternodeProcessor {
         message: &'a [u8],
         offset: &mut usize,
     ) -> Option<llmq::MNListDiff> {
-        llmq::MNListDiff::new(message, offset, |hash| {
-            self.lookup_block_height_by_hash(hash)
-        })
+        llmq::MNListDiff::new(message, offset, |hash| self.lookup_block_height_by_hash(hash))
     }
 }
