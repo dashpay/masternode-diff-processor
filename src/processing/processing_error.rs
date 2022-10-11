@@ -7,6 +7,7 @@ pub enum ProcessingError {
     LocallyStored = 2,
     ParseError = 3,
     HasNoBaseBlockHash = 4,
+    UnknownBlockHash = 5,
 }
 
 impl From<u8> for ProcessingError {
@@ -17,6 +18,7 @@ impl From<u8> for ProcessingError {
             2 => ProcessingError::LocallyStored,
             3 => ProcessingError::ParseError,
             4 => ProcessingError::HasNoBaseBlockHash,
+            5 => ProcessingError::UnknownBlockHash,
             _ => ProcessingError::None,
         }
     }
@@ -30,6 +32,7 @@ impl Into<u8> for ProcessingError {
             ProcessingError::LocallyStored => 2,
             ProcessingError::ParseError => 3,
             ProcessingError::HasNoBaseBlockHash => 4,
+            ProcessingError::UnknownBlockHash => 5,
         }
     }
 }

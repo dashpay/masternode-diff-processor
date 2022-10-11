@@ -202,6 +202,7 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
         let result = self.get_list_diff_result_internal(base_list, list_diff, cache);
+        println!("get_list_diff_result: {:#?}", result);
         result.encode()
     }
 
