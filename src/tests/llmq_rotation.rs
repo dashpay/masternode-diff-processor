@@ -451,7 +451,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_default_333(
     _context: *const std::ffi::c_void,
 ) -> *mut u8 {
     boxed(UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf")
-        .unwrap()
+        .unwrap().reversed()
         .0) as * mut _
 }
 
@@ -1423,7 +1423,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_333_2(
         }
         _ => "0000000000000000000000000000000000000000000000000000000000000000",
     };
-    UInt256::from_hex(root).unwrap().0.as_ptr()
+    UInt256::from_hex(root).unwrap().reversed().0.as_ptr()
 }
 
 #[test]
@@ -1569,7 +1569,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_jack_daniels(
     let h = UInt256(*(block_hash));
     let merkle_root =
         UInt256::from_hex("601bb47971ab483aec1ee77074a785036edbb7ce543d868881aa4e04a39490c0")
-            .unwrap();
+            .unwrap().reversed();
     println!(
         "get_merkle_root_by_hash_jack_daniels: {}: {}",
         h, merkle_root

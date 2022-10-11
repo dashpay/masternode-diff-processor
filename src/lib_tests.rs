@@ -486,7 +486,7 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let block_hash_reversed = block_hash.clone().reversed().0.to_hex();
         let merkle_root = if let Some(block) = data.block_for_hash(block_hash) {
-            block.merkleroot
+            block.merkleroot.clone().reversed()
         } else {
             UInt256::from_hex("0000000000000000000000000000000000000000000000000000000000000000").unwrap()
         };
@@ -579,11 +579,11 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let hash = UInt256(*block_hash);
         match data.blocks.iter().find(|block| block.hash == hash) {
-            Some(block) => boxed(block.merkleroot.0) as *mut _,
+            Some(block) => boxed(block.merkleroot.clone().reversed().0) as *mut _,
             None => match get_block_from_insight_by_hash(hash) {
                 Some(block) => {
                     data.blocks.push(block);
-                    boxed(block.merkleroot.0) as *mut _
+                    boxed(block.merkleroot.clone().reversed().0) as *mut _
                 },
                 None => boxed(UInt256::MIN.0) as *mut _
             }
