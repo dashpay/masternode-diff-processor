@@ -9,20 +9,10 @@ publish = false
 byte = "0.2"
 libc = "0.2.132"
 
-#[dependencies.dash-spv-primitives]
-#path = "../dash-spv-primitives"
-#[dependencies.dash-spv-models]
-#path = "../dash-spv-models"
-
 [dependencies.dash-spv-primitives]
-git = "https://github.com/pankcuf/dash-spv-primitives"
-branch = "master"
-version = "0.2.2"
-
+path = "../spv-primitives"
 [dependencies.dash-spv-models]
-git = "https://github.com/pankcuf/dash-spv-models"
-branch = "master"
-version = "0.2.3"
+path = "../spv-models"
 
 [build-dependencies]
 cbindgen = "0.24.3"

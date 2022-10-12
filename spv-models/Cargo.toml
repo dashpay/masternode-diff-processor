@@ -6,13 +6,8 @@ edition = "2021"
 [dependencies]
 byte = "0.2"
 
-#[dependencies.dash-spv-primitives]
-#path = "../dash-spv-primitives"
-
 [dependencies.dash-spv-primitives]
-git = "https://github.com/pankcuf/dash-spv-primitives"
-branch = "master"
-version = "0.2.2"
+path = "../spv-primitives"
 
 [lib]
 name = "dash_spv_models"
