@@ -178,7 +178,6 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        println!("get_list_diff_result_with_base_lookup: {:#?}", base_list);
         self.get_list_diff_result(base_list, list_diff, cache)
     }
 
@@ -920,7 +919,6 @@ impl MasternodeProcessor {
     }
 
     pub fn save_snapshot(&self, block_hash: UInt256, snapshot: llmq::LLMQSnapshot) -> bool {
-        println!("save_snapshot ==> {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash);
         unsafe {
             (self.save_llmq_snapshot)(
                 boxed(block_hash.0),
