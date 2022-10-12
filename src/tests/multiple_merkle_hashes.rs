@@ -152,9 +152,7 @@ pub fn validate_bitset_new(bitset: Vec<u8>, count: VarInt) {
         count,
         count.0 / 8
     );
-    if bitset.len() != (count.0 as usize + 7) / 8 {
-        assert!(false, "Error: The byte size of the signers bitvectors ({}) must match “(quorumSize + 7) / 8 ({})", bitset.len(), (count.0 + 7) / 8);
-    }
+    assert_eq!(bitset.len(), (count.0 as usize + 7) / 8, "Error: The byte size of the signers bitvectors ({}) must match “(quorumSize + 7) / 8 ({})", bitset.len(), (count.0 + 7) / 8);
     let len = (bitset.len() * 8) as i32;
     let size = count.0 as i32;
     if len != size {
@@ -165,9 +163,7 @@ pub fn validate_bitset_new(bitset: Vec<u8>, count: VarInt) {
             None => 0,
         };
         println!("lastByte: {} mask: {}", last_byte, mask);
-        if last_byte & mask != 0 {
-            assert!(false, "Error: No out-of-range bits should be set in byte representation of the signers bitvector");
-        }
+        assert_eq!(last_byte & mask, 0, "Error: No out-of-range bits should be set in byte representation of the signers bitvector");
     }
 }
 
