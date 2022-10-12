@@ -363,26 +363,25 @@ impl MasternodeProcessor {
         let mut added = added_quorums.clone();
         added.iter_mut().for_each(|(&llmq_type, llmqs_of_type)| {
             if self.should_process_quorum(llmq_type) {
-                (*llmqs_of_type)
-                    .iter_mut()
-                    .for_each(|(&llmq_block_hash, quorum)| {
-                        if let Some(masternode::MasternodeList { masternodes, .. }) = self
-                            .find_masternode_list(
-                                llmq_block_hash,
-                                &cache.mn_lists,
-                                &mut cache.needed_masternode_lists,
-                            )
-                        {
-                            //println!("--> validate_quorum: {:#?}", masternodes);
-                            self.validate_quorum(
-                                quorum,
-                                has_valid_quorums,
-                                llmq_block_hash,
-                                masternodes,
-                                cache,
-                            )
-                        }
-                    });
+                llmqs_of_type.iter_mut().for_each(|(&llmq_block_hash, quorum)| {
+                    if let Some(masternode::MasternodeList { masternodes, .. }) = self
+                        .find_masternode_list(
+                            llmq_block_hash,
+                            &cache.mn_lists,
+                            &mut cache.needed_masternode_lists,
+                        )
+                    {
+                        println!("--> validate_quorum: {:?}:{}:{}", quorum.llmq_type, quorum.llmq_hash, quorum.index.unwrap_or(0));
+                        self.validate_quorum(
+                            quorum,
+                            has_valid_quorums,
+                            llmq_block_hash,
+                            masternodes,
+                            cache,
+                        )
+                    }
+
+                });
             }
         });
         let mut quorums = base_quorums.clone();
