@@ -110,41 +110,11 @@ fn test_long_bitsets() {
         ("fdfeffffffffff0f", 60),
     ];
     for (bitset, size) in bitsets {
-        validate_bitset_new(Vec::from_hex(bitset).unwrap(), VarInt(size));
+        validate_bitset(Vec::from_hex(bitset).unwrap(), VarInt(size));
     }
 }
 
-fn validate_bitset(bitset: Vec<u8>, count: VarInt) {
-    // The byte size of the signers and validMembers bitvectors must match “(quorumSize + 7) / 8”
-    println!(
-        "validateBitsets: {:?}:{}:{}:{}",
-        bitset.to_hex(),
-        bitset.len(),
-        count,
-        count.0 / 8
-    );
-    if bitset.len() != (count.0 as usize + 7) / 8 {
-        assert!(false, "Error: The byte size of the signers bitvectors ({}) must match “(quorumSize + 7) / 8 ({})", bitset.len(), (count.0 + 7) / 8);
-    }
-    // No out-of-range bits should be set in byte representation of the signers and validMembers bitvectors
-    let offset = (count.0 / 8) as i32;
-    let mut s_offset = offset.clone() as usize;
-    let last_byte = bitset
-        .as_slice()
-        .read_with::<u8>(&mut s_offset, byte::LE)
-        .unwrap_or(0) as i32;
-
-    let mask = 255 >> (((8 - offset) % 32) + 32) % 32 << (((8 - offset) % 32) + 32) % 32;
-    // let mask = !(0xff >> rem);
-
-    println!("lastByte: {} mask: {}", last_byte, mask);
-    if last_byte & mask != 0 {
-        println!("Error: No out-of-range bits should be set in byte representation of the signers bitvector");
-        // assert!(false, "Error: No out-of-range bits should be set in byte representation of the signers bitvector");
-    }
-}
-
-pub fn validate_bitset_new(bitset: Vec<u8>, count: VarInt) {
+pub fn validate_bitset(bitset: Vec<u8>, count: VarInt) {
     println!(
         "validateBitsets: {:?}:{}:{}:{}",
         bitset.to_hex(),
