@@ -11,7 +11,7 @@ fn main() {
     // Here we write down crate names (!) where we want to retrieve C-bindings
     let includes = vec!["dash-spv-ffi".to_string(), "dash-spv-models".to_string()];
     parse_config.include = Some(includes.clone());
-    parse_config.extra_bindings = includes.clone();
+    parse_config.extra_bindings = includes;
     config.language = cbindgen::Language::C;
     config.parse = parse_config;
     cbindgen::generate_with_config(&crate_dir, config)
