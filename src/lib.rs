@@ -172,6 +172,13 @@ pub extern "C" fn process_mnlistdiff_from_message(
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor
         .lookup_block_height_by_hash(hash)));
+    processor.log(format!(
+        "process_mnlistdiff_from_message.list_diff: {}..{} {}..{}",
+        processor.lookup_block_height_by_hash(list_diff.base_block_hash),
+        processor.lookup_block_height_by_hash(list_diff.block_hash),
+        list_diff.base_block_hash,
+        list_diff.block_hash,
+    ));
     if !is_from_snapshot {
         let error = processor
             .should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
@@ -238,6 +245,13 @@ pub extern "C" fn process_qrinfo_from_message(
     let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let diff_tip = unwrap_or_qr_result_failure!(read_list_diff(offset));
+    processor.log(format!(
+        "process_qrinfo_from_message.list_diff: {}..{} {}..{}",
+        processor.lookup_block_height_by_hash(diff_tip.base_block_hash),
+        processor.lookup_block_height_by_hash(diff_tip.block_hash),
+        diff_tip.base_block_hash,
+        diff_tip.block_hash,
+    ));
     if !is_from_snapshot {
         let error =
             processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
