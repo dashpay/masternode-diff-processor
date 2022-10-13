@@ -174,8 +174,8 @@ pub extern "C" fn process_mnlistdiff_from_message(
         .lookup_block_height_by_hash(hash)));
     processor.log(format!(
         "process_mnlistdiff_from_message.list_diff: {}..{} {}..{}",
-        processor.lookup_block_height_by_hash(list_diff.base_block_hash),
-        processor.lookup_block_height_by_hash(list_diff.block_hash),
+        list_diff.base_block_height,
+        list_diff.block_height,
         list_diff.base_block_hash,
         list_diff.block_hash,
     ));

@@ -373,6 +373,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
+        base_block_height: block_height_lookup(base_block_hash.clone()),
         block_height: block_height_lookup(block_hash.clone())
     };
     mn_list_diff
