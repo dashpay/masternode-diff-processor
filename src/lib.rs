@@ -247,8 +247,8 @@ pub extern "C" fn process_qrinfo_from_message(
     let diff_tip = unwrap_or_qr_result_failure!(read_list_diff(offset));
     processor.log(format!(
         "process_qrinfo_from_message.list_diff: {}..{} {}..{}",
-        processor.lookup_block_height_by_hash(diff_tip.base_block_hash),
-        processor.lookup_block_height_by_hash(diff_tip.block_hash),
+        diff_tip.base_block_height,
+        diff_tip.block_height,
         diff_tip.base_block_hash,
         diff_tip.block_hash,
     ));
