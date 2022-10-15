@@ -40,6 +40,15 @@ impl MasternodeProcessorCache {
     pub fn add_masternode_list(&mut self, block_hash: UInt256, list: MasternodeList) {
         self.mn_lists.insert(block_hash, list);
     }
+    pub fn remove_masternode_list(&mut self, block_hash: UInt256) {
+        self.mn_lists.remove(&block_hash);
+    }
+    pub fn add_snapshot(&mut self, block_hash: UInt256, snapshot: LLMQSnapshot) {
+        self.llmq_snapshots.insert(block_hash, snapshot);
+    }
+    pub fn remove_snapshot(&mut self, block_hash: UInt256) {
+        self.llmq_snapshots.remove(&block_hash);
+    }
     pub fn get_quorum_members_of_type(
         &mut self,
         r#type: LLMQType,

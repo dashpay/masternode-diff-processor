@@ -462,9 +462,7 @@ pub mod tests {
     ) -> bool {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        let snapshot = *snapshot;
-        let snapshot_decoded = snapshot.decode();
-        data.cache.llmq_snapshots.insert(h, snapshot_decoded);
+        data.cache.add_snapshot(h, (*snapshot).decode());
         true
     }
 

@@ -30,9 +30,10 @@ use dash_spv_ffi::types;
 use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::consensus::encode;
-use dash_spv_primitives::crypto::byte_util::BytesDecodable;
+use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable};
 use std::ptr::null_mut;
 use std::slice;
+use dash_spv_primitives::crypto::UInt256;
 
 /// Destroys anonymous internal holder for UInt256
 #[no_mangle]
@@ -140,6 +141,24 @@ pub unsafe extern "C" fn processor_create_cache() -> *mut MasternodeProcessorCac
 pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessorCache) {
     println!("processor_destroy_cache: {:?}", cache);
     let cache = unbox_any(cache);
+}
+
+/// Remove masternode list from cache
+#[no_mangle]
+pub unsafe extern "C" fn processor_remove_masternode_list_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
+    println!("processor_clean_cache_before_height: {:?} {:?}", block_hash, cache);
+    if let Some(hash) = UInt256::from_const(block_hash) {
+        (&mut *cache).remove_masternode_list(hash);
+    }
+}
+
+/// Remove quorum snapshot from cache
+#[no_mangle]
+pub unsafe extern "C" fn processor_remove_llmq_snapshot_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
+    println!("processor_clean_cache_before_height: {:?} {:?}", block_hash, cache);
+    if let Some(hash) = UInt256::from_const(block_hash) {
+        (&mut *cache).remove_snapshot(hash);
+    }
 }
 
 /// Read and process message received as a response for 'GETMNLISTDIFF' call
