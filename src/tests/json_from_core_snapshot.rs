@@ -366,7 +366,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
         base_block_hash,
         block_hash,
         total_transactions,
-        merkle_hashes,
+        merkle_hashes: merkle_hashes.1,
         merkle_flags: merkle_flags.to_vec(),
         coinbase_transaction,
         deleted_masternode_hashes,
