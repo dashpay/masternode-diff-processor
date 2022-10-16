@@ -160,7 +160,12 @@ pub unsafe extern "C" fn processor_remove_llmq_snapshot_from_cache_for_block_has
         (&mut *cache).remove_snapshot(hash);
     }
 }
-
+/// Remove quorum snapshot from cache
+#[no_mangle]
+pub unsafe extern "C" fn processor_clear_cache(cache: *mut MasternodeProcessorCache) {
+    println!("processor_clear_cache: {:?}", cache);
+    (&mut *cache).clear();
+}
 /// Read and process message received as a response for 'GETMNLISTDIFF' call
 /// Here we calculate quorums according to Core v0.17
 /// See https://github.com/dashpay/dips/blob/master/dip-0004.md

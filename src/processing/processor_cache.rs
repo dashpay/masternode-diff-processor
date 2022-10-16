@@ -37,6 +37,13 @@ impl std::fmt::Debug for MasternodeProcessorCache {
 }
 
 impl MasternodeProcessorCache {
+    pub fn clear(&mut self) {
+        self.llmq_members.clear();
+        self.llmq_indexed_members.clear();
+        self.mn_lists.clear();
+        self.llmq_snapshots.clear();
+        self.needed_masternode_lists.clear();
+    }
     pub fn add_masternode_list(&mut self, block_hash: UInt256, list: MasternodeList) {
         self.mn_lists.insert(block_hash, list);
     }
