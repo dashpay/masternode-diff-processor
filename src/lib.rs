@@ -146,7 +146,7 @@ pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessor
 /// Remove masternode list from cache
 #[no_mangle]
 pub unsafe extern "C" fn processor_remove_masternode_list_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
-    println!("processor_clean_cache_before_height: {:?} {:?}", block_hash, cache);
+    println!("processor_remove_masternode_list_from_cache_for_block_hash: {:?} {:?}", block_hash, cache);
     if let Some(hash) = UInt256::from_const(block_hash) {
         (&mut *cache).remove_masternode_list(hash);
     }
@@ -155,7 +155,7 @@ pub unsafe extern "C" fn processor_remove_masternode_list_from_cache_for_block_h
 /// Remove quorum snapshot from cache
 #[no_mangle]
 pub unsafe extern "C" fn processor_remove_llmq_snapshot_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
-    println!("processor_clean_cache_before_height: {:?} {:?}", block_hash, cache);
+    println!("processor_remove_llmq_snapshot_from_cache_for_block_hash: {:?} {:?}", block_hash, cache);
     if let Some(hash) = UInt256::from_const(block_hash) {
         (&mut *cache).remove_snapshot(hash);
     }
