@@ -72,9 +72,7 @@ impl Default for MNListDiffResult {
 
 impl MNListDiffResult {
     pub fn default_with_error(error: ProcessingError) -> Self {
-        let mut result = Self::default();
-        result.error_status = error;
-        result
+        Self {error_status: error, ..Default::default()}
     }
 }
 
