@@ -399,3 +399,20 @@ pub extern "C" fn process_qrinfo_from_message(
 //         |list: *mut types::MasternodeList| unsafe { (destroy_masternode_list)(list) });
 //
 // }
+
+#[no_mangle]
+pub extern "C" fn test_snapshot_func(
+    get_llmq_snapshot_by_block_hash: GetLLMQSnapshotByBlockHash,
+    save_llmq_snapshot: SaveLLMQSnapshot,
+    destroy_snapshot: LLMQSnapshotDestroy,
+    opaque_context: *const std::ffi::c_void) {
+    let block_hash = UInt256::MIN;
+    dash_spv_ffi::ffi::callbacks::lookup_snapshot_by_block_hash(
+        block_hash,
+        |h: UInt256| unsafe {
+            (get_llmq_snapshot_by_block_hash)(boxed(h.0), opaque_context)
+        },
+        |snapshot: *mut types::LLMQSnapshot| unsafe { (destroy_snapshot)(snapshot) },
+    );
+}
+
