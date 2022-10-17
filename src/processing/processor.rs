@@ -117,7 +117,7 @@ impl MasternodeProcessor {
                 block_hash
             ));
             Some(masternode::MasternodeList::new(BTreeMap::default(), BTreeMap::default(), block_hash, self.lookup_block_height_by_hash(block_hash), false))
-            //None
+            // None
         } else if let Some(cached) = cached_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
             self.log(format!(
@@ -331,8 +331,8 @@ impl MasternodeProcessor {
                 if let Some(old) = masternodes.get_mut(hash) {
                     if old.update_height < modified.update_height {
                         modified.update_with_previous_entry(old, common::Block {
-                            height: block_height,
-                            hash: block_hash,
+                                    height: block_height,
+                                    hash: block_hash,
                         });
                         if !old.confirmed_hash.is_zero() &&
                             old.known_confirmed_at_height.is_some() &&
@@ -364,24 +364,24 @@ impl MasternodeProcessor {
         added.iter_mut().for_each(|(&llmq_type, llmqs_of_type)| {
             if self.should_process_quorum(llmq_type) {
                 llmqs_of_type.iter_mut().for_each(|(&llmq_block_hash, quorum)| {
-                    if let Some(masternode::MasternodeList { masternodes, .. }) = self
-                        .find_masternode_list(
-                            llmq_block_hash,
-                            &cache.mn_lists,
-                            &mut cache.needed_masternode_lists,
-                        )
-                    {
+                        if let Some(masternode::MasternodeList { masternodes, .. }) = self
+                            .find_masternode_list(
+                                llmq_block_hash,
+                                &cache.mn_lists,
+                                &mut cache.needed_masternode_lists,
+                            )
+                        {
                         println!("--> validate_quorum: {:?}:{}:{}", quorum.llmq_type, quorum.llmq_hash, quorum.index.unwrap_or(0));
-                        self.validate_quorum(
-                            quorum,
-                            has_valid_quorums,
-                            llmq_block_hash,
-                            masternodes,
-                            cache,
-                        )
-                    }
+                            self.validate_quorum(
+                                quorum,
+                                has_valid_quorums,
+                                llmq_block_hash,
+                                masternodes,
+                                cache,
+                            )
+                        }
 
-                });
+                    });
             }
         });
         let mut quorums = base_quorums.clone();
