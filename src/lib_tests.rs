@@ -154,9 +154,7 @@ pub mod tests {
         processor.genesis_hash = genesis_hash;
         let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
         let list_diff =
-            unwrap_or_diff_processing_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| {
-                processor.lookup_block_height_by_hash(hash)
-            }));
+            unwrap_or_diff_processing_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
         let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",
@@ -297,7 +295,6 @@ pub mod tests {
         let file = get_file_as_byte_vec(&filepath);
         file
     }
-
     pub fn assert_diff_result(context: &mut FFIContext, result: types::MNListDiffResult) {
         let masternode_list = unsafe { (*result.masternode_list).decode() };
         print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.clone().reversed());
@@ -335,7 +332,7 @@ pub mod tests {
         let block_hash_reversed = block_hash.clone().reversed();
         let block = data.block_for_hash(block_hash).unwrap_or(&MerkleBlock { hash: UInt256::MIN, height: u32::MAX, merkleroot: UInt256::MIN });
         let height = block.height;
-        // println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
+        println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
         height
     }
 
@@ -354,8 +351,7 @@ pub mod tests {
         if let Some(block) = data.block_for_height(block_height) {
             let block_hash = block.hash;
             println!("get_block_hash_by_height_from_context: {}: {:?}", block_height, block_hash.clone().reversed());
-            block_hash.clone().0.as_mut_ptr()
-            // block.hash.clone().reversed().0.as_mut_ptr()
+            boxed(block_hash.0) as *mut _
         } else {
             null_mut()
         }
@@ -466,9 +462,7 @@ pub mod tests {
     ) -> bool {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        let snapshot = *snapshot;
-        let snapshot_decoded = snapshot.decode();
-        data.cache.llmq_snapshots.insert(h, snapshot_decoded);
+        data.cache.add_snapshot(h, (*snapshot).decode());
         true
     }
 
@@ -487,13 +481,13 @@ pub mod tests {
         let block_hash = UInt256(*block_hash);
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let block_hash_reversed = block_hash.clone().reversed().0.to_hex();
-        let mut merkle_root = if let Some(block) = data.block_for_hash(block_hash) {
-            block.merkleroot
+        let merkle_root = if let Some(block) = data.block_for_hash(block_hash) {
+            block.merkleroot.clone().reversed()
         } else {
             UInt256::from_hex("0000000000000000000000000000000000000000000000000000000000000000").unwrap()
         };
         println!("get_merkle_root_by_hash_default {} ({}) => ({})", block_hash, block_hash_reversed, merkle_root);
-        merkle_root.0.as_mut_ptr()
+        boxed(merkle_root.0) as *mut _
     }
 
     pub unsafe extern "C" fn should_process_llmq_of_type(
@@ -551,11 +545,11 @@ pub mod tests {
     pub unsafe extern "C" fn get_block_hash_by_height_from_insight(block_height: u32, context: *const std::ffi::c_void) -> *mut u8 {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         match data.blocks.iter().find(|block| block.height == block_height) {
-            Some(block) => block.hash.clone().0.as_mut_ptr(),
+            Some(block) => boxed(block.hash.0) as *mut _,
             None => match get_block_from_insight_by_height(block_height) {
                 Some(block) => {
                     data.blocks.push(block.clone());
-                    block.hash.clone().0.as_mut_ptr()
+                    boxed(block.hash.0) as *mut _
                 },
                 None => null_mut()
             }
@@ -581,13 +575,13 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let hash = UInt256(*block_hash);
         match data.blocks.iter().find(|block| block.hash == hash) {
-            Some(block) => block.merkleroot.clone().0.as_mut_ptr(),
+            Some(block) => boxed(block.merkleroot.clone().reversed().0) as *mut _,
             None => match get_block_from_insight_by_hash(hash) {
                 Some(block) => {
                     data.blocks.push(block);
-                    block.merkleroot.clone().0.as_mut_ptr()
+                    boxed(block.merkleroot.clone().reversed().0) as *mut _
                 },
-                None => UInt256::MIN.clone().0.as_mut_ptr()
+                None => boxed(UInt256::MIN.0) as *mut _
             }
         }
     }

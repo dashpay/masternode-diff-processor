@@ -30,9 +30,10 @@ use dash_spv_ffi::types;
 use dash_spv_models::llmq;
 use dash_spv_models::masternode::LLMQEntry;
 use dash_spv_primitives::consensus::encode;
-use dash_spv_primitives::crypto::byte_util::BytesDecodable;
+use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable};
 use std::ptr::null_mut;
 use std::slice;
+use dash_spv_primitives::crypto::UInt256;
 
 /// Destroys anonymous internal holder for UInt256
 #[no_mangle]
@@ -142,6 +143,29 @@ pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessor
     let cache = unbox_any(cache);
 }
 
+/// Remove masternode list from cache
+#[no_mangle]
+pub unsafe extern "C" fn processor_remove_masternode_list_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
+    println!("processor_remove_masternode_list_from_cache_for_block_hash: {:?} {:?}", block_hash, cache);
+    if let Some(hash) = UInt256::from_const(block_hash) {
+        (&mut *cache).remove_masternode_list(hash);
+    }
+}
+
+/// Remove quorum snapshot from cache
+#[no_mangle]
+pub unsafe extern "C" fn processor_remove_llmq_snapshot_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
+    println!("processor_remove_llmq_snapshot_from_cache_for_block_hash: {:?} {:?}", block_hash, cache);
+    if let Some(hash) = UInt256::from_const(block_hash) {
+        (&mut *cache).remove_snapshot(hash);
+    }
+}
+/// Remove quorum snapshot from cache
+#[no_mangle]
+pub unsafe extern "C" fn processor_clear_cache(cache: *mut MasternodeProcessorCache) {
+    println!("processor_clear_cache: {:?}", cache);
+    (&mut *cache).clear();
+}
 /// Read and process message received as a response for 'GETMNLISTDIFF' call
 /// Here we calculate quorums according to Core v0.17
 /// See https://github.com/dashpay/dips/blob/master/dip-0004.md
@@ -172,6 +196,13 @@ pub extern "C" fn process_mnlistdiff_from_message(
     let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
     let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor
         .lookup_block_height_by_hash(hash)));
+    processor.log(format!(
+        "process_mnlistdiff_from_message.list_diff: {}..{} {}..{}",
+        list_diff.base_block_height,
+        list_diff.block_height,
+        list_diff.base_block_hash,
+        list_diff.block_hash,
+    ));
     if !is_from_snapshot {
         let error = processor
             .should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
@@ -238,6 +269,13 @@ pub extern "C" fn process_qrinfo_from_message(
     let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let diff_tip = unwrap_or_qr_result_failure!(read_list_diff(offset));
+    processor.log(format!(
+        "process_qrinfo_from_message.list_diff: {}..{} {}..{}",
+        diff_tip.base_block_height,
+        diff_tip.block_height,
+        diff_tip.base_block_hash,
+        diff_tip.block_hash,
+    ));
     if !is_from_snapshot {
         let error =
             processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
@@ -361,3 +399,21 @@ pub extern "C" fn process_qrinfo_from_message(
 //         |list: *mut types::MasternodeList| unsafe { (destroy_masternode_list)(list) });
 //
 // }
+// #[no_mangle]
+// pub extern "C" fn test_snapshot_func(
+//     get_llmq_snapshot_by_block_hash: GetLLMQSnapshotByBlockHash,
+//     save_llmq_snapshot: SaveLLMQSnapshot,
+//     destroy_snapshot: LLMQSnapshotDestroy,
+//     opaque_context: *const std::ffi::c_void) {
+//     let block_hash = UInt256::MIN;
+//     let lookup_result = unsafe { (get_llmq_snapshot_by_block_hash)(boxed(block_hash.0), opaque_context) };
+//     if !lookup_result.is_null() {
+//         let data = unsafe { (*lookup_result).decode() };
+//         unsafe { (destroy_snapshot)(lookup_result) };
+//         println!("test_snapshot_func: ({:?})", data);
+//     } else {
+//         println!("test_snapshot_func: (None)");
+//
+//     }
+// }
+
