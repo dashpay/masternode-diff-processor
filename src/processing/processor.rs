@@ -296,7 +296,7 @@ impl MasternodeProcessor {
     ) {
         let mut added_masternodes = added_or_modified_masternodes.clone();
         let mut modified_masternode_keys: HashSet<UInt256> = HashSet::new();
-        if base_masternodes.len() > 0 {
+        if !base_masternodes.is_empty() {
             let base_masternodes = base_masternodes.clone();
             base_masternodes.iter().for_each(|(h, _e)| {
                 added_masternodes.remove(h);
@@ -308,15 +308,14 @@ impl MasternodeProcessor {
         }
         let mut modified_masternodes: BTreeMap<UInt256, masternode::MasternodeEntry> =
             modified_masternode_keys
-                .clone()
                 .into_iter()
                 .fold(BTreeMap::new(), |mut acc, hash| {
                     acc.insert(hash, added_or_modified_masternodes[&hash].clone());
                     acc
                 });
 
-        let mut masternodes = if base_masternodes.len() > 0 {
-            let mut old_mnodes = base_masternodes.clone();
+        let mut masternodes = if !base_masternodes.is_empty() {
+            let mut old_mnodes = base_masternodes;
             for hash in deleted_masternode_hashes {
                 old_mnodes.remove(&hash.clone().reversed());
             }
@@ -342,7 +341,7 @@ impl MasternodeProcessor {
                         }
                     }
                     //println!("MasternodeEntry: modified: {}: old: {:?}: modified: {:?}", hash, old, modified);
-                    masternodes.insert(hash.clone(), modified.clone());
+                    masternodes.insert(*hash, modified.clone());
                 }
             });
         (added_masternodes, modified_masternodes, masternodes)
@@ -360,7 +359,7 @@ impl MasternodeProcessor {
         bool,
     ) {
         let has_valid_quorums = true;
-        let mut added = added_quorums.clone();
+        let mut added = added_quorums;
         added.iter_mut().for_each(|(&llmq_type, llmqs_of_type)| {
             if self.should_process_quorum(llmq_type) {
                 llmqs_of_type.iter_mut().for_each(|(&llmq_block_hash, quorum)| {
@@ -384,7 +383,7 @@ impl MasternodeProcessor {
                     });
             }
         });
-        let mut quorums = base_quorums.clone();
+        let mut quorums = base_quorums;
         quorums.extend(
             added
                 .clone()
@@ -394,7 +393,7 @@ impl MasternodeProcessor {
         );
         quorums.iter_mut().for_each(|(llmq_type, llmq_map)| {
             if let Some(keys_to_delete) = deleted_quorums.get(llmq_type) {
-                keys_to_delete.into_iter().for_each(|key| {
+                keys_to_delete.iter().for_each(|key| {
                     (*llmq_map).remove(key);
                 });
             }
@@ -464,13 +463,10 @@ impl MasternodeProcessor {
         block_height: u32,
     ) -> BTreeMap<UInt256, masternode::MasternodeEntry> {
         masternodes
-            .clone()
+            
             .into_iter()
             .filter_map(|(_, entry)| {
-                match masternode::MasternodeList::masternode_score(&entry, quorum_modifier, block_height) {
-                    Some(score) => Some((score, entry)),
-                    None => None
-                }
+                masternode::MasternodeList::masternode_score(&entry, quorum_modifier, block_height).map(|score| (score, entry))
             })
             .collect()
     }
@@ -508,8 +504,8 @@ impl MasternodeProcessor {
         block_height: u32,
     ) -> Vec<masternode::MasternodeEntry> {
         let scored_masternodes = Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
-        let scored_sorted_masternodes = Self::sort_scored_masternodes(scored_masternodes);
-        scored_sorted_masternodes
+        
+        Self::sort_scored_masternodes(scored_masternodes)
     }
 
     // Same as in LLMQEntry
@@ -544,9 +540,9 @@ impl MasternodeProcessor {
             Some(work_block_hash) => {
                 //println!("quorum_quarter_members_by_snapshot: find masternode list for: {}: {} (cached_snapshots: {:#?})", work_block_height, work_block_hash.clone().reversed(), cached_snapshots);
                 if let Some(masternode_list) =
-                    self.find_masternode_list(work_block_hash, &cached_lists, unknown_lists)
+                    self.find_masternode_list(work_block_hash, cached_lists, unknown_lists)
                 {
-                    if let Some(snapshot) = self.find_snapshot(work_block_hash, &cached_snapshots) {
+                    if let Some(snapshot) = self.find_snapshot(work_block_hash, cached_snapshots) {
                         let mut i: u32 = 0;
                         // TODO: partition with enumeration doesn't work here, so need to change
                         // nodes.into_iter().enumerate().partition(|&(i, _)| snapshot.member_list.bit_is_true_at_le_index(i as u32))
@@ -693,7 +689,7 @@ impl MasternodeProcessor {
                                 if masternodes_used_at_h_index
                                     .get(i)
                                     .unwrap()
-                                    .into_iter()
+                                    .iter()
                                     .filter(|&node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash)
                                     .count()
                                     == 0
@@ -871,14 +867,14 @@ impl MasternodeProcessor {
         block_hash: UInt256,
     ) -> Option<masternode::MasternodeList> {
         // First look at the local cache
-        let result = callbacks::lookup_masternode_list(
+        
+        callbacks::lookup_masternode_list(
             block_hash,
             |h: UInt256| unsafe {
                 (self.get_masternode_list_by_block_hash)(boxed(h.0), self.opaque_context)
             },
             |list: *mut types::MasternodeList| unsafe { (self.destroy_masternode_list)(list) },
-        );
-        result
+        )
     }
 
     pub fn save_masternode_list(
@@ -942,9 +938,8 @@ impl MasternodeProcessor {
     }
 
     pub fn should_process_quorum(&self, llmq_type: LLMQType) -> bool {
-        let should =
-            unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.opaque_context) };
-        should
+        
+        unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.opaque_context) }
     }
 
     pub fn should_process_diff_with_range(
