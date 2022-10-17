@@ -33,6 +33,7 @@ use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable};
 use std::ptr::null_mut;
 use std::slice;
+use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_primitives::crypto::UInt256;
 
 /// Destroys anonymous internal holder for UInt256
@@ -407,12 +408,14 @@ pub extern "C" fn test_snapshot_func(
     destroy_snapshot: LLMQSnapshotDestroy,
     opaque_context: *const std::ffi::c_void) {
     let block_hash = UInt256::MIN;
-    dash_spv_ffi::ffi::callbacks::lookup_snapshot_by_block_hash(
-        block_hash,
-        |h: UInt256| unsafe {
-            (get_llmq_snapshot_by_block_hash)(boxed(h.0), opaque_context)
-        },
-        |snapshot: *mut types::LLMQSnapshot| unsafe { (destroy_snapshot)(snapshot) },
-    );
+    let lookup_result = unsafe { (get_llmq_snapshot_by_block_hash)(boxed(block_hash.0), opaque_context) };
+    if !lookup_result.is_null() {
+        let data = unsafe { (*lookup_result).decode() };
+        unsafe { (destroy_snapshot)(lookup_result) };
+        println!("test_snapshot_func: ({:?})", data);
+    } else {
+        println!("test_snapshot_func: (None)");
+
+    }
 }
 
