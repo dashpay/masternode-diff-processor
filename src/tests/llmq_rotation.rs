@@ -1,4 +1,5 @@
 use bls_signatures::{G1Element, G2Element, Scheme};
+use dash_spv_ffi::ffi::boxer::boxed;
 use dash_spv_ffi::ffi::unboxer::unbox_any;
 use dash_spv_ffi::types;
 use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext};
@@ -449,10 +450,9 @@ unsafe extern "C" fn get_merkle_root_by_hash_default_333(
     block_hash: *mut [u8; 32],
     _context: *const std::ffi::c_void,
 ) -> *mut u8 {
-    UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf")
-        .unwrap()
-        .0
-        .as_mut_ptr()
+    boxed(UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf")
+        .unwrap().reversed()
+        .0) as * mut _
 }
 
 #[test]
@@ -1423,7 +1423,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_333_2(
         }
         _ => "0000000000000000000000000000000000000000000000000000000000000000",
     };
-    UInt256::from_hex(root).unwrap().0.as_ptr()
+    UInt256::from_hex(root).unwrap().reversed().0.as_ptr()
 }
 
 #[test]
@@ -1567,14 +1567,14 @@ unsafe extern "C" fn get_merkle_root_by_hash_jack_daniels(
 ) -> *mut u8 {
     // 74221: 55cea87c22849891b4e8819a8504605cc54314d03dacb97e6fa2aeb3d8000000 -> 601bb47971ab483aec1ee77074a785036edbb7ce543d868881aa4e04a39490c0
     let h = UInt256(*(block_hash));
-    let mut merkle_root =
+    let merkle_root =
         UInt256::from_hex("601bb47971ab483aec1ee77074a785036edbb7ce543d868881aa4e04a39490c0")
-            .unwrap();
+            .unwrap().reversed();
     println!(
         "get_merkle_root_by_hash_jack_daniels: {}: {}",
         h, merkle_root
     );
-    merkle_root.0.as_mut_ptr()
+    boxed(merkle_root.0) as *mut _
 }
 
 pub unsafe extern "C" fn should_process_llmq_of_type_jack_daniels(

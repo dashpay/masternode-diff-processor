@@ -1,0 +1,29 @@
+[
+    {
+        "hash": "0000000003fa1af7f55b5cde19da8c8fdb024a881a50794cd1c31e0cb4506b3d",
+        "size": 1056,
+        "height": 122064,
+        "version": 536870912,
+        "merkleroot": "ac841d3551d012e8ce5fbec60217043209317b50268d1c3717d79350d23fd593",
+        "tx": [
+            "7e0c79c36b50b13bae9cded407943df703a4f2b0cc6de9101d698cf1bb2864ea",
+            "dd4165a2a4936ed6538718b1f1a1773340d68405ea0883bd6e55a345c7c7485a",
+            "e4a1ff6bc34d97a2d86911e697a3fb1f8a9926d7f8888c5433e6e90bc7fda057",
+            "c2476a51da36f16fd38b7d0711e5f83374355ee9ff19fa466606aebc6310ba9e"
+        ],
+        "time": 1561126213,
+        "nonce": 2853199,
+        "bits": "1c0c2849",
+        "difficulty": 21.05687516081055,
+        "chainwork": "000000000000000000000000000000000000000000000000006a40236b40b0e8",
+        "confirmations": 686155,
+        "previousblockhash": "0000000007cf7427c25f15fab51b731e324570f1d371e981e843c16542edcdbb",
+        "nextblockhash": "000000000b01f94d50baae2131b4c8512888e3667fb59dc4fd5a3ec1d7172c70",
+        "reward": "22.50000000",
+        "isMainChain": true,
+        "poolInfo": {
+            "poolName": "Node Stratum Pool",
+            "url": "https://github.com/zone117x/node-stratum-pool"
+        }
+    }
+]

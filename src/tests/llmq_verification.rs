@@ -47,7 +47,7 @@ fn testnet_llmq_verification() {
         bytes.as_ptr(),
         bytes.len(),
         use_insight_as_backup,
-        false,
+        true,
         context.genesis_as_ptr(),
         processor,
         context.cache,
