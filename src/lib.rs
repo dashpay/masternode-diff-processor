@@ -33,7 +33,6 @@ use dash_spv_primitives::consensus::encode;
 use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable};
 use std::ptr::null_mut;
 use std::slice;
-use dash_spv_ffi::ffi::from::FromFFI;
 use dash_spv_primitives::crypto::UInt256;
 
 /// Destroys anonymous internal holder for UInt256
@@ -400,22 +399,21 @@ pub extern "C" fn process_qrinfo_from_message(
 //         |list: *mut types::MasternodeList| unsafe { (destroy_masternode_list)(list) });
 //
 // }
-
-#[no_mangle]
-pub extern "C" fn test_snapshot_func(
-    get_llmq_snapshot_by_block_hash: GetLLMQSnapshotByBlockHash,
-    save_llmq_snapshot: SaveLLMQSnapshot,
-    destroy_snapshot: LLMQSnapshotDestroy,
-    opaque_context: *const std::ffi::c_void) {
-    let block_hash = UInt256::MIN;
-    let lookup_result = unsafe { (get_llmq_snapshot_by_block_hash)(boxed(block_hash.0), opaque_context) };
-    if !lookup_result.is_null() {
-        let data = unsafe { (*lookup_result).decode() };
-        unsafe { (destroy_snapshot)(lookup_result) };
-        println!("test_snapshot_func: ({:?})", data);
-    } else {
-        println!("test_snapshot_func: (None)");
-
-    }
-}
+// #[no_mangle]
+// pub extern "C" fn test_snapshot_func(
+//     get_llmq_snapshot_by_block_hash: GetLLMQSnapshotByBlockHash,
+//     save_llmq_snapshot: SaveLLMQSnapshot,
+//     destroy_snapshot: LLMQSnapshotDestroy,
+//     opaque_context: *const std::ffi::c_void) {
+//     let block_hash = UInt256::MIN;
+//     let lookup_result = unsafe { (get_llmq_snapshot_by_block_hash)(boxed(block_hash.0), opaque_context) };
+//     if !lookup_result.is_null() {
+//         let data = unsafe { (*lookup_result).decode() };
+//         unsafe { (destroy_snapshot)(lookup_result) };
+//         println!("test_snapshot_func: ({:?})", data);
+//     } else {
+//         println!("test_snapshot_func: (None)");
+//
+//     }
+// }
 
