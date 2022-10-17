@@ -5,7 +5,7 @@ use crate::tests::block_store::init_mainnet_store;
 use crate::tests::json_from_core_snapshot::{list_to_list, MNList};
 use crate::tests::llmq_rotation::validate_llmq_callback_throuh_rust_bls;
 
-#[test]
+//#[test]
 fn mainnet_test_invalid_mn_list_root() {
     let chain = ChainType::MainNet;
     let context = &mut (FFIContext {
