@@ -148,7 +148,7 @@ pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessor
 pub unsafe extern "C" fn processor_remove_masternode_list_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
     println!("processor_remove_masternode_list_from_cache_for_block_hash: {:?} {:?}", block_hash, cache);
     if let Some(hash) = UInt256::from_const(block_hash) {
-        (&mut *cache).remove_masternode_list(hash);
+        (*cache).remove_masternode_list(hash);
     }
 }
 
@@ -157,14 +157,14 @@ pub unsafe extern "C" fn processor_remove_masternode_list_from_cache_for_block_h
 pub unsafe extern "C" fn processor_remove_llmq_snapshot_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
     println!("processor_remove_llmq_snapshot_from_cache_for_block_hash: {:?} {:?}", block_hash, cache);
     if let Some(hash) = UInt256::from_const(block_hash) {
-        (&mut *cache).remove_snapshot(hash);
+        (*cache).remove_snapshot(hash);
     }
 }
 /// Remove quorum snapshot from cache
 #[no_mangle]
 pub unsafe extern "C" fn processor_clear_cache(cache: *mut MasternodeProcessorCache) {
     println!("processor_clear_cache: {:?}", cache);
-    (&mut *cache).clear();
+    (*cache).clear();
 }
 /// Read and process message received as a response for 'GETMNLISTDIFF' call
 /// Here we calculate quorums according to Core v0.17
@@ -293,7 +293,7 @@ pub extern "C" fn process_qrinfo_from_message(
     let diff_h_c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_2c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_3c = unwrap_or_qr_result_failure!(read_list_diff(offset));
-    let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
+    let extra_share = message.read_with::<bool>(offset, ()).unwrap_or(false);
     let snapshot_at_h_4c = if extra_share {
         Some(unwrap_or_qr_result_failure!(read_snapshot(offset)))
     } else {
@@ -351,7 +351,7 @@ pub extern "C" fn process_qrinfo_from_message(
     );
     for i in 0..mn_list_diff_list_count {
         let list_diff = unwrap_or_qr_result_failure!(read_list_diff(offset));
-        let block_hash = list_diff.block_hash.clone();
+        let block_hash = list_diff.block_hash;
         mn_list_diff_list_vec.push(get_list_diff_result(list_diff));
         let snapshot = snapshots.get(i).unwrap();
         quorum_snapshot_list_vec.push(boxed(snapshot.encode()));
