@@ -133,7 +133,9 @@ impl MasternodeProcessor {
         if let Some(cached) = cached_snapshots.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
             Some(cached.clone())
-        } else { self.lookup_snapshot_by_block_hash(block_hash).map(|looked| looked) }
+        } else {
+            self.lookup_snapshot_by_block_hash(block_hash)
+        }
     }
 
     pub(crate) fn get_list_diff_result_with_base_lookup(
