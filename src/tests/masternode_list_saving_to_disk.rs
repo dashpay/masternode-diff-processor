@@ -36,7 +36,7 @@ fn test_mnl_saving_to_disk() {
             log_default,
         )
     };
-    let result = process_mnlistdiff_from_message(
+    let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
         false,
@@ -45,7 +45,7 @@ fn test_mnl_saving_to_disk() {
         processor,
         context.cache,
         context as *mut _ as *mut std::ffi::c_void,
-    );
+    )};
     println!("{:?}", result);
     let result = unsafe { *result };
     let block_hash = UInt256(unsafe { *result.block_hash });

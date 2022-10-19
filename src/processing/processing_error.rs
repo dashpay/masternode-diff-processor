@@ -24,9 +24,9 @@ impl From<u8> for ProcessingError {
     }
 }
 
-impl Into<u8> for ProcessingError {
-    fn into(self) -> u8 {
-        match self {
+impl From<ProcessingError> for u8 {
+    fn from(error: ProcessingError) -> Self {
+        match error {
             ProcessingError::None => 0,
             ProcessingError::PersistInRetrieval => 1,
             ProcessingError::LocallyStored => 2,
@@ -36,3 +36,4 @@ impl Into<u8> for ProcessingError {
         }
     }
 }
+

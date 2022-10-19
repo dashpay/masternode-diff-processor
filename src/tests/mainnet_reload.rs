@@ -82,7 +82,7 @@ pub fn load_masternode_lists_for_files(
     for file in files {
         println!("load_masternode_lists_for_files: [{}]", file);
         let bytes = message_from_file(file);
-        let result = process_mnlistdiff_from_message(
+        let result = unsafe { process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
             false,
@@ -91,7 +91,7 @@ pub fn load_masternode_lists_for_files(
             processor,
             context.cache,
             context as *mut _ as *mut std::ffi::c_void,
-        );
+        )};
         let result = unsafe { *result };
         println!("result: [{:?}]", result);
         //println!("MNDiff: {} added, {} modified", result.added_masternodes_count, result.modified_masternodes_count);

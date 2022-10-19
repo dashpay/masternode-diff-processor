@@ -54,6 +54,7 @@ impl std::fmt::Debug for MasternodeProcessor {
 }
 
 impl MasternodeProcessor {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         get_merkle_root_by_hash: MerkleRootLookup,
         get_block_height_by_hash: GetBlockHeightByHash,
@@ -316,6 +317,7 @@ impl MasternodeProcessor {
         (added_masternodes, modified_masternodes, masternodes)
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn classify_quorums(
         &self,
         base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
@@ -411,8 +413,8 @@ impl MasternodeProcessor {
         scores.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
         let mut valid_masternodes: Vec<masternode::MasternodeEntry> = Vec::new();
         let count = min(masternodes_in_list_count, scores.len());
-        for i in 0..count {
-            if let Some(masternode) = score_dictionary.get_mut(&scores[i]) {
+        for score in scores.iter().take(count) {
+            if let Some(masternode) = score_dictionary.get_mut(score) {
                 if (*masternode).is_valid_at(block_height) {
                     valid_masternodes.push((*masternode).clone());
                 }
@@ -452,12 +454,9 @@ impl MasternodeProcessor {
         let scored_masternodes = masternodes
             .into_iter()
             .fold(BTreeMap::new(), |mut map, entry| {
-                match masternode::MasternodeList::masternode_score(&entry, quorum_modifier, block_height) {
-                    Some(score) => {
-                        map.insert(score, entry);
-                    }
-                    None => {}
-                };
+                if let Some(score) = masternode::MasternodeList::masternode_score(&entry, quorum_modifier, block_height) {
+                    map.insert(score, entry);
+                }
                 map
             });
         Self::sort_scored_masternodes(scored_masternodes)
@@ -670,7 +669,7 @@ impl MasternodeProcessor {
 
     fn add_quorum_members_from_quarter(
         quorum_members: &mut Vec<Vec<masternode::MasternodeEntry>>,
-        quarter: &Vec<Vec<masternode::MasternodeEntry>>,
+        quarter: &[Vec<masternode::MasternodeEntry>],
         index: usize,
     ) {
         if let Some(indexed_quarter) = quarter.get(index) {
@@ -738,6 +737,7 @@ impl MasternodeProcessor {
     }
 
     /// Determine masternodes which is responsible for signing at this quorum index
+    #[allow(clippy::too_many_arguments)]
     pub fn get_rotated_masternodes_for_quorum(
         &self,
         llmq_type: LLMQType,

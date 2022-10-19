@@ -43,7 +43,7 @@ fn testnet_llmq_verification() {
             log_default,
         )
     };
-    let result = process_mnlistdiff_from_message(
+    let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
         use_insight_as_backup,
@@ -52,7 +52,7 @@ fn testnet_llmq_verification() {
         processor,
         context.cache,
         context as *mut _ as *mut std::ffi::c_void,
-    );
+    )};
     println!("{:?}", result);
     let result_119064 = unsafe { *result };
     assert_diff_result(context, result_119064);
@@ -64,7 +64,7 @@ fn testnet_llmq_verification() {
         let masternode_list_119064 = unsafe { *result_119064.masternode_list };
         let masternode_list_119064_decoded = unsafe { masternode_list_119064.decode() };
         let masternode_list_119064_encoded = masternode_list_119064_decoded.encode();
-        let result = process_mnlistdiff_from_message(
+        let result = unsafe { process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
             use_insight_as_backup,
@@ -73,7 +73,7 @@ fn testnet_llmq_verification() {
             processor,
             context.cache,
             context as *mut _ as *mut std::ffi::c_void,
-        );
+        )};
         println!("{:?}", result);
         let result_119200 = unsafe { *result };
         assert_diff_result(context, result_119200);
@@ -82,12 +82,12 @@ fn testnet_llmq_verification() {
         let added_quorums = (0..result_119200.added_llmq_type_maps_count)
             .into_iter()
             .fold(BTreeMap::new(), |mut acc, i| unsafe {
-                let map = *(*(result_119200.added_llmq_type_maps.offset(i as isize)));
+                let map = *(*(result_119200.added_llmq_type_maps.add(i)));
                 let llmq_type = LLMQType::from(map.llmq_type);
                 let entry_map = (0..map.count)
                     .into_iter()
                     .fold(BTreeMap::new(), |mut hacc, j| {
-                        let raw_entry = *(*(map.values.offset(j as isize)));
+                        let raw_entry = *(*(map.values.add(j)));
                         let entry = raw_entry.decode();
                         hacc.insert(entry.llmq_hash, entry);
                         hacc
@@ -99,7 +99,7 @@ fn testnet_llmq_verification() {
             .into_iter()
             .filter(|(_, map)| map.contains_key(&block_hash_119064))
             .collect();
-        assert!(hmm.len() > 0, "There should be a quorum using 119064");
+        assert!(!hmm.is_empty(), "There should be a quorum using 119064");
         // assert!(added_quorums.contains_key(&block_hash_119064), "There should be a quorum using 119064");
         // TODO: verify with QuorumValidationData (need implement BLS before)
         //let quorum_to_verify = added_quorums[&block_hash_119064];
@@ -164,7 +164,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
         )
     };
 
-    let result = process_mnlistdiff_from_message(
+    let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
         use_insight_as_backup,
@@ -173,7 +173,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
         processor,
         context.cache,
         context as *mut _ as *mut std::ffi::c_void,
-    );
+    )};
 
     println!("{:?}", result);
     let result_119064 = unsafe { *result };
@@ -188,7 +188,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
         let masternode_list_119064_encoded = masternode_list_119064_decoded.encode();
         //context.cache.mn_lists.insert(block_hash_119064, masternode_list_119064_decoded);
 
-        let result = process_mnlistdiff_from_message(
+        let result = unsafe { process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
             // block_hash_119064.0.as_ptr(),
@@ -198,7 +198,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
             processor,
             context.cache,
             context as *mut _ as *mut std::ffi::c_void,
-        );
+        )};
 
         println!("{:?}", result);
         let result_119200 = unsafe { *result };
@@ -208,12 +208,12 @@ fn testnet_llmq_verification_using_processor_and_cache() {
         let added_quorums = (0..result_119200.added_llmq_type_maps_count)
             .into_iter()
             .fold(BTreeMap::new(), |mut acc, i| unsafe {
-                let map = *(*(result_119200.added_llmq_type_maps.offset(i as isize)));
+                let map = *(*(result_119200.added_llmq_type_maps.add(i)));
                 let llmq_type = LLMQType::from(map.llmq_type);
                 let entry_map = (0..map.count)
                     .into_iter()
                     .fold(BTreeMap::new(), |mut hacc, j| {
-                        let raw_entry = *(*(map.values.offset(j as isize)));
+                        let raw_entry = *(*(map.values.add(j)));
                         let entry = raw_entry.decode();
                         hacc.insert(entry.llmq_hash, entry);
                         hacc
@@ -225,7 +225,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
             .into_iter()
             .filter(|(_, map)| map.contains_key(&block_hash_119064))
             .collect();
-        assert!(hmm.len() > 0, "There should be a quorum using 119064");
+        assert!(!hmm.is_empty(), "There should be a quorum using 119064");
         // assert!(added_quorums.contains_key(&block_hash_119064), "There should be a quorum using 119064");
         // TODO: verify with QuorumValidationData (need implement BLS before)
         //let quorum_to_verify = added_quorums[&block_hash_119064];

@@ -63,7 +63,9 @@ fn test_bitwise() {
     ];
     let mut masks = vec![];
     for i in 0..416 {
-        let mask = 255 >> (((8 - i) % 32) + 32) % 32 << (((8 - i) % 32) + 32) % 32;
+        // Don't optimize
+        #[allow(clippy::precedence)]
+        let mask = 255 >> (((8 - i) % 32) + 32) % 32 << ((((8 - i) % 32) + 32) % 32);
         masks.push(mask);
     }
     assert_eq!(test_values.len(), masks.len(), "length not match");
