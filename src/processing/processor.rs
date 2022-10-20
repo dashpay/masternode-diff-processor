@@ -54,6 +54,7 @@ impl std::fmt::Debug for MasternodeProcessor {
 }
 
 impl MasternodeProcessor {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         get_merkle_root_by_hash: MerkleRootLookup,
         get_block_height_by_hash: GetBlockHeightByHash,
@@ -70,7 +71,6 @@ impl MasternodeProcessor {
         destroy_snapshot: LLMQSnapshotDestroy,
         should_process_diff_with_range: ShouldProcessDiffWithRange,
         log_message: LogMessage,
-        /*opaque_context: *const std::ffi::c_void*/
     ) -> Self {
         Self {
             get_merkle_root_by_hash,
@@ -103,40 +103,18 @@ impl MasternodeProcessor {
         let genesis_hash = UInt256::from_const(self.genesis_hash).unwrap();
         if block_hash.is_zero() {
             // If it's a zero block we don't expect masternode list here
-            self.log(format!(
-                "find_masternode_list: (None: It's a zero hash) {}: {}",
-                UInt256::MAX,
-                block_hash
-            ));
             None
         } else if block_hash.eq(&genesis_hash) {
             // If it's a genesis block we don't expect masternode list here
-            self.log(format!(
-                "find_masternode_list: (None: It's a genesis) {}: {}",
-                self.lookup_block_height_by_hash(block_hash),
-                block_hash
-            ));
             Some(masternode::MasternodeList::new(BTreeMap::default(), BTreeMap::default(), block_hash, self.lookup_block_height_by_hash(block_hash), false))
             // None
         } else if let Some(cached) = cached_lists.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
-            self.log(format!(
-                "find_masternode_list: (Cached) {}: {}",
-                self.lookup_block_height_by_hash(block_hash),
-                block_hash
-            ));
             Some(cached.clone())
         } else if let Some(looked) = self.lookup_masternode_list(block_hash) {
             // Getting it from FFI directly
-            self.log(format!(
-                "find_masternode_list: (Looked) {}: {}: {:#?}",
-                self.lookup_block_height_by_hash(block_hash),
-                block_hash,
-                looked
-            ));
             Some(looked)
         } else {
-            //self.log(format!("find_masternode_list: (None) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             if self.lookup_block_height_by_hash(block_hash) != u32::MAX {
                 unknown_lists.push(block_hash);
             } else if self.use_insight_as_backup {
@@ -155,15 +133,9 @@ impl MasternodeProcessor {
     ) -> Option<llmq::LLMQSnapshot> {
         if let Some(cached) = cached_snapshots.get(&block_hash) {
             // Getting it from local cache stored as opaque in FFI context
-            self.log(format!("find_snapshot: (Cached) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
             Some(cached.clone())
-        } else if let Some(looked) = self.lookup_snapshot_by_block_hash(block_hash) {
-            // Getting it from FFI directly
-            self.log(format!("find_snapshot: (Looked) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
-            Some(looked)
         } else {
-            self.log(format!("find_snapshot: (None) {}: {}", self.lookup_block_height_by_hash(block_hash), block_hash));
-            None
+            self.lookup_snapshot_by_block_hash(block_hash)
         }
     }
 
@@ -336,17 +308,16 @@ impl MasternodeProcessor {
                         if !old.confirmed_hash.is_zero() &&
                             old.known_confirmed_at_height.is_some() &&
                             old.known_confirmed_at_height.unwrap() > block_height {
-                            println!("MasternodeEntry: modified.update height: {}: old: ({}, {}): modified: ({}, {})", hash, old.update_height, old.known_confirmed_at_height.unwrap_or(0), modified.update_height, modified.known_confirmed_at_height.unwrap_or(0));
                             old.known_confirmed_at_height = Some(block_height);
                         }
                     }
-                    //println!("MasternodeEntry: modified: {}: old: {:?}: modified: {:?}", hash, old, modified);
                     masternodes.insert(*hash, modified.clone());
                 }
             });
         (added_masternodes, modified_masternodes, masternodes)
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn classify_quorums(
         &self,
         base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>>,
@@ -370,7 +341,6 @@ impl MasternodeProcessor {
                                 &mut cache.needed_masternode_lists,
                             )
                         {
-                        println!("--> validate_quorum: {:?}:{}:{}", quorum.llmq_type, quorum.llmq_hash, quorum.index.unwrap_or(0));
                             self.validate_quorum(
                                 quorum,
                                 has_valid_quorums,
@@ -379,7 +349,6 @@ impl MasternodeProcessor {
                                 cache,
                             )
                         }
-
                     });
             }
         });
@@ -444,8 +413,8 @@ impl MasternodeProcessor {
         scores.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
         let mut valid_masternodes: Vec<masternode::MasternodeEntry> = Vec::new();
         let count = min(masternodes_in_list_count, scores.len());
-        for i in 0..count {
-            if let Some(masternode) = score_dictionary.get_mut(&scores[i]) {
+        for score in scores.iter().take(count) {
+            if let Some(masternode) = score_dictionary.get_mut(score) {
                 if (*masternode).is_valid_at(block_height) {
                     valid_masternodes.push((*masternode).clone());
                 }
@@ -463,7 +432,6 @@ impl MasternodeProcessor {
         block_height: u32,
     ) -> BTreeMap<UInt256, masternode::MasternodeEntry> {
         masternodes
-            
             .into_iter()
             .filter_map(|(_, entry)| {
                 masternode::MasternodeList::masternode_score(&entry, quorum_modifier, block_height).map(|score| (score, entry))
@@ -486,12 +454,9 @@ impl MasternodeProcessor {
         let scored_masternodes = masternodes
             .into_iter()
             .fold(BTreeMap::new(), |mut map, entry| {
-                match masternode::MasternodeList::masternode_score(&entry, quorum_modifier, block_height) {
-                    Some(score) => {
-                        map.insert(score, entry);
-                    }
-                    None => {}
-                };
+                if let Some(score) = masternode::MasternodeList::masternode_score(&entry, quorum_modifier, block_height) {
+                    map.insert(score, entry);
+                }
                 map
             });
         Self::sort_scored_masternodes(scored_masternodes)
@@ -504,7 +469,6 @@ impl MasternodeProcessor {
         block_height: u32,
     ) -> Vec<masternode::MasternodeEntry> {
         let scored_masternodes = Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
-        
         Self::sort_scored_masternodes(scored_masternodes)
     }
 
@@ -538,7 +502,6 @@ impl MasternodeProcessor {
         match self.lookup_block_hash_by_height(work_block_height) {
             None => panic!("missing block for height: {}", work_block_height),
             Some(work_block_hash) => {
-                //println!("quorum_quarter_members_by_snapshot: find masternode list for: {}: {} (cached_snapshots: {:#?})", work_block_height, work_block_hash.clone().reversed(), cached_snapshots);
                 if let Some(masternode_list) =
                     self.find_masternode_list(work_block_hash, cached_lists, unknown_lists)
                 {
@@ -569,28 +532,19 @@ impl MasternodeProcessor {
                             quorum_count,
                             work_block_height,
                         );
-                        // println!("used_at_h: {:#?}", sorted_used_at_h.iter().map(|m|m.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
-                        // println!("unused_at_h: {:#?}", sorted_unused_at_h.iter().map(|m|m.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
                         let mut sorted_combined_mns_list = sorted_unused_at_h;
                         sorted_combined_mns_list.extend(sorted_used_at_h);
-                        // println!("sorted_combined_mns_list: {:#?}", sorted_combined_mns_list.iter().map(|m|m.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
                         snapshot.apply_skip_strategy(
                             sorted_combined_mns_list,
                             quorum_count as usize,
                             quarter_size,
                         )
                     } else {
-                        self.log(format!(
-                            "missing snapshot for block at height: {}: {}",
-                            work_block_height, work_block_hash
-                        ));
+                        println!("missing snapshot for block at height: {}: {}", work_block_height, work_block_hash);
                         vec![]
                     }
                 } else {
-                    self.log(format!(
-                        "missing masternode_list for block at height: {}: {}",
-                        work_block_height, work_block_hash.clone().reversed()
-                    ));
+                    println!("missing masternode_list for block at height: {}: {}", work_block_height, work_block_hash.clone().reversed());
                     vec![]
                 }
             }
@@ -620,7 +574,7 @@ impl MasternodeProcessor {
                     self.find_masternode_list(work_block_hash, cached_lists, unknown_lists)
                 {
                     if masternode_list.masternodes.len() < quarter_size {
-                        self.log(format!("masternode list at {}: {} has less masternodes ({}) then required for quarter size: ({})", work_block_height, work_block_hash, masternode_list.masternodes.len(), quarter_size));
+                        println!("masternode list at {}: {} has less masternodes ({}) then required for quarter size: ({})", work_block_height, work_block_hash, masternode_list.masternodes.len(), quarter_size);
                         quarter_quorum_members
                     } else {
                         let mut masternodes_used_at_h = Vec::<masternode::MasternodeEntry>::new();
@@ -670,13 +624,8 @@ impl MasternodeProcessor {
                             quorum_count,
                             work_block_height,
                         );
-                        // println!("----------- buildNewQuorumQuarterMembers --------- ");
-                        // println!("sortedMnsUsedAtH: {:#?}", sorted_used_mns_list.iter().map(|m| m.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
-                        // println!("sortedMnsNotUsedAtH: {:#?}", sorted_unused_mns_list.iter().map(|m| m.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
                         let mut sorted_combined_mns_list = sorted_unused_mns_list;
                         sorted_combined_mns_list.extend(sorted_used_mns_list);
-                        // println!("sortedCombinedMnsList h[{}] {:#?}", quorum_base_block_height, sorted_combined_mns_list.iter().map(|n|n.provider_registration_transaction_hash.clone().reversed().to_string().chars().take(4).collect()).collect::<Vec<String>>());
-                        // println!("sortedCombinedMnsList h[{}] {:#?}", quorum_base_block_height, sorted_combined_mns_list.iter().map(|n|n.provider_registration_transaction_hash.clone().reversed()).collect::<Vec<UInt256>>());
                         let mut skip_list = Vec::<i32>::new();
                         let mut first_skipped_index = 0i32;
                         let mut idx = 0i32;
@@ -711,10 +660,7 @@ impl MasternodeProcessor {
                         quarter_quorum_members
                     }
                 } else {
-                    self.log(format!(
-                        "missing masternode list for height: {}: {}",
-                        work_block_height, work_block_hash
-                    ));
+                    println!("missing masternode list for height: {}: {}", work_block_height, work_block_hash);
                     quarter_quorum_members
                 }
             }
@@ -723,7 +669,7 @@ impl MasternodeProcessor {
 
     fn add_quorum_members_from_quarter(
         quorum_members: &mut Vec<Vec<masternode::MasternodeEntry>>,
-        quarter: &Vec<Vec<masternode::MasternodeEntry>>,
+        quarter: &[Vec<masternode::MasternodeEntry>],
         index: usize,
     ) {
         if let Some(indexed_quarter) = quarter.get(index) {
@@ -768,9 +714,6 @@ impl MasternodeProcessor {
             cached_snapshots,
             unknown_lists,
         );
-        // println!("INFO: Quarter H-C {:#?}", prev_q_h_m_c.iter().flat_map(|v| v.iter().map(|m| m.provider_registration_transaction_hash.clone().reversed())).collect::<Vec<UInt256>>());
-        // println!("INFO: Quarter H-2C {:#?}", prev_q_h_m_2c.iter().flat_map(|v| v.iter().map(|m| m.provider_registration_transaction_hash.clone().reversed())).collect::<Vec<UInt256>>());
-        // println!("INFO: Quarter H-3C {:#?}", prev_q_h_m_3c.iter().flat_map(|v| v.iter().map(|m| m.provider_registration_transaction_hash.clone().reversed())).collect::<Vec<UInt256>>());
         let mut rotated_members =
             Vec::<Vec<masternode::MasternodeEntry>>::with_capacity(num_quorums);
         let new_quarter_members = self.new_quorum_quarter_members(
@@ -794,6 +737,7 @@ impl MasternodeProcessor {
     }
 
     /// Determine masternodes which is responsible for signing at this quorum index
+    #[allow(clippy::too_many_arguments)]
     pub fn get_rotated_masternodes_for_quorum(
         &self,
         llmq_type: LLMQType,
@@ -867,7 +811,6 @@ impl MasternodeProcessor {
         block_hash: UInt256,
     ) -> Option<masternode::MasternodeList> {
         // First look at the local cache
-        
         callbacks::lookup_masternode_list(
             block_hash,
             |h: UInt256| unsafe {
@@ -931,14 +874,7 @@ impl MasternodeProcessor {
         )
     }
 
-    pub fn log(&self, message: String) {
-        println!("{}", message);
-        // let c_string = std::ffi::CString::new(message).unwrap();
-        // unsafe  { (self.log_message)(c_string.as_ptr(), self.opaque_context)}
-    }
-
     pub fn should_process_quorum(&self, llmq_type: LLMQType) -> bool {
-        
         unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.opaque_context) }
     }
 

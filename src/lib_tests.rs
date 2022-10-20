@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[warn(clippy::manual_map)]
 pub mod tests {
     extern crate libc;
     extern crate reqwest;
@@ -201,7 +202,7 @@ pub mod tests {
         let diff_h_c = unwrap_or_qr_processing_failure!(read_list_diff(offset));
         let diff_h_2c = unwrap_or_qr_processing_failure!(read_list_diff(offset));
         let diff_h_3c = unwrap_or_qr_processing_failure!(read_list_diff(offset));
-        let extra_share = message.read_with::<bool>(offset, {}).unwrap_or(false);
+        let extra_share = message.read_with::<bool>(offset, ()).unwrap_or(false);
         let (snapshot_at_h_4c, diff_h_4c) = if extra_share {
             (
                 Some(unwrap_or_qr_processing_failure!(read_snapshot(offset))),
@@ -246,6 +247,7 @@ pub mod tests {
             )));
         }
         // The order is important since the each new one dependent on previous
+        #[allow(clippy::manual_map)]
         let result_at_h_4c = if let Some(diff) = diff_h_4c {
             Some(process_list_diff(diff))
         } else {
@@ -275,12 +277,12 @@ pub mod tests {
         }
     }
 
-    pub fn get_file_as_byte_vec(filename: &String) -> Vec<u8> {
+    pub fn get_file_as_byte_vec(filename: &str) -> Vec<u8> {
         //println!("get_file_as_byte_vec: {}", filename);
         let mut f = fs::File::open(&filename).expect("no file found");
         let metadata = fs::metadata(&filename).expect("unable to read metadata");
         let mut buffer = vec![0; metadata.len() as usize];
-        f.read(&mut buffer).expect("buffer overflow");
+        f.read_exact(&mut buffer).expect("buffer overflow");
         buffer
     }
 
@@ -292,8 +294,7 @@ pub mod tests {
         };
         let filepath = format!("{}/../../../files/{}", path.display(), name.as_str());
         println!("{:?}", filepath);
-        let file = get_file_as_byte_vec(&filepath);
-        file
+        get_file_as_byte_vec(&filepath)
     }
     pub fn assert_diff_result(context: &mut FFIContext, result: types::MNListDiffResult) {
         let masternode_list = unsafe { (*result.masternode_list).decode() };
@@ -534,7 +535,7 @@ pub mod tests {
         let infos = (0..count)
             .into_iter()
             .map(|i| AggregationInfo {
-                public_key: UInt384(*(*(items.offset(i as isize)))),
+                public_key: UInt384(*(*(items.add(i)))),
                 digest: commitment_hash,
             })
             .collect::<Vec<AggregationInfo>>();
@@ -548,7 +549,7 @@ pub mod tests {
             Some(block) => boxed(block.hash.0) as *mut _,
             None => match get_block_from_insight_by_height(block_height) {
                 Some(block) => {
-                    data.blocks.push(block.clone());
+                    data.blocks.push(block);
                     boxed(block.hash.0) as *mut _
                 },
                 None => null_mut()
@@ -563,7 +564,7 @@ pub mod tests {
             Some(block) => block.height,
             None => match get_block_from_insight_by_hash(hash) {
                 Some(block) => {
-                    data.blocks.push(block.clone());
+                    data.blocks.push(block);
                     block.height
                 }
                 None => u32::MAX
@@ -592,7 +593,7 @@ pub mod tests {
         verify_string_hashes: Vec<&str>,
         verify_string_smle_hashes: Vec<&str>,
     ) {
-        let bytes = Vec::from_hex(&hex_string).unwrap();
+        let bytes = Vec::from_hex(hex_string).unwrap();
         let length = bytes.len();
         let c_array = bytes.as_ptr();
         let message: &[u8] = unsafe { slice::from_raw_parts(c_array, length) };
@@ -642,7 +643,7 @@ pub mod tests {
             )
         };
 
-        let result = process_mnlistdiff_from_message(
+        let result = unsafe { process_mnlistdiff_from_message(
             c_array,
             length,
             use_insight_as_backup,
@@ -651,11 +652,11 @@ pub mod tests {
             processor,
             cache,
             context,
-        );
+        )};
         println!("result: {:?}", result);
         let result = unsafe { unbox_any(result) };
         let masternode_list = unsafe { (*unbox_any(result.masternode_list)).decode() };
-        let masternodes = masternode_list.masternodes.clone();
+        let masternodes = masternode_list.masternodes;
         let mut pro_tx_hashes: Vec<UInt256> = masternodes.clone().into_keys().collect();
         pro_tx_hashes.sort();
         let mut verify_hashes: Vec<UInt256> = verify_string_hashes

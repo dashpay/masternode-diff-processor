@@ -48,6 +48,6 @@ fn test_quorum_issue() {
     let (success, lists) = load_masternode_lists_for_files(files, false, context);
     assert!(success, "Unsuccessful");
     lists.iter().for_each(|(hash, node)| {
-        println!("Testing quorum of masternode list at height {}", context.block_for_hash(hash.clone()).unwrap().height);
+        println!("Testing quorum of masternode list at height {}", context.block_for_hash(*hash).unwrap().height);
     });
 }

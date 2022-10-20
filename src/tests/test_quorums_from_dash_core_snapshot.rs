@@ -10,11 +10,7 @@ use crate::tests::llmq_rotation::{should_process_isd_quorum, validate_llmq_callb
 
 #[test]
 pub fn test_from_snapshot() {
-
     let qrinfo: QRInfo = serde_json::from_slice(&message_from_file("snapshot_0000021715c8575620382ceee42cc7556bac5ed395eaf9c75e2119aa2876a1e0.json".to_string())).unwrap();
-
-
-
     let chain = ChainType::TestNet;
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
@@ -23,18 +19,14 @@ pub fn test_from_snapshot() {
         blocks: init_testnet_store()
     });
     let block_height_lookup = |hash: UInt256| context.block_for_hash(hash).unwrap().height;
-
     let quorum_snapshot_h_c = snapshot_to_snapshot(qrinfo.quorum_snapshot_at_hminus_c);
     let quorum_snapshot_h_2c = snapshot_to_snapshot(qrinfo.quorum_snapshot_at_hminus2c);
     let quorum_snapshot_h_3c = snapshot_to_snapshot(qrinfo.quorum_snapshot_at_hminus3c);
-
     let mn_list_diff_tip = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_tip, block_height_lookup);
     let mn_list_diff_h = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_h, block_height_lookup);
     let mn_list_diff_h_c = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_at_hminus_c, block_height_lookup);
     let mn_list_diff_h_2c = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_at_hminus2c, block_height_lookup);
     let mn_list_diff_h_3c = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_at_hminus3c, block_height_lookup);
-
-
     let processor = unsafe { &mut *register_processor(
         get_merkle_root_by_hash_default,
         get_block_height_by_hash_from_context,
@@ -62,7 +54,7 @@ pub fn test_from_snapshot() {
     let cached_llmq_members = &mut context.cache.llmq_members;
     let cached_llmq_indexed_members = &mut context.cache.llmq_indexed_members;
     if let Some(rotated_quorums_h) = mn_list_diff_h.added_quorums.get(&chain.isd_llmq_type()) {
-        rotated_quorums_h.into_iter().for_each(|(&llmq_block_hash, entry)| {
+        rotated_quorums_h.iter().for_each(|(&llmq_block_hash, entry)| {
             println!("rotated_quorum: ({}: {})", llmq_block_hash, llmq_block_hash.clone().reversed());
             let llmq_block_height = get_height(llmq_block_hash);
             println!("rotated_quorum: ({}: {})\n {:#?}", llmq_block_height, llmq_block_hash, entry);

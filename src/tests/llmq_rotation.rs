@@ -43,7 +43,7 @@ fn test_llmq_rotation() {
             log_default,
         )
     };
-    let result = process_qrinfo_from_message(
+    let result = unsafe { process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
         use_insight_as_backup,
@@ -52,7 +52,7 @@ fn test_llmq_rotation() {
         processor,
         cache,
         context,
-    );
+    )};
     println!("{:?}", result);
     let result_5078 = unsafe { *result };
     let result_at_h = unsafe { *result_5078.result_at_h };
@@ -104,7 +104,7 @@ fn test_llmq_rotation_2() {
             log_default,
         )
     };
-    let result = process_qrinfo_from_message(
+    let result = unsafe { process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
         use_insight_as_backup,
@@ -113,7 +113,7 @@ fn test_llmq_rotation_2() {
         processor,
         cache,
         context,
-    );
+    )};
 }
 
 unsafe extern "C" fn block_height_lookup_(
@@ -485,7 +485,7 @@ fn test_devnet_333() {
             log_default,
         )
     };
-    let result = process_qrinfo_from_message(
+    let result = unsafe { process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
         false,
@@ -494,7 +494,7 @@ fn test_devnet_333() {
         processor,
         cache,
         context,
-    );
+    )};
 }
 
 #[test]
@@ -527,7 +527,7 @@ fn test_processor_devnet_333() {
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
 
-    let result = process_qrinfo_from_message(
+    let result = unsafe { process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
         // merkle_root: UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap().0.as_ptr(),
@@ -537,7 +537,7 @@ fn test_processor_devnet_333() {
         processor,
         cache,
         context,
-    );
+    )};
 }
 // #[test]
 // fn test_processor_devnet_manual() {
@@ -1502,7 +1502,7 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
     let commitment_hash = UInt256(*commitment_hash);
     let keys = (0..count)
         .into_iter()
-        .map(|i| G1Element::from_bytes_legacy(UInt384(*(*(items.offset(i as isize)))).as_bytes()).unwrap())
+        .map(|i| G1Element::from_bytes_legacy(UInt384(*(*(items.add(i)))).as_bytes()).unwrap())
         .collect::<Vec<G1Element>>();
 
     let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys);
@@ -1524,7 +1524,7 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
 fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>) -> bool {
     let scheme = bls_signatures::LegacySchemeMPL::new();
     let bls_signature = G2Element::from_bytes(signature.as_bytes()).unwrap();
-    let keys = public_keys.iter().map(|k| k).collect::<Vec<&G1Element>>();
+    let keys = public_keys.iter().collect::<Vec<&G1Element>>();
     let is_verified = scheme.verify_secure(keys, message_digest.as_bytes(), &bls_signature);
     is_verified
 }

@@ -46,8 +46,6 @@ impl Default for QRInfoResult {
 
 impl QRInfoResult {
     pub fn default_with_error(error: ProcessingError) -> Self {
-        let mut result = Self::default();
-        result.error_status = error;
-        result
+        Self { error_status: error, ..Self::default() }
     }
 }

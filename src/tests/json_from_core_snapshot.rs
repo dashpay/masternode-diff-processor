@@ -51,7 +51,7 @@ pub struct QRInfo {
     #[serde(rename = "mnListDiffAtHMinus3C")]
     pub mn_list_diff_at_hminus3c: ListDiff,
     #[serde(rename = "lastCommitmentPerIndex")]
-    pub last_commitment_per_index: Vec<LLMQ>,
+    pub last_commitment_per_index: Vec<Llmq>,
     #[serde(rename = "quorumSnapshotList")]
     pub quorum_snapshot_list: Vec<Snapshot>,
     #[serde(rename = "mnListDiffList")]
@@ -69,7 +69,7 @@ pub struct Snapshot {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct LLMQ {
+pub struct Llmq {
     pub version: i64,
     #[serde(rename = "llmqType")]
     pub llmq_type: i64,
@@ -126,7 +126,7 @@ pub struct ListDiff {
     #[serde(rename = "deletedQuorums")]
     pub deleted_quorums: Vec<String>,
     #[serde(rename = "newQuorums")]
-    pub new_quorums: Vec<LLMQ>,
+    pub new_quorums: Vec<Llmq>,
     #[serde(rename = "merkleRootMNList")]
     pub merkle_root_mnlist: String,
     #[serde(rename = "merkleRootQuorums")]
@@ -146,7 +146,7 @@ pub struct MNList {
     #[serde(rename = "mnList")]
     pub mn_list: Vec<Node>,
     #[serde(rename = "newQuorums")]
-    pub new_quorums: Vec<LLMQ>,
+    pub new_quorums: Vec<Llmq>,
 }
 
 pub fn list_to_list(value: MNList) -> masternode::MasternodeList {
@@ -198,7 +198,7 @@ pub fn value_to_masternode_list(value: &serde_json::Value) -> masternode::Master
     }
 }
 
-pub fn quorums_to_quorums(value: Vec<LLMQ>) -> BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>> {
+pub fn quorums_to_quorums(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>> {
     let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>> = BTreeMap::new();
     value.into_iter().filter(|llmq| LLMQType::from(llmq.llmq_type as u8) == LLMQType::Llmqtype60_75).for_each(|llmq| {
         let entry = masternode::LLMQEntry::new(
@@ -217,7 +217,7 @@ pub fn quorums_to_quorums(value: Vec<LLMQ>) -> BTreeMap<LLMQType, BTreeMap<UInt2
         );
         quorums
             .entry(entry.llmq_type)
-            .or_insert(BTreeMap::new())
+            .or_insert_with(BTreeMap::new)
             .insert(entry.llmq_hash, entry);
 
     });
@@ -271,7 +271,7 @@ pub fn quorums_to_quorums(value: Vec<LLMQ>) -> BTreeMap<LLMQType, BTreeMap<UInt2
 pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, masternode::MasternodeEntry> {
     let map: BTreeMap<UInt256, masternode::MasternodeEntry> = value
         .into_iter()
-        .filter_map(|node| {
+        .map(|node| {
             let provider_registration_transaction_hash = UInt256::from_hex(node.pro_reg_tx_hash.as_str()).unwrap();
             let confirmed_hash = UInt256::from_hex(node.confirmed_hash.as_str()).unwrap();
             // node.service don't really need
@@ -280,10 +280,7 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, masternode::M
             let key_id_voting = UInt160::from_bytes(&voting_bytes, &mut 0).unwrap();
             let operator_public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
             let is_valid = node.is_valid;
-            let entry = masternode::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 });
-            // assert_eq!(message.len(), MN_ENTRY_PAYLOAD_LENGTH);
-            // entry.update_with_block_height(block_height);
-            Some(entry)
+            masternode::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 })
         })
         .fold(BTreeMap::new(), |mut acc, entry| {
             let hash = entry
@@ -362,7 +359,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
     let deleted_quorums = BTreeMap::default();
     let added_quorums = quorums_to_quorums(diff.new_quorums);
     println!("block_hash_tip: {}", block_hash);
-    let mn_list_diff = MNListDiff {
+    MNListDiff {
         base_block_hash,
         block_hash,
         total_transactions,
@@ -373,8 +370,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
         added_or_modified_masternodes,
         deleted_quorums,
         added_quorums,
-        base_block_height: block_height_lookup(base_block_hash.clone()),
-        block_height: block_height_lookup(block_hash.clone())
-    };
-    mn_list_diff
+        base_block_height: block_height_lookup(base_block_hash),
+        block_height: block_height_lookup(block_hash)
+    }
 }
