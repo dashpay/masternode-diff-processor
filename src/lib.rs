@@ -157,7 +157,7 @@ pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessor
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_remove_masternode_list_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
-    println!("processor_remove_masternode_list_from_cache_for_block_hash: {:?} {:?}", block_hash, cache);
+    println!("processor_remove_masternode_list_from_cache_for_block_hash: {:?} {:p}", block_hash, cache);
     if let Some(hash) = UInt256::from_const(block_hash) {
         (*cache).remove_masternode_list(&hash);
     }
@@ -167,7 +167,7 @@ pub unsafe extern "C" fn processor_remove_masternode_list_from_cache_for_block_h
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_remove_llmq_snapshot_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
-    println!("processor_remove_llmq_snapshot_from_cache_for_block_hash: {:?} {:?}", block_hash, cache);
+    println!("processor_remove_llmq_snapshot_from_cache_for_block_hash: {:?} {:p}", block_hash, cache);
     if let Some(hash) = UInt256::from_const(block_hash) {
         (*cache).remove_snapshot(&hash);
     }
@@ -177,7 +177,7 @@ pub unsafe extern "C" fn processor_remove_llmq_snapshot_from_cache_for_block_has
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_remove_llmq_members_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
-    println!("processor_remove_llmq_members_from_cache_for_block_hash: {:?} {:?}", block_hash, cache);
+    println!("processor_remove_llmq_members_from_cache_for_block_hash: {:?} {:p}", block_hash, cache);
     if let Some(hash) = UInt256::from_const(block_hash) {
         (*cache).remove_quorum_members(&hash);
     }
@@ -187,7 +187,7 @@ pub unsafe extern "C" fn processor_remove_llmq_members_from_cache_for_block_hash
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_clear_cache(cache: *mut MasternodeProcessorCache) {
-    println!("processor_clear_cache: {:?}", cache);
+    println!("processor_clear_cache: {:p}", cache);
     (*cache).clear();
 }
 /// Read and process message received as a response for 'GETMNLISTDIFF' call
@@ -208,7 +208,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     let instant = std::time::Instant::now();
     let processor = &mut *processor;
     let cache = &mut *cache;
-    println!("process_mnlistdiff_from_message -> {:?} {:p} {:p} {:?}", instant, processor, cache, context);
+    println!("process_mnlistdiff_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
@@ -252,7 +252,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
-    println!( "process_qrinfo_from_message -> {:?} {:?} {:?} {:?}", instant, processor, cache, context);
+    println!( "process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     let offset = &mut 0;
     let mut process_list_diff = |list_diff: llmq::MNListDiff| {
         processor.get_list_diff_result_with_base_lookup(list_diff, cache)
@@ -300,7 +300,6 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
             snapshot_at_h_4c.clone().unwrap(),
         );
     }
-
     let result_at_tip = get_list_diff_result(diff_tip);
     let result_at_h = get_list_diff_result(diff_h);
     let result_at_h_c = get_list_diff_result(diff_h_c);
@@ -311,7 +310,6 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     } else {
         null_mut()
     };
-
     let last_quorum_per_index_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> =
         Vec::with_capacity(last_quorum_per_index_count);
