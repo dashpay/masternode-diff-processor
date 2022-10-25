@@ -2,38 +2,58 @@
 #![allow(unused_variables)]
 #[macro_use]
 pub mod processing;
-extern crate dash_spv_ffi;
-extern crate dash_spv_models;
+
+pub extern crate bitcoin_hashes as hashes;
+pub extern crate secp256k1;
 
 #[cfg(test)]
 mod lib_tests;
-mod macros;
 #[cfg(test)]
 mod tests;
 
+
+#[cfg(feature = "std")]
+use std::io;
+#[cfg(not(feature = "std"))]
+use core2::io;
+
+#[macro_use]
+pub mod internal_macros;
+#[macro_use]
+pub mod macros;
+pub mod blockdata;
+pub mod common;
+pub mod consensus;
+pub mod crypto;
+pub mod ffi;
+pub mod hash_types;
+pub mod models;
+pub mod network;
+pub mod tx;
+pub mod types;
+pub mod util;
+
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
 use byte::BytesExt;
-use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::callbacks::{
+use ffi::boxer::{boxed, boxed_vec};
+use ffi::callbacks::{
     AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash,
     GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, LogMessage,
     MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup,
     SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback,
     ValidateLLMQCallback,
 };
-use dash_spv_ffi::ffi::to::ToFFI;
-use dash_spv_ffi::ffi::unboxer::{
+use ffi::unboxer::{
     unbox_any, unbox_block, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_masternode_list,
     unbox_mn_list_diff_result, unbox_qr_info_result,
 };
-use dash_spv_ffi::types;
-use dash_spv_models::llmq;
-use dash_spv_models::masternode::LLMQEntry;
-use dash_spv_primitives::consensus::encode;
-use dash_spv_primitives::crypto::byte_util::{BytesDecodable, ConstDecodable};
+
 use std::ptr::null_mut;
 use std::slice;
-use dash_spv_primitives::crypto::UInt256;
+use crate::consensus::encode;
+use crate::crypto::byte_util::{BytesDecodable, ConstDecodable};
+use crate::crypto::UInt256;
+use crate::ffi::to::ToFFI;
 
 /// Destroys anonymous internal holder for UInt256
 /// # Safety
@@ -153,7 +173,7 @@ pub unsafe extern "C" fn processor_destroy_cache(cache: *mut MasternodeProcessor
     let cache = unbox_any(cache);
 }
 
-/// Remove masternode list from cache
+/// Remove models list from cache
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn processor_remove_masternode_list_from_cache_for_block_hash(block_hash: *const u8, cache: *mut MasternodeProcessorCache) {
@@ -213,7 +233,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
     let message: &[u8] = slice::from_raw_parts(message_arr, message_length as usize);
-    let list_diff = unwrap_or_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor
+    let list_diff = unwrap_or_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor
         .lookup_block_height_by_hash(hash)));
     if !is_from_snapshot {
         let error = processor
@@ -254,15 +274,15 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     processor.genesis_hash = genesis_hash;
     println!( "process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     let offset = &mut 0;
-    let mut process_list_diff = |list_diff: llmq::MNListDiff| {
+    let mut process_list_diff = |list_diff: models::MNListDiff| {
         processor.get_list_diff_result_with_base_lookup(list_diff, cache)
     };
     let read_list_diff =
         |offset: &mut usize| processor.read_list_diff_from_message(message, offset);
-    let read_snapshot = |offset: &mut usize| llmq::LLMQSnapshot::from_bytes(message, offset);
+    let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
     let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
     let mut get_list_diff_result =
-        |list_diff: llmq::MNListDiff| boxed(process_list_diff(list_diff));
+        |list_diff: models::MNListDiff| boxed(process_list_diff(list_diff));
     let snapshot_at_h_c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
@@ -315,13 +335,13 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
         Vec::with_capacity(last_quorum_per_index_count);
     for _i in 0..last_quorum_per_index_count {
         last_quorum_per_index_vec.push(boxed(
-            unwrap_or_qr_result_failure!(LLMQEntry::from_bytes(message, offset)).encode(),
+            unwrap_or_qr_result_failure!(models::LLMQEntry::from_bytes(message, offset)).encode(),
         ));
     }
     let quorum_snapshot_list_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> =
         Vec::with_capacity(quorum_snapshot_list_count);
-    let mut snapshots: Vec<llmq::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
+    let mut snapshots: Vec<models::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
     for _i in 0..quorum_snapshot_list_count {
         let snapshot = unwrap_or_qr_result_failure!(read_snapshot(offset));
         snapshots.push(snapshot.clone());

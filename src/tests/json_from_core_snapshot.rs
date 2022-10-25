@@ -2,17 +2,16 @@ use std::collections::BTreeMap;
 use std::num::ParseIntError;
 use byte::BytesExt;
 use byte::ctx::Bytes;
-use dash_spv_models::common::{LLMQSnapshotSkipMode, LLMQType, SocketAddress};
-use dash_spv_models::{llmq, masternode};
-use dash_spv_models::llmq::MNListDiff;
-use dash_spv_models::tx::CoinbaseTransaction;
-use dash_spv_primitives::consensus::encode::VarInt;
-use dash_spv_primitives::crypto::{UInt160, UInt256, UInt384, UInt768, VarBytes};
-use dash_spv_primitives::crypto::byte_util::{BytesDecodable, Reversable};
-use dash_spv_primitives::crypto::var_array::VarArray;
-use dash_spv_primitives::hashes::hex::FromHex;
-use dash_spv_primitives::util::base58;
 use serde::{Deserialize, Serialize};
+use crate::common::{LLMQSnapshotSkipMode, LLMQType, SocketAddress};
+use crate::consensus::encode::VarInt;
+use crate::crypto::{UInt160, UInt256, UInt384, UInt768, VarBytes};
+use crate::crypto::byte_util::{BytesDecodable, Reversable};
+use crate::crypto::var_array::VarArray;
+use crate::hashes::hex::FromHex;
+use crate::models;
+use crate::tx::CoinbaseTransaction;
+use crate::util::base58;
 
 #[derive(Serialize, Deserialize)]
 struct Masternode {
@@ -149,14 +148,14 @@ pub struct MNList {
     pub new_quorums: Vec<Llmq>,
 }
 
-pub fn list_to_list(value: MNList) -> masternode::MasternodeList {
+pub fn list_to_list(value: MNList) -> models::MasternodeList {
     let block_hash = block_hash_to_block_hash(value.block_hash);
     let known_height = value.known_height;
     let masternode_merkle_root = Some(block_hash_to_block_hash(value.masternode_merkle_root));
     let llmq_merkle_root = Some(block_hash_to_block_hash(value.quorum_merkle_root));
     let masternodes = nodes_to_masternodes(value.mn_list);
     let quorums = quorums_to_quorums(value.new_quorums);
-    masternode::MasternodeList {
+    models::MasternodeList {
         block_hash,
         known_height,
         masternode_merkle_root,
@@ -170,25 +169,25 @@ pub fn block_hash_to_block_hash(block_hash: String) -> UInt256 {
     UInt256::from_hex(block_hash.as_str()).unwrap()
 }
 
-pub fn snapshot_to_snapshot(snapshot: Snapshot) -> llmq::LLMQSnapshot {
+pub fn snapshot_to_snapshot(snapshot: Snapshot) -> models::LLMQSnapshot {
     let member_list = bools_to_bytes(snapshot.active_quorum_members);
     let skip_list = snapshot.mn_skip_list;
     let skip_list_mode = LLMQSnapshotSkipMode::from(snapshot.mn_skip_list_mode as u32);
-    llmq::LLMQSnapshot::new(member_list, skip_list, skip_list_mode)
+    models::LLMQSnapshot::new(member_list, skip_list, skip_list_mode)
 }
 
-pub fn value_to_snapshot(value: &serde_json::Value) -> llmq::LLMQSnapshot {
+pub fn value_to_snapshot(value: &serde_json::Value) -> models::LLMQSnapshot {
     let snapshot: Snapshot = serde_json::from_value(value.clone()).unwrap();
     let member_list = bools_to_bytes(snapshot.active_quorum_members);
     let skip_list = snapshot.mn_skip_list;
     let skip_list_mode = LLMQSnapshotSkipMode::from(snapshot.mn_skip_list_mode as u32);
-    llmq::LLMQSnapshot::new(member_list, skip_list, skip_list_mode)
+    models::LLMQSnapshot::new(member_list, skip_list, skip_list_mode)
 }
 
-pub fn value_to_masternode_list(value: &serde_json::Value) -> masternode::MasternodeList {
+pub fn value_to_masternode_list(value: &serde_json::Value) -> models::MasternodeList {
     let nodes: Vec<Node> = serde_json::from_value(value.clone()).unwrap();
     let masternodes = nodes_to_masternodes(nodes);
-    masternode::MasternodeList {
+    models::MasternodeList {
         block_hash: Default::default(),
         known_height: 0,
         masternode_merkle_root: None,
@@ -198,10 +197,10 @@ pub fn value_to_masternode_list(value: &serde_json::Value) -> masternode::Master
     }
 }
 
-pub fn quorums_to_quorums(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>> {
-    let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, masternode::LLMQEntry>> = BTreeMap::new();
+pub fn quorums_to_quorums(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> {
+    let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = BTreeMap::new();
     value.into_iter().filter(|llmq| LLMQType::from(llmq.llmq_type as u8) == LLMQType::Llmqtype60_75).for_each(|llmq| {
-        let entry = masternode::LLMQEntry::new(
+        let entry = models::LLMQEntry::new(
             llmq.version as u16,
             LLMQType::from(llmq.llmq_type as u8),
             block_hash_to_block_hash(llmq.quorum_hash),
@@ -224,8 +223,8 @@ pub fn quorums_to_quorums(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt2
     quorums
 }
 
-// pub fn masternodes_to_masternodes(value: Vec<Masternode>) -> BTreeMap<UInt256, masternode::MasternodeEntry> {
-//     let map: BTreeMap<UInt256, masternode::MasternodeEntry> = value
+// pub fn masternodes_to_masternodes(value: Vec<Masternode>) -> BTreeMap<UInt256, models::MasternodeEntry> {
+//     let map: BTreeMap<UInt256, models::MasternodeEntry> = value
 //         .into_iter()
 //         .filter_map(|node| {
 //
@@ -252,7 +251,7 @@ pub fn quorums_to_quorums(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt2
 //             let key_id_voting = UInt160::from_bytes(&voting_bytes, &mut 0).unwrap();
 //             let operator_public_key = UInt384::from_hex(node.pubkeyoperator.as_str()).unwrap();
 //             let is_valid = node.status == "ENABLED";
-//             let entry = masternode::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 });
+//             let entry = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 });
 //             // assert_eq!(message.len(), MN_ENTRY_PAYLOAD_LENGTH);
 //             // entry.update_with_block_height(block_height);
 //             Some(entry)
@@ -268,8 +267,8 @@ pub fn quorums_to_quorums(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt2
 //     map
 // }
 
-pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, masternode::MasternodeEntry> {
-    let map: BTreeMap<UInt256, masternode::MasternodeEntry> = value
+pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::MasternodeEntry> {
+    let map: BTreeMap<UInt256, models::MasternodeEntry> = value
         .into_iter()
         .map(|node| {
             let provider_registration_transaction_hash = UInt256::from_hex(node.pro_reg_tx_hash.as_str()).unwrap();
@@ -280,7 +279,7 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, masternode::M
             let key_id_voting = UInt160::from_bytes(&voting_bytes, &mut 0).unwrap();
             let operator_public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
             let is_valid = node.is_valid;
-            masternode::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 })
+            models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 })
         })
         .fold(BTreeMap::new(), |mut acc, entry| {
             let hash = entry
@@ -337,7 +336,7 @@ fn vec_to_arr<T, const N: usize>(v: Vec<T>) -> [T; N] {
 }
 
 pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
-    diff: ListDiff, block_height_lookup: BHL) -> MNListDiff {
+    diff: ListDiff, block_height_lookup: BHL) -> models::MNListDiff {
     let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reversed();
     let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reversed();
     let cb_tx_bytes = Vec::from_hex(diff.cb_tx.as_str()).unwrap();
@@ -359,7 +358,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
     let deleted_quorums = BTreeMap::default();
     let added_quorums = quorums_to_quorums(diff.new_quorums);
     println!("block_hash_tip: {}", block_hash);
-    MNListDiff {
+    models::MNListDiff {
         base_block_hash,
         block_hash,
         total_transactions,

@@ -1,14 +1,13 @@
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, get_block_height_by_hash_from_context};
-use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
-use dash_spv_ffi::ffi::from::FromFFI;
-use dash_spv_ffi::ffi::to::ToFFI;
-use dash_spv_ffi::types;
-use dash_spv_models::common::chain_type::ChainType;
-use dash_spv_models::common::LLMQType;
-use dash_spv_models::masternode::LLMQEntry;
-use dash_spv_primitives::crypto::byte_util::UInt256;
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, get_block_height_by_hash_from_context};
+use crate::{models, process_mnlistdiff_from_message, processor_create_cache, register_processor};
+use crate::ffi::from::FromFFI;
+use crate::ffi::to::ToFFI;
+use crate::types;
+use crate::common::chain_type::ChainType;
+use crate::common::LLMQType;
+use crate::crypto::byte_util::UInt256;
 use crate::tests::block_store::init_testnet_store;
 
 #[test]
@@ -95,7 +94,7 @@ fn testnet_llmq_verification() {
                 acc.insert(llmq_type, entry_map);
                 acc
             });
-        let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = added_quorums
+        let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = added_quorums
             .into_iter()
             .filter(|(_, map)| map.contains_key(&block_hash_119064))
             .collect();
@@ -221,7 +220,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
                 acc.insert(llmq_type, entry_map);
                 acc
             });
-        let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>> = added_quorums
+        let hmm: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = added_quorums
             .into_iter()
             .filter(|(_, map)| map.contains_key(&block_hash_119064))
             .collect();

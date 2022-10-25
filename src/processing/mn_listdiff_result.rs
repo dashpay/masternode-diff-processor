@@ -1,13 +1,8 @@
-use crate::processing::ProcessingError;
-use dash_spv_ffi::ffi::boxer::{boxed, boxed_vec};
-use dash_spv_ffi::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
-use dash_spv_ffi::types;
-use dash_spv_models::common::LLMQType;
-use dash_spv_models::masternode::{LLMQEntry, MasternodeEntry, MasternodeList};
-use dash_spv_primitives::crypto::UInt256;
 use std::collections::BTreeMap;
+use crate::{boxed, boxed_vec, common, models, ToFFI, types, UInt256};
+use crate::ffi::to::{encode_masternodes_map, encode_quorums_map};
+use crate::processing::ProcessingError;
 
-// #[derive(Debug)]
 pub struct MNListDiffResult {
     pub error_status: ProcessingError,
     pub base_block_hash: UInt256,
@@ -17,10 +12,10 @@ pub struct MNListDiffResult {
     pub has_valid_mn_list_root: bool,   //1 byte
     pub has_valid_llmq_list_root: bool, //1 byte
     pub has_valid_quorums: bool,        //1 byte
-    pub masternode_list: MasternodeList,
-    pub added_masternodes: BTreeMap<UInt256, MasternodeEntry>,
-    pub modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
-    pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
+    pub masternode_list: models::MasternodeList,
+    pub added_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
+    pub modified_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
+    pub added_quorums: BTreeMap<common::LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
     pub needed_masternode_lists: Vec<UInt256>,
 }
 

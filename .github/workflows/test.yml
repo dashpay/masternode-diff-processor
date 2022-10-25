@@ -18,7 +18,7 @@ jobs:
       - name: Install automake
         run: |
           brew install automake
-      - name: Checkout masternode-diff-processor
+      - name: Checkout models-diff-processor
         uses: actions/checkout@v2
         with:
           path: mnldiffprocessor

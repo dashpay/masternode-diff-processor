@@ -1,7 +1,7 @@
-use dash_spv_primitives::crypto::byte_util::Reversable;
-use dash_spv_primitives::crypto::UInt256;
-use dash_spv_primitives::hashes::hex::FromHex;
+use hashes::hex::FromHex;
+use crate::crypto::byte_util::Reversable;
 use crate::lib_tests::tests::MerkleBlock;
+use crate::UInt256;
 
 // pub const BLOCK_STORE_JSON: &str = r#"{
 //     "MainNet": [

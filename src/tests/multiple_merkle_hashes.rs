@@ -1,9 +1,9 @@
 use byte::{BytesExt, LE};
-use dash_spv_models::common::merkle_tree::MerkleTree;
-use dash_spv_primitives::consensus::encode::VarInt;
-use dash_spv_primitives::crypto::byte_util::{AsBytes, UInt256};
-use dash_spv_primitives::crypto::data_ops::Data;
-use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
+use hashes::hex::{FromHex, ToHex};
+use crate::common::merkle_tree::MerkleTree;
+use crate::consensus::encode::VarInt;
+use crate::crypto::byte_util::{AsBytes, UInt256};
+use crate::crypto::data_ops::Data;
 
 #[test]
 fn test_multiple_merkle_hashes() {

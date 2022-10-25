@@ -1,7 +1,7 @@
+use crate::common::ChainType;
 use crate::lib_tests::tests::FFIContext;
-use crate::tests::mainnet_reload::load_masternode_lists_for_files;
-use dash_spv_models::common::ChainType;
 use crate::tests::block_store::init_mainnet_store;
+use crate::tests::mainnet_reload::load_masternode_lists_for_files;
 
 #[test]
 fn test_quorum_issue() {
@@ -48,6 +48,6 @@ fn test_quorum_issue() {
     let (success, lists) = load_masternode_lists_for_files(files, false, context);
     assert!(success, "Unsuccessful");
     lists.iter().for_each(|(hash, node)| {
-        println!("Testing quorum of masternode list at height {}", context.block_for_hash(*hash).unwrap().height);
+        println!("Testing quorum of models list at height {}", context.block_for_hash(*hash).unwrap().height);
     });
 }
