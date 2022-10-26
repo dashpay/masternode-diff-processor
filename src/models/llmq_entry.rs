@@ -68,52 +68,30 @@ impl<'a> TryRead<'a, Endian> for LLMQEntry {
         };
         let signers_count = bytes.read_with::<VarInt>(offset, LE)?;
         let signers_buffer_length: usize = ((signers_count.0 as usize) + 7) / 8;
-        let signers_bitset = bytes.read_with(offset, Bytes::Len(signers_buffer_length))?;
+        let signers_bitset: &[u8] = bytes.read_with(offset, Bytes::Len(signers_buffer_length))?;
         let valid_members_count = bytes.read_with::<VarInt>(offset, LE)?;
         let valid_members_count_buffer_length: usize = ((valid_members_count.0 as usize) + 7) / 8;
-        let valid_members_bitset =
+        let valid_members_bitset: &[u8] =
             bytes.read_with(offset, Bytes::Len(valid_members_count_buffer_length))?;
         let public_key = bytes.read_with::<UInt384>(offset, LE)?;
         let verification_vector_hash = bytes.read_with::<UInt256>(offset, LE)?;
         let threshold_signature = bytes.read_with::<UInt768>(offset, LE)?;
         let all_commitment_aggregated_signature = bytes.read_with::<UInt768>(offset, LE)?;
-        let q_data = Self::generate_data(
+        let entry = LLMQEntry::new(
             version,
             llmq_type,
             llmq_hash,
             index,
             signers_count,
-            signers_bitset,
             valid_members_count,
-            valid_members_bitset,
+            signers_bitset.to_vec(),
+            valid_members_bitset.to_vec(),
             public_key,
             verification_vector_hash,
             threshold_signature,
-            all_commitment_aggregated_signature,
+            all_commitment_aggregated_signature
         );
-        let entry_hash = UInt256(sha256d::Hash::hash(q_data.as_slice()).into_inner());
-
-        Ok((
-            LLMQEntry {
-                version,
-                llmq_hash,
-                index,
-                public_key,
-                threshold_signature,
-                verification_vector_hash,
-                all_commitment_aggregated_signature,
-                signers_count,
-                llmq_type,
-                valid_members_count,
-                signers_bitset: signers_bitset.to_vec(),
-                valid_members_bitset: valid_members_bitset.to_vec(),
-                entry_hash,
-                verified: false,
-                saved: false,
-                commitment_hash: None,
-            },
-            *offset,
-        ))
+        Ok((entry, *offset))
     }
 }
 
