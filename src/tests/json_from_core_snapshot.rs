@@ -9,6 +9,7 @@ use crate::crypto::{UInt160, UInt256, UInt384, UInt768, VarBytes};
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
 use crate::crypto::var_array::VarArray;
 use crate::hashes::hex::FromHex;
+use crate::lib_tests::tests::message_from_file;
 use crate::models;
 use crate::tx::CoinbaseTransaction;
 use crate::util::base58;
@@ -106,6 +107,11 @@ pub struct Node {
     pub voting_address: String,
     #[serde(rename = "isValid")]
     pub is_valid: bool,
+
+    #[serde(rename = "updateHeight")]
+    pub update_height: Option<u32>,
+    #[serde(rename = "knownConfirmedAtHeight")]
+    pub known_confirmed_at_height: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -146,6 +152,10 @@ pub struct MNList {
     pub mn_list: Vec<Node>,
     #[serde(rename = "newQuorums")]
     pub new_quorums: Vec<Llmq>,
+}
+
+pub fn masternode_list_from_json(filename: String) -> models::MasternodeList {
+    list_to_list(serde_json::from_slice(&message_from_file(filename)).unwrap())
 }
 
 pub fn list_to_list(value: MNList) -> models::MasternodeList {
@@ -199,7 +209,7 @@ pub fn value_to_masternode_list(value: &serde_json::Value) -> models::Masternode
 
 pub fn quorums_to_quorums(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> {
     let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = BTreeMap::new();
-    value.into_iter().filter(|llmq| LLMQType::from(llmq.llmq_type as u8) == LLMQType::Llmqtype60_75).for_each(|llmq| {
+    value.into_iter()/*.filter(|llmq| LLMQType::from(llmq.llmq_type as u8) == LLMQType::Llmqtype60_75)*/.for_each(|llmq| {
         let entry = models::LLMQEntry::new(
             llmq.version as u16,
             LLMQType::from(llmq.llmq_type as u8),
@@ -279,7 +289,12 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
             let key_id_voting = UInt160::from_bytes(&voting_bytes, &mut 0).unwrap();
             let operator_public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
             let is_valid = node.is_valid;
-            models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 })
+            let mut masternode = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 });
+            if let Some(update_height) = node.update_height {
+                masternode.update_height = update_height;
+            }
+            masternode.known_confirmed_at_height = node.known_confirmed_at_height;
+            masternode
         })
         .fold(BTreeMap::new(), |mut acc, entry| {
             let hash = entry

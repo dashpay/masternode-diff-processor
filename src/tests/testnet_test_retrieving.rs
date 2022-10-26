@@ -344,7 +344,7 @@ fn init_hashes() -> Vec<UInt256> {
 #[test]
 fn testnet_test_retrieve_saved_hashes() {
     let chain = ChainType::TestNet;
-    let context = &mut (FFIContext { chain, cache: &mut Default::default(), blocks: init_testnet_store() });
+    let context = &mut (FFIContext { chain, is_dip_0024: false, cache: &mut Default::default(), blocks: init_testnet_store() });
     let bytes_122064 = message_from_file("MNL_0_122064.dat".to_string());
     let processor = unsafe {
         &mut *register_processor(

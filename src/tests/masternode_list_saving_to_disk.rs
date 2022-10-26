@@ -14,6 +14,7 @@ fn test_mnl_saving_to_disk() {
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
+        is_dip_0024: false,
         cache,
         blocks: init_testnet_store()
     });

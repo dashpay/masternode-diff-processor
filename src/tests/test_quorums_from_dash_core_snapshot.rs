@@ -15,6 +15,7 @@ pub fn test_from_snapshot() {
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
+        is_dip_0024: true,
         cache,
         blocks: init_testnet_store()
     });

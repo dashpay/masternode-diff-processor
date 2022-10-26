@@ -16,7 +16,7 @@ fn test_mainnet_checkpoint_1720000() {
     }*/
 
     let chain = ChainType::MainNet;
-    let context = &mut (FFIContext { chain, cache: &mut Default::default(), blocks: init_mainnet_store() });
+    let context = &mut (FFIContext { chain, is_dip_0024: false, cache: &mut Default::default(), blocks: init_mainnet_store() });
     let bytes = message_from_file("ML1720000.dat".to_string());
     let processor = unsafe {
         &mut *register_processor(

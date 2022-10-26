@@ -56,7 +56,7 @@ fn testnet_quorum_quarters() {
     let chain = ChainType::MainNet;
     let cache = unsafe { &mut *processor_create_cache() };
 
-    let context = &mut (FFIContext { chain, cache, blocks: init_mainnet_store() });
+    let context = &mut (FFIContext { chain, cache, is_dip_0024: true, blocks: init_mainnet_store() });
 
     let bytes = message_from_file("QRINFO_0_1739226.dat".to_string());
     let old_bytes = message_from_file("QRINFO_0_1740902.dat".to_string());

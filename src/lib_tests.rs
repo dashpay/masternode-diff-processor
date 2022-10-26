@@ -43,6 +43,7 @@ pub mod tests {
     #[derive(Debug)]
     pub struct FFIContext<'a> {
         pub chain: ChainType,
+        pub is_dip_0024: bool,
         pub cache: &'a mut MasternodeProcessorCache,
         // TODO:: make it initialized from json file with blocks
         pub blocks: Vec<MerkleBlock>,
@@ -502,6 +503,28 @@ pub mod tests {
         };
         llmq_type == quorum_type
     }
+
+    pub unsafe extern "C" fn should_process_llmq_of_type_actual(
+        llmq_type: u8,
+        context: *const std::ffi::c_void,
+    ) -> bool {
+        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+        let r#type = common::LLMQType::from(llmq_type);
+        let chain = data.chain;
+        let is_isd = chain.isd_llmq_type() == r#type;
+        let is_qr_context = data.is_dip_0024;
+        if is_isd {
+            is_qr_context
+        } else if is_qr_context /*skip old quorums here for now*/ {
+            false
+        } else {
+            chain.chain_locks_type() == r#type ||
+                chain.is_llmq_type() == r#type ||
+                chain.platform_type() == r#type ||
+                is_isd
+        }
+    }
+
     pub unsafe extern "C" fn validate_llmq_callback(
         data: *mut types::LLMQValidationData,
         _context: *const std::ffi::c_void,
@@ -616,6 +639,7 @@ pub mod tests {
         let base_masternode_list_hash: *const u8 = null_mut();
         let context = &mut FFIContext {
             chain,
+            is_dip_0024: false,
             cache: &mut MasternodeProcessorCache::default(),
             blocks: init_testnet_store()
         } as *mut _ as *mut std::ffi::c_void;

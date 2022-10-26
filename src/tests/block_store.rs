@@ -457,6 +457,10 @@ pub fn init_mainnet_store() -> Vec<MerkleBlock> {
         MerkleBlock { hash: UInt256::from_hex("0000000000000003029d0f83c85e2e9e6273c4001787b6b596d639dd8232e3f8").unwrap().reversed(), height: 1740696, merkleroot: UInt256::from_hex("c4436fc5387f8cf3e471e2daa8637de279213eae7590721028bfc66c73dc35ae").unwrap() },
         MerkleBlock { hash: UInt256::from_hex("000000000000002647c9cbd4c272b93f0454885ea3bbf737e6dc80cb23ef56ff").unwrap().reversed(), height: 1740699, merkleroot: UInt256::from_hex("3cbd838322db5d441a23b2b8666a0cf7cbcbdff28a17acb6c7ba3e8a223fab85").unwrap() },
         MerkleBlock { hash: UInt256::from_hex("000000000000000de7e088deaecc760151a4ae00a42c309d804b4a8d76260eaf").unwrap().reversed(), height: 1738360, merkleroot: UInt256::from_hex("375e7a19b094d1ab41ecccff0880a0cf6bea49528089656b561f979c8f8d7469").unwrap() },
+        MerkleBlock { hash: UInt256::from_hex("00000000000000268b50b62626433cd794ded10899dd51639755d0f8ee334168").unwrap().reversed(), height: 1761048, merkleroot: UInt256::from_hex("0f244df3e2cb5e644afaf5e83b4aaaa070e373551534a8727011534848e73704").unwrap() },
+        MerkleBlock { hash: UInt256::from_hex("0000000000000003b8b7721868e7ac76c9cbd3daf40165e25ed5c9b2e00148f9").unwrap().reversed(), height: 1761054, merkleroot: UInt256::from_hex("d888250687b51f3c291904069333898fe89cd818cbce99caca7c7653b680b66c").unwrap() },
+        MerkleBlock { hash: UInt256::from_hex("00000000000000248cfdd4da1ee40e49cb2e388679051e5f7305e0808da223b2").unwrap().reversed(), height: 1761072, merkleroot: UInt256::from_hex("0b58ff22cc9feae5dc2bcfb36244dd90138055cd1ecb7dc0b2f848da011181c0").unwrap() },
+        MerkleBlock { hash: UInt256::from_hex("0000000000000001d9e643a9b573dc0f1c597d8ca5887824beefb5ca77bf381c").unwrap().reversed(), height: 1761100, merkleroot: UInt256::from_hex("db577a335d0a6363c5f04736c52d30332745fe0e5e69073b6f3d066eb42023bd").unwrap() },
     ]
 }
 

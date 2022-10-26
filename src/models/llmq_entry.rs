@@ -148,6 +148,7 @@ impl LLMQEntry {
             all_commitment_aggregated_signature,
         );
         let entry_hash = UInt256(sha256d::Hash::hash(q_data.as_slice()).into_inner());
+        println!("LLMQEntry::new({}, {:?}, {}, {:?}, {}, {}, {}, {}, {}, {}, {}, {}) = {}", version, llmq_type, llmq_hash, index, signers_count, signers_bitset.to_hex(), valid_members_count, valid_members_bitset.to_hex(), public_key, verification_vector_hash, threshold_signature, all_commitment_aggregated_signature, entry_hash);
         Self {
             version,
             llmq_hash,

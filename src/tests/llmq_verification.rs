@@ -20,6 +20,7 @@ fn testnet_llmq_verification() {
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut FFIContext {
         chain,
+        is_dip_0024: false,
         cache,
         blocks: init_testnet_store()
     };
@@ -140,6 +141,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut FFIContext {
         chain,
+        is_dip_0024: false,
         cache,
         blocks: init_testnet_store()
     };

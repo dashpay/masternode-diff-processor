@@ -42,6 +42,7 @@ fn test_mainnet_reload_with_processor() {
     ];
     let context = &mut (FFIContext {
         chain,
+        is_dip_0024: false,
         cache: &mut Default::default(),
         blocks: init_mainnet_store()
     });

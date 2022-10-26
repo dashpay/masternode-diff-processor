@@ -41,6 +41,7 @@ fn test_quorum_issue() {
     let block_store = init_mainnet_store();
     let context = &mut (FFIContext {
         chain,
+        is_dip_0024: false,
         cache: &mut Default::default(),
         blocks: block_store
     });
