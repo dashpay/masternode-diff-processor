@@ -27,22 +27,19 @@ pub struct MasternodeEntry {
 impl std::fmt::Debug for MasternodeEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MasternodeEntry")
-            .field(
-                "provider_registration_transaction_hash",
-                &self.provider_registration_transaction_hash,
-            )
+            .field("provider_registration_transaction_hash", &self.provider_registration_transaction_hash)
             .field("confirmed_hash", &self.confirmed_hash)
-            // .field("confirmed_hash_hashed_with_provider_registration_transaction_hash", &self.confirmed_hash_hashed_with_provider_registration_transaction_hash)
-            // .field("socket_address", &self.socket_address)
-            // .field("operator_public_key", &self.operator_public_key)
-            // .field("previous_operator_public_keys", &self.previous_operator_public_keys)
-            // .field("previous_entry_hashes", &self.previous_entry_hashes)
-            // .field("previous_validity", &self.previous_validity)
+            .field("confirmed_hash_hashed_with_provider_registration_transaction_hash", &self.confirmed_hash_hashed_with_provider_registration_transaction_hash.unwrap_or(UInt256::MIN))
+            .field("socket_address", &self.socket_address)
+            .field("operator_public_key", &self.operator_public_key)
+            .field("previous_operator_public_keys", &self.previous_operator_public_keys)
+            .field("previous_entry_hashes", &self.previous_entry_hashes)
+            .field("previous_validity", &self.previous_validity)
             .field("known_confirmed_at_height", &self.known_confirmed_at_height.unwrap_or(0))
             .field("update_height", &self.update_height)
-            // .field("key_id_voting", &self.key_id_voting)
-            // .field("is_valid", &self.is_valid)
-            // .field("entry_hash", &self.entry_hash)
+            .field("key_id_voting", &self.key_id_voting)
+            .field("is_valid", &self.is_valid)
+            .field("entry_hash", &self.entry_hash)
             .finish()
     }
 }
@@ -213,7 +210,7 @@ impl MasternodeEntry {
         }
         let mut min_distance = u32::MAX;
         let mut is_valid = self.is_valid;
-        for (Block { height, .. }, validity) in self.previous_validity.clone() {
+        for (&Block { height, .. }, &validity) in &self.previous_validity {
             if height <= block_height {
                 continue;
             }
@@ -232,7 +229,7 @@ impl MasternodeEntry {
         }
         let mut min_distance = u32::MAX;
         let mut used_previous_operator_public_key_at_block_hash = self.operator_public_key;
-        for (Block { height, .. }, key) in self.previous_operator_public_keys.clone() {
+        for (&Block { height, .. }, &key) in &self.previous_operator_public_keys {
             if height <= block_height {
                 continue;
             }
@@ -249,10 +246,9 @@ impl MasternodeEntry {
         if self.previous_entry_hashes.is_empty() || block_height == u32::MAX {
             return self.entry_hash;
         }
-        let hashes: BTreeMap<Block, UInt256> = self.previous_entry_hashes.clone();
         let mut min_distance = u32::MAX;
         let mut used_hash = self.entry_hash;
-        for (Block { height, .. }, hash) in hashes {
+        for (&Block { height, .. }, &hash) in &self.previous_entry_hashes {
             if height <= block_height {
                 continue;
             }
