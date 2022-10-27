@@ -91,7 +91,6 @@ impl MasternodeList {
                 .map(|hash| {
                     let h = *hash;
                     let mn = &mns[&h];
-
                     mn.entry_hash_at(block_height)
                 })
                 .collect::<Vec<UInt256>>();
