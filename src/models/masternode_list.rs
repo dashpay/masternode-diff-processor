@@ -64,6 +64,7 @@ impl MasternodeList {
         }
         if quorums_active {
             let hashes = list.hashes_for_quorum_merkle_root();
+            println!("MasternodeList: {}:{}: hashes_for_quorum_merkle_root: {:#?} quorums: {:#?}", block_height, block_hash, hashes, list.quorums);
             list.llmq_merkle_root = merkle_root_from_hashes(hashes);
         }
         list
