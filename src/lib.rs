@@ -240,7 +240,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
             .should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
         let none_error: u8 = ProcessingError::None.into();
         if error != none_error {
-            println!("process_mnlistdiff_from_message >- {:?} ms [{:?}]", instant.elapsed().as_millis(), error);
+            println!("process_mnlistdiff_from_message <- {:?} ms [{:?}]", instant.elapsed().as_millis(), error);
             return boxed(types::MNListDiffResult::default_with_error(error));
         }
     }

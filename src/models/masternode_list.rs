@@ -60,7 +60,7 @@ impl MasternodeList {
             masternodes,
         };
         if let Some(hashes) = list.hashes_for_merkle_root(block_height) {
-            println!("MasternodeList: {}:{}: hashes_for_merkle_root: {:#?} masternodes: {:#?}", block_height, block_hash, hashes, list.masternodes);
+            //println!("MasternodeList: {}:{}: hashes_for_merkle_root: {:#?} masternodes: {:#?}", block_height, block_hash, hashes, list.masternodes);
             list.masternode_merkle_root = merkle_root_from_hashes(hashes);
         }
         if quorums_active {
@@ -150,6 +150,7 @@ impl MasternodeList {
         modifier: UInt256,
         block_height: u32,
     ) -> Option<UInt256> {
+        // println!("masternode_score: {}:{}:{:?}:{}:{:?}:{:?}", entry.provider_registration_transaction_hash, block_height, entry.known_confirmed_at_height, entry.is_valid_at(block_height), entry.confirmed_hash, entry.confirmed_hash_at(block_height));
         if !entry.is_valid_at(block_height) ||
             entry.confirmed_hash.is_zero() ||
             entry.confirmed_hash_at(block_height).is_none() {
