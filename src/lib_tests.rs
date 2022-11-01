@@ -3,31 +3,29 @@
 pub mod tests {
     extern crate libc;
     extern crate reqwest;
+    use byte::BytesExt;
+    use hashes::hex::{FromHex, ToHex};
+    use serde::{Deserialize, Serialize};
+    use std::io::Read;
+    use std::ptr::null_mut;
+    use std::{env, fs, slice};
+    use crate::ffi::boxer::boxed;
+    use crate::ffi::from::FromFFI;
+    use crate::ffi::to::ToFFI;
+    use crate::ffi::unboxer::unbox_any;
+    use crate::common::chain_type::{ChainType, IHaveChainSettings};
+    use crate::consensus::encode;
+    use crate::crypto::byte_util::{
+        BytesDecodable, Reversable, UInt256, UInt384, UInt768,
+    };
+    use crate::{common, models};
     use crate::processing::processor_cache::MasternodeProcessorCache;
     use crate::processing::{MNListDiffResult, QRInfoResult};
     use crate::{
         process_mnlistdiff_from_message, processor_create_cache, register_processor,
         unwrap_or_diff_processing_failure, unwrap_or_qr_processing_failure, unwrap_or_return,
-        MasternodeProcessor, ProcessingError,
+        MasternodeProcessor, ProcessingError, types
     };
-    use byte::BytesExt;
-    use dash_spv_ffi::ffi::boxer::boxed;
-    use dash_spv_ffi::ffi::from::FromFFI;
-    use dash_spv_ffi::ffi::to::ToFFI;
-    use dash_spv_ffi::ffi::unboxer::unbox_any;
-    use dash_spv_ffi::types;
-    use dash_spv_models::common::chain_type::{ChainType, IHaveChainSettings};
-    use dash_spv_models::common::LLMQType;
-    use dash_spv_models::{llmq, masternode};
-    use dash_spv_primitives::consensus::encode;
-    use dash_spv_primitives::crypto::byte_util::{
-        BytesDecodable, Reversable, UInt256, UInt384, UInt768,
-    };
-    use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
-    use serde::{Deserialize, Serialize};
-    use std::io::Read;
-    use std::ptr::null_mut;
-    use std::{env, fs, slice};
     use crate::tests::block_store::init_testnet_store;
 
     // This regex can be used to omit timestamp etc. while replacing after paste from xcode console log
@@ -45,6 +43,7 @@ pub mod tests {
     #[derive(Debug)]
     pub struct FFIContext<'a> {
         pub chain: ChainType,
+        pub is_dip_0024: bool,
         pub cache: &'a mut MasternodeProcessorCache,
         // TODO:: make it initialized from json file with blocks
         pub blocks: Vec<MerkleBlock>,
@@ -155,7 +154,7 @@ pub mod tests {
         processor.genesis_hash = genesis_hash;
         let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
         let list_diff =
-            unwrap_or_diff_processing_failure!(llmq::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
+            unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
         let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",
@@ -189,10 +188,10 @@ pub mod tests {
         let offset = &mut 0;
         let read_list_diff =
             |offset: &mut usize| processor.read_list_diff_from_message(message, offset);
-        let mut process_list_diff = |list_diff: llmq::MNListDiff| {
+        let mut process_list_diff = |list_diff: models::MNListDiff| {
             processor.get_list_diff_result_internal_with_base_lookup(list_diff, cache)
         };
-        let read_snapshot = |offset: &mut usize| llmq::LLMQSnapshot::from_bytes(message, offset);
+        let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
         let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
         let snapshot_at_h_c = unwrap_or_qr_processing_failure!(read_snapshot(offset));
         let snapshot_at_h_2c = unwrap_or_qr_processing_failure!(read_snapshot(offset));
@@ -222,17 +221,17 @@ pub mod tests {
         }
         let last_quorum_per_index_count =
             unwrap_or_qr_processing_failure!(read_var_int(offset)).0 as usize;
-        let mut last_quorum_per_index: Vec<masternode::LLMQEntry> =
+        let mut last_quorum_per_index: Vec<models::LLMQEntry> =
             Vec::with_capacity(last_quorum_per_index_count);
         for _i in 0..last_quorum_per_index_count {
-            let entry = unwrap_or_qr_processing_failure!(masternode::LLMQEntry::from_bytes(
+            let entry = unwrap_or_qr_processing_failure!(models::LLMQEntry::from_bytes(
                 message, offset
             ));
             last_quorum_per_index.push(entry);
         }
         let quorum_snapshot_list_count =
             unwrap_or_qr_processing_failure!(read_var_int(offset)).0 as usize;
-        let mut quorum_snapshot_list: Vec<llmq::LLMQSnapshot> =
+        let mut quorum_snapshot_list: Vec<models::LLMQSnapshot> =
             Vec::with_capacity(quorum_snapshot_list_count);
         for _i in 0..quorum_snapshot_list_count {
             quorum_snapshot_list.push(unwrap_or_qr_processing_failure!(read_snapshot(offset)));
@@ -498,12 +497,34 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
 
         let quorum_type: u8 = match data.chain {
-            ChainType::MainNet => LLMQType::Llmqtype400_60.into(),
-            ChainType::TestNet => LLMQType::Llmqtype50_60.into(),
-            ChainType::DevNet(_) => LLMQType::LlmqtypeDevnetDIP0024.into(),
+            ChainType::MainNet => common::LLMQType::Llmqtype400_60.into(),
+            ChainType::TestNet => common::LLMQType::Llmqtype50_60.into(),
+            ChainType::DevNet(_) => common::LLMQType::LlmqtypeDevnetDIP0024.into(),
         };
         llmq_type == quorum_type
     }
+
+    pub unsafe extern "C" fn should_process_llmq_of_type_actual(
+        llmq_type: u8,
+        context: *const std::ffi::c_void,
+    ) -> bool {
+        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+        let r#type = common::LLMQType::from(llmq_type);
+        let chain = data.chain;
+        let is_isd = chain.isd_llmq_type() == r#type;
+        let is_qr_context = data.is_dip_0024;
+        if is_isd {
+            is_qr_context
+        } else if is_qr_context /*skip old quorums here for now*/ {
+            false
+        } else {
+            chain.chain_locks_type() == r#type ||
+                chain.is_llmq_type() == r#type ||
+                chain.platform_type() == r#type ||
+                is_isd
+        }
+    }
+
     pub unsafe extern "C" fn validate_llmq_callback(
         data: *mut types::LLMQValidationData,
         _context: *const std::ffi::c_void,
@@ -618,6 +639,7 @@ pub mod tests {
         let base_masternode_list_hash: *const u8 = null_mut();
         let context = &mut FFIContext {
             chain,
+            is_dip_0024: false,
             cache: &mut MasternodeProcessorCache::default(),
             blocks: init_testnet_store()
         } as *mut _ as *mut std::ffi::c_void;

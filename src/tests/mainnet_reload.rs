@@ -1,10 +1,9 @@
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, get_block_height_by_hash_from_context};
-use crate::{process_mnlistdiff_from_message, processor_create_cache, register_processor};
-use dash_spv_ffi::ffi::from::FromFFI;
-use dash_spv_models::common::chain_type::ChainType;
-use dash_spv_models::masternode;
-use dash_spv_primitives::crypto::byte_util::UInt256;
 use std::collections::BTreeMap;
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, get_block_height_by_hash_from_context};
+use crate::{models, process_mnlistdiff_from_message, processor_create_cache, register_processor};
+use crate::ffi::from::FromFFI;
+use crate::common::chain_type::ChainType;
+use crate::crypto::byte_util::UInt256;
 use crate::tests::block_store::init_mainnet_store;
 
 #[test]
@@ -43,20 +42,21 @@ fn test_mainnet_reload_with_processor() {
     ];
     let context = &mut (FFIContext {
         chain,
+        is_dip_0024: false,
         cache: &mut Default::default(),
         blocks: init_mainnet_store()
     });
 
     let (success, lists) = load_masternode_lists_for_files(files, true, context);
     assert!(success, "Unsuccessful");
-    assert_eq!(lists.len(), 29, "There should be 29 masternode lists");
+    assert_eq!(lists.len(), 29, "There should be 29 models lists");
 }
 
 pub fn load_masternode_lists_for_files(
     files: Vec<String>,
     assert_validity: bool,
     context: &mut FFIContext,
-) -> (bool, BTreeMap<UInt256, masternode::MasternodeList>) {
+) -> (bool, BTreeMap<UInt256, models::MasternodeList>) {
     let cache = unsafe { &mut *processor_create_cache() };
     let processor = unsafe {
         register_processor(

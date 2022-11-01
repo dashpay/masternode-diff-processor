@@ -1,10 +1,9 @@
-use dash_spv_models::common::ChainType;
-use dash_spv_models::masternode;
-use dash_spv_primitives::crypto::byte_util::Reversable;
-use dash_spv_primitives::crypto::UInt256;
-use dash_spv_primitives::hashes::hex::FromHex;
+use crate::common::ChainType;
+use crate::crypto::byte_util::Reversable;
+use crate::crypto::UInt256;
+use crate::hashes::hex::FromHex;
 use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, process_qrinfo_from_message_internal, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
-use crate::{processor_create_cache, register_processor};
+use crate::{models, processor_create_cache, register_processor};
 use crate::tests::block_store::init_mainnet_store;
 use crate::tests::json_from_core_snapshot::{block_hash_to_block_hash, ListDiff, masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
 use crate::tests::llmq_rotation::{should_process_isd_quorum, validate_llmq_callback_throuh_rust_bls};
@@ -31,9 +30,9 @@ fn testnet_quorum_quarters() {
     let block_hash_8792 = list_diff_8792.block_hash;
     let block_hash_8840 = list_diff_8840.block_hash;
     let block_hash_8888 = list_diff_8888.block_hash;
-    let masternode_list_8792 = masternode::MasternodeList::new(list_diff_8792.added_or_modified_masternodes, list_diff_8792.added_quorums, block_hash_8792, block_height_8792, true);
-    let masternode_list_8840 = masternode::MasternodeList::new(list_diff_8840.added_or_modified_masternodes, list_diff_8840.added_quorums, block_hash_8840, block_height_8840, true);
-    let masternode_list_8888 = masternode::MasternodeList::new(list_diff_8888.added_or_modified_masternodes, list_diff_8888.added_quorums, block_hash_8888, block_height_8888, true);
+    let masternode_list_8792 = models::MasternodeList::new(list_diff_8792.added_or_modified_masternodes, list_diff_8792.added_quorums, block_hash_8792, block_height_8792, true);
+    let masternode_list_8840 = models::MasternodeList::new(list_diff_8840.added_or_modified_masternodes, list_diff_8840.added_quorums, block_hash_8840, block_height_8840, true);
+    let masternode_list_8888 = models::MasternodeList::new(list_diff_8888.added_or_modified_masternodes, list_diff_8888.added_quorums, block_hash_8888, block_height_8888, true);
 
     let processor = unsafe {
         &mut *register_processor(
@@ -57,7 +56,7 @@ fn testnet_quorum_quarters() {
     let chain = ChainType::MainNet;
     let cache = unsafe { &mut *processor_create_cache() };
 
-    let context = &mut (FFIContext { chain, cache, blocks: init_mainnet_store() });
+    let context = &mut (FFIContext { chain, cache, is_dip_0024: true, blocks: init_mainnet_store() });
 
     let bytes = message_from_file("QRINFO_0_1739226.dat".to_string());
     let old_bytes = message_from_file("QRINFO_0_1740902.dat".to_string());

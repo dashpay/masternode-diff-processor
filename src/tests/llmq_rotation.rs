@@ -1,14 +1,13 @@
 use bls_signatures::{G1Element, G2Element, Scheme};
-use dash_spv_ffi::ffi::boxer::boxed;
-use dash_spv_ffi::ffi::unboxer::unbox_any;
-use dash_spv_ffi::types;
+use crate::ffi::boxer::boxed;
+use crate::ffi::unboxer::unbox_any;
 use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext};
-use crate::{process_qrinfo_from_message, processor_create_cache, register_processor};
-use dash_spv_models::common::chain_type::{ChainType, DevnetType, IHaveChainSettings};
-use dash_spv_models::common::LLMQType;
-use dash_spv_primitives::crypto::byte_util::{AsBytes, Reversable, UInt256};
-use dash_spv_primitives::crypto::{UInt384, UInt768};
-use dash_spv_primitives::hashes::hex::{FromHex, ToHex};
+use crate::common::chain_type::{ChainType, DevnetType, IHaveChainSettings};
+use crate::common::LLMQType;
+use crate::crypto::byte_util::{AsBytes, Reversable, UInt256};
+use crate::crypto::{UInt384, UInt768};
+use crate::hashes::hex::{FromHex, ToHex};
+use crate::{process_qrinfo_from_message, processor_create_cache, register_processor, types};
 
 // #[test]
 // Deprecated
@@ -21,6 +20,7 @@ fn test_llmq_rotation() {
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
+        is_dip_0024: true,
         cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
@@ -81,6 +81,7 @@ fn test_llmq_rotation_2() {
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
+        is_dip_0024: true,
         cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
@@ -462,6 +463,7 @@ fn test_devnet_333() {
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
+        is_dip_0024: true,
         cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
@@ -523,6 +525,7 @@ fn test_processor_devnet_333() {
     let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
     let context = &mut (FFIContext {
         chain,
+        is_dip_0024: true,
         cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
@@ -741,12 +744,12 @@ fn test_processor_devnet_333_2() {
             log_default,
         )
     };
-    let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
-        cache,
+        is_dip_0024: false,
+        cache: unsafe { &mut *processor_create_cache() },
         blocks: vec![]
-    }) as *mut _ as *mut std::ffi::c_void;
+    });
 
     let mnldiff_bytes = message_from_file("mnlistdiff--1-25480.dat".to_string());
 
@@ -756,26 +759,23 @@ fn test_processor_devnet_333_2() {
         false,
         chain.genesis_hash().0.as_ptr(),
         processor,
-        cache,
-        context,
+        context.cache,
+        context as *mut _ as *mut std::ffi::c_void,
     );
 
     let bytes = message_from_file("qrinfo--1-24868.dat".to_string());
-
+    context.is_dip_0024 = true;
     let result = process_qrinfo_from_message_internal(
         bytes.as_ptr(),
         bytes.len(),
         false,
         chain.genesis_hash().0.as_ptr(),
         processor,
-        cache,
-        context,
+        context.cache,
+        context as *mut _ as *mut std::ffi::c_void,
     );
     println!("Result: {:#?}", &result);
-    assert!(
-        result.result_at_h.has_valid_mn_list_root,
-        "Invalid masternodes root"
-    );
+    assert!(result.result_at_h.has_valid_mn_list_root, "Invalid masternodes root");
     // assert!(result.result_at_h.has_valid_llmq_list_root, "Invalid quorums root");
 }
 
@@ -1454,6 +1454,7 @@ fn test_jack_daniels() {
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,
+        is_dip_0024: true,
         cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
@@ -1523,7 +1524,13 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
 
 fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>) -> bool {
     let scheme = bls_signatures::LegacySchemeMPL::new();
-    let bls_signature = G2Element::from_bytes(signature.as_bytes()).unwrap();
+    let bls_signature = match G2Element::from_bytes(signature.as_bytes()) {
+        Ok(signature) => signature,
+        Err(err) => {
+            println!("verify_secure_aggregated: error: {}", err);
+            return false;
+        }
+    };
     let keys = public_keys.iter().collect::<Vec<&G1Element>>();
     let is_verified = scheme.verify_secure(keys, message_digest.as_bytes(), &bls_signature);
     is_verified

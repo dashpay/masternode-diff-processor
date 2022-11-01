@@ -1,13 +1,12 @@
-use dash_spv_models::common::LLMQSnapshotSkipMode;
-use dash_spv_models::llmq::LLMQSnapshot;
-use dash_spv_primitives::crypto::byte_util::BytesDecodable;
-use dash_spv_primitives::crypto::data_ops::Data;
-use dash_spv_primitives::hashes::hex::FromHex;
+use hashes::hex::FromHex;
+use crate::crypto::byte_util::BytesDecodable;
+use crate::crypto::data_ops::Data;
+use crate::{common, models};
 
 #[test]
 pub fn test_quorum_snapshot() {
     let payload = Vec::from_hex("000000001fb95e7b0300").unwrap();
-    let snapshot = LLMQSnapshot::from_bytes(payload.as_slice(), &mut 0).unwrap();
+    let snapshot = models::LLMQSnapshot::from_bytes(payload.as_slice(), &mut 0).unwrap();
     println!("snapshot: {:?}", snapshot);
     assert!(snapshot.member_list.as_slice().bit_is_true_at_le_index(0));
     assert!(!snapshot.member_list.as_slice().bit_is_true_at_le_index(1));
@@ -40,6 +39,6 @@ pub fn test_quorum_snapshot() {
     assert!(!snapshot.member_list.as_slice().bit_is_true_at_le_index(28));
     assert!(!snapshot.member_list.as_slice().bit_is_true_at_le_index(29));
     assert!(!snapshot.member_list.as_slice().bit_is_true_at_le_index(30));
-    assert_eq!(LLMQSnapshotSkipMode::NoSkipping, snapshot.skip_list_mode);
+    assert_eq!(common::LLMQSnapshotSkipMode::NoSkipping, snapshot.skip_list_mode);
     assert_eq!(0, snapshot.skip_list.len());
 }
