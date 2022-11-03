@@ -155,7 +155,7 @@ pub mod tests {
         let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
         let list_diff =
             unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
-        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, cache);
+        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",
             std::time::Instant::now(),
@@ -188,8 +188,8 @@ pub mod tests {
         let offset = &mut 0;
         let read_list_diff =
             |offset: &mut usize| processor.read_list_diff_from_message(message, offset);
-        let mut process_list_diff = |list_diff: models::MNListDiff| {
-            processor.get_list_diff_result_internal_with_base_lookup(list_diff, cache)
+        let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
+            processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, cache)
         };
         let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
         let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
@@ -243,20 +243,20 @@ pub mod tests {
         for _i in 0..mn_list_diff_list_count {
             mn_list_diff_list.push(process_list_diff(unwrap_or_qr_processing_failure!(
                 read_list_diff(offset)
-            )));
+            ), true));
         }
         // The order is important since the each new one dependent on previous
         #[allow(clippy::manual_map)]
         let result_at_h_4c = if let Some(diff) = diff_h_4c {
-            Some(process_list_diff(diff))
+            Some(process_list_diff(diff, false))
         } else {
             None
         };
-        let result_at_h_3c = process_list_diff(diff_h_3c);
-        let result_at_h_2c = process_list_diff(diff_h_2c);
-        let result_at_h_c = process_list_diff(diff_h_c);
-        let result_at_h = process_list_diff(diff_h);
-        let result_at_tip = process_list_diff(diff_tip);
+        let result_at_h_3c = process_list_diff(diff_h_3c, false);
+        let result_at_h_2c = process_list_diff(diff_h_2c, false);
+        let result_at_h_c = process_list_diff(diff_h_c, false);
+        let result_at_h = process_list_diff(diff_h, true);
+        let result_at_tip = process_list_diff(diff_tip, false);
         QRInfoResult {
             error_status: ProcessingError::None,
             result_at_tip,
