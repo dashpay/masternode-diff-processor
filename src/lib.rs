@@ -244,7 +244,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
             return boxed(types::MNListDiffResult::default_with_error(error));
         }
     }
-    let result = processor.get_list_diff_result_with_base_lookup(list_diff, cache);
+    let result = processor.get_list_diff_result_with_base_lookup(list_diff, true, cache);
     println!("process_mnlistdiff_from_message <- {:?} ms", instant.elapsed().as_millis());
     boxed(result)
 }
@@ -274,15 +274,15 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     processor.genesis_hash = genesis_hash;
     println!( "process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     let offset = &mut 0;
-    let mut process_list_diff = |list_diff: models::MNListDiff| {
-        processor.get_list_diff_result_with_base_lookup(list_diff, cache)
+    let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
+        processor.get_list_diff_result_with_base_lookup(list_diff, should_process_quorums, cache)
     };
     let read_list_diff =
         |offset: &mut usize| processor.read_list_diff_from_message(message, offset);
     let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
     let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
     let mut get_list_diff_result =
-        |list_diff: models::MNListDiff| boxed(process_list_diff(list_diff));
+        |list_diff: models::MNListDiff, should_process_quorums: bool| boxed(process_list_diff(list_diff, should_process_quorums));
     let snapshot_at_h_c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
@@ -320,13 +320,13 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
             snapshot_at_h_4c.clone().unwrap(),
         );
     }
-    let result_at_tip = get_list_diff_result(diff_tip);
-    let result_at_h = get_list_diff_result(diff_h);
-    let result_at_h_c = get_list_diff_result(diff_h_c);
-    let result_at_h_2c = get_list_diff_result(diff_h_2c);
-    let result_at_h_3c = get_list_diff_result(diff_h_3c);
+    let result_at_tip = get_list_diff_result(diff_tip, false);
+    let result_at_h = get_list_diff_result(diff_h, true);
+    let result_at_h_c = get_list_diff_result(diff_h_c, false);
+    let result_at_h_2c = get_list_diff_result(diff_h_2c, false);
+    let result_at_h_3c = get_list_diff_result(diff_h_3c, false);
     let result_at_h_4c = if extra_share {
-        get_list_diff_result(diff_h_4c.unwrap())
+        get_list_diff_result(diff_h_4c.unwrap(), false)
     } else {
         null_mut()
     };
@@ -356,7 +356,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     for i in 0..mn_list_diff_list_count {
         let list_diff = unwrap_or_qr_result_failure!(read_list_diff(offset));
         let block_hash = list_diff.block_hash;
-        mn_list_diff_list_vec.push(get_list_diff_result(list_diff));
+        mn_list_diff_list_vec.push(get_list_diff_result(list_diff, true));
         let snapshot = snapshots.get(i).unwrap();
         quorum_snapshot_list_vec.push(boxed(snapshot.encode()));
         processor.save_snapshot(block_hash, snapshot.clone());

@@ -131,6 +131,7 @@ impl MasternodeProcessor {
     pub(crate) fn get_list_diff_result_with_base_lookup(
         &self,
         list_diff: models::MNListDiff,
+        should_process_quorums: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
         let base_block_hash = list_diff.base_block_hash;
@@ -139,12 +140,13 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result(base_list, list_diff, cache)
+        self.get_list_diff_result(base_list, list_diff, should_process_quorums, cache)
     }
 
     pub(crate) fn get_list_diff_result_internal_with_base_lookup(
         &self,
         list_diff: models::MNListDiff,
+        should_process_quorums: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
         let base_list = self.find_masternode_list(
@@ -152,16 +154,17 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result_internal(base_list, list_diff, cache)
+        self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, cache)
     }
 
     pub(crate) fn get_list_diff_result(
         &self,
         base_list: Option<models::MasternodeList>,
         list_diff: models::MNListDiff,
+        should_process_quorums: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
-        let result = self.get_list_diff_result_internal(base_list, list_diff, cache);
+        let result = self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, cache);
         println!("get_list_diff_result: {:#?}", result);
         result.encode()
     }
@@ -183,6 +186,7 @@ impl MasternodeProcessor {
         &self,
         base_list: Option<models::MasternodeList>,
         list_diff: models::MNListDiff,
+        should_process_quorums: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
         let base_block_hash = list_diff.base_block_hash;
@@ -205,6 +209,7 @@ impl MasternodeProcessor {
             base_quorums,
             list_diff.added_quorums,
             list_diff.deleted_quorums,
+            should_process_quorums,
             cache,
         );
         let masternode_list = models::MasternodeList::new(
@@ -312,6 +317,7 @@ impl MasternodeProcessor {
         base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
         added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
         deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
+        should_process_quorums: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> (
         BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
@@ -320,9 +326,10 @@ impl MasternodeProcessor {
     ) {
         let has_valid_quorums = true;
         let mut added = added_quorums;
-        added.iter_mut().for_each(|(&llmq_type, llmqs_of_type)| {
-            if self.should_process_quorum(llmq_type) {
-                llmqs_of_type.iter_mut().for_each(|(&llmq_block_hash, quorum)| {
+        if should_process_quorums {
+            added.iter_mut().for_each(|(&llmq_type, llmqs_of_type)| {
+                if self.should_process_quorum(llmq_type) {
+                    llmqs_of_type.iter_mut().for_each(|(&llmq_block_hash, quorum)| {
                         if let Some(models::MasternodeList { masternodes, .. }) = self
                             .find_masternode_list(
                                 llmq_block_hash,
@@ -339,8 +346,9 @@ impl MasternodeProcessor {
                             )
                         }
                     });
-            }
-        });
+                }
+            });
+        }
         let mut quorums = base_quorums;
         quorums.extend(
             added
