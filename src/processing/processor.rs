@@ -926,11 +926,10 @@ impl MasternodeProcessor {
                         items: boxed_vec(operator_pks),
                         count: operator_public_keys_count,
                         commitment_hash: boxed(quorum.generate_commitment_hash().0),
-                        all_commitment_aggregated_signature: boxed(
-                            quorum.all_commitment_aggregated_signature.0,
-                        ),
+                        all_commitment_aggregated_signature: boxed(quorum.all_commitment_aggregated_signature.0),
                         threshold_signature: boxed(quorum.threshold_signature.0),
                         public_key: boxed(quorum.public_key.0),
+                        version: quorum.version
                     }),
                     self.opaque_context,
                 )

@@ -537,15 +537,17 @@ pub mod tests {
             all_commitment_aggregated_signature,
             threshold_signature,
             public_key,
+            version
         } = *result;
         println!(
-            "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}",
+            "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {}",
             items,
             count,
             commitment_hash,
             all_commitment_aggregated_signature,
             threshold_signature,
-            public_key
+            public_key,
+            version
         );
 
         let all_commitment_aggregated_signature = UInt768(*all_commitment_aggregated_signature);

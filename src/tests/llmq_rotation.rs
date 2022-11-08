@@ -1485,17 +1485,19 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
         all_commitment_aggregated_signature,
         threshold_signature,
         public_key,
+        version
     } = *result;
 
 
     println!(
-        "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}",
+        "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {}",
         items,
         count,
         commitment_hash,
         all_commitment_aggregated_signature,
         threshold_signature,
-        public_key
+        public_key,
+        version
     );
     let all_commitment_aggregated_signature = UInt768(*all_commitment_aggregated_signature);
     let threshold_signature = UInt768(*threshold_signature);
@@ -1505,15 +1507,15 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
         .into_iter()
         .map(|i| G1Element::from_bytes_legacy(UInt384(*(*(items.add(i)))).as_bytes()).unwrap())
         .collect::<Vec<G1Element>>();
-
-    let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys);
+    let use_legacy = version >= 4;
+    let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys, use_legacy);
     if !all_commitment_aggregated_signature_validated {
         println!("••• Issue with all_commitment_aggregated_signature_validated: {}", all_commitment_aggregated_signature);
         return false;
     }
     // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
     // This is an aggregated BLS signature verification.
-    let quorum_signature_validated = verify_quorum_signature(commitment_hash, threshold_signature, public_key);
+    let quorum_signature_validated = verify_quorum_signature(commitment_hash, threshold_signature, public_key, use_legacy);
     if !quorum_signature_validated {
         println!("••• Issue with quorum_signature_validated");
         return false;
@@ -1522,8 +1524,7 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
     true
 }
 
-fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>) -> bool {
-    let scheme = bls_signatures::LegacySchemeMPL::new();
+fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>, use_legacy: bool) -> bool {
     let bls_signature = match G2Element::from_bytes(signature.as_bytes()) {
         Ok(signature) => signature,
         Err(err) => {
@@ -1532,15 +1533,21 @@ fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_
         }
     };
     let keys = public_keys.iter().collect::<Vec<&G1Element>>();
-    let is_verified = scheme.verify_secure(keys, message_digest.as_bytes(), &bls_signature);
-    is_verified
+    if use_legacy {
+        bls_signatures::LegacySchemeMPL::new().verify_secure(keys, message_digest.as_bytes(), &bls_signature)
+    } else {
+        bls_signatures::BasicSchemeMPL::new().verify_secure(keys, message_digest.as_bytes(), &bls_signature)
+    }
 }
 
-fn verify_quorum_signature(message_digest: UInt256, threshold_signature: UInt768, public_key: UInt384) -> bool {
-    let scheme = bls_signatures::LegacySchemeMPL::new();
+fn verify_quorum_signature(message_digest: UInt256, threshold_signature: UInt768, public_key: UInt384, use_legacy: bool) -> bool {
     let bls_public_key = G1Element::from_bytes_legacy(public_key.as_bytes()).unwrap();
     let bls_signature = G2Element::from_bytes_legacy(threshold_signature.as_bytes()).unwrap();
-    scheme.verify(&bls_public_key, message_digest.as_bytes(), &bls_signature)
+    if use_legacy {
+        bls_signatures::LegacySchemeMPL::new().verify(&bls_public_key, message_digest.as_bytes(), &bls_signature)
+    } else {
+        bls_signatures::BasicSchemeMPL::new().verify(&bls_public_key, message_digest.as_bytes(), &bls_signature)
+    }
 }
 
 unsafe extern "C" fn block_height_lookup_jack_daniels(

@@ -7,4 +7,5 @@ pub struct LLMQValidationData {
     pub all_commitment_aggregated_signature: *mut [u8; 96],
     pub threshold_signature: *mut [u8; 96],
     pub public_key: *mut [u8; 48],
+    pub version: u16,
 }
