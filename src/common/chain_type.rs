@@ -22,6 +22,7 @@ pub enum ChainType {
 pub enum DevnetType {
     JackDaniels,
     Devnet333,
+    Chacha,
 }
 
 impl DevnetType {
@@ -29,6 +30,7 @@ impl DevnetType {
         match self {
             DevnetType::JackDaniels => "jack-daniels".to_string(),
             DevnetType::Devnet333 => "333".to_string(),
+            DevnetType::Chacha => "chacha".to_string(),
         }
     }
 

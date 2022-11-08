@@ -16,8 +16,6 @@ pub struct MNListDiff {
     pub total_transactions: u32,
     pub merkle_hashes: Vec<UInt256>,
     pub merkle_flags: Vec<u8>,
-    // pub merkle_flags: &'a [u8],
-    // pub merkle_flags_count: usize,
     pub coinbase_transaction: CoinbaseTransaction,
     pub deleted_masternode_hashes: Vec<UInt256>,
     pub added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,

@@ -398,6 +398,7 @@ pub mod tests {
     ) -> *mut types::MasternodeList {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+        println!("get_masternode_list_by_block_hash_from_cache: {}", h);
         if let Some(list) = data.cache.mn_lists.get(&h) {
             println!("get_masternode_list_by_block_hash_from_cache: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
             let encoded = list.encode();
@@ -540,7 +541,7 @@ pub mod tests {
             version
         } = *result;
         println!(
-            "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {}",
+            "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {:?}",
             items,
             count,
             commitment_hash,

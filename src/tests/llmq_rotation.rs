@@ -1490,7 +1490,7 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
 
 
     println!(
-        "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {}",
+        "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {:?}",
         items,
         count,
         commitment_hash,
@@ -1503,7 +1503,7 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
     let threshold_signature = UInt768(*threshold_signature);
     let public_key = UInt384(*public_key);
     let commitment_hash = UInt256(*commitment_hash);
-    let use_legacy = version >= 4;
+    let use_legacy = version.use_bls_legacy();
     let keys = (0..count)
         .into_iter()
         .map(|i| if use_legacy {

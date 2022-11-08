@@ -4,6 +4,7 @@ use byte::BytesExt;
 use byte::ctx::Bytes;
 use serde::{Deserialize, Serialize};
 use crate::common::{LLMQSnapshotSkipMode, LLMQType, SocketAddress};
+use crate::common::llmq_version::LLMQVersion;
 use crate::consensus::encode::VarInt;
 use crate::crypto::{UInt160, UInt256, UInt384, UInt768, VarBytes};
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
@@ -211,7 +212,7 @@ pub fn quorums_to_quorums(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt2
     let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = BTreeMap::new();
     value.into_iter()/*.filter(|llmq| LLMQType::from(llmq.llmq_type as u8) == LLMQType::Llmqtype60_75)*/.for_each(|llmq| {
         let entry = models::LLMQEntry::new(
-            llmq.version as u16,
+            LLMQVersion::from(llmq.version as u16),
             LLMQType::from(llmq.llmq_type as u8),
             block_hash_to_block_hash(llmq.quorum_hash),
             Some(llmq.quorum_index as u16),

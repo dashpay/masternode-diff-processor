@@ -224,6 +224,7 @@ pub enum LLMQType {
     LlmqtypeTestDIP0024 = 103, // 4 members, 2 (66%) threshold, one per hour. Params might differ when -llmqtestparams is used
     LlmqtypeDevnetDIP0024 = 105, // 8 members, 4 (50%) threshold, one per hour. Params might differ when -llmqdevnetparams is used
     LlmqtypeDevnet333DIP0024 = 106, // 8 members, 4 (50%) threshold, one per hour. Params might differ when -llmqdevnetparams is used
+    LlmqtypeChachaBLSv19 = 205,
 }
 
 impl LLMQType {
@@ -240,6 +241,7 @@ impl LLMQType {
             LLMQType::LlmqtypeTestDIP0024 => LLMQ_TEST_DIP00024,
             LLMQType::LlmqtypeDevnetDIP0024 => LLMQ_0024,
             LLMQType::LlmqtypeDevnet333DIP0024 => LLMQ_0024_333,
+            LLMQType::LlmqtypeChachaBLSv19 => LLMQ_DEVNET,
             LLMQType::LlmqtypeUnknown => LLMQ_DEVNET,
         }
     }
@@ -270,6 +272,7 @@ impl From<u8> for LLMQType {
             103 => LLMQType::LlmqtypeTestDIP0024,
             105 => LLMQType::LlmqtypeDevnetDIP0024,
             106 => LLMQType::LlmqtypeDevnet333DIP0024,
+            205 => LLMQType::LlmqtypeChachaBLSv19,
             _ => LLMQType::LlmqtypeUnknown,
         }
     }
@@ -290,6 +293,7 @@ impl From<LLMQType> for u8 {
             LLMQType::LlmqtypeTestDIP0024 => 103,
             LLMQType::LlmqtypeDevnetDIP0024 => 105,
             LLMQType::LlmqtypeDevnet333DIP0024 => 106,
+            LLMQType::LlmqtypeChachaBLSv19 => 205,
         }
     }
 }

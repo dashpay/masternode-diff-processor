@@ -4,7 +4,6 @@ use crate::{common, encode, models, tx, types};
 use crate::crypto::{UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::crypto::byte_util::Reversable;
 use crate::ffi::to::ToFFI;
-use crate::models::llmq_entry::LLMQ_DEFAULT_VERSION;
 use crate::tx::transaction;
 
 pub trait FromFFI {
@@ -237,11 +236,7 @@ impl FromFFI for types::LLMQEntry {
         Self::Item {
             version: self.version,
             llmq_hash: UInt256(*self.llmq_hash),
-            index: if self.version == LLMQ_DEFAULT_VERSION {
-                None
-            } else {
-                Some(self.index)
-            },
+            index: if self.version.use_rotated_quorums() { Some(self.index) } else { None },
             public_key: UInt384(*self.public_key),
             threshold_signature: UInt768(*self.threshold_signature),
             verification_vector_hash: UInt256(*self.verification_vector_hash),
