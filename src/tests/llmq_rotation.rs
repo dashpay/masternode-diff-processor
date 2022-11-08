@@ -1503,11 +1503,15 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
     let threshold_signature = UInt768(*threshold_signature);
     let public_key = UInt384(*public_key);
     let commitment_hash = UInt256(*commitment_hash);
+    let use_legacy = version >= 4;
     let keys = (0..count)
         .into_iter()
-        .map(|i| G1Element::from_bytes_legacy(UInt384(*(*(items.add(i)))).as_bytes()).unwrap())
+        .map(|i| if use_legacy {
+            G1Element::from_bytes_legacy(UInt384(*(*(items.add(i)))).as_bytes()).unwrap()
+        } else {
+            G1Element::from_bytes(UInt384(*(*(items.add(i)))).as_bytes()).unwrap()
+        })
         .collect::<Vec<G1Element>>();
-    let use_legacy = version >= 4;
     let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys, use_legacy);
     if !all_commitment_aggregated_signature_validated {
         println!("••• Issue with all_commitment_aggregated_signature_validated: {}", all_commitment_aggregated_signature);
@@ -1525,10 +1529,14 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
 }
 
 fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>, use_legacy: bool) -> bool {
-    let bls_signature = match G2Element::from_bytes(signature.as_bytes()) {
+    let bls_signature = match if use_legacy {
+        G2Element::from_bytes_legacy(signature.as_bytes())
+    } else {
+        G2Element::from_bytes(signature.as_bytes())
+    } {
         Ok(signature) => signature,
         Err(err) => {
-            println!("verify_secure_aggregated: error: {}", err);
+            println!("verify_secure_aggregated (legacy = {}): error: {}", use_legacy, err);
             return false;
         }
     };
@@ -1541,12 +1549,10 @@ fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_
 }
 
 fn verify_quorum_signature(message_digest: UInt256, threshold_signature: UInt768, public_key: UInt384, use_legacy: bool) -> bool {
-    let bls_public_key = G1Element::from_bytes_legacy(public_key.as_bytes()).unwrap();
-    let bls_signature = G2Element::from_bytes_legacy(threshold_signature.as_bytes()).unwrap();
     if use_legacy {
-        bls_signatures::LegacySchemeMPL::new().verify(&bls_public_key, message_digest.as_bytes(), &bls_signature)
+        bls_signatures::LegacySchemeMPL::new().verify(&G1Element::from_bytes_legacy(public_key.as_bytes()).unwrap(), message_digest.as_bytes(), &G2Element::from_bytes_legacy(threshold_signature.as_bytes()).unwrap())
     } else {
-        bls_signatures::BasicSchemeMPL::new().verify(&bls_public_key, message_digest.as_bytes(), &bls_signature)
+        bls_signatures::BasicSchemeMPL::new().verify(&G1Element::from_bytes(public_key.as_bytes()).unwrap(), message_digest.as_bytes(), &G2Element::from_bytes(threshold_signature.as_bytes()).unwrap())
     }
 }
 
