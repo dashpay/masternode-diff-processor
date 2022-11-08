@@ -1,6 +1,8 @@
 # masternode-diff-message-processor
+
 Library for processing masternode diff messages
-WORK IN PROGRESS!
+
+| main | [![Tests](https://github.com/dashpay/masternode-diff-processor/workflows/Tests/badge.svg?branch=main)](https://github.com/dashpay/masternode-diff-processor/actions) | [![codecov](https://codecov.io/gh/dashpay/masternode-diff-processor/branch/main/graph/badge.svg)](https://codecov.io/gh/dashpay/masternode-diff-processor) | ![Lint](https://github.com/dashpay/masternode-diff-processor/workflows/Lint/badge.svg) |
 # TODO
 1. Create integration with BLS signatures
 2. Now it will be necessary to figure out what to do with the external libraries used, keeping in mind our policy regarding this.
