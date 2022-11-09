@@ -1,0 +1,42 @@
+name: Code coverage
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    name: Code coverage
+    runs-on: macOS-latest
+    steps:
+      - name: Install automake
+        run: |
+          brew install automake
+      - name: Checkout models-diff-processor
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+          path: mnldiffprocessor
+          submodules: recursive
+      - name: Create LFS file list
+        run: |
+          git lfs ls-files -l | cut -d' ' -f1 | sort > .lfs-assets-id
+        working-directory: ./mnldiffprocessor
+      - name: Restore LFS cache
+        uses: actions/cache@v2
+        id: lfs-cache
+        with:
+          path: mnldiffprocessor/.git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}-v1
+      - name: Rustup add targets
+        run: rustup target add aarch64-apple-ios x86_64-apple-ios aarch64-apple-ios-sim
+      - name: Invoke uploader
+        working-directory: ./mnldiffprocessor
+        run: |
+          curl -Os https://uploader.codecov.io/latest/macos/codecov && chmod +x codecov && ./codecov
