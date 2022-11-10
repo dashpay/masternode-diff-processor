@@ -1,6 +1,4 @@
-use crate::types::masternode_entry_hash::MasternodeEntryHash;
-use crate::types::operator_public_key::OperatorPublicKey;
-use crate::types::validity::Validity;
+use crate::types::{BlockOperatorPublicKey, MasternodeEntryHash, OperatorPublicKey, Validity};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -11,10 +9,10 @@ pub struct MasternodeEntry {
     pub key_id_voting: *mut [u8; 20],
     pub known_confirmed_at_height: u32, // nullable
     pub entry_hash: *mut [u8; 32],
-    pub operator_public_key: *mut [u8; 48],
+    pub operator_public_key: *mut OperatorPublicKey,
     pub previous_entry_hashes: *mut MasternodeEntryHash,
     pub previous_entry_hashes_count: usize,
-    pub previous_operator_public_keys: *mut OperatorPublicKey,
+    pub previous_operator_public_keys: *mut BlockOperatorPublicKey,
     pub previous_operator_public_keys_count: usize,
     pub previous_validity: *mut Validity,
     pub previous_validity_count: usize,

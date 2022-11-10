@@ -96,6 +96,7 @@ pub mod tests {
 
     pub struct AggregationInfo {
         pub public_key: UInt384,
+        pub version: u16,
         pub digest: UInt256,
     }
     pub fn get_block_from_insight_by_hash(hash: UInt256) -> Option<MerkleBlock> {
@@ -562,12 +563,15 @@ pub mod tests {
 
         let infos = (0..count)
             .into_iter()
-            .map(|i| AggregationInfo {
-                public_key: UInt384(*(*(items.add(i)))),
-                digest: commitment_hash,
+            .map(|i| {
+                let item = *(*items.add(i));
+                AggregationInfo {
+                    public_key: UInt384(item.data),
+                    version: item.version,
+                    digest: commitment_hash,
+                }
             })
             .collect::<Vec<AggregationInfo>>();
-
         true
     }
 

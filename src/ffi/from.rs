@@ -147,6 +147,16 @@ impl FromFFI for types::MasternodeList {
     }
 }
 
+impl FromFFI for types::OperatorPublicKey {
+    type Item = models::OperatorPublicKey;
+    unsafe fn decode(&self) -> Self::Item {
+        Self::Item {
+            data: UInt384(self.data),
+            version: self.version
+        }
+    }
+}
+
 impl FromFFI for types::MasternodeEntry {
     type Item = models::MasternodeEntry;
     unsafe fn decode(&self) -> Self::Item {
@@ -169,7 +179,7 @@ impl FromFFI for types::MasternodeEntry {
                 ip_address: UInt128(*self.ip_address),
                 port: self.port,
             },
-            operator_public_key: UInt384(*self.operator_public_key),
+            operator_public_key: (*self.operator_public_key).decode(),
             previous_operator_public_keys: (0..self.previous_operator_public_keys_count)
                 .into_iter()
                 .fold(BTreeMap::new(), |mut acc, i| {
@@ -178,7 +188,10 @@ impl FromFFI for types::MasternodeEntry {
                         height: obj.block_height,
                         hash: UInt256(obj.block_hash),
                     };
-                    let value = UInt384(obj.key);
+                    let value = models::OperatorPublicKey {
+                        data: UInt384(obj.key),
+                        version: obj.version
+                    };
                     acc.insert(key, value);
                     acc
                 }),

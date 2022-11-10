@@ -152,7 +152,7 @@ impl ToFFI for models::MasternodeEntry {
         let key_id_voting = boxed(self.key_id_voting.0);
         let known_confirmed_at_height = self.known_confirmed_at_height.unwrap_or(0);
         let entry_hash = boxed(self.entry_hash.0);
-        let operator_public_key = boxed(self.operator_public_key.0);
+        let operator_public_key = boxed(self.operator_public_key.encode());
         let previous_operator_public_keys = boxed_vec(
             self.previous_operator_public_keys
                 .iter()
@@ -163,10 +163,11 @@ impl ToFFI for models::MasternodeEntry {
                             height: block_height,
                         },
                         &key,
-                    )| types::OperatorPublicKey {
+                    )| types::BlockOperatorPublicKey {
                         block_hash: hash.0,
                         block_height,
-                        key: key.0,
+                        key: key.data.0,
+                        version: key.version
                     },
                 )
                 .collect(),
@@ -174,19 +175,7 @@ impl ToFFI for models::MasternodeEntry {
         let previous_entry_hashes = boxed_vec(
             self.previous_entry_hashes
                 .iter()
-                .map(
-                    |(
-                        &common::Block {
-                            hash: block_hash,
-                            height: block_height,
-                        },
-                        &hash,
-                    )| types::MasternodeEntryHash {
-                        block_hash: block_hash.0,
-                        block_height,
-                        hash: hash.0,
-                    },
-                )
+                .map(|(&common::Block { hash: block_hash, height: block_height }, &hash)| types::MasternodeEntryHash { block_hash: block_hash.0, block_height, hash: hash.0 })
                 .collect(),
         );
         let previous_validity = boxed_vec(
@@ -284,66 +273,6 @@ impl ToFFI for models::LLMQEntry {
     }
 }
 
-// impl ToFFI for models::MNListDiff {
-//     type Item = types::MNListDiff;
-//
-//     fn encode(&self) -> Self::Item {
-//         let deleted_masternode_hashes_count = self.deleted_masternode_hashes.len();
-//         let deleted_quorums_vec = self.deleted_quorums.clone().into_iter().fold(
-//             Vec::new(),
-//             |mut acc, (llmq_type, hashes)| {
-//                 hashes.iter().for_each(|&hash| {
-//                     acc.push(boxed(types::LLMQTypedHash {
-//                         llmq_hash: boxed(hash.0),
-//                         llmq_type: llmq_type.into(),
-//                     }))
-//                 });
-//                 acc
-//             },
-//         );
-//         let added_quorums_vec =
-//             self.added_quorums
-//                 .clone()
-//                 .into_iter()
-//                 .fold(Vec::new(), |mut acc, (_, map)| {
-//                     map.iter()
-//                         .for_each(|(_, entry)| acc.push(boxed(entry.encode())));
-//                     acc
-//                 });
-//         Self::Item {
-//             base_block_hash: boxed(self.base_block_hash.0),
-//             block_hash: boxed(self.block_hash.0),
-//             total_transactions: self.total_transactions,
-//             merkle_hashes: boxed_vec(
-//                 (0..self.merkle_hashes.len())
-//                     .into_iter()
-//                     .map(|i| boxed(self.merkle_hashes[i].0))
-//                     .collect(),
-//             ),
-//             merkle_hashes_count: self.merkle_hashes.len(),
-//             merkle_flags: boxed_vec(self.merkle_flags.to_vec()),
-//             merkle_flags_count: self.merkle_flags.len(),
-//             coinbase_transaction: boxed(self.coinbase_transaction.encode()),
-//             deleted_masternode_hashes_count,
-//             deleted_masternode_hashes: boxed_vec(
-//                 (0..deleted_masternode_hashes_count)
-//                     .into_iter()
-//                     .map(|i| boxed(self.deleted_masternode_hashes[i].0))
-//                     .collect(),
-//             ),
-//             added_or_modified_masternodes_count: self.added_or_modified_masternodes.len(),
-//             added_or_modified_masternodes: encode_masternodes_map(
-//                 &self.added_or_modified_masternodes,
-//             ),
-//             deleted_quorums_count: deleted_quorums_vec.len(),
-//             deleted_quorums: boxed_vec(deleted_quorums_vec),
-//             added_quorums_count: added_quorums_vec.len(),
-//             added_quorums: boxed_vec(added_quorums_vec),
-//             base_block_height: self.base_block_height,
-//             block_height: self.block_height,
-//         }
-//     }
-// }
 impl ToFFI for models::LLMQSnapshot {
     type Item = types::LLMQSnapshot;
 
@@ -358,69 +287,13 @@ impl ToFFI for models::LLMQSnapshot {
     }
 }
 
-// impl ToFFI for models::LLMQRotationInfo {
-//     type Item = types::QRInfo;
-//
-//     fn encode(&self) -> Self::Item {
-//         let snapshot_at_h_c = boxed(self.snapshot_at_h_c.encode());
-//         let snapshot_at_h_2c = boxed(self.snapshot_at_h_2c.encode());
-//         let snapshot_at_h_3c = boxed(self.snapshot_at_h_3c.encode());
-//         let mn_list_diff_tip = boxed(self.mn_list_diff_tip.encode());
-//         let mn_list_diff_at_h = boxed(self.mn_list_diff_at_h.encode());
-//         let mn_list_diff_at_h_c = boxed(self.mn_list_diff_at_h_c.encode());
-//         let mn_list_diff_at_h_2c = boxed(self.mn_list_diff_at_h_2c.encode());
-//         let mn_list_diff_at_h_3c = boxed(self.mn_list_diff_at_h_3c.encode());
-//         let extra_share = self.extra_share;
-//         let (snapshot_at_h_4c, mn_list_diff_at_h_4c) = if extra_share {
-//             (
-//                 boxed(self.snapshot_at_h_4c.as_ref().unwrap().encode()),
-//                 boxed(self.mn_list_diff_at_h_4c.as_ref().unwrap().encode()),
-//             )
-//         } else {
-//             (null_mut(), null_mut())
-//         };
-//         let last_quorum_per_index_count = self.last_quorum_per_index.len();
-//         let last_quorum_per_index = boxed_vec(
-//             (0..last_quorum_per_index_count)
-//                 .into_iter()
-//                 .map(|i| boxed(self.last_quorum_per_index[i].encode()))
-//                 .collect(),
-//         );
-//         let quorum_snapshot_list_count = self.quorum_snapshot_list.len();
-//         let quorum_snapshot_list = boxed_vec(
-//             (0..quorum_snapshot_list_count)
-//                 .into_iter()
-//                 .map(|i| boxed(self.quorum_snapshot_list[i].encode()))
-//                 .collect(),
-//         );
-//         let mn_list_diff_list_count = self.mn_list_diff_list.len();
-//         let mn_list_diff_list = boxed_vec(
-//             (0..mn_list_diff_list_count)
-//                 .into_iter()
-//                 .map(|i| boxed(self.mn_list_diff_list[i].encode()))
-//                 .collect(),
-//         );
-//         Self::Item {
-//             snapshot_at_h_c,
-//             snapshot_at_h_2c,
-//             snapshot_at_h_3c,
-//             mn_list_diff_tip,
-//             mn_list_diff_at_h,
-//             mn_list_diff_at_h_c,
-//             mn_list_diff_at_h_2c,
-//             mn_list_diff_at_h_3c,
-//             extra_share,
-//             snapshot_at_h_4c,
-//             mn_list_diff_at_h_4c,
-//             last_quorum_per_index_count,
-//             last_quorum_per_index,
-//             quorum_snapshot_list_count,
-//             quorum_snapshot_list,
-//             mn_list_diff_list_count,
-//             mn_list_diff_list,
-//         }
-//     }
-// }
+impl ToFFI for models::OperatorPublicKey {
+    type Item = types::OperatorPublicKey;
+
+    fn encode(&self) -> Self::Item {
+        Self::Item { data: self.data.0, version: self.version }
+    }
+}
 
 impl ToFFI for common::Block {
     type Item = types::Block;

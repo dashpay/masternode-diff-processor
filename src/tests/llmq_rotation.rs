@@ -1494,8 +1494,6 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
         public_key,
         version
     } = *result;
-
-
     println!(
         "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {:?}",
         items,
@@ -1513,10 +1511,15 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
     let use_legacy = version.use_bls_legacy();
     let keys = (0..count)
         .into_iter()
-        .map(|i| if use_legacy {
-            G1Element::from_bytes_legacy(UInt384(*(*(items.add(i)))).as_bytes()).unwrap()
-        } else {
-            G1Element::from_bytes(UInt384(*(*(items.add(i)))).as_bytes()).unwrap()
+        .map(|i| {
+            let item = *(*(items.add(i)));
+            let key = UInt384(item.data);
+            let version = item.version;
+            if version < 2 {
+                G1Element::from_bytes_legacy(key.as_bytes()).unwrap()
+            } else {
+                G1Element::from_bytes(key.as_bytes()).unwrap()
+            }
         })
         .collect::<Vec<G1Element>>();
     let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys, use_legacy);

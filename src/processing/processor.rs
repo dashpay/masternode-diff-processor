@@ -904,7 +904,7 @@ impl MasternodeProcessor {
         if quorum.llmq_type == LLMQType::Llmqtype60_75 {
             has_valid_quorums &= true;
         } else {
-            let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
+            let operator_pks: Vec<*mut types::OperatorPublicKey> = (0..valid_masternodes.len())
                 .into_iter()
                 .filter_map(|i| {
                     match quorum
@@ -912,9 +912,7 @@ impl MasternodeProcessor {
                         .as_slice()
                         .bit_is_true_at_le_index(i as u32)
                     {
-                        true => Some(boxed(
-                            valid_masternodes[i].operator_public_key_at(block_height).0,
-                        )),
+                        true => Some(boxed(valid_masternodes[i].operator_public_key_at(block_height).encode())),
                         false => None,
                     }
                 })

@@ -12,6 +12,7 @@ use crate::crypto::var_array::VarArray;
 use crate::hashes::hex::FromHex;
 use crate::lib_tests::tests::message_from_file;
 use crate::models;
+use crate::models::OperatorPublicKey;
 use crate::tx::CoinbaseTransaction;
 use crate::util::base58;
 
@@ -113,6 +114,9 @@ pub struct Node {
     pub update_height: Option<u32>,
     #[serde(rename = "knownConfirmedAtHeight")]
     pub known_confirmed_at_height: Option<u32>,
+
+    #[serde(rename = "version")]
+    pub version: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -290,8 +294,13 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
             let socket_address = SocketAddress { ip_address: Default::default(), port: 0 };
             let voting_bytes = base58::from(node.voting_address.as_str()).unwrap();
             let key_id_voting = UInt160::from_bytes(&voting_bytes, &mut 0).unwrap();
-            let operator_public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
+            let public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
+            let version = node.version;
             let is_valid = node.is_valid;
+            let operator_public_key = OperatorPublicKey {
+                data: public_key,
+                version: version.unwrap_or(0)
+            };
             let mut masternode = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 });
             if let Some(update_height) = node.update_height {
                 masternode.update_height = update_height;
@@ -369,11 +378,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
     let merkle_flags_var_int: VarInt = VarInt::from_bytes(tree_bytes, offset).unwrap();
     let merkle_flags_count = merkle_flags_var_int.0 as usize;
     let merkle_flags: &[u8] = tree_bytes.read_with(offset, Bytes::Len(merkle_flags_count)).unwrap();
-    let version = if let Some(version) = diff.version {
-        Some(LLMQVersion::from(version))
-    } else {
-        None
-    };
+    let version = diff.version.unwrap_or(0);
 
     let deleted_masternode_hashes = diff.deleted_mns.iter().map(|s| UInt256::from_hex(s.as_str()).unwrap()).collect();
     let added_or_modified_masternodes = nodes_to_masternodes(diff.mn_list);

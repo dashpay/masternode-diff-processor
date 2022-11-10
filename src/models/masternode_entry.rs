@@ -7,6 +7,7 @@ use crate::crypto::byte_util::Zeroable;
 use crate::crypto::data_ops::short_hex_string_from;
 use crate::crypto::{UInt128, UInt160, UInt256, UInt384};
 use crate::hashes::{sha256, sha256d, Hash};
+use crate::models::OperatorPublicKey;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct MasternodeEntry {
@@ -14,8 +15,8 @@ pub struct MasternodeEntry {
     pub confirmed_hash: UInt256,
     pub confirmed_hash_hashed_with_provider_registration_transaction_hash: Option<UInt256>,
     pub socket_address: SocketAddress,
-    pub operator_public_key: UInt384,
-    pub previous_operator_public_keys: BTreeMap<Block, UInt384>,
+    pub operator_public_key: OperatorPublicKey,
+    pub previous_operator_public_keys: BTreeMap<Block, OperatorPublicKey>,
     pub previous_entry_hashes: BTreeMap<Block, UInt256>,
     pub previous_validity: BTreeMap<Block, bool>,
     pub known_confirmed_at_height: Option<u32>,
@@ -61,7 +62,7 @@ impl<'a> TryRead<'a, Endian> for MasternodeEntry {
                 confirmed_hash,
                 socket_address,
                 key_id_voting,
-                operator_public_key,
+                OperatorPublicKey { data: operator_public_key, version: 0 },
                 is_valid,
             ),
             *offset,
@@ -75,7 +76,7 @@ impl MasternodeEntry {
         confirmed_hash: UInt256,
         socket_address: SocketAddress,
         key_id_voting: UInt160,
-        operator_public_key: UInt384,
+        operator_public_key: OperatorPublicKey,
         is_valid: u8,
     ) -> Self {
         let entry_hash = MasternodeEntry::calculate_entry_hash(
@@ -109,7 +110,7 @@ impl MasternodeEntry {
         provider_registration_transaction_hash: UInt256,
         confirmed_hash: UInt256,
         socket_address: SocketAddress,
-        operator_public_key: UInt384,
+        operator_public_key: OperatorPublicKey,
         key_id_voting: UInt160,
         is_valid: u8,
     ) -> UInt256 {
@@ -129,7 +130,7 @@ impl MasternodeEntry {
             .swap_bytes()
             .consensus_encode(&mut buffer)
             .unwrap();
-        *offset += operator_public_key.consensus_encode(&mut buffer).unwrap();
+        *offset += operator_public_key.data.consensus_encode(&mut buffer).unwrap();
         *offset += key_id_voting.consensus_encode(&mut buffer).unwrap();
         *offset += is_valid.consensus_encode(&mut buffer).unwrap();
         UInt256(sha256d::Hash::hash(&buffer).into_inner())
@@ -223,7 +224,7 @@ impl MasternodeEntry {
         is_valid
     }
 
-    pub fn operator_public_key_at(&self, block_height: u32) -> UInt384 {
+    pub fn operator_public_key_at(&self, block_height: u32) -> OperatorPublicKey {
         if self.previous_operator_public_keys.is_empty() {
             return self.operator_public_key;
         }
@@ -302,5 +303,9 @@ impl MasternodeEntry {
         if !self.confirmed_hash.is_zero() && block_height != u32::MAX {
             self.known_confirmed_at_height = Some(block_height);
         }
+    }
+
+    pub fn update_with_bls_version(&mut self, version: u16) {
+        self.operator_public_key.version = version;
     }
 }
