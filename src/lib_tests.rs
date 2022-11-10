@@ -138,6 +138,7 @@ pub mod tests {
         message_arr: *const u8,
         message_length: usize,
         use_insight_as_backup: bool,
+        protocol_version: u32,
         genesis_hash: *const u8,
         processor: *mut MasternodeProcessor,
         cache: *mut MasternodeProcessorCache,
@@ -145,6 +146,7 @@ pub mod tests {
     ) -> MNListDiffResult {
         let processor = unsafe { &mut *processor };
         let cache = unsafe { &mut *cache };
+        let is_bls_basic = protocol_version >= 20225;
         println!(
             "process_mnlistdiff_from_message_internal.start: {:?}",
             std::time::Instant::now()
@@ -154,7 +156,7 @@ pub mod tests {
         processor.genesis_hash = genesis_hash;
         let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
         let list_diff =
-            unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
+            unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash), is_bls_basic));
         let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",
@@ -169,6 +171,7 @@ pub mod tests {
         message: *const u8,
         message_length: usize,
         use_insight_as_backup: bool,
+        protocol_version: u32,
         genesis_hash: *const u8,
         processor: *mut MasternodeProcessor,
         cache: *mut MasternodeProcessorCache,
@@ -185,9 +188,10 @@ pub mod tests {
             "process_qrinfo_from_message --: {:?} {:?} {:?}",
             processor, processor.opaque_context, cache
         );
+        let is_bls_basic = protocol_version >= 20225;
         let offset = &mut 0;
         let read_list_diff =
-            |offset: &mut usize| processor.read_list_diff_from_message(message, offset);
+            |offset: &mut usize| processor.read_list_diff_from_message(message, offset, is_bls_basic);
         let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
             processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, cache)
         };
@@ -673,6 +677,7 @@ pub mod tests {
             length,
             use_insight_as_backup,
             false,
+            20221,
             chain.genesis_hash().0.as_ptr(),
             processor,
             cache,

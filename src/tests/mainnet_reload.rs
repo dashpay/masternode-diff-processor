@@ -87,6 +87,7 @@ pub fn load_masternode_lists_for_files(
             bytes.len(),
             false,
             false,
+            20221,
             context.genesis_as_ptr(),
             processor,
             context.cache,

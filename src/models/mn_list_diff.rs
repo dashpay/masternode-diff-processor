@@ -1,6 +1,7 @@
 use byte::BytesExt;
 use hashes::hex::ToHex;
 use std::collections::BTreeMap;
+use crate::common::llmq_version::LLMQVersion;
 use crate::common::LLMQType;
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
@@ -23,6 +24,7 @@ pub struct MNListDiff {
     pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
     pub base_block_height: u32,
     pub block_height: u32,
+    pub version: Option<LLMQVersion>,
 }
 
 impl std::fmt::Debug for MNListDiff {
@@ -53,6 +55,7 @@ impl MNListDiff {
         message: &[u8],
         offset: &mut usize,
         block_height_lookup: F,
+        is_bls_basic: bool,
     ) -> Option<Self> {
         let base_block_hash = UInt256::from_bytes(message, offset)?;
         let block_hash = UInt256::from_bytes(message, offset)?;
@@ -66,6 +69,12 @@ impl MNListDiff {
             Err(_err) => { return None; },
         };
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
+        let version = if is_bls_basic {
+            LLMQVersion::from_bytes(message, offset)
+        } else {
+            None
+        };
+
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
         let mut deleted_masternode_hashes: Vec<UInt256> =
             Vec::with_capacity(deleted_masternode_count as usize);
@@ -127,6 +136,7 @@ impl MNListDiff {
             added_quorums,
             base_block_height,
             block_height,
+            version
         })
     }
 }

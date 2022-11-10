@@ -137,6 +137,8 @@ pub struct ListDiff {
     pub merkle_root_mnlist: String,
     #[serde(rename = "merkleRootQuorums")]
     pub merkle_root_quorums: String,
+    #[serde(rename = "version")]
+    pub version: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -352,7 +354,7 @@ fn vec_to_arr<T, const N: usize>(v: Vec<T>) -> [T; N] {
 }
 
 pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
-    diff: ListDiff, block_height_lookup: BHL) -> models::MNListDiff {
+    diff: ListDiff, block_height_lookup: BHL, is_bls_basic: bool) -> models::MNListDiff {
     let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reversed();
     let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reversed();
     let cb_tx_bytes = Vec::from_hex(diff.cb_tx.as_str()).unwrap();
@@ -367,6 +369,11 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
     let merkle_flags_var_int: VarInt = VarInt::from_bytes(tree_bytes, offset).unwrap();
     let merkle_flags_count = merkle_flags_var_int.0 as usize;
     let merkle_flags: &[u8] = tree_bytes.read_with(offset, Bytes::Len(merkle_flags_count)).unwrap();
+    let version = if let Some(version) = diff.version {
+        Some(LLMQVersion::from(version))
+    } else {
+        None
+    };
 
     let deleted_masternode_hashes = diff.deleted_mns.iter().map(|s| UInt256::from_hex(s.as_str()).unwrap()).collect();
     let added_or_modified_masternodes = nodes_to_masternodes(diff.mn_list);
@@ -386,6 +393,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
         deleted_quorums,
         added_quorums,
         base_block_height: block_height_lookup(base_block_hash),
-        block_height: block_height_lookup(block_hash)
+        block_height: block_height_lookup(block_hash),
+        version
     }
 }

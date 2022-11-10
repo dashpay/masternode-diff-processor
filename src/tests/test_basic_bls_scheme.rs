@@ -109,6 +109,7 @@ fn test_basic_bls_scheme() {
         bytes.len(),
         false,
         true,
+        20225,
         genesis.0.as_ptr(),
         processor,
         cache,
