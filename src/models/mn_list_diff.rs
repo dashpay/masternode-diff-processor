@@ -48,6 +48,7 @@ impl std::fmt::Debug for MNListDiff {
             .field("added_quorums", &self.added_quorums)
             .field("base_block_height", &self.base_block_height)
             .field("block_height", &self.block_height)
+            .field("version", &self.version)
             .finish()
     }
 }
