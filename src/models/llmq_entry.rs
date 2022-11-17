@@ -2,6 +2,7 @@ use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, TryRead, LE};
 use hashes::hex::ToHex;
 use std::convert::Into;
+use crate::common::llmq_version::LLMQVersion;
 use crate::common::LLMQType;
 use crate::consensus::encode::VarInt;
 use crate::consensus::{Encodable, WriteExt};
@@ -9,12 +10,9 @@ use crate::crypto::data_ops::Data;
 use crate::crypto::{UInt256, UInt384, UInt768};
 use crate::hashes::{sha256d, Hash};
 
-pub const LLMQ_DEFAULT_VERSION: u16 = 1;
-pub const LLMQ_INDEXED_VERSION: u16 = 2;
-
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
 pub struct LLMQEntry {
-    pub version: u16,
+    pub version: LLMQVersion,
     pub llmq_hash: UInt256,
     pub index: Option<u16>,
     pub public_key: UInt384,
@@ -58,10 +56,11 @@ impl std::fmt::Debug for LLMQEntry {
 impl<'a> TryRead<'a, Endian> for LLMQEntry {
     fn try_read(bytes: &'a [u8], _ctx: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
-        let version = bytes.read_with::<u16>(offset, LE)?;
+        let version = bytes.read_with::<LLMQVersion>(offset, LE)?;
         let llmq_type = bytes.read_with::<LLMQType>(offset, LE)?;
         let llmq_hash = bytes.read_with::<UInt256>(offset, LE)?;
-        let index = if version >= LLMQ_INDEXED_VERSION {
+
+        let index = if version.use_rotated_quorums() {
             Some(bytes.read_with::<u16>(offset, LE)?)
         } else {
             None
@@ -98,7 +97,7 @@ impl<'a> TryRead<'a, Endian> for LLMQEntry {
 impl LLMQEntry {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        version: u16,
+        version: LLMQVersion,
         llmq_type: LLMQType,
         llmq_hash: UInt256,
         index: Option<u16>,
@@ -149,7 +148,7 @@ impl LLMQEntry {
 
     #[allow(clippy::too_many_arguments)]
     pub fn generate_data(
-        version: u16,
+        version: LLMQVersion,
         llmq_type: LLMQType,
         llmq_hash: UInt256,
         llmq_index: Option<u16>,
@@ -165,7 +164,8 @@ impl LLMQEntry {
         let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = llmq_type.into();
-        *offset += version.consensus_encode(&mut buffer).unwrap();
+        let llmq_v: u16 = version.into();
+        *offset += llmq_v.consensus_encode(&mut buffer).unwrap();
         *offset += llmq_u8.consensus_encode(&mut buffer).unwrap();
         *offset += llmq_hash.consensus_encode(&mut buffer).unwrap();
         if let Some(index) = llmq_index {

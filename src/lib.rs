@@ -220,6 +220,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     message_length: usize,
     use_insight_as_backup: bool,
     is_from_snapshot: bool,
+    protocol_version: u32,
     genesis_hash: *const u8,
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
@@ -233,8 +234,9 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
     let message: &[u8] = slice::from_raw_parts(message_arr, message_length as usize);
+    let is_bls_basic = protocol_version >= 20225;
     let list_diff = unwrap_or_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor
-        .lookup_block_height_by_hash(hash)));
+        .lookup_block_height_by_hash(hash), is_bls_basic));
     if !is_from_snapshot {
         let error = processor
             .should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
@@ -260,6 +262,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     message_length: usize,
     use_insight_as_backup: bool,
     is_from_snapshot: bool,
+    protocol_version: u32,
     genesis_hash: *const u8,
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
@@ -273,12 +276,13 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
     println!( "process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
+    let is_bls_basic = protocol_version >= 20225;
     let offset = &mut 0;
     let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
         processor.get_list_diff_result_with_base_lookup(list_diff, should_process_quorums, cache)
     };
     let read_list_diff =
-        |offset: &mut usize| processor.read_list_diff_from_message(message, offset);
+        |offset: &mut usize| processor.read_list_diff_from_message(message, offset, is_bls_basic);
     let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
     let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
     let mut get_list_diff_result =

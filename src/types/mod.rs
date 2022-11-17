@@ -34,6 +34,7 @@ pub use self::masternode_entry_hash::MasternodeEntryHash;
 pub use self::masternode_list::MasternodeList;
 pub use self::mn_list_diff::MNListDiff;
 pub use self::mn_list_diff_result::MNListDiffResult;
+pub use self::operator_public_key::BlockOperatorPublicKey;
 pub use self::operator_public_key::OperatorPublicKey;
 pub use self::qr_info::QRInfo;
 pub use self::qr_info_result::QRInfoResult;

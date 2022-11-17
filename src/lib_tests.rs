@@ -96,6 +96,7 @@ pub mod tests {
 
     pub struct AggregationInfo {
         pub public_key: UInt384,
+        pub version: u16,
         pub digest: UInt256,
     }
     pub fn get_block_from_insight_by_hash(hash: UInt256) -> Option<MerkleBlock> {
@@ -138,6 +139,7 @@ pub mod tests {
         message_arr: *const u8,
         message_length: usize,
         use_insight_as_backup: bool,
+        protocol_version: u32,
         genesis_hash: *const u8,
         processor: *mut MasternodeProcessor,
         cache: *mut MasternodeProcessorCache,
@@ -145,6 +147,7 @@ pub mod tests {
     ) -> MNListDiffResult {
         let processor = unsafe { &mut *processor };
         let cache = unsafe { &mut *cache };
+        let is_bls_basic = protocol_version >= 20225;
         println!(
             "process_mnlistdiff_from_message_internal.start: {:?}",
             std::time::Instant::now()
@@ -154,7 +157,7 @@ pub mod tests {
         processor.genesis_hash = genesis_hash;
         let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
         let list_diff =
-            unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash)));
+            unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash), is_bls_basic));
         let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",
@@ -169,6 +172,7 @@ pub mod tests {
         message: *const u8,
         message_length: usize,
         use_insight_as_backup: bool,
+        protocol_version: u32,
         genesis_hash: *const u8,
         processor: *mut MasternodeProcessor,
         cache: *mut MasternodeProcessorCache,
@@ -185,9 +189,10 @@ pub mod tests {
             "process_qrinfo_from_message --: {:?} {:?} {:?}",
             processor, processor.opaque_context, cache
         );
+        let is_bls_basic = protocol_version >= 20225;
         let offset = &mut 0;
         let read_list_diff =
-            |offset: &mut usize| processor.read_list_diff_from_message(message, offset);
+            |offset: &mut usize| processor.read_list_diff_from_message(message, offset, is_bls_basic);
         let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
             processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, cache)
         };
@@ -398,6 +403,7 @@ pub mod tests {
     ) -> *mut types::MasternodeList {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
+        println!("get_masternode_list_by_block_hash_from_cache: {}", h);
         if let Some(list) = data.cache.mn_lists.get(&h) {
             println!("get_masternode_list_by_block_hash_from_cache: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
             let encoded = list.encode();
@@ -537,15 +543,17 @@ pub mod tests {
             all_commitment_aggregated_signature,
             threshold_signature,
             public_key,
+            version
         } = *result;
         println!(
-            "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}",
+            "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {:?}",
             items,
             count,
             commitment_hash,
             all_commitment_aggregated_signature,
             threshold_signature,
-            public_key
+            public_key,
+            version
         );
 
         let all_commitment_aggregated_signature = UInt768(*all_commitment_aggregated_signature);
@@ -555,12 +563,15 @@ pub mod tests {
 
         let infos = (0..count)
             .into_iter()
-            .map(|i| AggregationInfo {
-                public_key: UInt384(*(*(items.add(i)))),
-                digest: commitment_hash,
+            .map(|i| {
+                let item = *(*items.add(i));
+                AggregationInfo {
+                    public_key: UInt384(item.data),
+                    version: item.version,
+                    digest: commitment_hash,
+                }
             })
             .collect::<Vec<AggregationInfo>>();
-
         true
     }
 
@@ -670,6 +681,7 @@ pub mod tests {
             length,
             use_insight_as_backup,
             false,
+            20221,
             chain.genesis_hash().0.as_ptr(),
             processor,
             cache,

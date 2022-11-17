@@ -4,6 +4,7 @@ use byte::BytesExt;
 use byte::ctx::Bytes;
 use serde::{Deserialize, Serialize};
 use crate::common::{LLMQSnapshotSkipMode, LLMQType, SocketAddress};
+use crate::common::llmq_version::LLMQVersion;
 use crate::consensus::encode::VarInt;
 use crate::crypto::{UInt160, UInt256, UInt384, UInt768, VarBytes};
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
@@ -11,6 +12,7 @@ use crate::crypto::var_array::VarArray;
 use crate::hashes::hex::FromHex;
 use crate::lib_tests::tests::message_from_file;
 use crate::models;
+use crate::models::OperatorPublicKey;
 use crate::tx::CoinbaseTransaction;
 use crate::util::base58;
 
@@ -112,6 +114,9 @@ pub struct Node {
     pub update_height: Option<u32>,
     #[serde(rename = "knownConfirmedAtHeight")]
     pub known_confirmed_at_height: Option<u32>,
+
+    #[serde(rename = "version")]
+    pub version: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -136,6 +141,8 @@ pub struct ListDiff {
     pub merkle_root_mnlist: String,
     #[serde(rename = "merkleRootQuorums")]
     pub merkle_root_quorums: String,
+    #[serde(rename = "version")]
+    pub version: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -211,7 +218,7 @@ pub fn quorums_to_quorums(value: Vec<Llmq>) -> BTreeMap<LLMQType, BTreeMap<UInt2
     let mut quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>> = BTreeMap::new();
     value.into_iter()/*.filter(|llmq| LLMQType::from(llmq.llmq_type as u8) == LLMQType::Llmqtype60_75)*/.for_each(|llmq| {
         let entry = models::LLMQEntry::new(
-            llmq.version as u16,
+            LLMQVersion::from(llmq.version as u16),
             LLMQType::from(llmq.llmq_type as u8),
             block_hash_to_block_hash(llmq.quorum_hash),
             Some(llmq.quorum_index as u16),
@@ -287,8 +294,13 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
             let socket_address = SocketAddress { ip_address: Default::default(), port: 0 };
             let voting_bytes = base58::from(node.voting_address.as_str()).unwrap();
             let key_id_voting = UInt160::from_bytes(&voting_bytes, &mut 0).unwrap();
-            let operator_public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
+            let public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
+            let version = node.version;
             let is_valid = node.is_valid;
+            let operator_public_key = OperatorPublicKey {
+                data: public_key,
+                version: version.unwrap_or(0)
+            };
             let mut masternode = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 });
             if let Some(update_height) = node.update_height {
                 masternode.update_height = update_height;
@@ -351,7 +363,7 @@ fn vec_to_arr<T, const N: usize>(v: Vec<T>) -> [T; N] {
 }
 
 pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
-    diff: ListDiff, block_height_lookup: BHL) -> models::MNListDiff {
+    diff: ListDiff, block_height_lookup: BHL, is_bls_basic: bool) -> models::MNListDiff {
     let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reversed();
     let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reversed();
     let cb_tx_bytes = Vec::from_hex(diff.cb_tx.as_str()).unwrap();
@@ -366,6 +378,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
     let merkle_flags_var_int: VarInt = VarInt::from_bytes(tree_bytes, offset).unwrap();
     let merkle_flags_count = merkle_flags_var_int.0 as usize;
     let merkle_flags: &[u8] = tree_bytes.read_with(offset, Bytes::Len(merkle_flags_count)).unwrap();
+    let version = diff.version.unwrap_or(0);
 
     let deleted_masternode_hashes = diff.deleted_mns.iter().map(|s| UInt256::from_hex(s.as_str()).unwrap()).collect();
     let added_or_modified_masternodes = nodes_to_masternodes(diff.mn_list);
@@ -385,6 +398,7 @@ pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
         deleted_quorums,
         added_quorums,
         base_block_height: block_height_lookup(base_block_hash),
-        block_height: block_height_lookup(block_hash)
+        block_height: block_height_lookup(block_hash),
+        version
     }
 }

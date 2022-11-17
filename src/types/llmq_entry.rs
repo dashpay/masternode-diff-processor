@@ -2,10 +2,10 @@ use byte::ctx::{Bytes, Endian};
 use byte::{BytesExt, TryRead, LE};
 use std::ptr::null_mut;
 use crate::common::llmq_type::LLMQType;
+use crate::common::llmq_version::LLMQVersion;
 use crate::consensus;
 use crate::crypto::byte_util::{UInt256, UInt384, UInt768};
 use crate::ffi::boxer::{boxed, boxed_vec};
-use crate::models::llmq_entry::LLMQ_INDEXED_VERSION;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -28,18 +28,19 @@ pub struct LLMQEntry {
     pub valid_members_bitset_length: usize,
     pub valid_members_count: u64,
     pub verified: bool,
-    pub version: u16,
+    pub version: LLMQVersion,
 }
 impl<'a> TryRead<'a, Endian> for LLMQEntry {
     fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {
         let length = bytes.len();
         let offset = &mut 0;
-        let version = bytes.read_with::<u16>(offset, LE)?;
+        let version = bytes.read_with::<LLMQVersion>(offset, LE)?;
         let llmq_type = bytes.read_with::<u8>(offset, LE)?;
         let llmq_hash = boxed(bytes.read_with::<UInt256>(offset, LE)?.0);
-        let index = match version {
-            LLMQ_INDEXED_VERSION => bytes.read_with::<u16>(offset, LE)?,
-            _ => 0,
+        let index = if version.use_rotated_quorums() {
+            bytes.read_with::<u16>(offset, LE)?
+        } else {
+            0
         };
         let signers_count =
             bytes.read_with::<consensus::encode::VarInt>(offset, LE)?;

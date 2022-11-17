@@ -16,8 +16,6 @@ pub struct MNListDiff {
     pub total_transactions: u32,
     pub merkle_hashes: Vec<UInt256>,
     pub merkle_flags: Vec<u8>,
-    // pub merkle_flags: &'a [u8],
-    // pub merkle_flags_count: usize,
     pub coinbase_transaction: CoinbaseTransaction,
     pub deleted_masternode_hashes: Vec<UInt256>,
     pub added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry>,
@@ -25,6 +23,10 @@ pub struct MNListDiff {
     pub added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, LLMQEntry>>,
     pub base_block_height: u32,
     pub block_height: u32,
+    // 0: protocol_version < 20225
+    // 1: all pubKeyOperator of all CSimplifiedMNListEntry are serialised using legacy BLS scheme
+    // 2: all pubKeyOperator of all CSimplifiedMNListEntry are serialised using basic BLS scheme
+    pub version: u16,
 }
 
 impl std::fmt::Debug for MNListDiff {
@@ -46,6 +48,7 @@ impl std::fmt::Debug for MNListDiff {
             .field("added_quorums", &self.added_quorums)
             .field("base_block_height", &self.base_block_height)
             .field("block_height", &self.block_height)
+            .field("version", &self.version)
             .finish()
     }
 }
@@ -55,6 +58,7 @@ impl MNListDiff {
         message: &[u8],
         offset: &mut usize,
         block_height_lookup: F,
+        is_bls_basic: bool,
     ) -> Option<Self> {
         let base_block_hash = UInt256::from_bytes(message, offset)?;
         let block_hash = UInt256::from_bytes(message, offset)?;
@@ -68,6 +72,11 @@ impl MNListDiff {
             Err(_err) => { return None; },
         };
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
+        let version = if is_bls_basic {
+            u16::from_bytes(message, offset)?
+        } else {
+            0
+        };
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
         let mut deleted_masternode_hashes: Vec<UInt256> =
             Vec::with_capacity(deleted_masternode_count as usize);
@@ -82,6 +91,7 @@ impl MNListDiff {
                 // assert_eq!(message.len(), MN_ENTRY_PAYLOAD_LENGTH);
                 let mut entry = MasternodeEntry::from_bytes(message, offset)?;
                 entry.update_with_block_height(block_height);
+                entry.update_with_bls_version(version);
                 Some(entry)
             })
             .fold(BTreeMap::new(), |mut acc, entry| {
@@ -129,6 +139,7 @@ impl MNListDiff {
             added_quorums,
             base_block_height,
             block_height,
+            version
         })
     }
 }

@@ -23,11 +23,11 @@ pub fn test_from_snapshot() {
     let quorum_snapshot_h_c = snapshot_to_snapshot(qrinfo.quorum_snapshot_at_hminus_c);
     let quorum_snapshot_h_2c = snapshot_to_snapshot(qrinfo.quorum_snapshot_at_hminus2c);
     let quorum_snapshot_h_3c = snapshot_to_snapshot(qrinfo.quorum_snapshot_at_hminus3c);
-    let mn_list_diff_tip = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_tip, block_height_lookup);
-    let mn_list_diff_h = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_h, block_height_lookup);
-    let mn_list_diff_h_c = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_at_hminus_c, block_height_lookup);
-    let mn_list_diff_h_2c = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_at_hminus2c, block_height_lookup);
-    let mn_list_diff_h_3c = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_at_hminus3c, block_height_lookup);
+    let mn_list_diff_tip = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_tip, block_height_lookup, false);
+    let mn_list_diff_h = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_h, block_height_lookup, false);
+    let mn_list_diff_h_c = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_at_hminus_c, block_height_lookup, false);
+    let mn_list_diff_h_2c = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_at_hminus2c, block_height_lookup, false);
+    let mn_list_diff_h_3c = masternode_list_from_genesis_diff(qrinfo.mn_list_diff_at_hminus3c, block_height_lookup, false);
     let processor = unsafe { &mut *register_processor(
         get_merkle_root_by_hash_default,
         get_block_height_by_hash_from_context,

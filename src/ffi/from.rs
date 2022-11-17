@@ -4,7 +4,6 @@ use crate::{common, encode, models, tx, types};
 use crate::crypto::{UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::crypto::byte_util::Reversable;
 use crate::ffi::to::ToFFI;
-use crate::models::llmq_entry::LLMQ_DEFAULT_VERSION;
 use crate::tx::transaction;
 
 pub trait FromFFI {
@@ -12,6 +11,7 @@ pub trait FromFFI {
     /// # Safety
     unsafe fn decode(&self) -> Self::Item;
 }
+
 impl FromFFI for types::TransactionInput {
     type Item = transaction::TransactionInput;
 
@@ -53,6 +53,7 @@ impl FromFFI for types::TransactionOutput {
         }
     }
 }
+
 impl FromFFI for types::Transaction {
     type Item = tx::Transaction;
 
@@ -79,6 +80,7 @@ impl FromFFI for types::Transaction {
         }
     }
 }
+
 impl FromFFI for types::CoinbaseTransaction {
     type Item = tx::CoinbaseTransaction;
 
@@ -148,6 +150,16 @@ impl FromFFI for types::MasternodeList {
     }
 }
 
+impl FromFFI for types::OperatorPublicKey {
+    type Item = models::OperatorPublicKey;
+    unsafe fn decode(&self) -> Self::Item {
+        Self::Item {
+            data: UInt384(self.data),
+            version: self.version
+        }
+    }
+}
+
 impl FromFFI for types::MasternodeEntry {
     type Item = models::MasternodeEntry;
     unsafe fn decode(&self) -> Self::Item {
@@ -170,7 +182,7 @@ impl FromFFI for types::MasternodeEntry {
                 ip_address: UInt128(*self.ip_address),
                 port: self.port,
             },
-            operator_public_key: UInt384(*self.operator_public_key),
+            operator_public_key: (*self.operator_public_key).decode(),
             previous_operator_public_keys: (0..self.previous_operator_public_keys_count)
                 .into_iter()
                 .fold(BTreeMap::new(), |mut acc, i| {
@@ -179,7 +191,10 @@ impl FromFFI for types::MasternodeEntry {
                         height: obj.block_height,
                         hash: UInt256(obj.block_hash),
                     };
-                    let value = UInt384(obj.key);
+                    let value = models::OperatorPublicKey {
+                        data: UInt384(obj.key),
+                        version: obj.version
+                    };
                     acc.insert(key, value);
                     acc
                 }),
@@ -237,11 +252,7 @@ impl FromFFI for types::LLMQEntry {
         Self::Item {
             version: self.version,
             llmq_hash: UInt256(*self.llmq_hash),
-            index: if self.version == LLMQ_DEFAULT_VERSION {
-                None
-            } else {
-                Some(self.index)
-            },
+            index: if self.version.use_rotated_quorums() { Some(self.index) } else { None },
             public_key: UInt384(*self.public_key),
             threshold_signature: UInt768(*self.threshold_signature),
             verification_vector_hash: UInt256(*self.verification_vector_hash),
@@ -263,61 +274,6 @@ impl FromFFI for types::LLMQEntry {
     }
 }
 
-impl FromFFI for types::MNListDiff {
-    type Item = models::MNListDiff;
-
-    unsafe fn decode(&self) -> Self::Item {
-        Self::Item {
-            base_block_hash: UInt256(*self.base_block_hash),
-            block_hash: UInt256(*self.block_hash),
-            total_transactions: self.total_transactions,
-            merkle_hashes: (0..self.merkle_hashes_count)
-                .into_iter()
-                .map(|i| UInt256(*(*self.merkle_hashes.add(i))))
-                .collect(),
-            merkle_flags: slice::from_raw_parts(self.merkle_flags, self.merkle_flags_count).to_vec(),
-            coinbase_transaction: (*self.coinbase_transaction).decode(),
-            deleted_masternode_hashes: (0..self.deleted_masternode_hashes_count)
-                .into_iter()
-                .map(|i| UInt256(*(*self.deleted_masternode_hashes.add(i))))
-                .collect(),
-            added_or_modified_masternodes: (0..self.added_or_modified_masternodes_count)
-                .into_iter()
-                .fold(BTreeMap::new(), |mut acc, i| {
-                    let value =
-                        (*(*self.added_or_modified_masternodes.add(i))).decode();
-                    let key = value
-                        .provider_registration_transaction_hash
-                        .clone()
-                        .reversed();
-                    acc.insert(key, value);
-                    acc
-                }),
-            deleted_quorums: (0..self.deleted_quorums_count).into_iter().fold(
-                BTreeMap::new(),
-                |mut acc, i| {
-                    let obj = *(*self.deleted_quorums.add(i));
-                    acc.entry(common::LLMQType::from(obj.llmq_type))
-                        .or_insert_with(Vec::new)
-                        .push(UInt256(*obj.llmq_hash));
-                    acc
-                },
-            ),
-            added_quorums: (0..self.added_quorums_count).into_iter().fold(
-                BTreeMap::new(),
-                |mut acc, i| {
-                    let entry = (*(*self.added_quorums.add(i))).decode();
-                    acc.entry(entry.llmq_type)
-                        .or_insert_with(BTreeMap::new)
-                        .insert(entry.llmq_hash, entry);
-                    acc
-                },
-            ),
-            base_block_height: self.base_block_height,
-            block_height: self.block_height,
-        }
-    }
-}
 impl FromFFI for types::LLMQSnapshot {
     type Item = models::LLMQSnapshot;
 
@@ -326,47 +282,6 @@ impl FromFFI for types::LLMQSnapshot {
             member_list: slice::from_raw_parts(self.member_list, self.member_list_length).to_vec(),
             skip_list: slice::from_raw_parts::<i32>(self.skip_list, self.skip_list_length).to_vec(),
             skip_list_mode: self.skip_list_mode,
-        }
-    }
-}
-
-impl FromFFI for types::QRInfo {
-    type Item = models::LLMQRotationInfo;
-
-    unsafe fn decode(&self) -> Self::Item {
-        let extra_share = self.extra_share;
-        let (snapshot_at_h_4c, mn_list_diff_at_h_4c) = if extra_share {
-            (
-                Some((*self.snapshot_at_h_4c).decode()),
-                Some((*self.mn_list_diff_at_h_4c).decode()),
-            )
-        } else {
-            (None, None)
-        };
-        Self::Item {
-            snapshot_at_h_c: (*self.snapshot_at_h_c).decode(),
-            snapshot_at_h_2c: (*self.snapshot_at_h_2c).decode(),
-            snapshot_at_h_3c: (*self.snapshot_at_h_3c).decode(),
-            mn_list_diff_tip: (*self.mn_list_diff_tip).decode(),
-            mn_list_diff_at_h: (*self.mn_list_diff_at_h).decode(),
-            mn_list_diff_at_h_c: (*self.mn_list_diff_at_h_c).decode(),
-            mn_list_diff_at_h_2c: (*self.mn_list_diff_at_h_2c).decode(),
-            mn_list_diff_at_h_3c: (*self.mn_list_diff_at_h_3c).decode(),
-            extra_share,
-            snapshot_at_h_4c,
-            mn_list_diff_at_h_4c,
-            last_quorum_per_index: (0..self.last_quorum_per_index_count)
-                .into_iter()
-                .map(|i| (*(*self.last_quorum_per_index.add(i))).decode())
-                .collect(),
-            quorum_snapshot_list: (0..self.quorum_snapshot_list_count)
-                .into_iter()
-                .map(|i| (*(*self.quorum_snapshot_list.add(i))).decode())
-                .collect(),
-            mn_list_diff_list: (0..self.mn_list_diff_list_count)
-                .into_iter()
-                .map(|i| (*(*self.mn_list_diff_list.add(i))).decode())
-                .collect(),
         }
     }
 }

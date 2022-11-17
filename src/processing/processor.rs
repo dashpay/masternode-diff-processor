@@ -904,7 +904,7 @@ impl MasternodeProcessor {
         if quorum.llmq_type == LLMQType::Llmqtype60_75 {
             has_valid_quorums &= true;
         } else {
-            let operator_pks: Vec<*mut [u8; 48]> = (0..valid_masternodes.len())
+            let operator_pks: Vec<*mut types::OperatorPublicKey> = (0..valid_masternodes.len())
                 .into_iter()
                 .filter_map(|i| {
                     match quorum
@@ -912,9 +912,7 @@ impl MasternodeProcessor {
                         .as_slice()
                         .bit_is_true_at_le_index(i as u32)
                     {
-                        true => Some(boxed(
-                            valid_masternodes[i].operator_public_key_at(block_height).0,
-                        )),
+                        true => Some(boxed(valid_masternodes[i].operator_public_key_at(block_height).encode())),
                         false => None,
                     }
                 })
@@ -926,11 +924,10 @@ impl MasternodeProcessor {
                         items: boxed_vec(operator_pks),
                         count: operator_public_keys_count,
                         commitment_hash: boxed(quorum.generate_commitment_hash().0),
-                        all_commitment_aggregated_signature: boxed(
-                            quorum.all_commitment_aggregated_signature.0,
-                        ),
+                        all_commitment_aggregated_signature: boxed(quorum.all_commitment_aggregated_signature.0),
                         threshold_signature: boxed(quorum.threshold_signature.0),
                         public_key: boxed(quorum.public_key.0),
+                        version: quorum.version
                     }),
                     self.opaque_context,
                 )
@@ -948,7 +945,8 @@ impl MasternodeProcessor {
         &self,
         message: &'a [u8],
         offset: &mut usize,
+        is_bls_basic: bool
     ) -> Option<models::MNListDiff> {
-        models::MNListDiff::new(message, offset, |hash| self.lookup_block_height_by_hash(hash))
+        models::MNListDiff::new(message, offset, |hash| self.lookup_block_height_by_hash(hash), is_bls_basic)
     }
 }

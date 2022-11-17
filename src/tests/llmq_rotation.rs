@@ -48,6 +48,7 @@ fn test_llmq_rotation() {
         bytes.len(),
         use_insight_as_backup,
         false,
+        20221,
         chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
@@ -110,6 +111,7 @@ fn test_llmq_rotation_2() {
         bytes.len(),
         use_insight_as_backup,
         false,
+        20221,
         chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
@@ -492,6 +494,7 @@ fn test_devnet_333() {
         bytes.len(),
         false,
         false,
+        20221,
         chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
@@ -536,6 +539,7 @@ fn test_processor_devnet_333() {
         // merkle_root: UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap().0.as_ptr(),
         false,
         false,
+        20221,
         chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
@@ -757,6 +761,7 @@ fn test_processor_devnet_333_2() {
         mnldiff_bytes.as_ptr(),
         mnldiff_bytes.len(),
         false,
+        20221,
         chain.genesis_hash().0.as_ptr(),
         processor,
         context.cache,
@@ -769,6 +774,7 @@ fn test_processor_devnet_333_2() {
         bytes.as_ptr(),
         bytes.len(),
         false,
+        20221,
         chain.genesis_hash().0.as_ptr(),
         processor,
         context.cache,
@@ -1465,6 +1471,7 @@ fn test_jack_daniels() {
         qrinfo_bytes.as_ptr(),
         qrinfo_bytes.len(),
         false,
+        20221,
         genesis.0.as_ptr(),
         processor,
         cache,
@@ -1485,35 +1492,44 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
         all_commitment_aggregated_signature,
         threshold_signature,
         public_key,
+        version
     } = *result;
-
-
     println!(
-        "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}",
+        "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {:?}",
         items,
         count,
         commitment_hash,
         all_commitment_aggregated_signature,
         threshold_signature,
-        public_key
+        public_key,
+        version
     );
     let all_commitment_aggregated_signature = UInt768(*all_commitment_aggregated_signature);
     let threshold_signature = UInt768(*threshold_signature);
     let public_key = UInt384(*public_key);
     let commitment_hash = UInt256(*commitment_hash);
+    let use_legacy = version.use_bls_legacy();
     let keys = (0..count)
         .into_iter()
-        .map(|i| G1Element::from_bytes_legacy(UInt384(*(*(items.add(i)))).as_bytes()).unwrap())
+        .map(|i| {
+            let item = *(*(items.add(i)));
+            let key = UInt384(item.data);
+            let version = item.version;
+            if version < 2 {
+                G1Element::from_bytes_legacy(key.as_bytes()).unwrap()
+            } else {
+                G1Element::from_bytes(key.as_bytes()).unwrap()
+            }
+        })
         .collect::<Vec<G1Element>>();
-
-    let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys);
+    let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys, use_legacy);
     if !all_commitment_aggregated_signature_validated {
         println!("••• Issue with all_commitment_aggregated_signature_validated: {}", all_commitment_aggregated_signature);
         return false;
     }
     // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
     // This is an aggregated BLS signature verification.
-    let quorum_signature_validated = verify_quorum_signature(commitment_hash, threshold_signature, public_key);
+    let quorum_signature_validated = verify_quorum_signature(commitment_hash, threshold_signature, public_key, use_legacy);
     if !quorum_signature_validated {
         println!("••• Issue with quorum_signature_validated");
         return false;
@@ -1522,25 +1538,32 @@ pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
     true
 }
 
-fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>) -> bool {
-    let scheme = bls_signatures::LegacySchemeMPL::new();
-    let bls_signature = match G2Element::from_bytes(signature.as_bytes()) {
+fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>, use_legacy: bool) -> bool {
+    let bls_signature = match if use_legacy {
+        G2Element::from_bytes_legacy(signature.as_bytes())
+    } else {
+        G2Element::from_bytes(signature.as_bytes())
+    } {
         Ok(signature) => signature,
         Err(err) => {
-            println!("verify_secure_aggregated: error: {}", err);
+            println!("verify_secure_aggregated (legacy = {}): error: {}", use_legacy, err);
             return false;
         }
     };
     let keys = public_keys.iter().collect::<Vec<&G1Element>>();
-    let is_verified = scheme.verify_secure(keys, message_digest.as_bytes(), &bls_signature);
-    is_verified
+    if use_legacy {
+        bls_signatures::LegacySchemeMPL::new().verify_secure(keys, message_digest.as_bytes(), &bls_signature)
+    } else {
+        bls_signatures::BasicSchemeMPL::new().verify_secure(keys, message_digest.as_bytes(), &bls_signature)
+    }
 }
 
-fn verify_quorum_signature(message_digest: UInt256, threshold_signature: UInt768, public_key: UInt384) -> bool {
-    let scheme = bls_signatures::LegacySchemeMPL::new();
-    let bls_public_key = G1Element::from_bytes_legacy(public_key.as_bytes()).unwrap();
-    let bls_signature = G2Element::from_bytes_legacy(threshold_signature.as_bytes()).unwrap();
-    scheme.verify(&bls_public_key, message_digest.as_bytes(), &bls_signature)
+fn verify_quorum_signature(message_digest: UInt256, threshold_signature: UInt768, public_key: UInt384, use_legacy: bool) -> bool {
+    if use_legacy {
+        bls_signatures::LegacySchemeMPL::new().verify(&G1Element::from_bytes_legacy(public_key.as_bytes()).unwrap(), message_digest.as_bytes(), &G2Element::from_bytes_legacy(threshold_signature.as_bytes()).unwrap())
+    } else {
+        bls_signatures::BasicSchemeMPL::new().verify(&G1Element::from_bytes(public_key.as_bytes()).unwrap(), message_digest.as_bytes(), &G2Element::from_bytes(threshold_signature.as_bytes()).unwrap())
+    }
 }
 
 unsafe extern "C" fn block_height_lookup_jack_daniels(
