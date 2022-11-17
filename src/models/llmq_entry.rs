@@ -10,10 +10,6 @@ use crate::crypto::data_ops::Data;
 use crate::crypto::{UInt256, UInt384, UInt768};
 use crate::hashes::{sha256d, Hash};
 
-// pub const LLMQ_DEFAULT_VERSION: u16 = 1;
-// pub const LLMQ_INDEXED_VERSION: u16 = 2;
-// pub const LLMQ_BLS_BASIC_VERSION: u16 = 3;
-
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
 pub struct LLMQEntry {
     pub version: LLMQVersion,
