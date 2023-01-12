@@ -100,6 +100,7 @@ impl ToFFI for tx::CoinbaseTransaction {
             } else {
                 boxed(self.merkle_root_llmq_list.unwrap().0)
             },
+            locked_amount: self.locked_amount
         }
     }
 }

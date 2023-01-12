@@ -9,6 +9,7 @@ pub trait IHaveChainSettings {
     fn isd_llmq_type(&self) -> LLMQType;
     fn chain_locks_type(&self) -> LLMQType;
     fn platform_type(&self) -> LLMQType;
+    fn should_process_llmq_of_type(&self, llmq_type: LLMQType) -> bool;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -23,6 +24,7 @@ pub enum DevnetType {
     JackDaniels,
     Devnet333,
     Chacha,
+    Mojito,
 }
 
 impl DevnetType {
@@ -31,6 +33,7 @@ impl DevnetType {
             DevnetType::JackDaniels => "jack-daniels".to_string(),
             DevnetType::Devnet333 => "333".to_string(),
             DevnetType::Chacha => "chacha".to_string(),
+            DevnetType::Mojito => "mojito".to_string(),
         }
     }
 
@@ -88,14 +91,24 @@ impl IHaveChainSettings for ChainType {
         }
 
     }
+
+    fn should_process_llmq_of_type(&self, llmq_type: LLMQType) -> bool {
+        self.chain_locks_type() == llmq_type ||
+            self.is_llmq_type() == llmq_type ||
+            self.platform_type() == llmq_type ||
+            self.isd_llmq_type() == llmq_type
+    }
+
 }
 
 impl IHaveChainSettings for DevnetType {
 
     fn genesis_hash(&self) -> UInt256 {
-        UInt256::from_hex("00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c")
-            .unwrap()
-            .reversed()
+        UInt256::from_hex(match self {
+            DevnetType::Mojito => "739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357",
+            _ => "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c"
+        }).unwrap().reversed()
+
     }
 
     fn is_llmq_type(&self) -> LLMQType {
@@ -112,5 +125,12 @@ impl IHaveChainSettings for DevnetType {
 
     fn platform_type(&self) -> LLMQType {
         LLMQType::LlmqtypeDevnet
+    }
+
+    fn should_process_llmq_of_type(&self, llmq_type: LLMQType) -> bool {
+        self.chain_locks_type() == llmq_type ||
+            self.is_llmq_type() == llmq_type ||
+            self.platform_type() == llmq_type ||
+            self.isd_llmq_type() == llmq_type
     }
 }
