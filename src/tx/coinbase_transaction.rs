@@ -13,6 +13,7 @@ pub struct CoinbaseTransaction {
     pub height: u32,
     pub merkle_root_mn_list: UInt256,
     pub merkle_root_llmq_list: Option<UInt256>,
+    pub locked_amount: u64,
 }
 
 impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
@@ -29,14 +30,21 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
         } else {
             None
         };
+        let locked_amount = if coinbase_transaction_version >= 3 {
+            bytes.read_with::<u64>(offset, byte::LE)?
+        } else {
+            u64::MAX
+        };
         base.tx_type = Coinbase;
         base.payload_offset = *offset;
+        assert!((coinbase_transaction_version >= 3 && locked_amount != u64::MAX) || (coinbase_transaction_version < 3 && locked_amount == u64::MAX), "For cbtx with version {} assets locked amount is {}", coinbase_transaction_version, locked_amount);
         let mut tx = Self {
             base,
             coinbase_transaction_version,
             height,
             merkle_root_mn_list,
             merkle_root_llmq_list,
+            locked_amount
         };
         tx.base.tx_hash = Some(UInt256(sha256d::Hash::hash(&tx.to_data()).into_inner()));
         Ok((tx, *offset))

@@ -95,6 +95,7 @@ impl FromFFI for types::CoinbaseTransaction {
             } else {
                 Some(UInt256(*self.merkle_root_llmq_list))
             },
+            locked_amount: self.locked_amount
         }
     }
 }
