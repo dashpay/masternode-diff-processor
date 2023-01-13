@@ -4,8 +4,7 @@ use hashes::hex::FromHex;
 use crate::common::chain_type::DevnetType;
 use crate::common::ChainType;
 use crate::{boxed, models, process_mnlistdiff_from_message, processor_create_cache, register_processor, ToFFI, types, UInt256};
-use crate::crypto::byte_util::AsBytes;
-use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_llmq_snapshot_by_block_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_llmq_snapshot_by_block_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, MerkleBlock, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 use crate::tests::llmq_rotation::validate_llmq_callback_throuh_rust_bls;
 
 unsafe extern "C" fn get_merkle_root_for_chacha(
@@ -110,7 +109,7 @@ fn test_basic_bls_scheme() {
         bytes.len(),
         false,
         true,
-        20225,
+        70225,
         genesis.0.as_ptr(),
         processor,
         cache,
@@ -124,8 +123,6 @@ unsafe extern "C" fn get_merkle_root_for_mojito(
     _context: *const std::ffi::c_void,
 ) -> *mut u8 {
     let h = UInt256(*(block_hash));
-    // 46fdbefe399f412021458107f269add6a7b2d34ca289f334dde170892a010000 -> 771758870c2750cf4fc7e40dff78a2087df015e6c400cebbd7aebf73a5b76cdf
-    // 255ae7a8b067e80fb564a33ca9aaf976b1460c4255245083c54c6b2f00010000 -> 4e1a1876130b66517b79738eda9fe1ec47096f627948bf152b4a2e45132ff432
     // 720ea2e4e7f6b31debe9bb852e1e4cdfdf10bed9827f0ef6527cfa0261010000 -> f0597c739df147363e06988fb4132dde4fbc66418b28a4e5d74e552ad2d555d0
     let merkle_root = UInt256::from_hex("f0597c739df147363e06988fb4132dde4fbc66418b28a4e5d74e552ad2d555d0")
             .unwrap();
@@ -205,20 +202,25 @@ fn test_dip_0027() {
         chain,
         is_dip_0024: false,
         cache,
-        blocks: vec![]
-    }) as *mut _ as *mut std::ffi::c_void;
+        blocks: vec![
+            MerkleBlock { hash: UInt256::from_hex("739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357").unwrap(), height: 1, merkleroot: Default::default() },
+            MerkleBlock { hash: UInt256::from_hex("720ea2e4e7f6b31debe9bb852e1e4cdfdf10bed9827f0ef6527cfa0261010000").unwrap(), height: 4450, merkleroot: UInt256::from_hex("f0597c739df147363e06988fb4132dde4fbc66418b28a4e5d74e552ad2d555d0")
+                .unwrap() }
+        ]
+    });
     let bytes = message_from_file("MNL_1_4450.dat".to_string());
     let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
         false,
         true,
-        20226,
+        70226,
         genesis.0.as_ptr(),
         processor,
-        cache,
-        context,
+        context.cache,
+        context as *mut _ as *mut std::ffi::c_void,
     )};
+    let result = unsafe { *result };
     println!("Result: {:#?}", &result);
-
+    assert_diff_result(context, result);
 }

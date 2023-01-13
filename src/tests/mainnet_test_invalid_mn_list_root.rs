@@ -48,7 +48,7 @@ fn mainnet_test_invalid_mn_list_root() {
             bytes.len(),
             false,
             false,
-            20221,
+            70221,
             context.genesis_as_ptr(),
             processor,
             context.cache,

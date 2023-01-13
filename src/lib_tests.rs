@@ -147,7 +147,7 @@ pub mod tests {
     ) -> MNListDiffResult {
         let processor = unsafe { &mut *processor };
         let cache = unsafe { &mut *cache };
-        let is_bls_basic = protocol_version >= 20225;
+        let is_bls_basic = protocol_version >= 70225;
         println!(
             "process_mnlistdiff_from_message_internal.start: {:?}",
             std::time::Instant::now()
@@ -189,7 +189,7 @@ pub mod tests {
             "process_qrinfo_from_message --: {:?} {:?} {:?}",
             processor, processor.opaque_context, cache
         );
-        let is_bls_basic = protocol_version >= 20225;
+        let is_bls_basic = protocol_version >= 70225;
         let offset = &mut 0;
         let read_list_diff =
             |offset: &mut usize| processor.read_list_diff_from_message(message, offset, is_bls_basic);
@@ -681,7 +681,7 @@ pub mod tests {
             length,
             use_insight_as_backup,
             false,
-            20221,
+            70221,
             chain.genesis_hash().0.as_ptr(),
             processor,
             cache,

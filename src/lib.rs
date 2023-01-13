@@ -234,7 +234,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
     let message: &[u8] = slice::from_raw_parts(message_arr, message_length as usize);
-    let is_bls_basic = protocol_version >= 20225;
+    let is_bls_basic = protocol_version >= 70225;
     let list_diff = unwrap_or_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor
         .lookup_block_height_by_hash(hash), is_bls_basic));
     if !is_from_snapshot {
@@ -276,7 +276,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     processor.use_insight_as_backup = use_insight_as_backup;
     processor.genesis_hash = genesis_hash;
     println!( "process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
-    let is_bls_basic = protocol_version >= 20225;
+    let is_bls_basic = protocol_version >= 70225;
     let offset = &mut 0;
     let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
         processor.get_list_diff_result_with_base_lookup(list_diff, should_process_quorums, cache)
