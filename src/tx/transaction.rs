@@ -5,7 +5,6 @@ use hashes::{sha256d, Hash};
 use crate::consensus::encode::VarInt;
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, VarBytes};
-use crate::crypto::data_ops::{ScriptMap, with_script_pub_key, with_script_sig};
 
 // block height indicating transaction is unconfirmed
 pub const TX_UNCONFIRMED: i32 = i32::MAX;
