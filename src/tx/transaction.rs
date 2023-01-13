@@ -5,6 +5,7 @@ use hashes::{sha256d, Hash};
 use crate::consensus::encode::VarInt;
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, VarBytes};
+use crate::crypto::data_ops::{ScriptMap, with_script_pub_key, with_script_sig};
 
 // block height indicating transaction is unconfirmed
 pub const TX_UNCONFIRMED: i32 = i32::MAX;
@@ -26,6 +27,10 @@ pub enum TransactionType {
     SubscriptionResetKey = 10,
     SubscriptionCloseAccount = 11,
     Transition = 12,
+    // tmp
+
+    /// TODO: find actual value for this type
+    CreditFunding = 255,
 }
 
 impl From<u16> for TransactionType {
@@ -153,6 +158,11 @@ pub trait ITransaction {
     fn payload_data(&self) -> Vec<u8>;
     fn payload_data_for(&self) -> Vec<u8>;
     fn transaction_type(&self) -> TransactionType;
+    fn outputs(&self) -> Vec<TransactionOutput>;
+    fn output_addresses(&self) -> Vec<Vec<u8>>;
+    fn inputs(&self) -> Vec<TransactionInput>;
+    fn tx_hash(&self) -> Option<UInt256>;
+    fn tx_type(&self) -> TransactionType;
 }
 
 #[derive(Debug, Clone)]
@@ -242,7 +252,42 @@ impl Transaction {
         }
         buffer
     }
+
+    pub fn input_addresses(&self) -> Vec<Vec<u8>> {
+        /*let script_map = ScriptMap::MAINNET;
+        self.inputs.iter().filter_map(|input| {
+            if let Some(script) = &input.script {
+                with_script_pub_key(&script, &script_map)
+            } else if let Some(signature) = &input.signature {
+                with_script_sig(&signature, &script_map)
+            } else {
+                None
+            }
+        }).collect()*/
+        vec![]
+    }
+
+    pub fn output_addresses(&self) -> Vec<Vec<u8>> {
+        self.outputs.iter().filter_map(|output| output.address.clone()).collect()
+    }
+
+    pub fn outputs(&self) -> Vec<TransactionOutput> {
+        self.outputs.clone()
+    }
+
+    pub fn inputs(&self) -> Vec<TransactionInput> {
+        self.inputs.clone()
+    }
+
+    pub fn tx_hash(&self) -> Option<UInt256> {
+        self.tx_hash
+    }
+
+    pub fn tx_type(&self) -> TransactionType {
+        self.tx_type
+    }
 }
+
 impl<'a> TryRead<'a, Endian> for Transaction {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;

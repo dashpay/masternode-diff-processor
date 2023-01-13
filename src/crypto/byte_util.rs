@@ -255,3 +255,109 @@ define_bytes_to_big_uint!(UInt256, 32);
 define_bytes_to_big_uint!(UInt384, 48);
 define_bytes_to_big_uint!(UInt512, 64);
 define_bytes_to_big_uint!(UInt768, 96);
+
+fn clone_into_array<A, T>(slice: &[T]) -> A
+    where
+        A: Default + AsMut<[T]>,
+        T: Clone,
+{
+    let mut a = A::default();
+    <A as AsMut<[T]>>::as_mut(&mut a).clone_from_slice(slice);
+    a
+}
+
+impl std::ops::Shr<usize> for UInt256 {
+    type Output = Self;
+
+    fn shr(self, rhs: usize) -> Self::Output {
+        let len = self.0.len();
+        let (a, b) = self.0.split_at(len - rhs);
+        let mut spun = [0u8; 32];
+        spun[0..rhs].copy_from_slice(b);
+        spun[rhs..len].copy_from_slice(a);
+        Self(spun)
+    }
+}
+
+impl std::ops::Shl<usize> for UInt256 {
+    type Output = Self;
+
+    fn shl(self, rhs: usize) -> Self::Output {
+        let len = self.0.len();
+        let (a, b) = self.0.split_at(rhs);
+        let mut spun = [0u8; 32];
+        spun[0..rhs].copy_from_slice(b);
+        spun[rhs..len].copy_from_slice(a);
+        Self(spun)
+    }
+}
+
+pub fn add_one_le(a: UInt256) -> UInt256 {
+    let mut r = [0u8; 32];
+    r[0..8].clone_from_slice(&1u64.to_le_bytes());
+    add_le(a, UInt256(r))
+}
+
+pub fn add_le(x: UInt256, a: UInt256) -> UInt256 {
+    let mut carry = 0u64;
+    let mut r = [0u8; 32];
+    for i in 0..8 {
+        let len = i + 4;
+        let xb: [u8; 4] = clone_into_array(&x.0[i..len]);
+        let ab: [u8; 4] = clone_into_array(&a.0[i..len]);
+        let sum = u32::from_le_bytes(xb) as u64 + u32::from_le_bytes(ab) as u64 + carry;
+        r[i..len].clone_from_slice(&(sum as u32).to_le_bytes());
+        carry = sum >> 32;
+    }
+    UInt256(r)
+}
+
+
+
+fn multiply_u32_le(mut a: UInt256, b: u32) -> UInt256 {
+    let mut carry = 0u64;
+    for i in 0..8 {
+        let len = i + 4;
+        let ab: [u8; 4] = clone_into_array(&a.0[i..len]);
+        let n = carry + (b as u64) * (u32::from_le_bytes(ab) as u64);
+        a.0[i..len].clone_from_slice(&(n as u32 & 0xffffffff).to_le_bytes());
+        carry = n >> 32;
+    }
+    return a;
+}
+
+pub fn shift_left_le(a: UInt256, bits: u8) -> UInt256 {
+    let mut r = [0u8; 32];
+    let k = bits / 8;
+    let bits = bits % 8;
+    for i in 0..32 {
+        let ik = i + k as usize;
+        let ik1 = ik + 1;
+        let u8s = a.0[i];
+        if ik1 < 32 && bits != 0 {
+            r[ik1] |= u8s >> (8 - bits);
+        }
+        if ik < 32 {
+            r[ik] |= u8s << bits;
+        }
+    }
+    UInt256(r)
+}
+
+fn shift_right_le(a: UInt256, bits: u8) -> UInt256 {
+    let mut r = [0u8; 32];
+    let k = bits / 8;
+    let bits = bits % 8;
+    for i in 0..32 {
+        let ik = i - k as isize;
+        let ik1 = ik - 1;
+        let u8s = a.0[i as usize];
+        if ik1 >= 0 && bits != 0 {
+            r[ik1 as usize] |= u8s << (8 - bits);
+        }
+        if ik >= 0 {
+            r[ik as usize] |= u8s >> bits;
+        }
+    }
+    UInt256(r)
+}
