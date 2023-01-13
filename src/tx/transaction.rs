@@ -126,14 +126,8 @@ impl std::fmt::Debug for TransactionOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TransactionOutput")
             .field("amount", &self.amount)
-            .field(
-                "script",
-                &self.script.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex(),
-            )
-            .field(
-                "address",
-                &self.address.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex(),
-            )
+            .field("script", &self.script.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex())
+            .field("address", &self.address.as_ref().unwrap_or(&Vec::<u8>::new()).to_hex())
             .finish()
     }
 }

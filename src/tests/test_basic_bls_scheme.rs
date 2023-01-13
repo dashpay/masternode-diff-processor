@@ -124,9 +124,10 @@ unsafe extern "C" fn get_merkle_root_for_mojito(
     _context: *const std::ffi::c_void,
 ) -> *mut u8 {
     let h = UInt256(*(block_hash));
-    // for block_hash '46fdbefe399f412021458107f269add6a7b2d34ca289f334dde170892a010000' -> 771758870c2750cf4fc7e40dff78a2087df015e6c400cebbd7aebf73a5b76cdf
+    // 46fdbefe399f412021458107f269add6a7b2d34ca289f334dde170892a010000 -> 771758870c2750cf4fc7e40dff78a2087df015e6c400cebbd7aebf73a5b76cdf
     // 255ae7a8b067e80fb564a33ca9aaf976b1460c4255245083c54c6b2f00010000 -> 4e1a1876130b66517b79738eda9fe1ec47096f627948bf152b4a2e45132ff432
-    let merkle_root = UInt256::from_hex("4e1a1876130b66517b79738eda9fe1ec47096f627948bf152b4a2e45132ff432")
+    // 720ea2e4e7f6b31debe9bb852e1e4cdfdf10bed9827f0ef6527cfa0261010000 -> f0597c739df147363e06988fb4132dde4fbc66418b28a4e5d74e552ad2d555d0
+    let merkle_root = UInt256::from_hex("f0597c739df147363e06988fb4132dde4fbc66418b28a4e5d74e552ad2d555d0")
             .unwrap();
     println!("get_merkle_root_for_mojito: {}: {}", h, merkle_root);
     boxed(merkle_root.0) as *mut _
@@ -139,8 +140,7 @@ unsafe extern "C" fn get_block_height_by_hash_mojito(
     let orig_s = h.clone().to_string();
     match orig_s.as_str() {
         "739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357" => 1,
-        "46fdbefe399f412021458107f269add6a7b2d34ca289f334dde170892a010000" => 5014,
-        "255ae7a8b067e80fb564a33ca9aaf976b1460c4255245083c54c6b2f00010000" => 5020,
+        "720ea2e4e7f6b31debe9bb852e1e4cdfdf10bed9827f0ef6527cfa0261010000" => 4450,
         _ => u32::MAX,
     }
 }
@@ -150,8 +150,7 @@ unsafe extern "C" fn get_block_hash_by_height_mojito(
 ) -> *mut u8 {
     match block_height {
         1 => boxed(UInt256::from_hex("739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357").unwrap().0) as *mut _,
-        5014 => boxed(UInt256::from_hex("46fdbefe399f412021458107f269add6a7b2d34ca289f334dde170892a010000").unwrap().0) as *mut _,
-        5020 => boxed(UInt256::from_hex("255ae7a8b067e80fb564a33ca9aaf976b1460c4255245083c54c6b2f00010000").unwrap().0) as *mut _,
+        4450 => boxed(UInt256::from_hex("720ea2e4e7f6b31debe9bb852e1e4cdfdf10bed9827f0ef6527cfa0261010000").unwrap().0) as *mut _,
         _ => null_mut()
     }
 }
@@ -159,12 +158,13 @@ pub unsafe extern "C" fn get_masternode_list_mojito(
     block_hash: *mut [u8; 32],
     context: *const std::ffi::c_void,
 ) -> *mut types::MasternodeList {
-    let h = UInt256(*(block_hash));
-    let nodes = BTreeMap::new();
-    let quorums = BTreeMap::new();
-    let list = models::MasternodeList::new(nodes, quorums, h, 9192, true);
-    let encoded = list.encode();
-    boxed(encoded)
+    null_mut()
+    // let h = UInt256(*(block_hash));
+    // let nodes = BTreeMap::new();
+    // let quorums = BTreeMap::new();
+    // let list = models::MasternodeList::new(nodes, quorums, h, 9192, true);
+    // let encoded = list.encode();
+    // boxed(encoded)
 }
 pub unsafe extern "C" fn should_process_llmq_of_type_mojito(
     llmq_type: u8,
@@ -207,13 +207,13 @@ fn test_dip_0027() {
         cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
-    let bytes = message_from_file("MNL_1_5020.dat".to_string());
+    let bytes = message_from_file("MNL_1_4450.dat".to_string());
     let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
         false,
         true,
-        20225,
+        20226,
         genesis.0.as_ptr(),
         processor,
         cache,
