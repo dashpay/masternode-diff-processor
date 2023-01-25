@@ -110,8 +110,8 @@ fn testnet_quorum_quarters() {
     processor.save_snapshot(block_hash_8936_h_2c, snapshot_8936_h_2c);
     processor.save_snapshot(block_hash_8936_h_3c, snapshot_8936_h_3c);
 
-    let old_result = process_qrinfo_from_message_internal(old_bytes.as_ptr(), old_bytes.len(), false, 20221, context.genesis_as_ptr(), processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
-    let old_result2 = process_qrinfo_from_message_internal(old_bytes2.as_ptr(), old_bytes2.len(), false, 20221, context.genesis_as_ptr(), processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
+    let old_result = process_qrinfo_from_message_internal(old_bytes.as_ptr(), old_bytes.len(), false, 70221, context.genesis_as_ptr(), processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
+    let old_result2 = process_qrinfo_from_message_internal(old_bytes2.as_ptr(), old_bytes2.len(), false, 70221, context.genesis_as_ptr(), processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
     // println!("old_result tip: {}", old_result.result_at_tip.block_hash.clone().reversed()); // 1740902
     // println!("old_result h: {}", old_result.result_at_h.block_hash.clone().reversed()); // 1738648
     // println!("old_result h-c: {}", old_result.result_at_h_c.block_hash.clone().reversed()); // 1738360
@@ -128,7 +128,7 @@ fn testnet_quorum_quarters() {
         bytes.as_ptr(),
         bytes.len(),
         false,
-        20221,
+        70221,
         context.genesis_as_ptr(),
         processor,
         context.cache,

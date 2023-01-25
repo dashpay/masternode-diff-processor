@@ -43,7 +43,7 @@ fn test_mainnet_checkpoint_1720000() {
             bytes.len(),
             false,
             true,
-            20221,
+            70221,
             context.genesis_as_ptr(),
             processor,
             context.cache,

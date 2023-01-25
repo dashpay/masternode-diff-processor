@@ -69,6 +69,9 @@ impl CoinbaseTransaction {
                 *offset += llmq_list.consensus_encode(&mut buffer).unwrap();
             }
         }
+        if self.coinbase_transaction_version >= 3 {
+            *offset += self.locked_amount.enc(&mut buffer);
+        }
         buffer
     }
 

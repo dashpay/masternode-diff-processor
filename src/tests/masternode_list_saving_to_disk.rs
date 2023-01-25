@@ -42,7 +42,7 @@ fn test_mnl_saving_to_disk() {
         bytes.len(),
         false,
         false,
-        20221,
+        70221,
         context.genesis_as_ptr(),
         processor,
         context.cache,
