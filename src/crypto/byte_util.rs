@@ -1,40 +1,15 @@
 use byte::{BytesExt, LE, Result, TryRead};
 use byte::ctx::Endian;
 use std::{mem, slice};
-use hashes::Hash;
+use hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, sha256, sha256d, sha512};
+use secp256k1::rand::{Rng, thread_rng};
+use crate::chain::params::BIP32_SEED_KEY;
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
 use crate::hashes::{hex::{FromHex, ToHex}, hex};
+use crate::util::base58;
+use crate::util::data_ops::short_hex_string_from;
 
 pub const MN_ENTRY_PAYLOAD_LENGTH: usize = 151;
-
-#[inline]
-pub fn merkle_root_from_hashes(hashes: Vec<UInt256>) -> Option<UInt256> {
-    let length = hashes.len();
-    let mut level = hashes.clone();
-    if length == 0 { return None; }
-    if length == 1 { return Some(hashes[0]); }
-    while level.len() != 1 {
-        let len = level.len();
-        let capacity = (0.5 * len as f64).round();
-        let mut higher_level: Vec<UInt256> = Vec::with_capacity(capacity as usize);
-        for i in (0..len).step_by(2) {
-            let offset = &mut 0;
-            let mut buffer: Vec<u8> = Vec::with_capacity(64);
-            let left = level[i];
-            *offset += left.consensus_encode(&mut buffer).unwrap();
-            *offset +=
-                if level.len() - i > 1 {
-                    level[i+1]
-                } else {
-                    left
-                }.consensus_encode(&mut buffer).unwrap();
-
-            higher_level.push(UInt256(hashes::sha256d::Hash::hash(&buffer).into_inner()));
-        }
-        level = higher_level;
-    }
-    Some(level[0])
-}
 
 pub trait AsBytes {
     fn as_bytes(&self) -> &[u8];
@@ -56,6 +31,9 @@ pub trait ConstDecodable<'a, T: TryRead<'a, Endian>> {
 }
 pub trait BytesDecodable<'a, T: TryRead<'a, Endian>> {
     fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<T>;
+    fn from_bytes_force(bytes: &'a [u8]) -> T {
+        Self::from_bytes(bytes, &mut 0).unwrap()
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -71,6 +49,8 @@ pub struct UInt512(pub [u8; 64]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt768(pub [u8; 96]);
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ECPoint(pub [u8; 33]);
 
 #[macro_export]
 macro_rules! impl_bytes_decodable {
@@ -108,20 +88,14 @@ macro_rules! impl_decodable {
             #[allow(clippy::not_unsafe_ptr_arg_deref)]
             fn from_const(bytes: *const u8) -> Option<Self> {
                 let safe_bytes = unsafe { slice::from_raw_parts(bytes, $byte_len) };
-                match safe_bytes.read_with::<Self>(&mut 0, LE) {
-                    Ok(data) => Some(data),
-                    Err(_err) => None
-                }
+                safe_bytes.read_with::<Self>(&mut 0, LE).ok()
             }
         }
         impl<'a> MutDecodable<'a, $var_type> for $var_type {
             #[allow(clippy::not_unsafe_ptr_arg_deref)]
             fn from_mut(bytes: *mut u8) -> Option<Self> {
                 let safe_bytes = unsafe { slice::from_raw_parts_mut(bytes, $byte_len) };
-                match safe_bytes.read_with::<Self>(&mut 0, LE) {
-                    Ok(data) => Some(data),
-                    Err(_err) => None
-                }
+                safe_bytes.read_with::<Self>(&mut 0, LE).ok()
             }
         }
     }
@@ -148,13 +122,12 @@ macro_rules! define_try_read_to_big_uint {
 #[macro_export]
 macro_rules! define_bytes_to_big_uint {
     ($uint_type: ident, $byte_len: expr) => {
+
         define_try_read_to_big_uint!($uint_type, $byte_len);
+
         impl std::default::Default for $uint_type {
             fn default() -> Self {
-                let mut data: [u8; $byte_len] = [0u8; $byte_len];
-                for i in 0..$byte_len {
-                    data[i] = 0;
-                }
+                let data: [u8; $byte_len] = [0u8; $byte_len];
                 Self(data)
             }
         }
@@ -256,7 +229,31 @@ define_bytes_to_big_uint!(UInt384, 48);
 define_bytes_to_big_uint!(UInt512, 64);
 define_bytes_to_big_uint!(UInt768, 96);
 
-fn clone_into_array<A, T>(slice: &[T]) -> A
+define_bytes_to_big_uint!(ECPoint, 33);
+
+pub trait Random {
+    fn random() -> Self where Self: Sized;
+}
+
+impl Random for UInt256 {
+    fn random() -> UInt256 {
+        let mut data: [u8; 32] = [0u8; 32];
+        for i in 0..32 {
+            data[i] = thread_rng().gen();
+        }
+        UInt256(data)
+    }
+}
+pub const fn merge<const N: usize>(mut buf: [u8; N], bytes: &[u8]) -> [u8; N] {
+    let mut i = 0;
+    while i < bytes.len() {
+        buf[i] = bytes[i];
+        i += 1;
+    }
+    buf
+}
+
+pub(crate) fn clone_into_array<A, T>(slice: &[T]) -> A
     where
         A: Default + AsMut<[T]>,
         T: Clone,
@@ -264,6 +261,33 @@ fn clone_into_array<A, T>(slice: &[T]) -> A
     let mut a = A::default();
     <A as AsMut<[T]>>::as_mut(&mut a).clone_from_slice(slice);
     a
+}
+
+impl From<u32> for UInt256 {
+    fn from(value: u32) -> Self {
+        let mut r = [0u8; 32];
+        r[..4].clone_from_slice(&value.to_le_bytes());
+        UInt256(r)
+    }
+}
+
+impl From<u64> for UInt256 {
+    fn from(value: u64) -> Self {
+        let mut r = [0u8; 32];
+        r[..8].clone_from_slice(&value.to_le_bytes());
+        UInt256(r)
+    }
+}
+
+impl From<[u64; 4]> for UInt256 {
+    fn from(value: [u64; 4]) -> Self {
+        let mut r = [0u8; 32];
+        r[..8].clone_from_slice(&value[0].to_le_bytes());
+        r[8..16].clone_from_slice(&value[1].to_le_bytes());
+        r[16..24].clone_from_slice(&value[2].to_le_bytes());
+        r[24..].clone_from_slice(&value[3].to_le_bytes());
+        UInt256(r)
+    }
 }
 
 impl std::ops::Shr<usize> for UInt256 {
@@ -360,4 +384,337 @@ fn shift_right_le(a: UInt256, bits: u8) -> UInt256 {
         }
     }
     UInt256(r)
+}
+
+impl UInt160 {
+    pub fn hash160(data: &[u8]) -> Self {
+        UInt160(hash160::Hash::hash(data).into_inner())
+    }
+
+    pub fn u32_le(&self) -> u32 {
+        u32::from_le_bytes(clone_into_array(&self.0[..4]))
+    }
+}
+
+impl UInt256 {
+    pub fn sha256(data: &[u8]) -> Self {
+        UInt256(sha256::Hash::hash(data).into_inner())
+    }
+    pub fn sha256_str(data: &str) -> Self {
+        UInt256(sha256::Hash::hash(data.as_bytes()).into_inner())
+    }
+    pub fn sha256d(data: &[u8]) -> Self {
+        UInt256(sha256d::Hash::hash(data).into_inner())
+    }
+    pub fn sha256d_str(data: &str) -> Self {
+        UInt256(sha256d::Hash::hash(data.as_bytes()).into_inner())
+    }
+    pub fn x11_hash(data: &[u8]) -> Self {
+        let hash = rs_x11_hash::get_x11_hash(&data);
+        UInt256::from_bytes(&hash, &mut 0)
+            .expect("Error x11 hashing")
+    }
+
+    pub fn block_hash_for_dev_net_genesis_block_with_version(version: u32, prev_hash: UInt256, merkle_root: UInt256, timestamp: u32, target: u32, nonce: u32) -> Self {
+        let mut writer = Vec::<u8>::new();
+        version.enc(&mut writer);
+        prev_hash.enc(&mut writer);
+        merkle_root.enc(&mut writer);
+        timestamp.enc(&mut writer);
+        target.enc(&mut writer);
+        nonce.enc(&mut writer);
+        Self::x11_hash(&writer)
+    }
+}
+
+impl UInt256 {
+    pub fn add_le_u32(&self, a: UInt256) -> UInt256 {
+        let mut carry = 0u64;
+        let mut r = [0u8; 32];
+        for i in 0..8 {
+            let len = i + 4;
+            let xb: [u8; 4] = clone_into_array(&self.0[i..len]);
+            let ab: [u8; 4] = clone_into_array(&a.0[i..len]);
+            let sum = u32::from_le_bytes(xb) as u64 + u32::from_le_bytes(ab) as u64 + carry;
+            r[i..len].clone_from_slice(&(sum as u32).to_le_bytes());
+            carry = sum >> 32;
+        }
+        UInt256(r)
+    }
+
+    pub fn add_le(&self, a: UInt256) -> UInt256 {
+        let mut carry = 0u64;
+        let mut r = [0u8; 32];
+        for i in 0..8 {
+            let ix = i * 4;
+            let len = ix + 4;
+            let xb: [u8; 4] = clone_into_array(&self.0[ix..len]);
+            let ab: [u8; 4] = clone_into_array(&a.0[ix..len]);
+            let sum = u32::from_le_bytes(xb) as u64 + u32::from_le_bytes(ab) as u64 + carry;
+            r[ix..len].clone_from_slice(&(sum as u32).to_le_bytes());
+            carry = sum >> 32;
+        }
+        UInt256(r)
+    }
+
+    pub fn add_be(&self, a: UInt256) -> UInt256 {
+        self.clone().reversed().add_le(a.clone().reversed()).reversed()
+    }
+
+    // add 1u64
+    pub fn add_one_le(&self) -> UInt256 {
+        let mut r = [0u8; 32];
+        r[..8].clone_from_slice(&1u64.to_le_bytes());
+        let one = UInt256(r);
+        self.add_le(one)
+    }
+
+    pub fn neg_le(&self) -> UInt256 {
+        let mut r = [0u8; 32];
+        for i in 0..32 {
+            r[i] = !self.0[i];
+        }
+        UInt256(r)
+    }
+
+    pub fn subtract_le(&self, rhs: UInt256) -> UInt256 {
+        self.add_le(rhs.neg_le().add_one_le())
+    }
+
+    pub fn subtract_be(&self, rhs: UInt256) -> UInt256 {
+        self.clone().reversed().add_le(rhs.clone().reversed().neg_le().add_one_le()).reversed()
+    }
+
+    pub fn shift_left_le(&self, bits: u8) -> UInt256 {
+        let mut r = [0u8; 32];
+        let k = bits / 8;
+        let bits = bits % 8;
+        for i in 0..32 {
+            let ik = i + k as usize;
+            let ik1 = ik + 1;
+            let u8s = self.0[i];
+            if ik1 < 32 && bits != 0 {
+                r[ik1] |= u8s >> (8 - bits);
+            }
+            if ik < 32 {
+                r[ik] |= u8s << bits;
+            }
+        }
+        UInt256(r)
+    }
+
+    pub fn shift_right_le(&self, bits: u8) -> UInt256 {
+        let mut r = [0u8; 32];
+        let k = bits / 8;
+        let bits = bits % 8;
+        for i in 0..32 {
+            let ik = i - k as isize;
+            let ik1 = ik - 1;
+            let u8s = self.0[i as usize];
+            if ik1 >= 0 && bits != 0 {
+                r[ik1 as usize] |= u8s << (8 - bits);
+            }
+            if ik >= 0 {
+                r[ik as usize] |= u8s >> bits;
+            }
+        }
+        UInt256(r)
+    }
+
+    pub fn multiply_u32_le(&self, b: u32) -> UInt256 {
+        let mut r = [0u8; 32];
+        let mut carry = 0u64;
+        for i in 0..8 {
+            let len = i + 4;
+            let ab: [u8; 4] = clone_into_array(&self.0[i..len]);
+            let n = carry + (b as u64) * (u32::from_le_bytes(ab) as u64);
+            r[i..len].clone_from_slice(&(n as u32 & 0xffffffff).to_le_bytes());
+            carry = n >> 32;
+        }
+        UInt256(r)
+    }
+
+    // #define uint256_is_31_bits(u) ((((u).u64[1] | (u).u64[2] | (u).u64[3]) == 0) && ((u).u32[1] == 0) && (((u).u32[0] & 0x80000000) == 0))
+    pub fn is_31_bits(&self) -> bool {
+        let u64_1 = u64::from_le_bytes(clone_into_array(&self.0[8..16]));
+        let u64_2 = u64::from_le_bytes(clone_into_array(&self.0[16..24]));
+        let u64_3 = u64::from_le_bytes(clone_into_array(&self.0[24..]));
+        let u32_1 = u32::from_le_bytes(clone_into_array(&self.0[4..8]));
+        let u32_0 = u32::from_le_bytes(clone_into_array(&self.0[..4]));
+        (u64_1 | u64_2 | u64_3) == 0 && u32_1 == 0 && u32_0 & 0x80000000 == 0
+    }
+
+    pub fn sup(&self, rhs: &UInt256) -> bool {
+        for i in (0..32).rev() {
+            if self.0[i] > rhs.0[i] {
+                return true;
+            } else if self.0[i] < rhs.0[i] {
+                return false;
+            }
+        }
+        // equal
+        return false;
+    }
+
+    pub fn supeq(&self, rhs: &UInt256) -> bool {
+        for i in (0..32).rev() {
+            if self.0[i] > rhs.0[i] {
+                return true;
+            } else if self.0[i] < rhs.0[i] {
+                return false;
+            }
+        }
+        // equal
+        return true;
+    }
+
+    pub fn xor(&self, rhs: &UInt256) -> UInt256 {
+        let mut r = [0u8; 32];
+        for i in 0..32 {
+            r[i] = self.0[i] ^ rhs.0[i];
+        }
+        UInt256(r)
+    }
+
+    pub fn inverse(&self) -> UInt256 {
+        self.xor(&UInt256::MAX)
+    }
+
+    pub fn divide_le(&self, rhs: UInt256) -> UInt256 {
+        let mut r = UInt256::MIN; // the quotient
+        let mut num = self.clone();
+        let mut div = rhs.clone();
+        let num_bits = num.compact_bits_le();
+        let div_bits = div.compact_bits_le();
+        assert_ne!(div_bits, 0, "");
+        if div_bits > num_bits {
+            // the result is certainly 0
+            return r;
+        } else {
+            let mut shift = (num_bits - div_bits) as isize;
+            div = div.shift_left_le(shift as u8); // shift so that div and nun align
+            while shift >= 0 {
+                if num.supeq(&div) {
+                    num = num.subtract_le(div);
+                    r.0[(shift / 8) as usize] |= 1 << (shift & 7); // set a bit of the result
+                }
+                div = div.shift_right_le(1); // shift back
+                shift -= 1;
+            }
+        }
+        // num now contains the remainder of the division
+        r
+    }
+
+
+
+    pub fn compact_bits_le(&self) -> u16 {
+        for pos in (0..8).rev() {
+            let posx = pos * 4;
+            let len = posx + 4;
+            let ab: [u8; 4] = clone_into_array(&self.0[posx..len]);
+            let ab_32 = u32::from_le_bytes(ab);
+            if ab_32 != 0 {
+                for bits in (0..32).rev() {
+                    if ab_32 & 1 << bits != 0 {
+                        return (8 * posx + bits + 1) as u16;
+                    }
+                }
+                return (8 * posx + 1) as u16;
+            }
+        }
+        return 0;
+    }
+
+    pub fn get_compact_le(&self) -> i32 {
+        let mut size = ((self.compact_bits_le() + 7) / 8) as u32;
+        let mut compact = if size <= 3 {
+            u32::from_le_bytes(clone_into_array(&self.0[..4])) << 8 * (3 - size)
+        } else {
+            u32::from_le_bytes(clone_into_array(&self.shift_right_le((8 * (size - 3)) as u8).0[..4]))
+        };
+        // The 0x00800000 bit denotes the sign.
+        // Thus, if it is already set, divide the mantissa by 256 and increase the exponent.
+        if compact & 0x00800000 != 0 {
+            compact >>= 8;
+            size += 1;
+        }
+        assert_eq!(compact & !0x007fffff, 0, "--1--");
+        assert!(size < 256, "--2--");
+        compact |= size << 24;
+        compact as i32
+    }
+
+    pub fn set_compact_le(compact: i32) -> UInt256 {
+        let size = compact >> 24;
+        let mut word = Self::MIN;
+        word.0[..4].clone_from_slice(&(compact as i32 & 0x007fffff).to_le_bytes());
+        if size <= 3 {
+            word = word.shift_right_le((8 * (3 - size)) as u8);
+        } else {
+            word = word.shift_left_le((8 * (size - 3)) as u8);
+        }
+        word
+    }
+
+    pub fn set_compact_be(compact: i32) -> UInt256 {
+        Self::set_compact_le(compact).reversed()
+    }
+
+    pub fn u32_le(&self) -> u32 {
+        u32::from_le_bytes(clone_into_array(&self.0[..4]))
+    }
+
+    pub fn u64_le(&self) -> u64 {
+        u64::from_le_bytes(clone_into_array(&self.0[..8]))
+    }
+    pub fn u64_2_le(&self) -> u64 {
+        u64::from_le_bytes(clone_into_array(&self.0[8..16]))
+    }
+    pub fn u64_3_le(&self) -> u64 {
+        u64::from_le_bytes(clone_into_array(&self.0[16..24]))
+    }
+    pub fn u64_4_le(&self) -> u64 {
+        u64::from_le_bytes(clone_into_array(&self.0[24..]))
+    }
+}
+
+impl UInt256 {
+    pub fn short_hex(&self) -> String {
+        short_hex_string_from(self.as_bytes())
+    }
+}
+
+impl UInt256 {
+    pub fn from_base58_string(data: &str) -> Option<Self> {
+        base58::from(data)
+            .ok()
+            .and_then(|d| Self::from_bytes(&d, &mut 0))
+    }
+}
+
+impl UInt256 {
+    pub fn hmac<T: Hash<Inner = [u8; 32]>>(key: &[u8], input: &[u8]) -> Self {
+        let mut engine = HmacEngine::<T>::new(key);
+        engine.input(input);
+        Self(Hmac::<T>::from_engine(engine).into_inner())
+    }
+}
+
+impl secp256k1::ThirtyTwoByteHash for UInt256 {
+    fn into_32(self) -> [u8; 32] {
+        self.0
+    }
+}
+
+impl UInt512 {
+    pub fn hmac(key: &[u8], input: &[u8]) -> Self {
+        let mut engine = HmacEngine::<sha512::Hash>::new(key);
+        engine.input(input);
+        Self(Hmac::<sha512::Hash>::from_engine(engine).into_inner())
+    }
+
+    pub fn bip32_seed_key(input: &[u8]) -> Self {
+        Self::hmac(BIP32_SEED_KEY.as_bytes(), input)
+    }
 }

@@ -1,4 +1,4 @@
-use crate::common::ChainType;
+use crate::chain::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 use crate::hashes::hex::FromHex;

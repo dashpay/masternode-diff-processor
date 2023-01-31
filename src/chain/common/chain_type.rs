@@ -1,7 +1,9 @@
 use hashes::hex::FromHex;
+use crate::chain::common::LLMQType;
 use crate::crypto::byte_util::Reversable;
-use crate::UInt256;
-use crate::common::LLMQType;
+use crate::crypto::UInt256;
+
+// pub const USER_AGENT: String = format!("/dash-spv-core:{}", env!("CARGO_PKG_VERSION"));
 
 pub trait IHaveChainSettings {
     fn genesis_hash(&self) -> UInt256;
@@ -12,18 +14,40 @@ pub trait IHaveChainSettings {
     fn should_process_llmq_of_type(&self, llmq_type: LLMQType) -> bool;
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
 pub enum ChainType {
+    #[default]
     MainNet,
     TestNet,
     DevNet(DevnetType),
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+impl From<i16> for ChainType {
+    fn from(orig: i16) -> Self {
+        match orig {
+            0 => ChainType::MainNet,
+            1 => ChainType::TestNet,
+            _ => ChainType::DevNet(DevnetType::default()),
+        }
+    }
+}
+
+impl From<ChainType> for i16 {
+    fn from(value: ChainType) -> Self {
+        match value {
+            ChainType::MainNet => 0,
+            ChainType::TestNet => 1,
+            ChainType::DevNet(..) => 2,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
 pub enum DevnetType {
     JackDaniels,
     Devnet333,
     Chacha,
+    #[default]
     Mojito,
 }
 
@@ -47,6 +71,42 @@ impl ChainType {
         *self == ChainType::MainNet
     }
 
+    pub fn user_agent(&self) -> String {
+        format!("/dash-spv-core:{}{}/", env!("CARGO_PKG_VERSION"),
+        match self {
+            ChainType::MainNet => format!(""),
+            ChainType::TestNet => format!("(testnet)"),
+            ChainType::DevNet(devnet_type) => format!("(devnet.{})", devnet_type.identifier())
+        })
+    }
+
+    pub fn coin_type(&self) -> u32 {
+        if self.is_mainnet() { 5 } else { 1 }
+    }
+
+    pub fn devnet_identifier(&self) -> Option<String> {
+        if let ChainType::DevNet(devnet_type) = self {
+            Some(devnet_type.identifier())
+        } else {
+            None
+        }
+    }
+
+    pub fn devnet_version(&self) -> Option<i16> {
+        if let ChainType::DevNet(devnet_type) = self {
+            Some(devnet_type.version() as i16)
+        } else {
+            None
+        }
+    }
+
+    pub fn dns_seeds(&self) -> Vec<&str> {
+        match self {
+            ChainType::MainNet => vec!["dnsseed.dash.org"],
+            ChainType::TestNet => vec!["testnet-seed.dashdot.io"],
+            ChainType::DevNet(_) => vec![]
+        }
+    }
 }
 
 impl IHaveChainSettings for ChainType {
@@ -108,7 +168,6 @@ impl IHaveChainSettings for DevnetType {
             DevnetType::Mojito => "739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357",
             _ => "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c"
         }).unwrap().reversed()
-
     }
 
     fn is_llmq_type(&self) -> LLMQType {

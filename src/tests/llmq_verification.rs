@@ -5,8 +5,8 @@ use crate::{models, process_mnlistdiff_from_message, processor_create_cache, reg
 use crate::ffi::from::FromFFI;
 use crate::ffi::to::ToFFI;
 use crate::types;
-use crate::common::chain_type::ChainType;
-use crate::common::LLMQType;
+use crate::chain::common::chain_type::ChainType;
+use crate::chain::common::LLMQType;
 use crate::crypto::byte_util::UInt256;
 use crate::tests::block_store::init_testnet_store;
 

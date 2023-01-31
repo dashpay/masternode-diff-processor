@@ -13,12 +13,12 @@ pub mod tests {
     use crate::ffi::from::FromFFI;
     use crate::ffi::to::ToFFI;
     use crate::ffi::unboxer::unbox_any;
-    use crate::common::chain_type::{ChainType, IHaveChainSettings};
+    use crate::chain::common::chain_type::{ChainType, IHaveChainSettings};
     use crate::consensus::encode;
     use crate::crypto::byte_util::{
         BytesDecodable, Reversable, UInt256, UInt384, UInt768,
     };
-    use crate::{common, models};
+    use crate::{chain, models};
     use crate::processing::processor_cache::MasternodeProcessorCache;
     use crate::processing::{MNListDiffResult, QRInfoResult};
     use crate::{
@@ -503,9 +503,9 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
 
         let quorum_type: u8 = match data.chain {
-            ChainType::MainNet => common::LLMQType::Llmqtype400_60.into(),
-            ChainType::TestNet => common::LLMQType::Llmqtype50_60.into(),
-            ChainType::DevNet(_) => common::LLMQType::LlmqtypeDevnetDIP0024.into(),
+            ChainType::MainNet => chain::common::LLMQType::Llmqtype400_60.into(),
+            ChainType::TestNet => chain::common::LLMQType::Llmqtype50_60.into(),
+            ChainType::DevNet(_) => chain::common::LLMQType::LlmqtypeDevnetDIP0024.into(),
         };
         llmq_type == quorum_type
     }
@@ -515,7 +515,7 @@ pub mod tests {
         context: *const std::ffi::c_void,
     ) -> bool {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        let r#type = common::LLMQType::from(llmq_type);
+        let r#type = chain::common::LLMQType::from(llmq_type);
         let chain = data.chain;
         let is_isd = chain.isd_llmq_type() == r#type;
         let is_qr_context = data.is_dip_0024;

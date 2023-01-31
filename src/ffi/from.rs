@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::slice;
-use crate::{common, encode, models, tx, types};
+use crate::{chain, common, encode, models, tx, types};
 use crate::crypto::{UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::crypto::byte_util::Reversable;
 use crate::ffi::to::ToFFI;
@@ -19,16 +19,8 @@ impl FromFFI for types::TransactionInput {
         Self::Item {
             input_hash: UInt256(*self.input_hash),
             index: self.index,
-            script: if self.script.is_null() || self.script_length == 0 {
-                None
-            } else {
-                Some(slice::from_raw_parts(self.script, self.script_length).to_vec())
-            },
-            signature: if self.signature.is_null() || self.signature_length == 0 {
-                None
-            } else {
-                Some(slice::from_raw_parts(self.signature, self.signature_length).to_vec())
-            },
+            script: (!self.script.is_null() && self.script_length > 0).then_some(slice::from_raw_parts(self.script, self.script_length).to_vec()),
+            signature: (!self.signature.is_null() && self.signature_length > 0).then_some(slice::from_raw_parts(self.signature, self.signature_length).to_vec()),
             sequence: self.sequence,
         }
     }
@@ -40,16 +32,8 @@ impl FromFFI for types::TransactionOutput {
     unsafe fn decode(&self) -> Self::Item {
         Self::Item {
             amount: self.amount,
-            script: if self.script.is_null() || self.script_length == 0 {
-                None
-            } else {
-                Some(slice::from_raw_parts(self.script, self.script_length).to_vec())
-            },
-            address: if self.address.is_null() || self.address_length == 0 {
-                None
-            } else {
-                Some(slice::from_raw_parts(self.address, self.address_length).to_vec())
-            },
+            script: (!self.script.is_null() && self.script_length > 0).then_some(slice::from_raw_parts(self.script, self.script_length).to_vec()),
+            address: (!self.address.is_null() && self.address_length > 0).then_some(slice::from_raw_parts(self.address, self.address_length).to_vec()),
         }
     }
 }
@@ -69,11 +53,7 @@ impl FromFFI for types::Transaction {
                 .collect(),
             lock_time: self.lock_time,
             version: self.version,
-            tx_hash: if self.tx_hash.is_null() {
-                None
-            } else {
-                Some(UInt256(*self.tx_hash))
-            },
+            tx_hash: (!self.tx_hash.is_null()).then_some(UInt256(*self.tx_hash)),
             tx_type: self.tx_type,
             payload_offset: self.payload_offset,
             block_height: self.block_height,
@@ -90,11 +70,7 @@ impl FromFFI for types::CoinbaseTransaction {
             coinbase_transaction_version: self.coinbase_transaction_version,
             height: self.height,
             merkle_root_mn_list: UInt256(*self.merkle_root_mn_list),
-            merkle_root_llmq_list: if self.merkle_root_llmq_list.is_null() {
-                None
-            } else {
-                Some(UInt256(*self.merkle_root_llmq_list))
-            },
+            merkle_root_llmq_list: (!self.merkle_root_llmq_list.is_null()).then_some(UInt256(*self.merkle_root_llmq_list)),
             locked_amount: self.locked_amount
         }
     }
@@ -107,16 +83,8 @@ impl FromFFI for types::MasternodeList {
         Self::Item {
             block_hash: UInt256(*self.block_hash),
             known_height: self.known_height,
-            masternode_merkle_root: if self.masternode_merkle_root.is_null() {
-                None
-            } else {
-                Some(UInt256(*self.masternode_merkle_root))
-            },
-            llmq_merkle_root: if self.llmq_merkle_root.is_null() {
-                None
-            } else {
-                Some(UInt256(*self.llmq_merkle_root))
-            },
+            masternode_merkle_root: (!self.masternode_merkle_root.is_null()).then_some(UInt256(*self.masternode_merkle_root)),
+            llmq_merkle_root: (!self.llmq_merkle_root.is_null()).then_some(UInt256(*self.llmq_merkle_root)),
             masternodes: (0..self.masternodes_count).into_iter().fold(
                 BTreeMap::new(),
                 |mut acc, i| {
@@ -133,7 +101,7 @@ impl FromFFI for types::MasternodeList {
                 BTreeMap::new(),
                 |mut acc, i| {
                     let llmq_map = *(*self.llmq_type_maps.add(i));
-                    let key = common::LLMQType::from(llmq_map.llmq_type);
+                    let key = chain::common::LLMQType::from(llmq_map.llmq_type);
                     let value: BTreeMap<UInt256, models::LLMQEntry> = (0..llmq_map.count)
                         .into_iter()
                         .fold(BTreeMap::new(), |mut acc, j| {
@@ -169,16 +137,7 @@ impl FromFFI for types::MasternodeEntry {
                 *self.provider_registration_transaction_hash,
             ),
             confirmed_hash: UInt256(*self.confirmed_hash),
-            confirmed_hash_hashed_with_provider_registration_transaction_hash: if self
-                .confirmed_hash_hashed_with_provider_registration_transaction_hash
-                .is_null()
-            {
-                None
-            } else {
-                Some(UInt256(
-                    *self.confirmed_hash_hashed_with_provider_registration_transaction_hash,
-                ))
-            },
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: (!self.confirmed_hash_hashed_with_provider_registration_transaction_hash.is_null()).then_some(UInt256(*self.confirmed_hash_hashed_with_provider_registration_transaction_hash)),
             socket_address: common::SocketAddress {
                 ip_address: UInt128(*self.ip_address),
                 port: self.port,
@@ -225,11 +184,7 @@ impl FromFFI for types::MasternodeEntry {
                     acc
                 },
             ),
-            known_confirmed_at_height: if self.known_confirmed_at_height > 0 {
-                Some(self.known_confirmed_at_height)
-            } else {
-                None
-            },
+            known_confirmed_at_height: (self.known_confirmed_at_height > 0).then_some(self.known_confirmed_at_height),
             update_height: self.update_height,
             key_id_voting: UInt160(*self.key_id_voting),
             is_valid: self.is_valid,
@@ -253,7 +208,7 @@ impl FromFFI for types::LLMQEntry {
         Self::Item {
             version: self.version,
             llmq_hash: UInt256(*self.llmq_hash),
-            index: if self.version.use_rotated_quorums() { Some(self.index) } else { None },
+            index: self.version.use_rotated_quorums().then_some(self.index),
             public_key: UInt384(*self.public_key),
             threshold_signature: UInt768(*self.threshold_signature),
             verification_vector_hash: UInt256(*self.verification_vector_hash),
@@ -266,11 +221,7 @@ impl FromFFI for types::LLMQEntry {
             entry_hash: UInt256(*self.entry_hash),
             verified: self.verified,
             saved: self.saved,
-            commitment_hash: if self.commitment_hash.is_null() {
-                None
-            } else {
-                Some(UInt256(*self.commitment_hash))
-            },
+            commitment_hash: (!self.commitment_hash.is_null()).then_some(UInt256(*self.commitment_hash)),
         }
     }
 }

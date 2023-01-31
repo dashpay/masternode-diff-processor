@@ -1,9 +1,9 @@
-use common::{LLMQParams, LLMQType};
 use hashes::{sha256d, Hash};
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use crate::{AddInsightBlockingLookup, boxed, boxed_vec, common, ConstDecodable, encode, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, LogMessage, models, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback, types, UInt256, ValidateLLMQCallback};
+use crate::chain::common::{LLMQParams, LLMQType};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{Reversable, Zeroable};
 use crate::crypto::data_ops::{Data, inplace_intersection};

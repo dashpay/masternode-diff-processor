@@ -1,5 +1,5 @@
-use crate::common::chain_type::IHaveChainSettings;
-use crate::common::ChainType;
+use crate::chain::common::chain_type::IHaveChainSettings;
+use crate::chain::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 use crate::{processor_create_cache, register_processor};

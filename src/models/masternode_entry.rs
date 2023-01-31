@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use crate::common::{Block, SocketAddress};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::Zeroable;
-use crate::crypto::data_ops::short_hex_string_from;
+use crate::util::data_ops::short_hex_string_from;
 use crate::crypto::{UInt128, UInt160, UInt256, UInt384};
 use crate::hashes::{sha256, sha256d, Hash};
 use crate::models::OperatorPublicKey;

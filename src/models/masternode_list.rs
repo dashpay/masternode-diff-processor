@@ -1,11 +1,12 @@
-use hashes::{sha256, Hash};
+use hashes::{Hash, sha256};
 use std::collections::BTreeMap;
-use crate::common::LLMQType;
+use crate::chain::common::LLMQType;
 use crate::models::{LLMQEntry, MasternodeEntry};
 use crate::tx::CoinbaseTransaction;
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::{merkle_root_from_hashes, Reversable, Zeroable};
+use crate::crypto::byte_util::{Reversable, Zeroable};
 use crate::crypto::UInt256;
+use crate::util::data_ops::merkle_root_from_hashes;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct MasternodeList {

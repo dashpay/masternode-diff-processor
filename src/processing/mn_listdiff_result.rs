@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use crate::{boxed, boxed_vec, common, models, ToFFI, types, UInt256};
+use crate::{boxed, boxed_vec, chain, models, ToFFI, types, UInt256};
 use crate::ffi::to::{encode_masternodes_map, encode_quorums_map};
 use crate::processing::ProcessingError;
 
@@ -15,7 +15,7 @@ pub struct MNListDiffResult {
     pub masternode_list: models::MasternodeList,
     pub added_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
     pub modified_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
-    pub added_quorums: BTreeMap<common::LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
+    pub added_quorums: BTreeMap<chain::common::LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
     pub needed_masternode_lists: Vec<UInt256>,
 }
 

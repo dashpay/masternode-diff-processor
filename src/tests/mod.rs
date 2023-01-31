@@ -1,5 +1,7 @@
 pub mod block_store;
 pub mod json_from_core_snapshot;
+pub mod indexes;
+pub mod keys;
 pub mod llmq_rotation;
 pub mod llmq_rotation_testnet;
 pub mod llmq_snapshot;

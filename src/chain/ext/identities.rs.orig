@@ -1,0 +1,53 @@
+use crate::chain::Chain;
+<<<<<<< Updated upstream
+use crate::crypto::byte_util::Zeroable;
+=======
+>>>>>>> Stashed changes
+use crate::platform::identity::identity::Identity;
+use crate::UInt256;
+
+pub trait Identities {
+<<<<<<< Updated upstream
+    fn identity_for_unique_id(&self, unique_id: UInt256) -> Option<&Identity>;
+=======
+>>>>>>> Stashed changes
+    fn identity_for_unique_id_in_wallet_including_foreign_identites(&self, unique_id: UInt256, include_foreign_blockchain_identities: bool) -> Option<&Identity>;
+}
+
+impl Identities for Chain {
+<<<<<<< Updated upstream
+    fn identity_for_unique_id(&self, unique_id: UInt256) -> Option<&Identity> {
+        assert!(!unique_id.is_zero(), "unique_id must not be null");
+        self.identities.values().find(|&&identity| identity.unique_id == unique_id).map(|&i| i)
+    }
+    fn identity_for_unique_id_in_wallet_including_foreign_identites(&self, unique_id: UInt256, include_foreign_blockchain_identities: bool) -> Option<&Identity> {
+        assert!(!unique_id.is_zero(), "unique_id must not be null");
+        self.wallets.iter().find_map(|&wallet| if let Some(identity) = wallet.identity_for_unique_id(unique_id) {
+            Some(identity)
+        } else {
+            None
+        }).or({
+            if include_foreign_blockchain_identities {
+                self.identities_manager().foreign_blockchain_identity_with_unique_id(unique_id)
+            } else {
+                None
+            }
+        })
+=======
+    fn identity_for_unique_id_in_wallet_including_foreign_identites(&self, unique_id: UInt256, include_foreign_blockchain_identities: bool) -> Option<&Identity> {
+        todo!("impl")
+        // assert!(!unique_id.is_zero(), "unique_id must not be null");
+        // self.wallets.iter().find_map(|&wallet| if let Some(identity) = wallet.identity_for_unique_id(unique_id) {
+        //     Some(identity)
+        // } else {
+        //     None
+        // }).or({
+        //     if include_foreign_blockchain_identities {
+        //         self.identities_manager().foreign_blockchain_identity_with_unique_id(unique_id)
+        //     } else {
+        //         None
+        //     }
+        // })
+>>>>>>> Stashed changes
+    }
+}
