@@ -4,9 +4,8 @@ use crate::BytesDecodable;
 use crate::consensus::Encodable;
 
 #[repr(u16)]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Hash, Ord)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 pub enum MasternodeType {
-    #[default]
     Regular = 0,
     HighPerformance = 1,
 }
