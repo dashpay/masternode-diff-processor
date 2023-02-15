@@ -46,8 +46,8 @@ impl<'a> TryRead<'a, Endian> for MasternodeType {
     fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
         let orig = bytes.read_with::<u16>(offset, endian).unwrap();
-        let llmq_type = MasternodeType::from(orig);
-        Ok((llmq_type, 2))
+        let masternode_type = MasternodeType::from(orig);
+        Ok((masternode_type, 2))
     }
 }
 

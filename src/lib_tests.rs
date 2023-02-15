@@ -69,6 +69,15 @@ pub mod tests {
         pub merkleroot: UInt256,
     }
 
+    impl MerkleBlock {
+        pub fn new(height: u32, hash: &str, merkle_root: &str) -> MerkleBlock {
+            MerkleBlock {
+                height,
+                hash: UInt256::from_hex(hash).unwrap(),
+                merkleroot: if merkle_root.is_empty() { UInt256::MIN } else { UInt256::from_hex(merkle_root).unwrap() } }
+        }
+    }
+
     #[derive(Serialize, Deserialize)]
     struct Block {
         pub hash: String,

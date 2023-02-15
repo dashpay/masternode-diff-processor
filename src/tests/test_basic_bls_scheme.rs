@@ -224,3 +224,98 @@ fn test_dip_0027() {
     println!("Result: {:#?}", &result);
     assert_diff_result(context, result);
 }
+
+unsafe extern "C" fn get_merkle_root_for_white_russian(
+    block_hash: *mut [u8; 32],
+    _context: *const std::ffi::c_void,
+) -> *mut u8 {
+    let h = UInt256(*(block_hash));
+    // 720ea2e4e7f6b31debe9bb852e1e4cdfdf10bed9827f0ef6527cfa0261010000 -> f0597c739df147363e06988fb4132dde4fbc66418b28a4e5d74e552ad2d555d0
+    let merkle_root = UInt256::from_hex("f0597c739df147363e06988fb4132dde4fbc66418b28a4e5d74e552ad2d555d0")
+        .unwrap();
+    println!("get_merkle_root_for_white_russian: {}: {}", h, merkle_root);
+    boxed(merkle_root.0) as *mut _
+}
+
+pub unsafe extern "C" fn should_process_llmq_of_type_white_russian(
+    llmq_type: u8,
+    context: *const std::ffi::c_void,
+) -> bool {
+    llmq_type == 106
+    //println!("should_process_llmq_of_type_chacha: {}", llmq_type);
+    //true
+}
+unsafe extern "C" fn get_block_height_by_hash_white_russian(
+    block_hash: *mut [u8; 32],
+    _context: *const std::ffi::c_void,
+) -> u32 {
+    let h = UInt256(*(block_hash));
+    let orig_s = h.clone().to_string();
+    match orig_s.as_str() {
+        "739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357" => 1,
+        "720ea2e4e7f6b31debe9bb852e1e4cdfdf10bed9827f0ef6527cfa0261010000" => 4450,
+        _ => u32::MAX,
+    }
+}
+unsafe extern "C" fn get_block_hash_by_height_white_russian(
+    block_height: u32,
+    _context: *const std::ffi::c_void,
+) -> *mut u8 {
+    match block_height {
+        1 => boxed(UInt256::from_hex("739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357").unwrap().0) as *mut _,
+        4450 => boxed(UInt256::from_hex("720ea2e4e7f6b31debe9bb852e1e4cdfdf10bed9827f0ef6527cfa0261010000").unwrap().0) as *mut _,
+        _ => null_mut()
+    }
+}
+
+#[test]
+fn test_core19_beta5() {
+    let chain = ChainType::DevNet(DevnetType::WhiteRussian);
+    let genesis =
+        UInt256::from_hex("5eca658095d6639161ce74240f6fc373ba5c5f210c26468835cb853500d03b63")
+            .unwrap();
+    let processor = unsafe {
+        register_processor(
+            get_merkle_root_for_white_russian,
+            get_block_height_by_hash_white_russian,
+            get_block_hash_by_height_white_russian,
+            get_llmq_snapshot_by_block_hash_default,
+            save_llmq_snapshot_in_cache,
+            get_masternode_list_mojito,
+            masternode_list_save_in_cache,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
+            should_process_llmq_of_type_white_russian,
+            validate_llmq_callback_throuh_rust_bls,
+            hash_destroy_default,
+            snapshot_destroy_default,
+            should_process_diff_with_range_default,
+            log_default,
+        )
+    };
+    let cache = unsafe { &mut *processor_create_cache() };
+    let context = &mut (FFIContext {
+        chain,
+        is_dip_0024: false,
+        cache,
+        blocks: vec![
+            MerkleBlock::new(1, "9163d6958065ca5e73c36f0f2474ce618846260c215f5cba633bd0003585cb35", ""),
+            MerkleBlock::new(4290, "64287dd971d99adb10efdfb61097ba0fa651deda3886f3dd8e258e7364000000", ""),
+        ]
+    });
+    let bytes = message_from_file("MNL_WHITE_RUSSIAN_1_4290.dat".to_string());
+    let result = unsafe { process_mnlistdiff_from_message(
+        bytes.as_ptr(),
+        bytes.len(),
+        false,
+        true,
+        70227,
+        genesis.0.as_ptr(),
+        processor,
+        context.cache,
+        context as *mut _ as *mut std::ffi::c_void,
+    )};
+    let result = unsafe { *result };
+    println!("Result: {:#?}", &result);
+    assert_diff_result(context, result);
+}
