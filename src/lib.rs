@@ -39,6 +39,9 @@ pub mod storage;
 pub mod tx;
 pub mod types;
 pub mod util;
+pub mod environment;
+pub mod chains_manager;
+pub mod manager;
 
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
 use byte::BytesExt;

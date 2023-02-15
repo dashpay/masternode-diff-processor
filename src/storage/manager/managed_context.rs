@@ -1,8 +1,14 @@
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ManagedContext {
     // pub pool: Pool<ConnectionManager<SqliteConnection>>,
     // pub chain: &'static ChainEntity,
     // prepared_for_save: HashMap<>
+}
+
+impl ManagedContext {
+    pub const fn new_const_default() -> Self {
+        Self { /*pool: get_connection_pool()*/ }
+    }
 }
 
 impl Default for ManagedContext {

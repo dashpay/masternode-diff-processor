@@ -36,6 +36,16 @@ pub trait BytesDecodable<'a, T: TryRead<'a, Endian>> {
     }
 }
 
+// todo: migrate?
+// #[repr(C, align(32))]
+// pub union UInt256 {
+//     pub u8: [u8; 256 / 8],
+//     pub u16: [u16; 256 / 16],
+//     pub u32: [u32; 256 / 32],
+//     pub u64: [u64; 256 / 64],
+// }
+
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UInt128(pub [u8; 16]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -57,23 +67,24 @@ macro_rules! impl_bytes_decodable {
     ($var_type: ident) => {
         impl<'a> BytesDecodable<'a, $var_type> for $var_type {
             fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
-                match bytes.read_with(offset, LE) {
-                    Ok(data) => Some(data),
-                    Err(_err) => None
-                }
+                bytes.read_with(offset, LE).ok()
             }
         }
     }
 }
+// todo: replace current impl with that:
+// impl<'a, T: TryRead<'a, _>> BytesDecodable<'a, T> for T {
+//     fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<T> {
+//         bytes.read_with::<Self>(offset, byte::LE).ok()
+//     }
+// }
+
 #[macro_export]
 macro_rules! impl_bytes_decodable_lt {
     ($var_type: ident) => {
         impl<'a> BytesDecodable<'a, $var_type<'a>> for $var_type<'a> {
             fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<Self> {
-                match bytes.read_with(offset, LE) {
-                    Ok(data) => Some(data),
-                    Err(_err) => None
-                }
+                bytes.read_with(offset, LE).ok()
             }
         }
     }
@@ -716,5 +727,12 @@ impl UInt512 {
 
     pub fn bip32_seed_key(input: &[u8]) -> Self {
         Self::hmac(BIP32_SEED_KEY.as_bytes(), input)
+    }
+
+    pub fn from(a: UInt256, b: UInt256) -> Self {
+        let mut result = [0u8; 64];
+        result[..32].copy_from_slice(&a.0);
+        result[32..].copy_from_slice(&b.0);
+        Self(result)
     }
 }

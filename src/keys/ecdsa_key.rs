@@ -5,10 +5,13 @@ use hashes::sha256;
 use hashes::hex::{FromHex, ToHex};
 use secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
 use secp256k1::Secp256k1;
-use crate::chain::bip::dip14::{ckd_priv, ckd_pub};
+use crate::chain::bip::bip32::StringKey;
+use crate::chain::bip::dip14::{derive_child_private_key, derive_child_private_key_256, derive_child_public_key};
 use crate::chain::chain::Chain;
+use crate::chain::common::ChainType;
 use crate::chain::ext::Settings;
 use crate::chain::params::ScriptMap;
+use crate::chain::wallet::seed::Seed;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, BytesDecodable, clone_into_array, Zeroable};
 use crate::crypto::{ECPoint, UInt160, UInt256, UInt512};
@@ -33,7 +36,29 @@ pub struct ECDSAKey {
 
 /// Shorthands
 impl ECDSAKey {
-    pub fn key_with_secret(data: &Vec<u8>, compressed: bool) -> Option<Self> {
+    pub fn public_key_data_from_seed(seed: &[u8], compressed: bool) -> Option<Vec<u8>> {
+        Self::secret_key_from_bytes(seed)
+            .ok()
+            .map(|secret_key|
+                Self::public_key_from_secret_key_serialized(&secret_key, compressed))
+    }
+
+    pub fn key_with_secret(secret: &UInt256, compressed: bool) -> Option<Self> {
+        Self::secret_key_from_bytes(secret.as_bytes())
+            .ok()
+            .map(|seckey| Self::with_seckey(seckey, compressed))
+    }
+    pub fn key_with_combined_secret(data: &UInt512, compressed: bool) -> Option<Self> {
+        Self::secret_key_from_bytes(&data.0[..32])
+            .ok()
+            .map(|seckey| Self::with_seckey_and_chaincode(seckey, UInt256::from_bytes_force(&data.0[32..]), compressed))
+    }
+    pub fn key_with_secret_slice(data: &[u8], compressed: bool) -> Option<Self> {
+        Self::secret_key_from_bytes(data)
+            .ok()
+            .map(|seckey| Self::with_seckey(seckey, compressed))
+    }
+    pub fn key_with_secret_data(data: &Vec<u8>, compressed: bool) -> Option<Self> {
         Self::secret_key_from_bytes(data)
             .ok()
             .map(|seckey| Self::with_seckey(seckey, compressed))
@@ -41,7 +66,7 @@ impl ECDSAKey {
     pub fn key_with_secret_hex(string: &str, compressed: bool) -> Option<Self> {
         Vec::from_hex(string)
             .ok()
-            .and_then(|data| Self::key_with_secret(&data, compressed))
+            .and_then(|data| Self::key_with_secret_data(&data, compressed))
     }
 
     pub fn key_recovered_from_compact_sig(compact_sig: &Vec<u8>, message_digest: UInt256) -> Option<Self> {
@@ -76,8 +101,9 @@ impl ECDSAKey {
             .ok()
     }
 
-    pub fn init_with_seed_data(data: &Vec<u8>) -> Option<Self> {
-        let i = UInt512::bip32_seed_key(data);
+    pub fn init_with_seed_data(seed: &Seed) -> Option<Self> {
+        let i = UInt512::bip32_seed_key(&seed.data);
+        println!("ECDSAKey.init_with_seed_data: {}: {}", seed.data.to_hex(), i);
         Self::secret_key_from_bytes(&i.0[..32])
             .ok()
             .map(|seckey| Self::with_seckey_and_chaincode(seckey, UInt256::from_bytes_force(&i.0[32..]), true))
@@ -244,22 +270,38 @@ impl IKey for ECDSAKey {
         } else {
             // compact
             Self::key_recovered_from_compact_sig(signature, UInt256::from_bytes_force(message_digest))
-                .map_or(false, |mut key| key.public_key_data().eq(&self.public_key_data()))
+                .map_or(false, |key| key.public_key_data().eq(&self.public_key_data()))
         }
     }
 
-    fn public_key_data(&mut self) -> Vec<u8> {
+    fn public_key_data(&self) -> Vec<u8> {
         if self.pubkey.is_empty() && self.has_private_key() {
             // let mut d = Vec::<u8>::with_capacity(if self.compressed { 33 } else { 65 });
             let seckey = self.secret_key().unwrap();
             let pubkey = secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &seckey);
-            self.pubkey = if self.compressed {
+            let serialized = if self.compressed {
                 pubkey.serialize().to_vec()
             } else {
                 pubkey.serialize_uncompressed().to_vec()
             };
+            println!("publicKeyData: {}", serialized.to_hex());
+            return serialized;
         }
         self.pubkey.clone()
+        // if (self.pubkey.length == 0 && uint256_is_not_zero(_seckey)) {
+        //     NSMutableData *d = [NSMutableData secureDataWithLength:self.compressed ? 33 : 65];
+        //     size_t len = d.length;
+        //     secp256k1_pubkey pk;
+        //
+        //     if (secp256k1_ec_pubkey_create(_ctx, &pk, _seckey.u8)) {
+        //         secp256k1_ec_pubkey_serialize(_ctx, d.mutableBytes, &len, &pk,
+        //                                       (self.compressed ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED));
+        //         if (len == d.length) self.pubkey = d;
+        //     }
+        //     NSAssert(self.pubkey, @"Public key data should exist");
+        // }
+        // NSAssert(self.pubkey, @"Public key data should exist");
+        // return self.pubkey;
     }
 
     fn extended_private_key_data(&self) -> Option<Vec<u8>> {
@@ -278,34 +320,68 @@ impl IKey for ECDSAKey {
         }
     }
 
-    fn extended_public_key_data(&mut self) -> Option<Vec<u8>> {
+    fn extended_public_key_data(&self) -> Option<Vec<u8>> {
         if !self.is_extended {
             None
         } else {
+            println!("extended_public_key_data.fingerprint: {}", self.fingerprint);
+            println!("extended_public_key_data.chaincode: {}", self.chaincode);
+            println!("extended_public_key_data.public_key_data: {}", self.public_key_data().to_hex());
             let mut writer = Vec::<u8>::new();
             self.fingerprint.enc(&mut writer);
             self.chaincode.enc(&mut writer);
-            self.public_key_data().enc(&mut writer);
+            writer.extend(self.public_key_data());
             // assert!(writer.len() >= 4 + std:: sizeof(UInt256) + sizeof(DSECPoint), @"extended public key is wrong size");
+            println!("extended_public_key_data.result: {}", writer.to_hex());
             Some(writer)
         }
     }
 
     fn private_derive_to_path(&self, index_path: &IndexPath<u32>) -> Option<Self> where Self: Sized {
-        let chain = self.chaincode;
-        let secret = self.seckey;
-        (0..index_path.length() - 1).into_iter().for_each(|i| {
-            ckd_priv(secret, chain, index_path.index_at_position(i));
-        });
-        if let Some(mut key) = Self::key_with_secret(&secret.as_bytes().to_vec(), true) {
-            let fingerprint = key.hash160().u32_le();
-            ckd_priv(secret, chain, index_path.index_at_position(index_path.length() - 1));
-            if let Some(mut child_key) = Self::key_with_secret(&secret.as_bytes().to_vec(), true) {
-                child_key.chaincode = chain;
-                child_key.fingerprint = fingerprint;
-                child_key.is_extended = true;
-                return Some(child_key);
-            }
+        let mut secret = UInt512::from(self.seckey, self.chaincode);
+        if !index_path.is_empty() {
+            (0..index_path.length() - 1)
+                .into_iter()
+                .for_each(|i| {
+                    derive_child_private_key(&mut secret, index_path.index_at_position(i));
+                    // index_path.derive(&mut secret, i);
+                });
+        }
+        let fingerprint = Self::key_with_secret_slice(&secret.0[..32], true)
+            .map(|mut key| key.hash160().u32_le()).unwrap_or(0);
+        derive_child_private_key(&mut secret, index_path.index_at_position(index_path.length() - 1));
+        // index_path.derive(&mut secret, index_path.length() - 1);
+        if let Some(mut child_key) = Self::key_with_secret_slice(&secret.0[..32], true) {
+            child_key.chaincode = UInt256::from_bytes_force(&secret.0[32..]);
+            child_key.fingerprint = fingerprint;
+            child_key.is_extended = true;
+            return Some(child_key);
+        }
+        None
+    }
+
+    fn private_derive_to_256bit_derivation_path<DPATH>(&self, derivation_path: &DPATH) -> Option<Self>
+        // where Self: Sized, DPATH: ChildKeyDerivation {
+        where Self: Sized, DPATH: IIndexPath<Item = UInt256> {
+        let mut secret = UInt512::from(self.seckey, self.chaincode);
+        let mut fingerprint = 0u32;
+        if !derivation_path.is_empty() {
+            (0..derivation_path.length() - 1).into_iter().for_each(|i| {
+                // derivation_path.derive(&mut secret, i);
+                let derivation = derivation_path.index_at_position(i);
+                let is_hardened = derivation_path.hardened_at_position(i);
+                derive_child_private_key_256(&mut secret, &derivation, is_hardened);
+            });
+            fingerprint = Self::key_with_secret_slice(&secret.0[..32], true)
+                .map(|mut key| key.hash160().u32_le()).unwrap_or(0);
+            // derivation_path.derive(&mut secret, derivation_path.length() - 1);
+            derive_child_private_key_256(&mut secret, &derivation_path.last_index(), derivation_path.last_hardened());
+        }
+        if let Some(mut child_key) = Self::key_with_secret_slice(&secret.0[..32], true) {
+            child_key.chaincode = UInt256::from_bytes_force(&secret.0[32..]);
+            child_key.fingerprint = fingerprint;
+            child_key.is_extended = true;
+            return Some(child_key);
         }
         None
     }
@@ -344,11 +420,11 @@ impl IKey for ECDSAKey {
     }
 
 
-    fn serialized_private_key_for_chain(&self, script_map: &ScriptMap) -> String {
+    fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
         //if (uint256_is_zero(_seckey)) return nil;
         //NSMutableData *d = [NSMutableData secureDataWithCapacity:sizeof(UInt256) + 2];
         let mut writer = Vec::<u8>::new();
-        script_map.privkey.enc(&mut writer);
+        script.privkey.enc(&mut writer);
         self.seckey.enc(&mut writer);
         if self.compressed {
             b'\x01'.enc(&mut writer);
@@ -357,12 +433,27 @@ impl IKey for ECDSAKey {
     }
 
     fn forget_private_key(&mut self) {
-
+        self.public_key_data_mut();
+        self.seckey = UInt256::MIN;
     }
 }
 
 impl ECDSAKey {
 
+
+    pub(crate) fn public_key_data_mut(&mut self) -> Vec<u8> {
+        if self.pubkey.is_empty() && self.has_private_key() {
+            // let mut d = Vec::<u8>::with_capacity(if self.compressed { 33 } else { 65 });
+            let seckey = self.secret_key().unwrap();
+            let pubkey = secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &seckey);
+            self.pubkey = if self.compressed {
+                pubkey.serialize().to_vec()
+            } else {
+                pubkey.serialize_uncompressed().to_vec()
+            };
+        }
+        self.pubkey.clone()
+    }
 
     /// Pieter Wuille's compact signature encoding used for bitcoin message signing
     /// to verify a compact signature, recover a public key from the signature and verify that it matches the signer's pubkey
@@ -386,18 +477,23 @@ impl ECDSAKey {
         UInt160::hash160(&self.public_key_data())
     }
 
-    pub fn serialized_auth_private_key_from_seed(seed: &Vec<u8>, chain: &Chain) -> String {
-        let i = UInt512::bip32_seed_key(seed);
-        let mut secret = UInt256(clone_into_array(&i.0[..32]));
-        let mut chain_hash = UInt256(clone_into_array(&i.0[32..]));
+    pub fn serialized_auth_private_key_from_seed(seed: &Vec<u8>, script_map: ScriptMap) -> String {
+        let mut key = UInt512::bip32_seed_key(seed);
         // path m/1H/0 (same as copay uses for bitauth)
-        ckd_priv(secret, chain_hash, 1 | BIP32_HARD);
-        ckd_priv(secret, chain_hash, 0);
+        derive_child_private_key(&mut key, 1 | BIP32_HARD);
+        derive_child_private_key(&mut key, 0);
         let mut writer = Vec::<u8>::new();
-        chain.script().privkey.enc(&mut writer);
-        secret.enc(&mut writer);
+        script_map.privkey.enc(&mut writer);
+        writer.extend_from_slice(&key.0[..32]);
         b'\x01'.enc(&mut writer); // specifies compressed pubkey format
         base58::check_encode_slice(&writer)
+    }
+
+    pub fn serialized_private_master_key_from_seed(seed: &Vec<u8>, chain_type: ChainType) -> String {
+        let i = UInt512::bip32_seed_key(seed);
+        let secret = UInt256(clone_into_array(&i.0[..32]));
+        let chain = UInt256(clone_into_array(&i.0[32..]));
+        StringKey::serialize(0, 0, false, UInt256::MIN, chain, secret.as_bytes().to_vec(), chain_type)
     }
 
     pub fn public_key_from_extended_public_key_data(data: &Vec<u8>, index_path: &IndexPath<u32>) -> Option<Vec<u8>> {
@@ -405,10 +501,16 @@ impl ECDSAKey {
             assert!(false, "Extended public key is wrong size");
             return None;
         }
+        println!("ECDSAKey.publicKeyFromExtendedPublicKeyData.key_data: {}, index_path: {:?}", data.to_hex(), index_path);
         let mut chain = UInt256::from_bytes_force(&data[4..36]);
         let mut k = ECPoint::from_bytes_force(&data[36..69]);
-        // TODO: check if is valid
-        index_path.indexes.iter().for_each(|&i| k = ckd_pub(k, chain, i));
+        (0..index_path.length()).into_iter().for_each(|i| {
+            let derivation = index_path.index_at_position(i);
+            println!("ECDSAKey.publicKeyFromExtendedPublicKeyData.loop.{}..derivation: {}, chain: {}, pubkey: {}", i, derivation, chain, k);
+            derive_child_public_key(&mut k, &mut chain, derivation);
+            println!("ECDSAKey.publicKeyFromExtendedPublicKeyData.loop.{}.. chain: {}, pubkey: {}", i, chain, k);
+        });
+        println!("ECDSAKey.publicKeyFromExtendedPublicKeyData.result: {}", k);
         Some(k.as_bytes().to_vec())
     }
 

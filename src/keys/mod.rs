@@ -31,28 +31,31 @@ pub trait IKey: Send + Sync + Debug {
     fn private_key_data(&self) -> Option<Vec<u8>> {
         panic!("Should be overriden in implementation")
     }
-    fn public_key_data(&mut self) -> Vec<u8> {
+    fn public_key_data(&self) -> Vec<u8> {
         panic!("Should be overriden in implementation")
     }
     fn extended_private_key_data(&self) -> Option<Vec<u8>> {
         panic!("Should be overriden in implementation")
     }
-    fn extended_public_key_data(&mut self) -> Option<Vec<u8>> {
+    fn extended_public_key_data(&self) -> Option<Vec<u8>> {
         panic!("Should be overriden in implementation")
     }
     fn private_derive_to_path(&self, index_path: &IndexPath<u32>) -> Option<Self> where Self: Sized {
         panic!("Should be overriden in implementation")
     }
-    fn public_derive_to_256bit_derivation_path<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH) -> Option<Self> where Self: Sized {
-        self.public_derive_to_256bit_derivation_path_with_offset(derivation_path, 0)
-    }
-    fn public_derive_to_256bit_derivation_path_with_offset<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH, offset: usize) -> Option<Self> where Self: Sized {
-        panic!("Should be overriden in implementation")
-    }
-    fn private_derive_to_256bit_derivation_path<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH> + IIndexPath>(&self, derivation_path: &DPATH) -> Option<Self> where Self: Sized {
+    fn private_derive_to_256bit_derivation_path<DPATH>(&self, derivation_path: &DPATH) -> Option<Self>
+        where Self: Sized, DPATH: IIndexPath<Item = UInt256> {
         self.private_derive_to_path(&derivation_path.base_index_path())
     }
-    fn serialized_private_key_for_chain(&self, script_map: &ScriptMap) -> String {
+    fn public_derive_to_256bit_derivation_path<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH) -> Option<Self>
+        where Self: Sized {
+        self.public_derive_to_256bit_derivation_path_with_offset(derivation_path, 0)
+    }
+    fn public_derive_to_256bit_derivation_path_with_offset<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH, offset: usize) -> Option<Self>
+        where Self: Sized {
+        panic!("Should be overriden in implementation")
+    }
+    fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
         panic!("Should be overriden in implementation")
     }
     fn hmac_256_data(&self, data: &Vec<u8>) -> UInt256 {

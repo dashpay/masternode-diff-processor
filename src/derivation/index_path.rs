@@ -98,6 +98,12 @@ pub trait IIndexPath: Sized {
                 .map(|position| self.index_u64_at_position(position) as u32)
                 .collect())
     }
+    fn last_index(&self) -> Self::Item {
+        self.index_at_position(self.length() - 1)
+    }
+    fn last_hardened(&self) -> bool {
+        self.hardened_at_position(self.length() - 1)
+    }
     fn indexes(&self) -> &Vec<Self::Item>;
     fn hardened_indexes(&self) -> &Vec<bool>;
     fn index_at_position(&self, position: usize) -> Self::Item {
@@ -189,6 +195,7 @@ pub trait IIndexPath: Sized {
         writer
     }
 
+    // fn derive_child(&self, key: &mut UInt512, position: usize);
 }
 
 #[derive(Debug, Default)]
@@ -211,4 +218,8 @@ impl<T> IIndexPath for IndexPath<T> where T: Copy + Debug + Display + Encodable 
     fn hardened_indexes(&self) -> &Vec<bool> {
         &self.hardened
     }
+
+    // fn derive_child(&self, key: &mut UInt512, position: usize) {
+    //     todo!()
+    // }
 }

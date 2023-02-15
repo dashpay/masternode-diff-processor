@@ -1,8 +1,6 @@
 use byte::BytesExt;
-use byte::ctx::Bytes;
 use hashes::{Hash, sha256d};
 use crate::chain::common::ChainType;
-use crate::chain::params::Params;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::clone_into_array;
 use crate::crypto::UInt256;
@@ -18,7 +16,7 @@ pub enum Error {
     /// Checksum was not correct (expected, actual)
     BadChecksum(u32, u32),
     /// Checksum was not correct (expected, actual)
-    InvalidAddress(&'static [u8]),
+    InvalidAddress([u8; 4]),
 
     /// The length (in bytes) of the object was not correct
     /// Note that if the length is excessively long the provided length may be
@@ -52,7 +50,7 @@ impl Key {
         let mut writer = Vec::<u8>::new();
         self.fingerprint.enc(&mut writer);
         self.chain.enc(&mut writer);
-        self.data.enc(&mut writer);
+        writer.extend_from_slice(&self.data);
         writer
     }
 }
@@ -93,7 +91,7 @@ impl Key {
 // }
 
 impl Key {
-    pub fn serialize(&self, params: &Params) -> String {
+    pub fn serialize(&self, chain_type: ChainType) -> String {
         if self.child.is_31_bits() {
             let mut child = u32::from_le_bytes(clone_into_array(&self.child.0[..4]));
             if self.hardened {
@@ -103,7 +101,7 @@ impl Key {
             // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:14 + key.length + sizeof(chain)])
             let mut writer = Vec::<u8>::with_capacity(14 + self.data.len() + std::mem::size_of::<UInt256>());
             let is_priv = self.data.len() < 33;
-            writer.extend_from_slice(&if is_priv { params.bip32_script_map.xprv } else { params.bip32_script_map.xpub }); // 4
+            writer.extend_from_slice(&if is_priv { chain_type.bip32_script_map().xprv } else { chain_type.bip32_script_map().xpub }); // 4
             self.depth.enc(&mut writer);             // 5
             self.fingerprint.enc(&mut writer);       // 9
             child.enc(&mut writer);             // 13
@@ -111,13 +109,13 @@ impl Key {
             if is_priv {
                 b'\0'.enc(&mut writer);              // 46 (prv) / 45 (pub)
             }
-            self.data.enc(&mut writer);              // 78 (prv) / 78 (pub)
+            writer.extend_from_slice(self.data.as_slice()); // 78 (prv) / 78 (pub)
             base58::check_encode_slice(&writer)
         } else {
             // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:47 + key.length + sizeof(chain)])
             let mut writer = Vec::<u8>::with_capacity(47 + self.data.len() + std::mem::size_of::<UInt256>());
             let is_priv = self.data.len() < 33;
-            writer.extend_from_slice(&if is_priv { params.dip14_script_map.dps } else { params.dip14_script_map.dpp }); // 4
+            writer.extend_from_slice(&if is_priv { chain_type.dip14_script_map().dps } else { chain_type.dip14_script_map().dpp }); // 4
             self.depth.enc(&mut writer);             // 5
             self.fingerprint.enc(&mut writer);       // 9
             self.hardened.enc(&mut writer);          // 10
@@ -126,28 +124,34 @@ impl Key {
             if is_priv {
                 b'\0'.enc(&mut writer);              // 75 (prv) / 74 (pub)
             }
-            self.data.enc(&mut writer);              // 107 (prv) / 107 (pub)
+            writer.extend_from_slice(self.data.as_slice()); // 107 (prv) / 107 (pub)
             base58::check_encode_slice(&writer)
         }
 
     }
 }
-fn from_message(all_data: &'static [u8], params: &Params) -> Result<Key, Error> {
-    // let mut offset = &mut 4;
-    let len = all_data.len();
-    let len_4 = len - 4;
-    let mut offset = &mut 0;
-    let data: &[u8] = all_data.read_with(&mut 0, Bytes::Len(len_4)).unwrap();
-    let checked_data: &[u8] = all_data.read_with(&mut len_4.clone(), Bytes::Len(4)).unwrap();
-    let head: &[u8] = data.read_with(&mut offset, Bytes::Len(4)).unwrap();
+
+fn split_msg(message: Vec<u8>, mid: usize) -> (Vec<u8>, Vec<u8>) {
+    let (data, checked_data) = message.split_at(mid);
+    (data.to_vec(), checked_data.to_vec())
+}
+
+fn from_message(message: Vec<u8>, chain_type: ChainType) -> Result<Key, Error> {
+    let len = message.len();
+    let mid = len - 4;
+    let (data, checked_data) = split_msg(message, len - 4);
+    let (head, tail) = split_msg(data.clone(), 4);
     let expected = endian::slice_to_u32_le(&sha256d::Hash::hash(&data)[..4]);
-    let actual = endian::slice_to_u32_le(checked_data);
+    let actual = endian::slice_to_u32_le(&checked_data);
+    let header: [u8; 4] = clone_into_array(&head);
+    let mut offset = &mut 4;
     match (expected == actual, len) {
         (true, 82) => {
             // 32
             // todo: maybe we need to check testnet script map too
-            if params.bip32_script_map.xpub.ne(head) && params.bip32_script_map.xprv.ne(head) {
-                return Err(Error::InvalidAddress(head));
+            if chain_type.bip32_script_map().xpub.ne(&header) &&
+                chain_type.bip32_script_map().xprv.ne(&header) {
+                return Err(Error::InvalidAddress(header));
             }
             // if !data.eq(params.bip32_script_map.xpub) &&
             //     !data.eq(params.bip32_script_map.xprv) {
@@ -164,21 +168,19 @@ fn from_message(all_data: &'static [u8], params: &Params) -> Result<Key, Error> 
             let fingerprint = data.read_with::<u32>(&mut offset, byte::LE).unwrap();
             let child_32 = data.read_with::<u32>(&mut offset, byte::BE).unwrap();
             let chain = data.read_with::<UInt256>(&mut offset, byte::LE).unwrap();
-            if params.bip32_script_map.xprv.eq(data) {
+            if chain_type.bip32_script_map().xprv.eq(&header) {
                 *offset += 1;
             }
             let hardened = (child_32 & BIP32_HARD) > 0;
             let child = UInt256::from(child_32 & !BIP32_HARD);
-            let mut d = Vec::<u8>::new();
-            d.extend_from_slice(&data[*offset..]);
-            // let d: &[u8] = data.read_with(&mut offset, Bytes::Len(data.len() - *offset)).unwrap();
+            let d = Vec::<u8>::from(&data[*offset..]);
             Ok(Key { depth, fingerprint, child, chain, data: d, hardened })
         },
         (true, 111) => {
             // 256
             // todo: maybe we need to check testnet script map too
-            if params.dip14_script_map.dps.ne(data) && params.dip14_script_map.dpp.ne(data) {
-                return Err(Error::InvalidAddress(data));
+            if chain_type.dip14_script_map().dps.ne(&header) && chain_type.dip14_script_map().dpp.ne(&header) {
+                return Err(Error::InvalidAddress(header));
             }
             // if !data.eq(params.dip14_script_map.dps) &&
             //     !data.eq(params.dip14_script_map.dpp) {
@@ -190,7 +192,7 @@ fn from_message(all_data: &'static [u8], params: &Params) -> Result<Key, Error> 
             let hardened = data.read_with::<u8>(&mut offset, byte::LE).unwrap() >= 0;
             let child = data.read_with::<UInt256>(&mut offset, byte::LE).unwrap();
             let chain = data.read_with::<UInt256>(&mut offset, byte::LE).unwrap();
-            if data.eq(&if params.chain_type == ChainType::MainNet { params.dip14_script_map.dps } else { params.bip32_script_map.xprv }) {
+            if data.eq(&if chain_type == ChainType::MainNet { chain_type.dip14_script_map().dps } else { chain_type.bip32_script_map().xprv }) {
                 *offset += 1;
             }
             let mut d = Vec::<u8>::new();
@@ -198,7 +200,7 @@ fn from_message(all_data: &'static [u8], params: &Params) -> Result<Key, Error> 
             // let d: &[u8] = data.read_with(&mut offset, Bytes::Len(data.len() - *offset)).unwrap();
             Ok(Key { depth, fingerprint, child, chain, data: d, hardened })
         },
-        (true, _) => Err(Error::InvalidLength(all_data.len())),
+        (true, _) => Err(Error::InvalidLength(len)),
         _ => Err(Error::BadChecksum(expected, actual)),
     }
 
@@ -229,16 +231,16 @@ fn from_message(all_data: &'static [u8], params: &Params) -> Result<Key, Error> 
 }
 
 // Decode base58-encoded string into bip32 private key
-pub fn from(data: &String, params: &Params) -> Result<Key, Error> {
-    todo!()
-    // base58::from(data.as_str())
-    //     .map_err(base58::Error::into)
-    //     .and_then(|message| from_message(&message, params))
+pub fn from(data: &String, chain_type: ChainType) -> Result<Key, Error> {
+    base58::from(data.as_str())
+        .map_err(base58::Error::into)
+        .and_then(|message| from_message(message, chain_type))
 }
 
 pub mod StringKey {
     use byte::BytesExt;
-    use crate::chain::params::Params;
+    use hashes::hex::ToHex;
+    use crate::chain::common::ChainType;
     use crate::consensus::Encodable;
     use crate::crypto::byte_util::clone_into_array;
     use crate::crypto::UInt256;
@@ -246,11 +248,11 @@ pub mod StringKey {
     use crate::util::base58;
 
     // helper function for serializing BIP32 master public/private keys to standard export format
-    fn deserialize(data: &str, mut depth: u8, mut fingerprint: u32, mut hardened: bool, mut child: UInt256, mut chain: UInt256, params: &Params) -> Option<Vec<u8>> {
+    fn deserialize(data: &str, mut depth: u8, mut fingerprint: u32, mut hardened: bool, mut child: UInt256, mut chain: UInt256, chain_type: ChainType) -> Option<Vec<u8>> {
         match base58::from(data) {
             Ok(all_data) if all_data.len() == 82 => {
                 let mut child_32 = 0u32;
-                match deserialize_32(data, depth, fingerprint, child_32, chain, params) {
+                match deserialize_32(data, depth, fingerprint, child_32, chain, chain_type) {
                     Some(key) => {
                         child_32 = child_32.swap_bytes();
                         hardened = (child_32 & BIP32_HARD) > 0;
@@ -260,12 +262,12 @@ pub mod StringKey {
                     None => None
                 }
             }
-            Ok(all_data) if all_data.len() == 111 => deserialize_256(data, depth, fingerprint, hardened, child, chain, params),
+            Ok(all_data) if all_data.len() == 111 => deserialize_256(data, depth, fingerprint, hardened, child, chain, chain_type),
             _ => None
         }
     }
     // helper function for serializing BIP32 master public/private keys to standard export format
-    fn deserialize_32(data: &str, mut depth: u8, mut fingerprint: u32, mut child: u32, mut chain: UInt256, params: &Params) -> Option<Vec<u8>> {
+    fn deserialize_32(data: &str, mut depth: u8, mut fingerprint: u32, mut child: u32, mut chain: UInt256, chain_type: ChainType) -> Option<Vec<u8>> {
         match base58::from(data) {
             Ok(all_data) if all_data.len() == 82 => {
                 let len_4 = all_data.len() - 4;
@@ -276,7 +278,7 @@ pub mod StringKey {
                     return None;
                 }
                 // todo: maybe we need to check testnet script map too
-                if params.bip32_script_map.xpub.ne(data) && params.bip32_script_map.xprv.ne(data) {
+                if chain_type.bip32_script_map().xpub.ne(data) && chain_type.bip32_script_map().xprv.ne(data) {
                     return None;
                 }
                 // if !data.eq(params.bip32_script_map.xpub) &&
@@ -288,7 +290,7 @@ pub mod StringKey {
                 fingerprint = data.read_with::<u32>(offset, byte::LE).unwrap();
                 child = data.read_with::<u32>(offset, byte::LE).unwrap();
                 chain = data.read_with::<UInt256>(offset, byte::LE).unwrap();
-                if params.bip32_script_map.xprv.eq(data) {
+                if chain_type.bip32_script_map().xprv.eq(data) {
                     *offset += 1;
                 }
                 // if data.eq(params.bip32_script_map.xprv) {
@@ -300,7 +302,7 @@ pub mod StringKey {
         }
     }
     // helper function for serializing BIP32 master public/private keys to standard export format
-    fn deserialize_256(data: &str, mut depth: u8, mut fingerprint: u32, mut hardened: bool, mut child: UInt256, mut chain: UInt256, params: &Params) -> Option<Vec<u8>> {
+    fn deserialize_256(data: &str, mut depth: u8, mut fingerprint: u32, mut hardened: bool, mut child: UInt256, mut chain: UInt256, chain_type: ChainType) -> Option<Vec<u8>> {
         match base58::from(data) {
             Ok(all_data) if all_data.len() == 111 => {
                 let len_4 = all_data.len() - 4;
@@ -311,7 +313,7 @@ pub mod StringKey {
                     return None;
                 }
                 // todo: maybe we need to check testnet script map too
-                if params.dip14_script_map.dps.ne(data) && params.dip14_script_map.dpp.ne(data) {
+                if chain_type.dip14_script_map().dps.ne(data) && chain_type.dip14_script_map().dpp.ne(data) {
                     return None;
                 }
 
@@ -326,7 +328,7 @@ pub mod StringKey {
                 hardened = data.read_with::<u8>(offset, byte::LE).unwrap() >= 0;
                 child = data.read_with::<UInt256>(offset, byte::LE).unwrap();
                 chain = data.read_with::<UInt256>(offset, byte::LE).unwrap();
-                if params.bip32_256_script().eq(data) {
+                if if chain_type.is_mainnet() { chain_type.dip14_script_map().dps } else { chain_type.bip32_script_map().xprv }.eq(data) {
                     *offset += 1;
                 }
                 Some(data[*offset..data.len()].to_vec())
@@ -336,25 +338,25 @@ pub mod StringKey {
     }
 
     // helper function for serializing BIP32 master public/private keys to standard export format
-    pub(crate) fn serialize(depth: u8, fingerprint: u32, hardened: bool, child: UInt256, chain: UInt256, key: Vec<u8>, params: &Params) -> String {
+    pub(crate) fn serialize(depth: u8, fingerprint: u32, hardened: bool, child: UInt256, chain: UInt256, key: Vec<u8>, chain_type: ChainType) -> String {
         if child.is_31_bits() {
             let mut small_i = u32::from_le_bytes(clone_into_array(&child.0[..4]));
             if hardened {
                 small_i |= BIP32_HARD;
             }
             small_i = small_i.swap_bytes();
-            serialize_32(depth, fingerprint, small_i, chain, key, params)
+            serialize_32(depth, fingerprint, small_i, chain, key, chain_type)
         } else {
-            serialize_256(depth, fingerprint, hardened, child, chain, key, params)
+            serialize_256(depth, fingerprint, hardened, child, chain, key, chain_type)
         }
     }
 
     // helper function for serializing BIP32 master public/private keys to standard export format
-    fn serialize_32(depth: u8, fingerprint: u32, child: u32, chain: UInt256, key: Vec<u8>, params: &Params) -> String {
+    fn serialize_32(depth: u8, fingerprint: u32, child: u32, chain: UInt256, key: Vec<u8>, chain_type: ChainType) -> String {
         // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:14 + key.length + sizeof(chain)])
         let mut writer = Vec::<u8>::with_capacity(14 + key.len() + std::mem::size_of::<UInt256>());
         let is_priv = key.len() < 33;
-        writer.extend_from_slice(&if is_priv { params.bip32_script_map.xprv } else { params.bip32_script_map.xpub }); // 4
+        writer.extend_from_slice(&if is_priv { chain_type.bip32_script_map().xprv } else { chain_type.bip32_script_map().xpub }); // 4
         depth.enc(&mut writer);             // 5
         fingerprint.enc(&mut writer);       // 9
         child.enc(&mut writer);             // 13
@@ -362,16 +364,20 @@ pub mod StringKey {
         if is_priv {
             b'\0'.enc(&mut writer);         // 46 (prv) / 45 (pub)
         }
-        key.enc(&mut writer);               // 78 (prv) / 78 (pub)
+        writer.extend(key);            // 78 (prv) / 78 (pub)
+        println!("serialize_32: {}", writer.to_hex());
+        //serialize_32: 0488b21e013442193e8000000047fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141035a784662a4a20a65bf6aab9ae98a6c068a81c52e4b032c0fb5400c706cfccc56
+
         base58::check_encode_slice(&writer)
     }
-
+    // real: 0488b21e000000000000000000873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508210339a36013301597daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2
+    // test: 0488b21e000000000000000000873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d5080339a36013301597daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2
     // helper function for serializing BIP32 master public/private keys to standard export format
-    fn serialize_256(depth: u8, fingerprint: u32, hardened: bool, child: UInt256, chain: UInt256, key: Vec<u8>, params: &Params) -> String {
+    fn serialize_256(depth: u8, fingerprint: u32, hardened: bool, child: UInt256, chain: UInt256, key: Vec<u8>, chain_type: ChainType) -> String {
         // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:47 + key.length + sizeof(chain)])
         let mut writer = Vec::<u8>::with_capacity(47 + key.len() + std::mem::size_of::<UInt256>());
         let is_priv = key.len() < 33;
-        writer.extend_from_slice(&if is_priv { params.dip14_script_map.dps } else { params.dip14_script_map.dpp }); // 4
+        writer.extend_from_slice(&if is_priv { chain_type.dip14_script_map().dps } else { chain_type.dip14_script_map().dpp }); // 4
         depth.enc(&mut writer);             // 5
         fingerprint.enc(&mut writer);       // 9
         hardened.enc(&mut writer);          // 10

@@ -316,9 +316,6 @@ impl<'a> TryWrite<Endian> for LLMQType {
 }
 impl<'a> BytesDecodable<'a, LLMQType> for LLMQType {
     fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<LLMQType> {
-        match bytes.read_with::<LLMQType>(offset, byte::LE) {
-            Ok(data) => Some(data),
-            Err(_err) => None,
-        }
+        bytes.read_with::<Self>(offset, byte::LE).ok()
     }
 }

@@ -1,13 +1,14 @@
 use crate::chain::Chain;
 use crate::platform::identity::identity::Identity;
 use crate::UInt256;
+use crate::util::Shared;
 
 pub trait Identities {
-    fn identity_for_unique_id_in_wallet_including_foreign_identites(&self, unique_id: UInt256, include_foreign_blockchain_identities: bool) -> Option<&Identity>;
+    fn identity_for_unique_id_in_wallet_including_foreign_identites(&self, unique_id: UInt256, include_foreign_blockchain_identities: bool) -> Option<Identity>;
 }
 
-impl Identities for Chain {
-    fn identity_for_unique_id_in_wallet_including_foreign_identites(&self, unique_id: UInt256, include_foreign_blockchain_identities: bool) -> Option<&Identity> {
+impl Identities for Shared<Chain> {
+    fn identity_for_unique_id_in_wallet_including_foreign_identites(&self, unique_id: UInt256, include_foreign_blockchain_identities: bool) -> Option<Identity> {
         todo!("impl")
         // assert!(!unique_id.is_zero(), "unique_id must not be null");
         // self.wallets.iter().find_map(|&wallet| if let Some(identity) = wallet.identity_for_unique_id(unique_id) {

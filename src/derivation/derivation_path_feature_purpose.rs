@@ -1,5 +1,6 @@
 use crate::crypto::UInt256;
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum DerivationPathFeaturePurpose {
     Default = 9,
     Identities = 5,
@@ -13,43 +14,27 @@ pub enum DerivationPathFeaturePurpose {
 impl From<u32> for DerivationPathFeaturePurpose {
     fn from(orig: u32) -> Self {
         match orig {
-            0 => DerivationPathFeaturePurpose::IdentitiesSubfeatureAuthentication,
-            1 => DerivationPathFeaturePurpose::IdentitiesSubfeatureRegistration,
-            2 => DerivationPathFeaturePurpose::IdentitiesSubfeatureTopup,
-            3 => DerivationPathFeaturePurpose::IdentitiesSubfeatureInvitations,
-            5 => DerivationPathFeaturePurpose::Identities,
-            9 => DerivationPathFeaturePurpose::Default,
-            15 => DerivationPathFeaturePurpose::DashPay,
-            _ => DerivationPathFeaturePurpose::Default,
+            0 => Self::IdentitiesSubfeatureAuthentication,
+            1 => Self::IdentitiesSubfeatureRegistration,
+            2 => Self::IdentitiesSubfeatureTopup,
+            3 => Self::IdentitiesSubfeatureInvitations,
+            5 => Self::Identities,
+            9 => Self::Default,
+            15 => Self::DashPay,
+            _ => Self::Default,
         }
     }
 }
 
 impl From<DerivationPathFeaturePurpose> for u32 {
-    fn from(value: DerivationPathFeaturePurpose) -> Self {
-        match value {
-            DerivationPathFeaturePurpose::Default => 9,
-            DerivationPathFeaturePurpose::Identities => 5,
-            DerivationPathFeaturePurpose::IdentitiesSubfeatureAuthentication => 0,
-            DerivationPathFeaturePurpose::IdentitiesSubfeatureRegistration => 1,
-            DerivationPathFeaturePurpose::IdentitiesSubfeatureTopup => 2,
-            DerivationPathFeaturePurpose::IdentitiesSubfeatureInvitations => 3,
-            DerivationPathFeaturePurpose::DashPay => 15,
-        }
+    fn from(value: DerivationPathFeaturePurpose) -> u32 {
+        value as u32
     }
 }
 
 impl From<DerivationPathFeaturePurpose> for UInt256 {
-    fn from(value: DerivationPathFeaturePurpose) -> Self {
-        match value {
-            DerivationPathFeaturePurpose::Default => UInt256::from(9u32),
-            DerivationPathFeaturePurpose::Identities => UInt256::from(5u32),
-            DerivationPathFeaturePurpose::IdentitiesSubfeatureAuthentication => UInt256::MIN,
-            DerivationPathFeaturePurpose::IdentitiesSubfeatureRegistration => UInt256::from(1u32),
-            DerivationPathFeaturePurpose::IdentitiesSubfeatureTopup => UInt256::from(2u32),
-            DerivationPathFeaturePurpose::IdentitiesSubfeatureInvitations => UInt256::from(3u32),
-            DerivationPathFeaturePurpose::DashPay => UInt256::from(15u32),
-        }
+    fn from(value: DerivationPathFeaturePurpose) -> UInt256 {
+        UInt256::from(u32::from(value))
     }
 }
 

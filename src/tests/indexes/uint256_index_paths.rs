@@ -30,7 +30,7 @@ fn perform_tests_for_indexes(indexes: Vec<UInt256>) {
 
     if length > 2 {
         let slice_length = length - 2;
-        new_index_path = new_index_path.index_path_by_removing_last_index();
+        // new_index_path = new_index_path.index_path_by_removing_last_index();
         new_index_path = UInt256IndexPath::index_path_with_indexes(index_path.indexes()[1..slice_length+1].to_vec());
         assert_eq!(new_index_path.length(), slice_length)
     }

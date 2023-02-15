@@ -1,5 +1,6 @@
 use hashes::hex::FromHex;
 use crate::chain::common::LLMQType;
+use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap};
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 
@@ -12,6 +13,7 @@ pub trait IHaveChainSettings {
     fn chain_locks_type(&self) -> LLMQType;
     fn platform_type(&self) -> LLMQType;
     fn should_process_llmq_of_type(&self, llmq_type: LLMQType) -> bool;
+    fn is_evolution_enabled(&self) -> bool;
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
@@ -107,6 +109,25 @@ impl ChainType {
             ChainType::DevNet(_) => vec![]
         }
     }
+
+    pub fn script_map(&self) -> ScriptMap {
+        match self {
+            ChainType::MainNet => ScriptMap::MAINNET,
+            _ => ScriptMap::TESTNET
+        }
+    }
+    pub fn bip32_script_map(&self) -> BIP32ScriptMap {
+        match self {
+            ChainType::MainNet => BIP32ScriptMap::MAINNET,
+            _ => BIP32ScriptMap::TESTNET
+        }
+    }
+    pub fn dip14_script_map(&self) -> DIP14ScriptMap {
+        match self {
+            ChainType::MainNet => DIP14ScriptMap::MAINNET,
+            _ => DIP14ScriptMap::TESTNET
+        }
+    }
 }
 
 impl IHaveChainSettings for ChainType {
@@ -159,6 +180,9 @@ impl IHaveChainSettings for ChainType {
             self.isd_llmq_type() == llmq_type
     }
 
+    fn is_evolution_enabled(&self) -> bool {
+        false
+    }
 }
 
 impl IHaveChainSettings for DevnetType {
@@ -191,5 +215,9 @@ impl IHaveChainSettings for DevnetType {
             self.is_llmq_type() == llmq_type ||
             self.platform_type() == llmq_type ||
             self.isd_llmq_type() == llmq_type
+    }
+
+    fn is_evolution_enabled(&self) -> bool {
+        false
     }
 }

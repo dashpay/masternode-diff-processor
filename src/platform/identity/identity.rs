@@ -1,6 +1,6 @@
 use crate::UInt256;
 
-#[derive(Debug, Default, Eq)]
+#[derive(Clone, Debug, Default, Eq)]
 pub struct Identity {
     /// This is the unique identifier representing the blockchain identity.
     /// It is derived from the credit funding transaction credit burn UTXO (as of dpp v10).

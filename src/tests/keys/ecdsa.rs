@@ -3,7 +3,6 @@ use hashes::{sha256, Hash};
 
 use crate::UInt256;
 use crate::chain::ext::Settings;
-use crate::chain::params::MAINNET_PARAMS;
 use crate::chain::Chain;
 use crate::keys::{CryptoData, DHKey, ECDSAKey, IKey};
 use crate::util::Address::is_valid_dash_private_key;
@@ -26,14 +25,14 @@ fn test_sign_key(secret: &str, message: &str, compressed: bool, test_signature: 
 
 fn test_compact_signature_recovery(signature: &Vec<u8>, md: UInt256, test_data: Vec<u8>) {
     match ECDSAKey::key_recovered_from_compact_sig(&signature, md) {
-        Some(mut key) => assert_eq!(key.public_key_data(), test_data, "public key data doesn't match"),
+        Some(key) => assert_eq!(key.public_key_data(), test_data, "public key data doesn't match"),
         _ => panic!("Key can't recovered")
     }
 }
 
 fn test_compact_signature_key(secret: &str, message: &str, compressed: bool) {
     match ECDSAKey::key_with_secret_hex(secret, compressed) {
-        Some(mut key) => {
+        Some(key) => {
             let message_digest = UInt256::sha256_str(message);
             let sig = key.compact_sign(message_digest);
             test_compact_signature_recovery(&sig, message_digest, key.public_key_data());
@@ -52,7 +51,7 @@ fn test_restore_compact_signatures_from_base58(signature: &str, message: &str, t
 
 #[test]
 pub fn test_key_with_private_key() {
-    let chain = Chain { params: MAINNET_PARAMS, wallets: vec![] };
+    let chain = Chain::create_mainnet();
     // wrong private key
     assert!(!is_valid_dash_private_key("7s18Ypj1scza76SPf56Jm9zraxSrv58TgzmxwuDXoauvV84ud61", &chain.script()), "valid when invalid");
     assert!(ECDSAKey::key_with_private_key("hello", &chain).is_none(), "valid when totally invalid");
@@ -72,7 +71,7 @@ pub fn test_key_with_private_key() {
             let addr = key.address_with_public_key_data(&chain.script());
             assert_eq!("XbKPGyV1BpzzxNAggx6Q9a6o7GaBWTLhJS", addr.as_str(), "addresses don't match");
             // compressed private key export
-            assert_eq!("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", key.serialized_private_key_for_chain(&chain.script()).as_str(), "serialized_private_key_for_chain");
+            assert_eq!("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", key.serialized_private_key_for_script(&chain.script()).as_str(), "serialized_private_key_for_script");
         },
         None => { assert!(false, "Key is invalid"); }
     };
@@ -151,7 +150,7 @@ fn test_ecdsa_encryption_and_decryption() {
     let bob_secret = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140";
     let mut bob_key_pair = ECDSAKey::key_with_secret_hex(bob_secret, true).unwrap();
     let secret = "my little secret is a pony that never sleeps";
-    let mut key = ECDSAKey::init_with_dh_key_exchange_with_public_key(&mut bob_key_pair, &alice_key_pair).unwrap();
+    let key = ECDSAKey::init_with_dh_key_exchange_with_public_key(&mut bob_key_pair, &alice_key_pair).unwrap();
     assert_eq!(key.public_key_data().to_hex(), "fbd27dbb9e7f471bf3de3704a35e884e37d35c676dc2cc8c3cc574c3962376d2", "they should be the same data");
     // Alice is sending to Bob
     let mut secret_data = secret.as_bytes().to_vec();

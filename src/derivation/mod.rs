@@ -9,9 +9,15 @@ pub mod index_path;
 pub mod protocol;
 pub mod sequence_gap_limit;
 pub mod uint256_index_path;
+pub mod credit_funding_derivation_path;
+pub mod simple_indexed_derivation_path;
+pub mod masternode_holdings_derivation_path;
+pub mod authentication_keys_derivation_path;
+pub mod factory;
 
 use crate::chain::bip::bip32;
-use crate::chain::params::Params;
+use crate::chain::common::ChainType;
+use crate::keys::KeyType;
 use crate::storage::manager::managed_context::ManagedContext;
 use crate::UInt256;
 
@@ -25,6 +31,8 @@ pub const DERIVATION_PATH_STANDALONE_INFO_DICTIONARY_LOCATION: &str = "DP_SIDL";
 pub const DERIVATION_PATH_STANDALONE_INFO_TERMINAL_INDEX: &str = "DP_SI_T_INDEX";
 pub const DERIVATION_PATH_STANDALONE_INFO_TERMINAL_HARDENED: &str = "DP_SI_T_HARDENED";
 pub const DERIVATION_PATH_STANDALONE_INFO_DEPTH: &str = "DP_SI_DEPTH";
+
+pub const DERIVATION_PATH_IS_USED_KEY: &str = "DERIVATION_PATH_IS_USED_KEY";
 
 pub fn string_representation_of_derivation_path_index(index: &UInt256, hardened: bool, context: Option<&ManagedContext>) -> String {
     let hardened_str = if hardened { "'" } else { "" };
@@ -44,23 +52,32 @@ pub fn string_representation_of_derivation_path_index(index: &UInt256, hardened:
     }
 }
 
-fn standalone_extended_public_key_location_string_for_unique_id(unique_id: &String) -> String {
+pub fn standalone_extended_public_key_location_string_for_unique_id(unique_id: &str) -> String {
     format!("{}_{}", DERIVATION_PATH_EXTENDED_PUBLIC_KEY_STANDALONE_BASED_LOCATION, unique_id)
 }
 
-fn standalone_info_dictionary_location_string_for_unique_id(unique_id: &String) -> String {
+fn standalone_info_dictionary_location_string_for_unique_id(unique_id: &str) -> String {
     format!("{}_{}", DERIVATION_PATH_STANDALONE_INFO_DICTIONARY_LOCATION, unique_id)
 }
 
-fn wallet_based_extended_public_key_location_string_for_unique_id(unique_id: &String) -> String {
+pub fn wallet_based_extended_public_key_location_string_for_unique_id(unique_id: &str) -> String {
     format!("{}_{}", DERIVATION_PATH_EXTENDED_PUBLIC_KEY_WALLET_BASED_LOCATION, unique_id)
 }
 
-pub fn wallet_based_extended_private_key_location_string_for_unique_id(unique_id: &String) -> String {
+pub fn wallet_based_extended_private_key_location_string_for_unique_id(unique_id: &str) -> String {
     format!("{}_{}", DERIVATION_PATH_EXTENDED_SECRET_KEY_WALLET_BASED_LOCATION, unique_id)
 }
 
+pub fn wallet_based_extended_public_key_location_string_for_unique_id_and_key_type(unique_id: &str, key_type: KeyType, index_path_string: String) -> String {
+    format!("{}{}{}", wallet_based_extended_public_key_location_string_for_unique_id(unique_id), key_type.derivation_string(), index_path_string)
+}
 
-fn deserialized_extended_public_key_for_chain(extended_public_key_string: &String, params: &Params) -> Result<bip32::Key, bip32::Error> {
-    bip32::from(extended_public_key_string, params)
+
+fn deserialized_extended_public_key_for_chain(extended_public_key_string: &String, chain_type: ChainType) -> Result<bip32::Key, bip32::Error> {
+    bip32::from(extended_public_key_string, chain_type)
+}
+
+
+pub fn has_known_balance_unique_id(unique_id: String, reference: u32) -> String {
+    format!("{}_{}_{}", DERIVATION_PATH_IS_USED_KEY, unique_id, reference)
 }

@@ -2,3 +2,5 @@
 # symbols won't be available until runtime
 #rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup
 #rustflags = ["-C", "prefer-dynamic"]
+[target.'cfg(all(target_os = "macos"))']
+runner = "./macos_runner.sh"

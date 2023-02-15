@@ -1,41 +1,43 @@
 use std::collections::HashSet;
+use hashes::hex::ToHex;
 use crate::chain::{Chain, Wallet};
-use crate::chain::wallet::Account;
+use crate::chain::bip::bip32;
+use crate::chain::common::ChainType;
 use crate::UInt256;
-use crate::chain::ext::Settings;
-use crate::derivation::derivation_path_kind::DerivationPathKind;
+use crate::chain::wallet::seed::Seed;
 use crate::derivation::derivation_path_reference::DerivationPathReference;
 use crate::derivation::derivation_path_type::DerivationPathType;
 use crate::derivation::index_path::{IIndexPath, IndexPath};
 use crate::derivation::protocol::IDerivationPath;
 use crate::derivation::uint256_index_path::UInt256IndexPath;
-use crate::derivation::{standalone_extended_public_key_location_string_for_unique_id, wallet_based_extended_public_key_location_string_for_unique_id};
+use crate::derivation::derivation_path_feature_purpose::DerivationPathFeaturePurpose;
+use crate::derivation::{standalone_extended_public_key_location_string_for_unique_id, wallet_based_extended_private_key_location_string_for_unique_id, wallet_based_extended_public_key_location_string_for_unique_id};
 use crate::keys::IKey;
 use crate::keys::key::{Key, KeyType};
 use crate::storage::keychain::Keychain;
-use crate::storage::manager::managed_context::ManagedContext;
+use crate::util::Shared;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct DerivationPath {
     pub base: UInt256IndexPath,
+    pub chain: Shared<Chain>,
+    pub chain_type: ChainType,
+    pub wallet: Option<Shared<Wallet>>,
+    pub wallet_unique_id: Option<String>,
     pub hardened_indexes: Vec<bool>,
     /// is this an open account
     pub r#type: DerivationPathType,
     pub signing_algorithm: KeyType,
-    /// account for the derivation path
-    pub chain: &'static Chain,
-    /// account for the derivation path
-    pub account: Option<&'static Account>,
-    pub wallet: Option<&'static Wallet>,
+
     /// extended Public Key
     pub extended_public_key_data: Vec<u8>,
     /// extended Public Key Identifier, which is just the short hex string of the extended public key
     pub standalone_extended_public_key_unique_id: Option<String>,
     /// the wallet_based_extended_public_key_location_string is the key used to store the public key in the key chain
-    pub wallet_based_extended_public_key_location_string: Option<String>,
+    // pub wallet_based_extended_public_key_location_string: Option<String>,
     /// the wallet_based_extended_public_key_location_string is the key used to store the private key in the key chain,
     /// this is only available on authentication derivation paths
-    pub wallet_based_extended_private_key_location_string: Option<String>,
+    // pub wallet_based_extended_private_key_location_string: Option<String>,
     /// current derivation path balance excluding transactions known to be invalid
     pub balance: u64,
     /// purpose of the derivation path if BIP 43 based
@@ -55,7 +57,6 @@ pub struct DerivationPath {
 
     pub standalone_extended_public_key_location_string: Option<String>,
 
-    pub context: &'static ManagedContext,
     // @property (nonatomic, readonly) DSDerivationPathEntity *derivationPathEntity;
 
     /// private
@@ -89,46 +90,100 @@ impl IIndexPath for DerivationPath {
 }
 
 impl IDerivationPath for DerivationPath {
-    fn chain(&self) -> &Chain {
-        self.chain
+    fn chain(&self) -> &Shared<Chain> {
+        &self.chain
     }
 
-    fn wallet(&self) -> Option<&Wallet> {
-        self.wallet.or(self.account.and_then(|acc| acc.wallet))
+    fn chain_type(&self) -> ChainType {
+        self.chain_type
     }
 
-    fn context(&self) -> &ManagedContext {
-        self.context
+    fn wallet(&self) -> &Option<Shared<Wallet>> {
+        &self.wallet
     }
+
+    fn set_wallet(&mut self, wallet: Shared<Wallet>) {
+        self.wallet = Some(wallet);
+    }
+
+    fn wallet_unique_id(&self) -> Option<String> {
+        self.wallet_unique_id.clone()
+    }
+
+    fn set_wallet_unique_id(&mut self, unique_id: String) {
+        self.wallet_unique_id = Some(unique_id);
+    }
+
+    // fn chain(&self) -> Weak<Chain> {
+    //     self.chain
+    // }
+
+    // fn wallet(&self) -> Weak<Wallet> {
+    //     self.wallet.upgrade()
+    //     self.wallet.or(self.account.map(|acc| acc.wallet))
+    // }
+
+    // fn context(&self) -> Weak<ManagedContext> {
+    //     self.chain.
+    // }
 
     fn signing_algorithm(&self) -> KeyType {
         self.signing_algorithm
     }
 
-    fn reference(&self) -> &DerivationPathReference {
-        &self.reference
+    fn reference(&self) -> DerivationPathReference {
+        self.reference
     }
 
-    fn extended_public_key(&mut self) -> Option<Key> {
-        self.extended_public_key.clone().or({
-            let key_path = if self.wallet.is_some() && (!self.base.is_empty() || self.reference == DerivationPathReference::Root) {
-                self.wallet_based_extended_public_key_location_string()
-            } else {
-                self.standalone_extended_public_key_location_string().unwrap()
-            };
-            Keychain::get_data(key_path).ok().and_then(|data| {
-                self.extended_public_key = self.signing_algorithm.key_with_extended_public_key_data(&data);
-                self.extended_public_key.clone()
-            })
-        })
+    fn extended_public_key(&self) -> Option<Key> {
+        if let Some(key) = self.extended_public_key.as_ref() {
+            return Some(key.clone());
+        } else if let Some(wallet_unique_id) = self.wallet_unique_id() {
+            let key = self.public_key_location_string_for_wallet_unique_id(wallet_unique_id.as_str());
+            println!("extended_public_key.key: {}", key);
+            Keychain::get_data(key)
+                .ok()
+                .and_then(|data| {
+                    println!("extended_public_key.data: {}", data.to_hex());
+                    self.signing_algorithm().key_with_extended_public_key_data(&data)
+                })
+        } else {
+            None
+        }
+    }
+    fn extended_public_key_mut(&mut self) -> Option<Key> {
+        if let Some(key) = self.extended_public_key.as_ref() {
+            return Some(key.clone());
+        } else if let Some(wallet_unique_id) = self.wallet_unique_id() {
+            Keychain::get_data(self.public_key_location_string_for_wallet_unique_id(wallet_unique_id.as_str()))
+                .ok()
+                .and_then(|data| {
+                    self.extended_public_key = self.signing_algorithm().key_with_extended_public_key_data(&data);
+                    self.extended_public_key.clone()
+                })
+        } else {
+            None
+        }
     }
 
     fn has_extended_public_key(&self) -> bool {
-        self.extended_public_key.is_some() || (self.wallet.is_some() && Keychain::has_data(if !self.base.is_empty() || self.reference == DerivationPathReference::Root {
-            wallet_based_extended_public_key_location_string_for_unique_id(self.wallet.unwrap().unique_id_string())
+        if let Some(wallet_unique_id) = self.wallet_unique_id() {
+            self.extended_public_key.is_some() || Keychain::has_data(if self.is_wallet_based() {
+                wallet_based_extended_public_key_location_string_for_unique_id(wallet_unique_id.as_str())
+            } else {
+                standalone_extended_public_key_location_string_for_unique_id(wallet_unique_id.as_str())
+            }).is_ok()
         } else {
-            standalone_extended_public_key_location_string_for_unique_id(self.wallet.unwrap().unique_id_string())
-        }).unwrap_or(false))
+            false
+        }
+    }
+
+    fn depth(&self) -> u8 {
+        if self.depth != 0 {
+            self.depth
+        } else {
+            self.length() as u8
+        }
     }
 
     fn all_addresses(&self) -> HashSet<String> {
@@ -141,7 +196,7 @@ impl IDerivationPath for DerivationPath {
 
     fn standalone_extended_public_key_unique_id(&mut self) -> Option<String> {
         self.standalone_extended_public_key_unique_id.clone().or({
-            if self.extended_public_key.is_none() && self.wallet.is_none() {
+            if self.extended_public_key.is_none() && self.wallet.is_some() {
                 assert!(false, "we really should have a wallet");
                 None
             } else {
@@ -150,10 +205,6 @@ impl IDerivationPath for DerivationPath {
                 id
             }
         })
-    }
-
-    fn kind(&self) -> DerivationPathKind {
-        DerivationPathKind::Default
     }
 
     fn balance(&self) -> u64 {
@@ -168,8 +219,8 @@ impl IDerivationPath for DerivationPath {
         panic!("This must be implemented in subclasses")
     }
 
-    fn generate_extended_public_key_from_seed(&mut self, seed: &Vec<u8>, wallet_unique_id: Option<&String>) -> Option<Key> {
-        self.generate_extended_public_key_from_seed_and_store_private_key(seed, wallet_unique_id, false)
+    fn generate_extended_public_key_from_seed(&mut self, seed: &Seed) -> Option<Key> {
+        self.generate_extended_public_key_from_seed_and_store_private_key(seed, false)
     }
 
     fn register_transaction_address(&mut self, address: &String) -> bool {
@@ -182,41 +233,251 @@ impl IDerivationPath for DerivationPath {
 }
 
 impl DerivationPath {
-    pub fn serialized_private_keys_at_index_paths(&self, index_paths: Vec<IndexPath<u32>>, seed: Option<Vec<u8>>) -> Option<Vec<String>> {
-        if seed.is_none() {
-            return None;
-        }
-        if index_paths.is_empty() {
-            return Some(vec![]);
-        }
-        let top_key_opt = self.signing_algorithm().key_with_seed_data(&seed.unwrap());
-        if top_key_opt.is_none() {
-            return Some(vec![]);
-        }
-        let derivation_path_extended_key_opt = top_key_opt.unwrap().private_derive_to_256bit_derivation_path(self);
-        if derivation_path_extended_key_opt.is_none() {
-            return Some(vec![]);
-        }
-        let derivation_path_extended_key = derivation_path_extended_key_opt.unwrap();
-        Some(index_paths.into_iter()
-            .filter_map(|index_path| derivation_path_extended_key.private_derive_to_path(&index_path)
-                .map(|key| key.serialized_private_key_for_chain(self.chain.script()))).collect())
+    pub fn master_identity_contacts_derivation_path_for_account_number(account_number: u32, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+        Self::derivation_path_with_indexes(
+            vec![
+                UInt256::from(DerivationPathFeaturePurpose::Default),
+                UInt256::from(chain_type.coin_type()),
+                UInt256::from(DerivationPathFeaturePurpose::DashPay),
+                UInt256::from(account_number),
+            ],
+            vec![true, true, true, true],
+            DerivationPathType::PartialPath,
+            KeyType::ECDSA,
+            DerivationPathReference::ContactBasedFundsRoot,
+            chain_type,
+            chain
+        )
     }
 
-    pub fn wallet_based_extended_public_key_location_string(&mut self) -> String {
-        self.wallet_based_extended_public_key_location_string.clone().unwrap_or({
-            let str = wallet_based_extended_public_key_location_string_for_unique_id(self.wallet.unwrap().unique_id_string());
-            self.wallet_based_extended_public_key_location_string = Some(str.clone());
-            str
-        })
+    pub fn derivation_path_with_indexes(indexes: Vec<UInt256>, hardened: Vec<bool>, r#type: DerivationPathType, signing_algorithm: KeyType, reference: DerivationPathReference, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+        Self {
+            base: UInt256IndexPath { indexes, hardened_indexes: hardened },
+            r#type,
+            signing_algorithm,
+            chain,
+            reference,
+            chain_type,
+            // context: chain.chain_context(),
+            ..Default::default()
+        }
     }
+
+    pub fn derivation_path_with_bip32_key(key: bip32::Key, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+        let key_type = KeyType::ECDSA;
+        let mut path = Self::derivation_path_with_indexes(
+            vec![key.child],
+            vec![key.hardened],
+            DerivationPathType::ViewOnlyFunds,
+            key_type,
+            DerivationPathReference::Unknown,
+            chain_type,
+            chain
+        );
+        path.extended_public_key = key_type.key_with_extended_public_key_data(&key.to_data());
+        path.depth = key.depth;
+        path.standalone_save_extended_public_key_to_keychain();
+        path.load_addresses();
+        path
+    }
+
+    // pub fn derivation_path_with_serialized_extended_public_key(key: &String, chain: &SharedChain) -> Option<Self> {
+    //     deserialized_extended_public_key_for_chain(key, &chain.params)
+    //         .map(|pk| Self::derivation_path_with_bip32_key(pk, Arc::downgrade(chain)))
+    //         .ok()
+    // }
+
+    /*pub fn init_with_extended_public_key_identifier(extended_public_key_identifier: String, chain: &Chain) -> Option<Self> {
+        let key = standalone_info_dictionary_location_string_for_unique_id(&extended_public_key_identifier);
+        return if let Ok(info_dictionary) = Keychain::get_dict::<String, KeychainDictValueKind>(key) {
+            let terminal_index =
+                if let Some(&KeychainDictValueKind::Uint256(terminal_index)) = info_dictionary.get(DERIVATION_PATH_STANDALONE_INFO_TERMINAL_INDEX) {
+                    Some(terminal_index)
+                } else {
+                    None
+                };
+
+            let terminal_hardened = if let Some(&KeychainDictValueKind::Bool(terminal_hardened)) = info_dictionary.get(DERIVATION_PATH_STANDALONE_INFO_TERMINAL_HARDENED) {
+                Some(terminal_hardened)
+            } else {
+                None
+            };
+            if terminal_index.is_none() || terminal_hardened.is_none() {
+                return None;
+            }
+            // TODO: length here is zero! so is not based on indexes length?
+            let key_type = KeyType::ECDSA;
+            let mut s = Self {
+                base: UInt256IndexPath { indexes: vec![terminal_index.unwrap()], hardened_indexes: vec![terminal_hardened.unwrap()] },
+                r#type: DerivationPathType::ViewOnlyFunds,
+                signing_algorithm: key_type,
+                reference: DerivationPathReference::Unknown,
+                chain,
+                ..Default::default()
+            };
+            if let Ok(data) = Keychain::get_data(standalone_extended_public_key_location_string_for_unique_id(&extended_public_key_identifier)) {
+                s.extended_public_key = key_type.key_with_extended_public_key_data(&data);
+                if let Some(&KeychainDictValueKind::Byte(depth)) = info_dictionary.get(DERIVATION_PATH_STANDALONE_INFO_DEPTH) {
+                    s.depth = depth
+                } else {
+                    return None;
+                };
+                s.load_addresses();
+                Some(s)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }*/
 
     /// Key Generation
-    pub fn generate_extended_public_key_from_seed_and_store_private_key(&mut self, seed: &Vec<u8>, wallet_unique_id: Option<&String>, store_private_key: bool) -> Option<Key> {
-        if seed.is_empty() || (self.base.is_empty() && !DerivationPathReference::Root.eq(self.reference())) {
+
+    pub fn generate_extended_public_key_from_seed_no_store(&mut self, seed: &Seed) -> Option<Key> {
+        if seed.is_empty() || (self.is_empty() && !DerivationPathReference::Root.eq(&self.reference())) {
+            None
+        } else {
+            self.signing_algorithm()
+                .key_with_seed_data(seed)
+                .and_then(|seed_key| {
+                    self.extended_public_key = seed_key.private_derive_to_256bit_derivation_path(self);
+                    assert!(self.extended_public_key.is_some(), "extendedPublicKey should be set");
+                    self.extended_public_key.as_mut().map(|extended_public_key| {
+                        extended_public_key.forget_private_key();
+                        extended_public_key.to_owned()
+                    })
+                })
+        }
+    }
+
+    pub fn generate_extended_public_key_from_seed_and_store_private_key(&mut self, seed: &Seed, store_private_key: bool) -> Option<Key> {
+        if seed.is_empty() || !self.is_wallet_based() {
+            None
+        } else {
+            let key_type = self.signing_algorithm();
+            key_type
+                .key_with_seed_data(seed)
+                .and_then(|seed_key| {
+                    self.extended_public_key = seed_key.private_derive_to_256bit_derivation_path(self);
+                    assert!(self.extended_public_key.is_some(), "extendedPublicKey should be set");
+                    let index_path_string = self.index_path_enumerated_string();
+                    if let Some(pk) = self.extended_public_key.as_mut() {
+                        Keychain::save_extended_public_key(
+                            seed.unique_id_as_str(),
+                            key_type,
+                            index_path_string,
+                            pk.extended_public_key_data())
+                            .expect("Can't store extended_public_key_data in keychain");
+                        if store_private_key {
+                            Keychain::save_extended_private_key(
+                                seed.unique_id_as_str(),
+                                pk.extended_private_key_data())
+                                .expect("Can't store extended_private_key_data in keychain");
+                        }
+                        pk.forget_private_key();
+                    }
+                    self.extended_public_key.to_owned()
+                    // self.extended_public_key.as_mut().map(|extended_public_key| {
+                    //     Keychain::set_data(
+                    //         self.wallet_based_extended_public_key_location_string_for_wallet_unique_id(&wallet_unique_id),
+                    //         extended_public_key.extended_public_key_data(),
+                    //         false)
+                    //         .expect("Can't store extended_public_key_data in keychain");
+                    //     if store_private_key {
+                    //         Keychain::set_data(
+                    //             wallet_based_extended_private_key_location_string_for_unique_id(&wallet_unique_id),
+                    //             extended_public_key.extended_private_key_data(),
+                    //             true)
+                    //             .expect("Can't store extended_private_key_data in keychain");
+                    //     }
+                    //     extended_public_key.forget_private_key();
+                    //     extended_public_key.to_owned()
+                    // })
+                })
+        }
+    }
+    /*pub fn generate_extended_public_key_from_parent_derivation_path<P>(&mut self, path: &mut P, wallet_unique_id: Option<&String>) -> Option<Key>
+        where P: IDerivationPath + IIndexPath<Item = UInt256> {
+        assert_eq!(path.signing_algorithm(), self.signing_algorithm(), "The signing algorithms must be the same");
+        assert!(self.length() > path.length(), "length must be inferior to the parent derivation path length");
+        assert!(path.has_extended_public_key(), "the parent derivation path must have an extended public key");
+        if self.is_empty() ||
+            self.length() < path.length() ||
+            !path.has_extended_public_key() ||
+            path.signing_algorithm() != self.signing_algorithm() {
             return None;
         }
-        self.extended_public_key = self.signing_algorithm().private_derive_to_256bit_derivation_path_from_seed_and_store(seed, self, wallet_unique_id, store_private_key);
-        self.extended_public_key.clone()
+        for i in 0..path.length() {
+            let index = self.index_at_position(i);
+            assert_eq!(path.index_at_position(i), index, "This derivation path must start with elements of the parent derivation path");
+            if path.index_at_position(i) != self.index_at_position(i) {
+                return None;
+            }
+        }
+        self.extended_public_key = path.extended_public_key()
+            .and_then(|mut ext_pk| ext_pk.public_derive_to_256bit_derivation_path_with_offset(self, path.length()));
+        assert!(self.extended_public_key.is_some(), "extendedPublicKey should be set");
+        if let Some(unique_id) = wallet_unique_id {
+            Keychain::set_data(
+                self.wallet_based_extended_public_key_location_string_for_wallet_unique_id(unique_id),
+                self.extended_public_key.and_then(|mut key| key.extended_public_key_data()),
+                false)
+                .expect("Can't store extended public key");
+        }
+        self.extended_public_key
+    }*/
+
+    pub fn serialized_private_keys_at_index_paths(&self, index_paths: Vec<IndexPath<u32>>, seed: &Seed) -> Option<Vec<String>> {
+        if seed.is_empty() {
+            return None;
+        }
+        index_paths.is_empty().then_some(vec![])
+            .or(self.signing_algorithm()
+                .key_with_seed_data(seed)
+                .map_or(Some(vec![]), |top_key| top_key.private_derive_to_256bit_derivation_path(self)
+                    .map_or(Some(vec![]), |derivation_path_extended_key| Some(index_paths.into_iter()
+                            .filter_map(|index_path| derivation_path_extended_key.private_derive_to_path(&index_path)
+                                .map(|key| key.serialized_private_key_for_script(&self.chain_type().script_map())))
+                            .collect())
+                    )))
     }
+
+    pub fn deserialized_extended_private_key_for_chain(extended_private_key_string: &String, chain_type: ChainType) -> Option<Vec<u8>> {
+        bip32::from(extended_private_key_string, chain_type)
+            .map(|key| key.to_data())
+            .ok()
+    }
+
+    fn standalone_save_extended_public_key_to_keychain(&mut self) {
+        /*if let (Some(ex_pk), Some(key)) = (&self.extended_public_key, self.standalone_extended_public_key_location_string()) {
+            Keychain::set_data(key, self.extended_public_key_data(), false).expect("");
+            let mut map = serde_json::Map::from_iter([
+                (DERIVATION_PATH_STANDALONE_INFO_TERMINAL_HARDENED.to_owned(), json!(self.terminal_hardened())),
+                (DERIVATION_PATH_STANDALONE_INFO_DEPTH.to_owned(), json!(self.depth)),
+            ]);
+            if let Some(&terminal_index) = self.indexes().last() {
+                map.insert(DERIVATION_PATH_STANDALONE_INFO_TERMINAL_INDEX.to_owned(), json!(terminal_index.0.to_hex()));
+            }
+            if let Some(key) = self.standalone_info_dictionary_location_string() {
+                Keychain::set_json(serde_json::Value::Object(map), key, false).expect("");
+            }
+            self.context().perform_block_and_wait(|context| {
+                DerivationPathEntity::derivation_path_entity_matching_derivation_path(self, context).expect("");
+            });
+        }*/
+    }
+
+    pub fn wallet_based_extended_private_key_location_string(&self) -> String {
+        self.wallet_unique_id()
+            .map(|unique_id| wallet_based_extended_private_key_location_string_for_unique_id(unique_id.as_str()))
+            .unwrap_or(String::new())
+    }
+
+    pub fn wallet_based_extended_public_key_location_string(&self) -> String {
+        self.wallet_unique_id()
+            .map(|unique_id| wallet_based_extended_public_key_location_string_for_unique_id(unique_id.as_str()))
+            .unwrap_or(String::new())
+    }
+
 }

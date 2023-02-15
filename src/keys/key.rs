@@ -1,5 +1,7 @@
 use std::fmt::Debug;
 use crate::BytesDecodable;
+use crate::chain::ScriptMap;
+use crate::chain::wallet::seed::Seed;
 use crate::crypto::{UInt256, UInt384, UInt768};
 use crate::crypto::byte_util::AsBytes;
 use crate::derivation::protocol::IDerivationPath;
@@ -34,7 +36,6 @@ impl From<BLSKey> for Key {
         Key::BLS(value)
     }
 }
-
 
 impl Default for KeyType {
     fn default() -> Self {
@@ -100,17 +101,17 @@ impl KeyType {
 
     pub(crate) fn key_with_private_key_data(&self, data: &Vec<u8>) -> Option<Key> {
         match self {
-            KeyType::ECDSA => ECDSAKey::key_with_secret(data, true).map(|key| Key::ECDSA(key)),
+            KeyType::ECDSA => ECDSAKey::key_with_secret_data(data, true).map(|key| Key::ECDSA(key)),
             KeyType::BLS => BLSKey::key_with_private_key(data, true).map(|key| Key::BLS(key)),
             KeyType::BLSBasic => BLSKey::key_with_private_key(data, false).map(|key| Key::BLS(key)),
         }
     }
 
-    pub(crate) fn key_with_seed_data(&self, data: &Vec<u8>) -> Option<Key> {
+    pub(crate) fn key_with_seed_data(&self, seed: &Seed) -> Option<Key> {
         match self {
-            KeyType::ECDSA => ECDSAKey::init_with_seed_data(data).map(|key| Key::ECDSA(key)),
-            KeyType::BLS => BLSKey::extended_private_key_with_seed_data(data, true).map(|key| Key::BLS(key)),
-            KeyType::BLSBasic => BLSKey::extended_private_key_with_seed_data(data, false).map(|key| Key::BLS(key)),
+            KeyType::ECDSA => ECDSAKey::init_with_seed_data(seed).map(|key| Key::ECDSA(key)),
+            KeyType::BLS => BLSKey::extended_private_key_with_seed_data(seed, true).map(|key| Key::BLS(key)),
+            KeyType::BLSBasic => BLSKey::extended_private_key_with_seed_data(seed, false).map(|key| Key::BLS(key)),
         }
     }
 
@@ -139,17 +140,21 @@ impl KeyType {
     }
     // fn private_derive_to_256bit_derivation_path<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH> + IIndexPath>(&self, derivation_path: &DPATH) -> Option<Self> where Self: Sized {
 
-    pub fn private_derive_to_256bit_derivation_path_from_seed_and_store<IPATH, DPATH>(&self, seed: &Vec<u8>, derivation_path: &DPATH, wallet_unique_id: Option<&String>, store_private_key: bool) -> Option<Key>
-        where IPATH: IIndexPath, DPATH: IDerivationPath<IPATH> + IIndexPath  {
+    pub fn private_derive_to_256bit_derivation_path_from_seed_and_store<IPATH, DPATH>(&self, seed: &Seed, derivation_path: &DPATH, store_private_key: bool) -> Option<Key>
+        where IPATH: IIndexPath, DPATH: IDerivationPath + IIndexPath<Item = UInt256>  {
         if let Some(seed_key) = self.key_with_seed_data(seed) {
+            println!("private_derive_to_256bit_derivation_path_from_seed_and_store: seed_key: {:?}", seed_key.clone());
             let derived = seed_key.private_derive_to_256bit_derivation_path(derivation_path);
             if let Some(mut ext_pk) = derived {
                 let ext_pub_data = ext_pk.extended_private_key_data();
                 let ext_prv_data = ext_pk.extended_public_key_data();
-                if let Some(unique_id) = wallet_unique_id {
-                    Keychain::set_data(derivation_path.wallet_based_extended_public_key_location_string_for_wallet_unique_id(unique_id), ext_pub_data, false).expect("");
+                println!("private_derive_to_256bit_derivation_path_from_seed_and_store: ext_prv_data: {:?} ext_pub_data: {:?}", ext_prv_data.clone(), ext_pub_data.clone());
+                if !seed.unique_id.is_empty() {
+                    Keychain::set_data(derivation_path.wallet_based_extended_public_key_location_string_for_wallet_unique_id(seed.unique_id_as_str()), ext_pub_data, false)
+                        .expect("");
                     if store_private_key {
-                        Keychain::set_data(wallet_based_extended_private_key_location_string_for_unique_id(unique_id), ext_prv_data, true).expect("");
+                        Keychain::set_data(wallet_based_extended_private_key_location_string_for_unique_id(seed.unique_id_as_str()), ext_prv_data, true)
+                            .expect("");
                     }
                 }
                 ext_pk.forget_private_key();
@@ -185,10 +190,82 @@ impl IKey for Key {
         }
     }
 
+    fn private_key_data(&self) -> Option<Vec<u8>> {
+        match self {
+            Key::ECDSA(key) => key.private_key_data(),
+            Key::BLS(key) => key.private_key_data(),
+        }
+    }
+
+    fn public_key_data(&self) -> Vec<u8> {
+        match self {
+            Key::ECDSA(key) => key.public_key_data(),
+            Key::BLS(key) => key.public_key_data(),
+        }
+    }
+
+    fn extended_private_key_data(&self) -> Option<Vec<u8>> {
+        match self {
+            Key::ECDSA(key) => key.extended_private_key_data(),
+            Key::BLS(key) => key.extended_public_key_data(),
+        }
+    }
+
+    fn extended_public_key_data(&self) -> Option<Vec<u8>> {
+        match self {
+            Key::ECDSA(key) => key.extended_public_key_data(),
+            Key::BLS(key) => key.extended_public_key_data(),
+        }
+    }
+
     fn private_derive_to_path(&self, index_path: &IndexPath<u32>) -> Option<Key> {
         match self {
             Key::ECDSA(key) => key.private_derive_to_path(index_path).map(Into::into),
             Key::BLS(key) => key.private_derive_to_path(index_path).map(Into::into),
         }
+    }
+
+    fn private_derive_to_256bit_derivation_path<DPATH>(&self, derivation_path: &DPATH) -> Option<Self>
+        where Self: Sized, DPATH: IIndexPath<Item=UInt256> {
+        match self {
+            Key::ECDSA(key) => key.private_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
+            Key::BLS(key) => key.private_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
+        }
+    }
+
+    fn public_derive_to_256bit_derivation_path<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH) -> Option<Self> where Self: Sized {
+        match self {
+            Key::ECDSA(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
+            Key::BLS(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
+        }
+    }
+
+    fn public_derive_to_256bit_derivation_path_with_offset<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH, offset: usize) -> Option<Self> where Self: Sized {
+        match self {
+            Key::ECDSA(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
+            Key::BLS(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
+        }
+    }
+
+    fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
+        match self {
+            Key::ECDSA(key) => key.serialized_private_key_for_script(script),
+            Key::BLS(key) => key.serialized_private_key_for_script(script),
+        }
+    }
+
+    fn hmac_256_data(&self, data: &Vec<u8>) -> UInt256 {
+        match self {
+            Key::ECDSA(key) => key.hmac_256_data(data),
+            Key::BLS(key) => key.hmac_256_data(data),
+        }
+    }
+
+    fn forget_private_key(&mut self) {
+        match self {
+            Key::ECDSA(key) => key.forget_private_key(),
+            Key::BLS(key) => key.forget_private_key(),
+        }
+
     }
 }

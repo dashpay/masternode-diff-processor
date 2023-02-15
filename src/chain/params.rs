@@ -50,7 +50,7 @@ pub const BITCOIN_PRIVKEY_TEST: u8 = 239;
 
 pub const BIP32_SEED_KEY: &str = "Bitcoin seed";
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ScriptMap {
     // DASH_PRIVKEY | DASH_PRIVKEY_TEST
     pub privkey: u8,
@@ -73,7 +73,7 @@ impl ScriptMap {
     };
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct BIP32ScriptMap {
     pub xprv: [u8; 4],
     pub xpub: [u8; 4],
@@ -85,7 +85,7 @@ impl BIP32ScriptMap {
 }
 
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct DIP14ScriptMap {
     pub dps: [u8; 4],
     pub dpp: [u8; 4],
@@ -96,14 +96,17 @@ impl DIP14ScriptMap {
     pub const TESTNET: DIP14ScriptMap = DIP14ScriptMap { dps: [b'\x0E', b'\xED', b'\x27', b'\x74'], dpp: [b'\x0E', b'\xED', b'\x27', b'\x0B'] };
 }
 
-#[derive(Debug, Default)]
+// #[derive(Clone, Debug, Default)]
+// pub struct Script
+
+#[derive(Clone, Debug, Default)]
 pub struct SporkParams {
     pub public_key_hex_string: Option<&'static str>,
     pub private_key_base58_string: Option<&'static str>,
     pub address: &'static str,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Params {
     pub chain_type: ChainType,
     /// Mining and Dark Gravity Wave Parameters
@@ -144,9 +147,9 @@ pub struct Params {
     pub dashpay_contract_id: &'static str,
     pub minimum_difficulty_blocks: u32,
     pub standard_dapi_jrpc_port: u32,
-    pub script_map: ScriptMap,
-    pub bip32_script_map: BIP32ScriptMap,
-    pub dip14_script_map: DIP14ScriptMap,
+    // pub script_map: ScriptMap,
+    // pub bip32_script_map: BIP32ScriptMap,
+    // pub dip14_script_map: DIP14ScriptMap,
 }
 
 pub const MAINNET_PARAMS: Params = Params {
@@ -175,9 +178,9 @@ pub const MAINNET_PARAMS: Params = Params {
     dashpay_contract_id: "",
     minimum_difficulty_blocks: 0,
     standard_dapi_jrpc_port: 3000,
-    script_map: ScriptMap::MAINNET,
-    bip32_script_map: BIP32ScriptMap::MAINNET,
-    dip14_script_map: DIP14ScriptMap::MAINNET
+    // script_map: ScriptMap::MAINNET,
+    // bip32_script_map: BIP32ScriptMap::MAINNET,
+    // dip14_script_map: DIP14ScriptMap::MAINNET
 };
 
 pub const TESTNET_PARAMS: Params = Params {
@@ -206,9 +209,9 @@ pub const TESTNET_PARAMS: Params = Params {
     dashpay_contract_id: "Bwr4WHCPz5rFVAD87RqTs3izo4zpzwsEdKPWUT1NS1C7",
     minimum_difficulty_blocks: 0,
     standard_dapi_jrpc_port: 3000,
-    script_map: ScriptMap::TESTNET,
-    bip32_script_map: BIP32ScriptMap::TESTNET,
-    dip14_script_map: DIP14ScriptMap::TESTNET
+    // script_map: ScriptMap::TESTNET,
+    // bip32_script_map: BIP32ScriptMap::TESTNET,
+    // dip14_script_map: DIP14ScriptMap::TESTNET
 };
 
 pub fn create_devnet_params_for_type(r#type: DevnetType) -> Params {
@@ -253,9 +256,9 @@ pub fn create_devnet_params_for_type(r#type: DevnetType) -> Params {
             DevnetType::Mojito => 1000000,
         },
         standard_dapi_jrpc_port: 3000,
-        script_map: ScriptMap::TESTNET,
-        bip32_script_map: BIP32ScriptMap::TESTNET,
-        dip14_script_map: DIP14ScriptMap::TESTNET
+        // script_map: ScriptMap::TESTNET,
+        // bip32_script_map: BIP32ScriptMap::TESTNET,
+        // dip14_script_map: DIP14ScriptMap::TESTNET
     }
 }
 
@@ -291,9 +294,6 @@ impl Params {
         self.chain_type != ChainType::MainNet
     }
 
-    pub fn bip32_256_script(&self) -> [u8; 4] {
-        if self.chain_type.is_mainnet() { self.dip14_script_map.dps } else { self.bip32_script_map.xprv }
-    }
 
     // if params.chain_type.is_mainnet() { params.dip14_script_map.dps } else { params.bip32_script_map.xprv }
 }

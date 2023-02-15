@@ -9,21 +9,21 @@ pub mod address {
     use crate::util::data_append::DataAppend;
     use crate::util::script::ScriptElement;
 
-    pub fn from_hash160_for_script_map(hash: &UInt160, script_map: &ScriptMap) -> String {
+    pub fn from_hash160_for_script_map(hash: &UInt160, map: &ScriptMap) -> String {
         let mut writer: Vec<u8> = Vec::new();
-        script_map.pubkey.enc(&mut writer);
+        map.pubkey.enc(&mut writer);
         hash.enc(&mut writer);
         let val = u32::from_le_bytes(clone_into_array(&sha256d::Hash::hash(&writer).into_inner()[..4]));
         val.enc(&mut writer);
         base58::encode_slice(&writer)
     }
 
-    pub fn with_public_key_data(data: &Vec<u8>, script_map: &ScriptMap) -> String {
+    pub fn with_public_key_data(data: &Vec<u8>, map: &ScriptMap) -> String {
         // TODO: SecAllocate SecureRandom
         // NSMutableData *d = [NSMutableData secureDataWithCapacity:160 / 8 + 1];
         // let d = SecureBox::new(160 / 8 + 1);
         let mut d = Vec::<u8>::new();
-        script_map.pubkey.enc(&mut d);
+        map.pubkey.enc(&mut d);
         UInt160::hash160(data).enc(&mut d);
         base58::check_encode_slice(&d)
     }
@@ -101,12 +101,12 @@ pub mod address {
         }
     }
 
-    pub fn is_valid_dash_private_key(address: &str, script: &ScriptMap) -> bool {
+    pub fn is_valid_dash_private_key(address: &str, map: &ScriptMap) -> bool {
         // let data = address.as_str();
         base58::from_check(address).map_or(false, |d| {
             if d.len() == 33 || d.len() == 34 {
                 // wallet import format: https://en.bitcoin.it/wiki/Wallet_import_format
-                d[0] == script.privkey
+                d[0] == map.privkey
             } else {
                 // hex encoded key
                 let hex_key = address.as_bytes().to_hex();

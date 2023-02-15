@@ -22,6 +22,8 @@ std = ["secp256k1/std", "bitcoin_hashes/std"]
 #no-std = ["hashbrown", "core2/alloc", "bitcoin_hashes/alloc"]
 
 [dependencies]
+bip0039 = { version = "0.11.0", default-features = false, features = ["chinese-simplified", "french", "italian", "japanese", "korean", "spanish"] }
+bip39 = { version = "1.0.1", default-features = false, features = ["chinese-simplified", "french", "italian", "japanese", "korean", "spanish", "rand"] }
 bitflags = "2.0.0-rc.1"
 byte = "0.2"
 bitcoin_hashes = { version = "0.11.0", default-features = false }
@@ -29,9 +31,12 @@ bitcoinconsensus = { version = "0.19.0-3", optional = true }
 bls-signatures = { git = "https://github.com/dashevo/bls-signatures", branch = "rust-bindings-enhancement" }
 common-crypto = "0.3.0"
 core2 = { version = "0.4.0", optional = true, default-features = false }
+futures = "0.3.25"
 libc = "0.2.132"
 rs-x11-hash = "0.1.2"
 secp256k1 = { version = "0.26.0", features = [ "recovery", "rand-std", "bitcoin_hashes" ] }
+security-framework = "2.8.2"
+unicode-normalization = "0.1.22"
 
 [dev-dependencies]
 secp256k1 = { version = "0.26.0", features = [ "recovery", "rand-std" ] }
@@ -46,6 +51,7 @@ cbindgen = "0.24.3"
 [lib]
 name = "dash_spv_masternode_processor"
 #crate-type = ["staticlib", "cdylib"]
+#proc-macro = true
 
 [profile.release]
 lto = "thin"
