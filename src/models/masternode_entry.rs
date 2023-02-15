@@ -29,7 +29,7 @@ pub struct MasternodeEntry {
     pub is_valid: bool,
     pub mn_type: MasternodeType,
     pub platform_http_port: u16,
-    pub platform_node_id: UInt160,
+    // pub platform_node_id: UInt160,
     pub entry_hash: UInt256,
 }
 impl std::fmt::Debug for MasternodeEntry {
@@ -49,7 +49,7 @@ impl std::fmt::Debug for MasternodeEntry {
             .field("is_valid", &self.is_valid)
             .field("mn_type", &self.mn_type)
             .field("platform_http_port", &self.platform_http_port)
-            .field("platform_node_id", &self.platform_node_id)
+            // .field("platform_node_id", &self.platform_node_id)
             .field("entry_hash", &self.entry_hash)
             .finish()
     }
@@ -57,41 +57,47 @@ impl std::fmt::Debug for MasternodeEntry {
 
 impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
     fn try_read(bytes: &'a [u8], context: MasternodeReadContext) -> byte::Result<(Self, usize)> {
+        let MasternodeReadContext (block_height, protocol_version, bls_version) = context;
         let offset = &mut 0;
         let provider_registration_transaction_hash =
             bytes.read_with::<UInt256>(offset, byte::LE)?;
         let confirmed_hash = bytes.read_with::<UInt256>(offset, byte::LE)?;
         let ip_address = bytes.read_with::<UInt128>(offset, byte::LE)?;
-        let port = bytes.read_with::<u16>(offset, byte::LE)?.swap_bytes();
+        let port = bytes.read_with::<u16>(offset, byte::BE)?;
         let socket_address = SocketAddress { ip_address, port };
         let operator_public_key = bytes.read_with::<UInt384>(offset, byte::LE)?;
         let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
         let is_valid = bytes.read_with::<u8>(offset, byte::LE)
             .unwrap_or(0);
-        let mn_type = if context.1 >= 70227 {
+        let mn_type = if protocol_version >= 70227 {
             bytes.read_with::<MasternodeType>(offset, byte::LE)?
         } else {
             MasternodeType::Regular
         };
-        let (platform_http_port, platform_node_id) = if mn_type == MasternodeType::HighPerformance {
-            (bytes.read_with::<u16>(offset, byte::LE)?.swap_bytes(),
-             bytes.read_with::<UInt160>(offset, byte::LE)?)
-        } else {
-            (0u16, UInt160::MIN)
-        };
+        let platform_http_port = (mn_type == MasternodeType::HighPerformance)
+            .then_some(bytes.read_with::<u16>(offset, byte::BE)?)
+            .unwrap_or(0);
+        // let (platform_http_port, platform_node_id) = if mn_type == MasternodeType::HighPerformance {
+        //     (bytes.read_with::<u16>(offset, byte::LE)?.swap_bytes(),
+        //      bytes.read_with::<UInt160>(offset, byte::LE)?)
+        // } else {
+        //     (0u16, UInt160::MIN)
+        // };
         let mut entry = Self::new(
             provider_registration_transaction_hash,
             confirmed_hash,
             socket_address,
             key_id_voting,
-            OperatorPublicKey { data: operator_public_key, version: 0 },
+            OperatorPublicKey { data: operator_public_key, version: bls_version },
             is_valid,
             mn_type,
             platform_http_port,
-            platform_node_id
+            // platform_node_id,
+            block_height
         );
-        entry.update_with_block_height(context.0);
-        entry.update_with_bls_version(context.2);
+        if !entry.confirmed_hash.is_zero() && block_height != u32::MAX {
+            entry.known_confirmed_at_height = Some(block_height);
+        }
         Ok((entry, *offset))
     }
 }
@@ -106,7 +112,8 @@ impl MasternodeEntry {
         is_valid: u8,
         mn_type: MasternodeType,
         platform_http_port: u16,
-        platform_node_id: UInt160,
+        // platform_node_id: UInt160,
+        update_height: u32,
     ) -> Self {
         let entry_hash = MasternodeEntry::calculate_entry_hash(
             provider_registration_transaction_hash,
@@ -128,12 +135,12 @@ impl MasternodeEntry {
             previous_entry_hashes: Default::default(),
             previous_validity: Default::default(),
             known_confirmed_at_height: None,
-            update_height: 0,
+            update_height,
             key_id_voting,
             is_valid: is_valid != 0,
             mn_type,
             platform_http_port,
-            platform_node_id,
+            // platform_node_id,
             entry_hash,
         }
     }
@@ -319,16 +326,5 @@ impl MasternodeEntry {
         if entry.entry_hash_at(self.update_height) != self.entry_hash {
             self.previous_entry_hashes.insert(block, entry.entry_hash);
         }
-    }
-
-    pub fn update_with_block_height(&mut self, block_height: u32) {
-        self.update_height = block_height;
-        if !self.confirmed_hash.is_zero() && block_height != u32::MAX {
-            self.known_confirmed_at_height = Some(block_height);
-        }
-    }
-
-    pub fn update_with_bls_version(&mut self, version: u16) {
-        self.operator_public_key.version = version;
     }
 }

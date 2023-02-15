@@ -235,7 +235,7 @@ impl FromFFI for types::MasternodeEntry {
             is_valid: self.is_valid,
             mn_type: self.mn_type.into(),
             platform_http_port: self.platform_http_port,
-            platform_node_id: UInt160(*self.platform_node_id),
+            //platform_node_id: UInt160(*self.platform_node_id),
             entry_hash: UInt256(*self.entry_hash),
         }
     }
