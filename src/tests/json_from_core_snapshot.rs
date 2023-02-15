@@ -5,6 +5,7 @@ use byte::ctx::Bytes;
 use serde::{Deserialize, Serialize};
 use crate::common::{LLMQSnapshotSkipMode, LLMQType, SocketAddress};
 use crate::common::llmq_version::LLMQVersion;
+use crate::common::masternode_type::MasternodeType;
 use crate::consensus::encode::VarInt;
 use crate::crypto::{UInt160, UInt256, UInt384, UInt768, VarBytes};
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
@@ -301,7 +302,7 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
                 data: public_key,
                 version: version.unwrap_or(0)
             };
-            let mut masternode = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 });
+            let mut masternode = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 }, MasternodeType::Regular, 0, UInt160::MIN);
             if let Some(update_height) = node.update_height {
                 masternode.update_height = update_height;
             }

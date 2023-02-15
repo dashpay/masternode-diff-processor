@@ -5,6 +5,7 @@ pub mod llmq_type;
 pub mod llmq_version;
 pub mod merkle_tree;
 pub mod socket_address;
+pub mod masternode_type;
 
 pub use self::block::Block;
 pub use self::chain_type::ChainType;

@@ -20,4 +20,10 @@ pub struct MasternodeEntry {
     pub ip_address: *mut [u8; 16],
     pub port: u16,
     pub update_height: u32,
+    // Core v0.19
+    // 0: regular, 1: high performance
+    pub mn_type: u16,
+    pub platform_http_port: u16,
+    pub platform_node_id: *mut [u8; 20],
+
 }

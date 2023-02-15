@@ -1,13 +1,17 @@
-use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
 use std::collections::BTreeMap;
 use crate::common::{Block, SocketAddress};
+use crate::common::masternode_type::MasternodeType;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::Zeroable;
 use crate::crypto::data_ops::short_hex_string_from;
 use crate::crypto::{UInt128, UInt160, UInt256, UInt384};
 use crate::hashes::{sha256, sha256d, Hash};
 use crate::models::OperatorPublicKey;
+
+// (block_height, protocol_version, bls_version)
+#[derive(Clone, Copy)]
+pub struct MasternodeReadContext(pub u32, pub u32, pub u16);
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct MasternodeEntry {
@@ -23,6 +27,9 @@ pub struct MasternodeEntry {
     pub update_height: u32,
     pub key_id_voting: UInt160,
     pub is_valid: bool,
+    pub mn_type: MasternodeType,
+    pub platform_http_port: u16,
+    pub platform_node_id: UInt160,
     pub entry_hash: UInt256,
 }
 impl std::fmt::Debug for MasternodeEntry {
@@ -40,12 +47,16 @@ impl std::fmt::Debug for MasternodeEntry {
             .field("update_height", &self.update_height)
             .field("key_id_voting", &self.key_id_voting)
             .field("is_valid", &self.is_valid)
+            .field("mn_type", &self.mn_type)
+            .field("platform_http_port", &self.platform_http_port)
+            .field("platform_node_id", &self.platform_node_id)
             .field("entry_hash", &self.entry_hash)
             .finish()
     }
 }
-impl<'a> TryRead<'a, Endian> for MasternodeEntry {
-    fn try_read(bytes: &'a [u8], _ctx: Endian) -> byte::Result<(Self, usize)> {
+
+impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
+    fn try_read(bytes: &'a [u8], context: MasternodeReadContext) -> byte::Result<(Self, usize)> {
         let offset = &mut 0;
         let provider_registration_transaction_hash =
             bytes.read_with::<UInt256>(offset, byte::LE)?;
@@ -55,18 +66,33 @@ impl<'a> TryRead<'a, Endian> for MasternodeEntry {
         let socket_address = SocketAddress { ip_address, port };
         let operator_public_key = bytes.read_with::<UInt384>(offset, byte::LE)?;
         let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
-        let is_valid = bytes.read_with::<u8>(offset, byte::LE).unwrap_or(0);
-        Ok((
-            Self::new(
-                provider_registration_transaction_hash,
-                confirmed_hash,
-                socket_address,
-                key_id_voting,
-                OperatorPublicKey { data: operator_public_key, version: 0 },
-                is_valid,
-            ),
-            *offset,
-        ))
+        let is_valid = bytes.read_with::<u8>(offset, byte::LE)
+            .unwrap_or(0);
+        let mn_type = if context.1 >= 70227 {
+            bytes.read_with::<MasternodeType>(offset, byte::LE)?
+        } else {
+            MasternodeType::Regular
+        };
+        let (platform_http_port, platform_node_id) = if mn_type == MasternodeType::HighPerformance {
+            (bytes.read_with::<u16>(offset, byte::LE)?,
+             bytes.read_with::<UInt160>(offset, byte::LE)?)
+        } else {
+            (0u16, UInt160::MIN)
+        };
+        let mut entry = Self::new(
+            provider_registration_transaction_hash,
+            confirmed_hash,
+            socket_address,
+            key_id_voting,
+            OperatorPublicKey { data: operator_public_key, version: 0 },
+            is_valid,
+            mn_type,
+            platform_http_port,
+            platform_node_id
+        );
+        entry.update_with_block_height(context.0);
+        entry.update_with_bls_version(context.2);
+        Ok((entry, *offset))
     }
 }
 
@@ -78,6 +104,9 @@ impl MasternodeEntry {
         key_id_voting: UInt160,
         operator_public_key: OperatorPublicKey,
         is_valid: u8,
+        mn_type: MasternodeType,
+        platform_http_port: u16,
+        platform_node_id: UInt160,
     ) -> Self {
         let entry_hash = MasternodeEntry::calculate_entry_hash(
             provider_registration_transaction_hash,
@@ -102,6 +131,9 @@ impl MasternodeEntry {
             update_height: 0,
             key_id_voting,
             is_valid: is_valid != 0,
+            mn_type,
+            platform_http_port,
+            platform_node_id,
             entry_hash,
         }
     }

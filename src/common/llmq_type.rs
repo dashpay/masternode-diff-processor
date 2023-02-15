@@ -18,6 +18,7 @@ pub struct DKGParams {
 pub struct LLMQParams {
     pub r#type: LLMQType,
     pub name: &'static str,
+    // pub use_rotation: bool,
     pub size: u32,
     pub min_size: u32,
     pub threshold: u32,
@@ -76,12 +77,21 @@ pub const DKG_100_67: DKGParams = DKGParams {
     mining_window_end: 18,
     bad_votes_threshold: 80,
 };
+
 pub const DKG_60_75: DKGParams = DKGParams {
     interval: 24 * 12,
     phase_blocks: 2,
     mining_window_start: 42,
     mining_window_end: 50,
     bad_votes_threshold: 48,
+};
+
+pub const DKG_WHITE_RUSSIAN: DKGParams = DKGParams {
+    interval: 24 * 12,
+    phase_blocks: 2,
+    mining_window_start: 10,
+    mining_window_end: 18,
+    bad_votes_threshold: 2,
 };
 
 pub const LLMQ_TEST: LLMQParams = LLMQParams {
@@ -206,6 +216,17 @@ pub const LLMQ_60_75: LLMQParams = LLMQParams {
     keep_old_connections: 64,
     recovery_members: 25,
 };
+pub const LLMQ_TEST_PLATFORM: LLMQParams = LLMQParams {
+    r#type: LLMQType::LlmqtypeDevnet333DIP0024,
+    name: "llmq_test_platform",
+    size: 4,
+    min_size: 3,
+    threshold: 2,
+    dkg_params: DKG_WHITE_RUSSIAN,
+    signing_active_quorum_count: 2,
+    keep_old_connections: 4,
+    recovery_members: 3,
+};
 
 #[warn(non_camel_case_types)]
 #[repr(u8)]
@@ -219,11 +240,13 @@ pub enum LLMQType {
     Llmqtype60_75 = 5,   // 60 members, 45 (75%) threshold, one every 12 hours
 
     LlmqtypeTest = 100,             // 3 members, 2 (66%) threshold, one per hour
+    // dev-only
     LlmqtypeDevnet = 101,           // 10 members, 6 (60%) threshold, one per hour
     LlmqtypeTestV17 = 102, // 3 members, 2 (66%) threshold, one per hour. Params might differ when -llmqtestparams is used
     LlmqtypeTestDIP0024 = 103, // 4 members, 2 (66%) threshold, one per hour. Params might differ when -llmqtestparams is used
     LlmqtypeDevnetDIP0024 = 105, // 8 members, 4 (50%) threshold, one per hour. Params might differ when -llmqdevnetparams is used
     LlmqtypeDevnet333DIP0024 = 106, // 8 members, 4 (50%) threshold, one per hour. Params might differ when -llmqdevnetparams is used
+    // LLMQ_TEST_PLATFORM = 106,    // 4 members, 2 (66%) threshold, one per hour.
     LlmqtypeChachaBLSv19 = 205,
 }
 
@@ -240,7 +263,7 @@ impl LLMQType {
             LLMQType::LlmqtypeTestV17 => LLMQ_V017,
             LLMQType::LlmqtypeTestDIP0024 => LLMQ_TEST_DIP00024,
             LLMQType::LlmqtypeDevnetDIP0024 => LLMQ_0024,
-            LLMQType::LlmqtypeDevnet333DIP0024 => LLMQ_0024_333,
+            LLMQType::LlmqtypeDevnet333DIP0024 => LLMQ_TEST_PLATFORM,
             LLMQType::LlmqtypeChachaBLSv19 => LLMQ_DEVNET,
             LLMQType::LlmqtypeUnknown => LLMQ_DEVNET,
         }

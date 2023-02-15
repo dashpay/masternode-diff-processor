@@ -945,8 +945,8 @@ impl MasternodeProcessor {
         &self,
         message: &'a [u8],
         offset: &mut usize,
-        is_bls_basic: bool
+        protocol_version: u32
     ) -> Option<models::MNListDiff> {
-        models::MNListDiff::new(message, offset, |hash| self.lookup_block_height_by_hash(hash), is_bls_basic)
+        models::MNListDiff::new(message, offset, |hash| self.lookup_block_height_by_hash(hash), protocol_version)
     }
 }
