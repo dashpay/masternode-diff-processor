@@ -74,7 +74,7 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
             MasternodeType::Regular
         };
         let (platform_http_port, platform_node_id) = if mn_type == MasternodeType::HighPerformance {
-            (bytes.read_with::<u16>(offset, byte::LE)?,
+            (bytes.read_with::<u16>(offset, byte::LE)?.swap_bytes(),
              bytes.read_with::<UInt160>(offset, byte::LE)?)
         } else {
             (0u16, UInt160::MIN)
@@ -149,22 +149,13 @@ impl MasternodeEntry {
         let offset: &mut usize = &mut 0;
         const HASH_IMPORTANT_DATA_LENGTH: usize = 32 + 32 + 16 + 2 + 48 + 20 + 1;
         let mut buffer: Vec<u8> = Vec::with_capacity(HASH_IMPORTANT_DATA_LENGTH);
-        *offset += provider_registration_transaction_hash
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += confirmed_hash.consensus_encode(&mut buffer).unwrap();
-        *offset += socket_address
-            .ip_address
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += socket_address
-            .port
-            .swap_bytes()
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += operator_public_key.data.consensus_encode(&mut buffer).unwrap();
-        *offset += key_id_voting.consensus_encode(&mut buffer).unwrap();
-        *offset += is_valid.consensus_encode(&mut buffer).unwrap();
+        *offset += provider_registration_transaction_hash.enc(&mut buffer);
+        *offset += confirmed_hash.enc(&mut buffer);
+        *offset += socket_address.ip_address.enc(&mut buffer);
+        *offset += socket_address.port.swap_bytes().enc(&mut buffer);
+        *offset += operator_public_key.data.enc(&mut buffer);
+        *offset += key_id_voting.enc(&mut buffer);
+        *offset += is_valid.enc(&mut buffer);
         UInt256(sha256d::Hash::hash(&buffer).into_inner())
     }
 
@@ -232,8 +223,8 @@ impl MasternodeEntry {
     pub fn hash_confirmed_hash(confirmed_hash: UInt256, pro_reg_tx_hash: UInt256) -> UInt256 {
         let mut buffer: Vec<u8> = Vec::with_capacity(64);
         let offset: &mut usize = &mut 0;
-        *offset += pro_reg_tx_hash.consensus_encode(&mut buffer).unwrap();
-        *offset += confirmed_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += pro_reg_tx_hash.enc(&mut buffer);
+        *offset += confirmed_hash.enc(&mut buffer);
         UInt256(sha256::Hash::hash(&buffer).into_inner())
     }
 
