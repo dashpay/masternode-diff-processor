@@ -57,41 +57,29 @@ impl std::fmt::Debug for MasternodeEntry {
 
 impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
     fn try_read(bytes: &'a [u8], context: MasternodeReadContext) -> byte::Result<(Self, usize)> {
-        // println!("MasternodeEntry:read: {:?}", bytes.to_hex());
         let MasternodeReadContext (block_height, protocol_version, bls_version) = context;
         let offset = &mut 0;
         let provider_registration_transaction_hash =
             bytes.read_with::<UInt256>(offset, byte::LE)?;
-        println!("MasternodeEntry:provider_registration_transaction_hash: {:?}", provider_registration_transaction_hash);
         let confirmed_hash = bytes.read_with::<UInt256>(offset, byte::LE)?;
-        println!("MasternodeEntry:confirmed_hash: {:?}", confirmed_hash);
         let ip_address = bytes.read_with::<UInt128>(offset, byte::LE)?;
-        println!("MasternodeEntry:ip_address: {:?}", ip_address);
         let port = bytes.read_with::<u16>(offset, byte::BE)?;
-        println!("MasternodeEntry:port: {:?}", port);
         let socket_address = SocketAddress { ip_address, port };
         let operator_public_key = bytes.read_with::<UInt384>(offset, byte::LE)?;
-        println!("MasternodeEntry:operator_public_key: {:?}", operator_public_key);
         let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
-        println!("MasternodeEntry:key_id_voting: {:?}", key_id_voting);
         let is_valid = bytes.read_with::<u8>(offset, byte::LE)
             .unwrap_or(0);
-        println!("MasternodeEntry:is_valid: {:?}", is_valid);
         let mn_type = if protocol_version >= 70227 {
-            // MasternodeType::Regular
             bytes.read_with::<MasternodeType>(offset, byte::LE)?
         } else {
             MasternodeType::Regular
         };
-        println!("MasternodeEntry:mn_type: {:?}", mn_type);
         let (platform_http_port, platform_node_id) = if mn_type == MasternodeType::HighPerformance {
             (bytes.read_with::<u16>(offset, byte::LE)?.swap_bytes(),
              bytes.read_with::<UInt160>(offset, byte::LE)?)
         } else {
             (0u16, UInt160::MIN)
         };
-        println!("MasternodeEntry:platform_http_port: {:?}", platform_http_port);
-        println!("MasternodeEntry:platform_node_id: {:?}", platform_node_id);
         let mut entry = Self::new(
             provider_registration_transaction_hash,
             confirmed_hash,
@@ -135,7 +123,6 @@ impl MasternodeEntry {
             platform_http_port,
             platform_node_id
         );
-        println!("MasternodeEntry:entry_hash: {:?}", entry_hash);
         Self {
             provider_registration_transaction_hash,
             confirmed_hash,
@@ -182,7 +169,6 @@ impl MasternodeEntry {
             let mn_type_u16: u16 = mn_type.into();
             mn_type_u16.enc(&mut buffer);
             if mn_type == MasternodeType::HighPerformance {
-                // swap?
                 platform_http_port.swap_bytes().enc(&mut buffer);
                 platform_node_id.enc(&mut buffer);
             }
