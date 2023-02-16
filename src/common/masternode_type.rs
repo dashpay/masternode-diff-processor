@@ -1,7 +1,6 @@
 use byte::ctx::Endian;
-use byte::{BytesExt, TryRead, TryWrite};
+use byte::{BytesExt, TryRead};
 use crate::BytesDecodable;
-use crate::consensus::Encodable;
 
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
@@ -51,13 +50,6 @@ impl<'a> TryRead<'a, Endian> for MasternodeType {
     }
 }
 
-impl<'a> TryWrite<Endian> for MasternodeType {
-    fn try_write(self, bytes: &mut [u8], _endian: Endian) -> byte::Result<usize> {
-        let orig: u16 = self.into();
-        orig.enc(bytes);
-        Ok(2)
-    }
-}
 impl<'a> BytesDecodable<'a, MasternodeType> for MasternodeType {
     fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<MasternodeType> {
         bytes.read_with::<MasternodeType>(offset, byte::LE).ok()

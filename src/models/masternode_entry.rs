@@ -156,24 +156,22 @@ impl MasternodeEntry {
         platform_http_port: u16,
         platform_node_id: UInt160,
     ) -> UInt256 {
-        const HASH_IMPORTANT_DATA_LENGTH: usize = 32 + 32 + 16 + 2 + 48 + 20 + 1;
-        let mut buffer: Vec<u8> = Vec::with_capacity(HASH_IMPORTANT_DATA_LENGTH);
-        provider_registration_transaction_hash.enc(&mut buffer);
-        confirmed_hash.enc(&mut buffer);
-        socket_address.ip_address.enc(&mut buffer);
-        socket_address.port.swap_bytes().enc(&mut buffer);
-        operator_public_key.data.enc(&mut buffer);
-        key_id_voting.enc(&mut buffer);
-        is_valid.enc(&mut buffer);
+        let mut writer = Vec::<u8>::new();
+        provider_registration_transaction_hash.enc(&mut writer);
+        confirmed_hash.enc(&mut writer);
+        socket_address.enc(&mut writer);
+        operator_public_key.data.enc(&mut writer);
+        key_id_voting.enc(&mut writer);
+        is_valid.enc(&mut writer);
         if operator_public_key.version == 2 /*Basic BLS*/ {
             let mn_type_u16: u16 = mn_type.into();
-            mn_type_u16.enc(&mut buffer);
+            mn_type_u16.enc(&mut writer);
             if mn_type == MasternodeType::HighPerformance {
-                platform_http_port.swap_bytes().enc(&mut buffer);
-                platform_node_id.enc(&mut buffer);
+                platform_http_port.swap_bytes().enc(&mut writer);
+                platform_node_id.enc(&mut writer);
             }
         }
-        UInt256(sha256d::Hash::hash(&buffer).into_inner())
+        UInt256(sha256d::Hash::hash(&writer).into_inner())
     }
 
     pub fn confirmed_hash_at(&self, block_height: u32) -> Option<UInt256> {
