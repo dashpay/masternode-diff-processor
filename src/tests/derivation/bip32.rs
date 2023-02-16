@@ -14,10 +14,11 @@ use crate::derivation::BIP32_HARD;
 use crate::derivation::derivation_path::DerivationPath;
 use crate::derivation::derivation_path_reference::DerivationPathReference;
 use crate::derivation::derivation_path_type::DerivationPathType;
-use crate::derivation::index_path::IIndexPath;
+use crate::derivation::index_path::{IIndexPath, IndexPath};
 use crate::derivation::protocol::IDerivationPath;
 use crate::keys::{BLSKey, ECDSAKey, IKey, KeyType};
 use crate::{BytesDecodable, UInt256};
+use crate::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
 use crate::util::{base58, Shared};
 
 #[test]
@@ -522,5 +523,27 @@ fn test_31_bit_compatibility_mode_derivation() {
 
 #[test]
 fn test_ecdsa_private_derivation() {
-
+    let manager = ChainsManager::new();
+    let chain_type = ChainType::MainNet;
+    let chain = manager.mainnet.borrow();
+    let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
+    let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
+    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let mut path = AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_wallet(chain_type, wallet, chain.borrow(), true);
+    let key = path.generate_extended_public_key_from_seed(&seed);
+    let index_path1 = IndexPath::index_path_with_indexes(vec![1, 5]);
+    let index_path2 = IndexPath::index_path_with_indexes(vec![4, 6]);
+    let private_key1 = path.private_key_at_index_path_from_seed(&index_path1, &seed).unwrap();
+    let public_key1 = path.public_key_at_index_path(&index_path1).unwrap();
+    let private_key2 = path.private_key_at_index_path_from_seed(&index_path2, &seed).unwrap();
+    let public_key2 = path.public_key_at_index_path(&index_path2).unwrap();
+    assert_eq!(private_key1.public_key_data().to_hex(), public_key1.public_key_data().to_hex(), "the public keys must match");
+    assert_eq!(private_key2.public_key_data().to_hex(), public_key2.public_key_data().to_hex(), "the public keys must match");
+    let private_keys = path.private_keys_at_index_paths(vec![index_path1, index_path2], &seed);
+    let private_key1_from_multi_index = private_keys.get(0).unwrap();
+    let private_key2_from_multi_index = private_keys.get(1).unwrap();
+    assert_eq!(private_key1_from_multi_index.public_key_data().to_hex(), private_key1.public_key_data().to_hex(), "the public keys must match");
+    assert_eq!(private_key2_from_multi_index.public_key_data().to_hex(), private_key2.public_key_data().to_hex(), "the public keys must match");
+    assert_eq!(private_key1_from_multi_index.private_key_data().unwrap().to_hex(), private_key1.private_key_data().unwrap().to_hex(), "the private keys must match");
+    assert_eq!(private_key2_from_multi_index.private_key_data().unwrap().to_hex(), private_key2.private_key_data().unwrap().to_hex(), "the private keys must match");
 }

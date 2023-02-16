@@ -274,6 +274,11 @@ impl IKey for ECDSAKey {
         }
     }
 
+    fn private_key_data(&self) -> Option<Vec<u8>> {
+        (!self.seckey.is_zero())
+            .then_some(self.seckey.0.to_vec())
+    }
+
     fn public_key_data(&self) -> Vec<u8> {
         if self.pubkey.is_empty() && self.has_private_key() {
             // let mut d = Vec::<u8>::with_capacity(if self.compressed { 33 } else { 65 });
@@ -284,7 +289,7 @@ impl IKey for ECDSAKey {
             } else {
                 pubkey.serialize_uncompressed().to_vec()
             };
-            println!("publicKeyData: {}", serialized.to_hex());
+            // println!("publicKeyData: {}", serialized.to_hex());
             return serialized;
         }
         self.pubkey.clone()
