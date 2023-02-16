@@ -183,7 +183,7 @@ impl MasternodeEntry {
             mn_type_u16.enc(&mut buffer);
             if mn_type == MasternodeType::HighPerformance {
                 // swap?
-                platform_http_port.enc(&mut buffer);
+                platform_http_port.swap_bytes().enc(&mut buffer);
                 platform_node_id.enc(&mut buffer);
             }
         }
