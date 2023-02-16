@@ -41,7 +41,7 @@ pub unsafe fn unbox_masternode_entry(x: *mut types::MasternodeEntry) {
     unbox_vec_ptr(entry.previous_validity, entry.previous_validity_count);
     unbox_any(entry.provider_registration_transaction_hash);
     unbox_any(entry.ip_address);
-    //unbox_any(entry.platform_node_id);
+    unbox_any(entry.platform_node_id);
 }
 
 /// # Safety

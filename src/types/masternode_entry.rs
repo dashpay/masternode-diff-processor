@@ -24,6 +24,6 @@ pub struct MasternodeEntry {
     // 0: regular, 1: high performance
     pub mn_type: u16,
     pub platform_http_port: u16,
-    // pub platform_node_id: *mut [u8; 20],
+    pub platform_node_id: *mut [u8; 20],
 
 }

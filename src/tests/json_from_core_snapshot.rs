@@ -303,7 +303,7 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
                 version: version.unwrap_or(0)
             };
             let update_height = node.update_height.unwrap_or(0);
-            let mut masternode = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, is_valid, MasternodeType::Regular, 0, /*UInt160::MIN,*/ update_height);
+            let mut masternode = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, is_valid, MasternodeType::Regular, 0, UInt160::MIN, update_height);
             masternode.known_confirmed_at_height = node.known_confirmed_at_height;
             masternode
         })
