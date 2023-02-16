@@ -204,14 +204,14 @@ impl DataAppend for Vec<u8> /* io::Write */ {
     fn script_elements(&self) -> Vec<ScriptElement> {
         let mut a = Vec::<ScriptElement>::new();
         let len = self.len();
-        let mut chunk_size = 0usize;
+        let chunk_size = &mut 0usize;
         let mut i = 0usize;
         'outer: while i < len {
             match self[i] {
                 x @ 0 | x @ 0x4f..=0xff => {
-                    chunk_size = 1;
+                    *chunk_size = 1;
                     a.push(ScriptElement::Number(x));
-                    i += chunk_size;
+                    i += *chunk_size;
                     continue 'outer;
                 },
                 0x4c => { // OP_PUSHDATA1
@@ -219,7 +219,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                     if i + std::mem::size_of::<u8>() > len {
                         break 'outer;
                     }
-                    chunk_size = self[i] as usize;
+                    *chunk_size = self[i] as usize;
                     i += std::mem::size_of::<u8>();
                 },
                 0x4d => { // OP_PUSHDATA2
@@ -227,7 +227,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                     if i + std::mem::size_of::<u16>() > len {
                         break 'outer;
                     }
-                    chunk_size = (self[i] as u16).swap_bytes() as usize;
+                    *chunk_size = (self[i] as u16).swap_bytes() as usize;
                     i += std::mem::size_of::<u16>();
                 },
                 0x4e => { // OP_PUSHDATA4
@@ -235,20 +235,20 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                     if i + std::mem::size_of::<u32>() > len {
                         break 'outer;
                     }
-                    chunk_size = (self[i] as u32).swap_bytes() as usize;
+                    *chunk_size = (self[i] as u32).swap_bytes() as usize;
                     i += std::mem::size_of::<u32>();
                 },
                 _ => {
-                    chunk_size = self[i] as usize;
+                    *chunk_size = self[i] as usize;
                     i += 1;
                 }
             };
-            if i + chunk_size > len {
+            if i + *chunk_size > len {
                 return a;
             }
-            let chunk = &self[i..i+chunk_size];
+            let chunk = &self[i..i+*chunk_size];
             a.push(ScriptElement::Data(chunk, op_len(chunk)));
-            i += chunk_size;
+            i += *chunk_size;
         }
         a
     }
