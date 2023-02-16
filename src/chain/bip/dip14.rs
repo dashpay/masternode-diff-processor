@@ -1,3 +1,4 @@
+use hashes::hex::ToHex;
 use secp256k1::Scalar;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, clone_into_array};
@@ -167,13 +168,14 @@ pub fn derive_child_private_key_256(k: &mut UInt512, i: &UInt256, hardened: bool
 // - In case parse256(IL) >= n or Ki is the point at infinity, the resulting key is invalid, and one should proceed with
 //   the next value for i.
 //
-fn _ckd_pub(k: ECPoint, mut c: UInt256, key: &[u8]) -> ECPoint {
-    // I = HMAC-SHA512(c, P(K) || i)
-    let i = UInt512::hmac(key, &c.0);
-    // c = IR
-    c = UInt256(clone_into_array(&i.0[..32]));
-    // K = P(IL) + K
-    secp256k1_point_add(&k, &c)
+fn ckd_pub(k: &mut ECPoint, c: &mut UInt256, key: &[u8]) {
+    let key = UInt512::hmac(&c.0, key);
+    c.0.copy_from_slice(&key.0[32..]);
+    let s = secp256k1::Secp256k1::new();
+    let mut pub_key = secp256k1::PublicKey::from_slice(&k.0).expect("invalid public key");
+    let tweak = Scalar::from_be_bytes(clone_into_array(&key.0[..32])).expect("invalid tweak");
+    pub_key = pub_key.add_exp_tweak(&s, &tweak).expect("failed to add tweak");
+    k.0.copy_from_slice(pub_key.serialize().as_ref())
 }
 
 // I = HMAC-SHA512(c, P(K) || i)
@@ -184,38 +186,22 @@ pub fn derive_child_public_key(k: &mut ECPoint, c: &mut UInt256, i: u32) {
         // can't derive private child key from public parent key
         return;
     }
-    let buf = &mut [0u8; 37];
-    buf[..33].clone_from_slice(&k.0);
-    buf[33..].clone_from_slice(&i.to_be_bytes());
-    let key = UInt512::hmac(&c.0, buf.as_slice());
-    c.0.copy_from_slice(&key.0[32..]);
-    let s = secp256k1::Secp256k1::new();
-    let pub_key = secp256k1::PublicKey::from_slice(&k.0).expect("invalid public key");
-    let tweak = Scalar::from_be_bytes(clone_into_array(&key.0[..32])).expect("invalid tweak");
-    let pub_key = pub_key.add_exp_tweak(&s, &tweak).expect("failed to add tweak");
-    k.0.copy_from_slice(pub_key.serialize().as_ref());
+    let writer = &mut [0u8; 37];
+    writer[..33].clone_from_slice(&k.0);
+    writer[33..].clone_from_slice(&i.to_be_bytes());
+    ckd_pub(k, c, writer);
 }
 
-pub fn ckd_pub_256(k: ECPoint, c: UInt256, i: UInt256, hardened: bool) -> ECPoint {
+pub fn derive_child_public_key_256(k: &mut ECPoint, c: &mut UInt256, i: UInt256, hardened: bool) {
     if hardened {
         // can't derive private child key from public parent key
-        return k;
+        return;
     }
-    let i_is_31_bits = i.is_31_bits();
-    if i_is_31_bits {
-        _ckd_pub(k, c, &i.u32_le().swap_bytes().to_le_bytes())
+    let mut writer = k.as_bytes().to_vec();
+    if i.is_31_bits() {
+        writer.extend_from_slice(&i.u32_le().to_be_bytes());
     } else {
-        _ckd_pub(k, c, i.as_bytes())
-    }
-    // let buf = if i_is_31_bits {
-    //
-    // } else {
-    //     i.0
-    // };
-    // let buf = if i_is_31_bits {
-    //     &i.u32_le().swap_bytes().to_le_bytes()
-    // } else {
-    //     i.as_bytes()
-    // };
-    // _ckd_pub(k, c, buf)
+        writer.extend_from_slice(i.as_bytes());
+    };
+    ckd_pub(k, c, &writer);
 }

@@ -1,12 +1,15 @@
 use std::sync::{Arc, Mutex};
 use bls_signatures::bip32::ExtendedPrivateKey;
 use hashes::hex::{FromHex, ToHex};
+use crate::chain::bip::dip14::{derive_child_private_key, derive_child_private_key_256, derive_child_public_key, derive_child_public_key_256};
 use crate::chain::Chain;
 use crate::chain::common::chain_type::IHaveChainSettings;
 use crate::chain::common::ChainType;
 use crate::chain::ext::wallets::Wallets;
 use crate::chain::wallet::seed::Seed;
 use crate::chains_manager::ChainsManager;
+use crate::crypto::byte_util::{AsBytes, clone_into_array};
+use crate::crypto::{ECPoint, UInt512};
 use crate::derivation::BIP32_HARD;
 use crate::derivation::derivation_path::DerivationPath;
 use crate::derivation::derivation_path_reference::DerivationPathReference;
@@ -14,7 +17,7 @@ use crate::derivation::derivation_path_type::DerivationPathType;
 use crate::derivation::index_path::IIndexPath;
 use crate::derivation::protocol::IDerivationPath;
 use crate::keys::{BLSKey, ECDSAKey, IKey, KeyType};
-use crate::UInt256;
+use crate::{BytesDecodable, UInt256};
 use crate::util::{base58, Shared};
 
 #[test]
@@ -470,3 +473,54 @@ fn test_bip44_sequence_serialized_master_public_key() {
     });
 }
 
+#[test]
+fn test_31_bit_derivation() {
+    let chain_type = ChainType::MainNet;
+    let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
+    let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
+    let i = UInt512::bip32_seed_key(&seed.data);
+    let secret = UInt256(clone_into_array(&i.0[..32]));
+    let mut chain = UInt256(clone_into_array(&i.0[32..]));
+    let mut child_chain = chain.clone();
+    let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
+    let parent_public_key = parent_secret.public_key_data();
+    let derivation = 0u32;
+    let mut private_key_data = UInt512::from(secret, chain);
+    derive_child_private_key(&mut private_key_data, derivation);
+    let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
+    chain = UInt256(clone_into_array(&private_key_data.0[32..]));
+    let public_key = ECDSAKey::key_with_secret(&child_secret, true).unwrap().public_key_data();
+    let mut pubkey = ECPoint::from_bytes_force(&parent_public_key);
+    derive_child_public_key(&mut pubkey, &mut child_chain, 0);
+    assert_eq!(chain, child_chain, "the bip32 chains must match");
+    assert_eq!(&public_key, pubkey.as_bytes(), "the public keys must match");
+}
+
+#[test]
+fn test_31_bit_compatibility_mode_derivation() {
+    let chain_type = ChainType::MainNet;
+    let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
+    let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
+    let i = UInt512::bip32_seed_key(&seed.data);
+    let secret = UInt256(clone_into_array(&i.0[..32]));
+    let mut chain = UInt256(clone_into_array(&i.0[32..]));
+    let mut child_chain = chain.clone();
+    let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
+    let parent_public_key = parent_secret.public_key_data();
+    let derivation = 0u32;
+    let mut private_key_data = UInt512::from(secret, chain);
+    let derivation = UInt256::MIN;
+    derive_child_private_key_256(&mut private_key_data, &derivation, false);
+    let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
+    chain = UInt256(clone_into_array(&private_key_data.0[32..]));
+    let public_key = ECDSAKey::key_with_secret(&child_secret, true).unwrap().public_key_data();
+    let mut pubkey = ECPoint::from_bytes_force(&parent_public_key);
+    derive_child_public_key_256(&mut pubkey, &mut child_chain, derivation, false);
+    assert_eq!(chain, child_chain, "the bip32 chains must match");
+    assert_eq!(&public_key, pubkey.as_bytes(), "the public keys must match");
+}
+
+#[test]
+fn test_ecdsa_private_derivation() {
+
+}
