@@ -508,7 +508,6 @@ fn test_31_bit_compatibility_mode_derivation() {
     let mut child_chain = chain.clone();
     let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
     let parent_public_key = parent_secret.public_key_data();
-    let derivation = 0u32;
     let mut private_key_data = UInt512::from(secret, chain);
     let derivation = UInt256::MIN;
     derive_child_private_key_256(&mut private_key_data, &derivation, false);
@@ -546,4 +545,32 @@ fn test_ecdsa_private_derivation() {
     assert_eq!(private_key2_from_multi_index.public_key_data().to_hex(), private_key2.public_key_data().to_hex(), "the public keys must match");
     assert_eq!(private_key1_from_multi_index.private_key_data().unwrap().to_hex(), private_key1.private_key_data().unwrap().to_hex(), "the private keys must match");
     assert_eq!(private_key2_from_multi_index.private_key_data().unwrap().to_hex(), private_key2.private_key_data().unwrap().to_hex(), "the private keys must match");
+}
+
+#[test]
+fn test_256_bit_derivation() {
+    let manager = ChainsManager::new();
+    let chain_type = ChainType::MainNet;
+    let chain = manager.mainnet.borrow();
+    let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
+    let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
+    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let i = UInt512::bip32_seed_key(&seed.data);
+    let secret = UInt256(clone_into_array(&i.0[..32]));
+    let mut chain = UInt256(clone_into_array(&i.0[32..]));
+    let mut child_chain = chain.clone();
+    let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
+    let parent_public_key = parent_secret.public_key_data();
+    let derivation = UInt256::from([5, 12, 15, 1337]);
+    let mut private_key_data = UInt512::from(secret, chain);
+    derive_child_private_key_256(&mut private_key_data, &derivation, false);
+    let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
+    chain = UInt256(clone_into_array(&private_key_data.0[32..]));
+    let public_key = ECDSAKey::key_with_secret(&child_secret, true).unwrap().public_key_data();
+    let mut pubkey = ECPoint::from_bytes_force(&parent_public_key);
+    derive_child_public_key_256(&mut pubkey, &mut child_chain, derivation, false);
+    assert_eq!(chain, child_chain, "the bip32 chains must match");
+    assert_eq!(&public_key, pubkey.as_bytes(), "the public keys must match");
+    assert_eq!(derivation, UInt256::from_hex("05000000000000000c000000000000000f000000000000003905000000000000").unwrap(), "derivation must match the correct value");
+    assert_eq!(public_key.to_hex(), "029d469d2a7070d6367afc099be3d0a8d6467ced43228b8ce3d1723f6f4f78cac7", "the public must match the correct value");
 }
