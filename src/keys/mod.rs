@@ -12,7 +12,6 @@ use common_crypto::cryptor;
 use crate::UInt256;
 use crate::chain::ScriptMap;
 use crate::derivation::index_path::{IIndexPath, IndexPath};
-use crate::derivation::protocol::IDerivationPath;
 use crate::util::Address::with_public_key_data;
 
 pub trait IKey: Send + Sync + Debug {
@@ -149,10 +148,10 @@ pub trait CryptoData<K: IKey>: Send + Sync + Debug {
 
 
     // DHKey
-    fn encrypt_with_dh_key(&self, dh_key: &K) -> Option<Vec<u8>> where K: DHKey {
-        self.encrypt_with_dh_key_using_iv(dh_key, Self::random_initialization_vector_of_size(CC_BLOCK_SIZE_AES128))
+    fn encrypt_with_dh_key(&self, key: &K) -> Option<Vec<u8>> where K: DHKey {
+        self.encrypt_with_dh_key_using_iv(key, Self::random_initialization_vector_of_size(CC_BLOCK_SIZE_AES128))
     }
-    fn encrypt_with_dh_key_using_iv(&self, dh_key: &K, initialization_vector: Vec<u8>) -> Option<Vec<u8>> where K: DHKey;
+    fn encrypt_with_dh_key_using_iv(&self, key: &K, initialization_vector: Vec<u8>) -> Option<Vec<u8>> where K: DHKey;
     fn decrypt_with_dh_key(&self, key: &K) -> Option<Vec<u8>> where K: DHKey {
         self.decrypt_with_dh_key_using_iv_size(key, CC_BLOCK_SIZE_AES128)
     }

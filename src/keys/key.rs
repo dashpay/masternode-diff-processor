@@ -9,7 +9,7 @@ use crate::derivation::index_path::{IIndexPath, IndexPath};
 use crate::derivation::wallet_based_extended_private_key_location_string_for_unique_id;
 use crate::keys::bls_key::BLSKey;
 use crate::keys::ecdsa_key::ECDSAKey;
-use crate::keys::IKey;
+use crate::keys::{CryptoData, DHKey, IKey};
 use crate::storage::keychain::Keychain;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -269,5 +269,59 @@ impl IKey for Key {
             Key::BLS(key) => key.forget_private_key(),
         }
 
+    }
+}
+
+impl DHKey for Key {
+    fn init_with_dh_key_exchange_with_public_key(public_key: &mut Self, private_key: &Self) -> Option<Self> where Self: Sized {
+        match (public_key, private_key) {
+            (Key::ECDSA(public_key), Key::ECDSA(private_key)) =>
+                ECDSAKey::init_with_dh_key_exchange_with_public_key(public_key, private_key)
+                    .map(Into::into),
+            (Key::BLS(public_key), Key::BLS(private_key)) =>
+                BLSKey::init_with_dh_key_exchange_with_public_key(public_key, private_key)
+                    .map(Into::into),
+            _ => None
+        }
+    }
+}
+
+impl CryptoData<Key> for Vec<u8> {
+    fn encrypt_with_secret_key_using_iv(&mut self, secret_key: &Key, public_key: &Key, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+        match (secret_key, public_key) {
+            (Key::ECDSA(secret_key), Key::ECDSA(public_key)) =>
+                <Vec<u8> as CryptoData<ECDSAKey>>::encrypt_with_secret_key_using_iv(self, secret_key, public_key, initialization_vector),
+            (Key::BLS(secret_key), Key::BLS(public_key)) =>
+                <Vec<u8> as CryptoData<BLSKey>>::encrypt_with_secret_key_using_iv(self, secret_key, public_key, initialization_vector),
+            _ => None
+        }
+    }
+
+    fn decrypt_with_secret_key_using_iv_size(&mut self, secret_key: &Key, public_key: &Key, iv_size: usize) -> Option<Vec<u8>> {
+        match (secret_key, public_key) {
+            (Key::ECDSA(secret_key), Key::ECDSA(public_key)) =>
+                <Vec<u8> as CryptoData<ECDSAKey>>::decrypt_with_secret_key_using_iv_size(self, secret_key, public_key, iv_size),
+            (Key::BLS(secret_key), Key::BLS(public_key)) =>
+                <Vec<u8> as CryptoData<BLSKey>>::decrypt_with_secret_key_using_iv_size(self, secret_key, public_key, iv_size),
+            _ => None
+        }
+    }
+
+    fn encrypt_with_dh_key_using_iv(&self, key: &Key, initialization_vector: Vec<u8>) -> Option<Vec<u8>> where Key: DHKey {
+        match key {
+            Key::ECDSA(key) =>
+                <Vec<u8> as CryptoData<ECDSAKey>>::encrypt_with_dh_key_using_iv(self, key, initialization_vector),
+            Key::BLS(key) =>
+                <Vec<u8> as CryptoData<BLSKey>>::encrypt_with_dh_key_using_iv(self, key, initialization_vector),
+        }
+    }
+
+    fn decrypt_with_dh_key_using_iv_size(&self, key: &Key, iv_size: usize) -> Option<Vec<u8>> where Key: DHKey {
+        match key {
+            Key::ECDSA(key) =>
+                <Vec<u8> as CryptoData<ECDSAKey>>::decrypt_with_dh_key_using_iv_size(self, key, iv_size),
+            Key::BLS(key) =>
+                <Vec<u8> as CryptoData<BLSKey>>::decrypt_with_dh_key_using_iv_size(self, key, iv_size),
+        }
     }
 }

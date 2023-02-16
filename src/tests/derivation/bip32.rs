@@ -1,4 +1,6 @@
 use std::sync::{Arc, Mutex};
+use base64::{alphabet, Engine};
+use base64::engine::{GeneralPurpose, GeneralPurposeConfig};
 use bls_signatures::bip32::ExtendedPrivateKey;
 use hashes::hex::{FromHex, ToHex};
 use crate::chain::bip::dip14::{derive_child_private_key, derive_child_private_key_256, derive_child_public_key, derive_child_public_key_256};
@@ -16,7 +18,7 @@ use crate::derivation::derivation_path_reference::DerivationPathReference;
 use crate::derivation::derivation_path_type::DerivationPathType;
 use crate::derivation::index_path::{IIndexPath, IndexPath};
 use crate::derivation::protocol::IDerivationPath;
-use crate::keys::{BLSKey, ECDSAKey, IKey, KeyType};
+use crate::keys::{BLSKey, CryptoData, ECDSAKey, IKey, Key, KeyType};
 use crate::{BytesDecodable, UInt256};
 use crate::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
 use crate::derivation::incoming_funds_derivation_path::IncomingFundsDerivationPath;
@@ -597,19 +599,47 @@ fn test_dashpay_derivation() {
         assert_eq!(ext_pubkey_from_master_contact_path.extended_public_key_data().unwrap().to_hex(), "351973adaa8073a0ac848c08ba1c6df9a14d3c52033febe9bf4c5b365546a163bac5c8180240b908657221ebdc8fde7cd3017531159a7c58b955db380964c929dc6a85ac86", "Incorrect value for extended public key");
         assert_eq!(incoming_path.address_at_index(0).unwrap(), "Xs8zNYNY5hT38KFb8tq8EbnPn7GCNaqr45", "First address should match expected value");
     });
-
 }
 
-// UInt256 sourceUser1 = @"01".hexToData.SHA256;
-// UInt256 destinationUser2 = @"02".hexToData.SHA256;
-// DSDerivationPath *masterContactsDerivationPath = [account masterContactsDerivationPath];
-// DSIncomingFundsDerivationPath *incomingFundsDerivationPath = [DSIncomingFundsDerivationPath contactBasedDerivationPathWithDestinationBlockchainIdentityUniqueId:destinationUser2 sourceBlockchainIdentityUniqueId:sourceUser1 forAccountNumber:0 onChain:self.chain];
-// incomingFundsDerivationPath.account = account;
-//
-// DSKey *extendedPublicKeyFromMasterContactDerivationPath = [incomingFundsDerivationPath generateExtendedPublicKeyFromParentDerivationPath:masterContactsDerivationPath storeUnderWalletUniqueId:nil];
-// DSKey *extendedPublicKeyFromSeed = [incomingFundsDerivationPath generateExtendedPublicKeyFromSeed:seed storeUnderWalletUniqueId:nil];
-//
-// XCTAssertEqualObjects(extendedPublicKeyFromMasterContactDerivationPath.extendedPublicKeyData, extendedPublicKeyFromSeed.extendedPublicKeyData, @"The extended public keys should be the same");
-// XCTAssertEqualObjects(extendedPublicKeyFromMasterContactDerivationPath.extendedPublicKeyData.hexString, @"351973adaa8073a0ac848c08ba1c6df9a14d3c52033febe9bf4c5b365546a163bac5c8180240b908657221ebdc8fde7cd3017531159a7c58b955db380964c929dc6a85ac86", @"Incorrect value for extended public key");
-// XCTAssertEqualObjects([incomingFundsDerivationPath addressAtIndex:0], @"Xs8zNYNY5hT38KFb8tq8EbnPn7GCNaqr45", @"First address should match expected value");
-// }
+#[test]
+fn test_base64_extended_public_key_size() {
+    let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
+    let manager = ChainsManager::new();
+    let chain_type = ChainType::MainNet;
+    let chain = manager.mainnet.borrow();
+    let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
+    let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
+    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    wallet.with(|w| {
+        let account = w.account_with_number_mut(0).unwrap();
+        let path = account.master_contacts_derivation_path.as_mut().unwrap();
+        path.generate_extended_public_key_from_seed_no_store(&seed);
+        let source_identity_unique_id = UInt256::sha256(&[0x01]);
+        let destination_identity_unique_id = UInt256::sha256(&[0x02]);
+        let mut incoming_path = IncomingFundsDerivationPath::contact_based_derivation_path_with_destination_identity_unique_id(destination_identity_unique_id, source_identity_unique_id, 0, chain_type, chain.borrow());
+        incoming_path.set_wallet(wallet.borrow());
+        let ext_pubkey_from_master_contact_path = incoming_path.base.generate_extended_public_key_from_parent_derivation_path(path, None).unwrap();
+        let bob_seed = [10u8, 9, 8, 7, 6, 6, 7, 8, 9, 10];
+
+        let bob_keypair_bls = BLSKey::key_with_seed_data(&Seed::with_data(bob_seed.to_vec()), true);
+        let path_bls = AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_wallet(chain_type, wallet.borrow(), chain.borrow(), true);
+        let private_key_bls = path_bls.private_key_at_index(0, &seed).unwrap();
+        let mut pubkey_data_bls = ext_pubkey_from_master_contact_path.extended_public_key_data().unwrap();
+        println!("pubkey_data_bls: {}", pubkey_data_bls.to_hex());
+        pubkey_data_bls.encrypt_with_secret_key(&private_key_bls, &Key::BLS(bob_keypair_bls));
+        println!("pubkey_data_bls (encrypted): {}", pubkey_data_bls.to_hex());
+        // assert_eq!(base64_engine.encode(pubkey_data_bls).len(), 128, "The size of the base64 should be 128");
+        assert_eq!(base64_engine.encode(pubkey_data_bls).len(), 92, "The size of the base64 should be 92");
+
+        let bob_secret = UInt256::from_hex("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140").unwrap();
+        let bob_keypair_ecdsa = ECDSAKey::key_with_secret(&bob_secret, true).unwrap();
+        let path_ecdsa = AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_wallet(chain_type, wallet.borrow(), chain.borrow(), true);
+        let private_key_ecdsa = path_ecdsa.private_key_at_index(0, &seed).unwrap();
+        let mut pubkey_data_ecdsa = ext_pubkey_from_master_contact_path.extended_public_key_data().unwrap();
+        println!("pubkey_data_ecdsa: {}", pubkey_data_ecdsa.to_hex());
+        pubkey_data_ecdsa.encrypt_with_secret_key(&private_key_ecdsa, &Key::ECDSA(bob_keypair_ecdsa));
+        println!("pubkey_data_ecdsa (encrypted): {}", pubkey_data_ecdsa.to_hex());
+        // assert_eq!(base64_engine.encode(pubkey_data_ecdsa).len(), 128, "The size of the base64 should be 128");
+        assert_eq!(base64_engine.encode(pubkey_data_ecdsa).len(), 92, "The size of the base64 should be 128");
+    });
+}
