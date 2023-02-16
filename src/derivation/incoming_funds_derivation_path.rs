@@ -5,7 +5,9 @@ use crate::chain::{Chain, Wallet};
 use crate::chain::common::ChainType;
 use crate::chain::wallet::seed::Seed;
 use crate::derivation::derivation_path::DerivationPath;
+use crate::derivation::derivation_path_feature_purpose::DerivationPathFeaturePurpose;
 use crate::derivation::derivation_path_reference::DerivationPathReference;
+use crate::derivation::derivation_path_type::DerivationPathType;
 use crate::derivation::index_path::{IIndexPath, IndexPath};
 use crate::derivation::protocol::IDerivationPath;
 use crate::derivation::sequence_gap_limit::SequenceGapLimit;
@@ -24,6 +26,7 @@ pub struct IncomingFundsDerivationPath {
     pub contact_destination_blockchain_identity: Identity,
     pub source_is_local: bool,
     pub destination_is_local: bool,
+    account_number: u32,
 
     external_derivation_path: bool,
     external_addresses: Vec<String>,
@@ -166,7 +169,34 @@ impl IDerivationPath for IncomingFundsDerivationPath {
         format!("{}-{}-{}", self.contact_source_blockchain_identity_unique_id.short_hex(), self.contact_destination_blockchain_identity_unique_id.short_hex(),
                 self.base.create_identifier_for_derivation_path())
     }
+}
 
+impl IncomingFundsDerivationPath {
+    pub fn contact_based_derivation_path_with_destination_identity_unique_id(destination_identity_unique_id: UInt256, source_identity_unique_id: UInt256, account_number: u32, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+        assert_ne!(source_identity_unique_id, destination_identity_unique_id, "source and destination must be different");
+        Self {
+            base: DerivationPath::derivation_path_with_indexes(
+                vec![
+                    UInt256::from(DerivationPathFeaturePurpose::Default),
+                    UInt256::from(chain_type.coin_type()),
+                    UInt256::from(DerivationPathFeaturePurpose::DashPay),
+                    UInt256::from(account_number),
+                    source_identity_unique_id,
+                    destination_identity_unique_id
+                ],
+                vec![true, true, true, true, false, false],
+                DerivationPathType::ClearFunds,
+                KeyType::ECDSA,
+                DerivationPathReference::ContactBasedFunds,
+                chain_type,
+                chain
+            ),
+            account_number,
+            contact_source_blockchain_identity_unique_id: source_identity_unique_id,
+            contact_destination_blockchain_identity_unique_id: destination_identity_unique_id,
+            ..Default::default()
+        }
+    }
 }
 
 impl IncomingFundsDerivationPath  {

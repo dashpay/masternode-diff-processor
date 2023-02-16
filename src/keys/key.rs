@@ -233,14 +233,16 @@ impl IKey for Key {
         }
     }
 
-    fn public_derive_to_256bit_derivation_path<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH) -> Option<Self> where Self: Sized {
+    fn public_derive_to_256bit_derivation_path<DPATH>(&mut self, derivation_path: &DPATH) -> Option<Self>
+        where Self: Sized, DPATH: IIndexPath<Item = UInt256> {
         match self {
             Key::ECDSA(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
             Key::BLS(key) => key.public_derive_to_256bit_derivation_path(derivation_path).map(Into::into),
         }
     }
 
-    fn public_derive_to_256bit_derivation_path_with_offset<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH, offset: usize) -> Option<Self> where Self: Sized {
+    fn public_derive_to_256bit_derivation_path_with_offset<DPATH>(&mut self, derivation_path: &DPATH, offset: usize) -> Option<Self>
+        where Self: Sized, DPATH: IIndexPath<Item = UInt256> {
         match self {
             Key::ECDSA(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),
             Key::BLS(key) => key.public_derive_to_256bit_derivation_path_with_offset(derivation_path, offset).map(Into::into),

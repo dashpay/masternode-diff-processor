@@ -1,4 +1,3 @@
-use hashes::hex::ToHex;
 use secp256k1::Scalar;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, clone_into_array};

@@ -397,8 +397,7 @@ impl DerivationPath {
                 })
         }
     }
-    /*pub fn generate_extended_public_key_from_parent_derivation_path<P>(&mut self, path: &mut P, wallet_unique_id: Option<&String>) -> Option<Key>
-        where P: IDerivationPath + IIndexPath<Item = UInt256> {
+    pub fn generate_extended_public_key_from_parent_derivation_path<DPATH: IDerivationPath + IIndexPath<Item = UInt256>>(&mut self, path: &DPATH, wallet_unique_id: Option<&String>) -> Option<Key> {
         assert_eq!(path.signing_algorithm(), self.signing_algorithm(), "The signing algorithms must be the same");
         assert!(self.length() > path.length(), "length must be inferior to the parent derivation path length");
         assert!(path.has_extended_public_key(), "the parent derivation path must have an extended public key");
@@ -421,12 +420,12 @@ impl DerivationPath {
         if let Some(unique_id) = wallet_unique_id {
             Keychain::set_data(
                 self.wallet_based_extended_public_key_location_string_for_wallet_unique_id(unique_id),
-                self.extended_public_key.and_then(|mut key| key.extended_public_key_data()),
+                self.extended_public_key.clone().and_then(|key| key.extended_public_key_data()),
                 false)
                 .expect("Can't store extended public key");
         }
-        self.extended_public_key
-    }*/
+        self.extended_public_key.clone()
+    }
 
     pub fn serialized_private_keys_at_index_paths(&self, index_paths: Vec<IndexPath<u32>>, seed: &Seed) -> Option<Vec<String>> {
         if seed.is_empty() {

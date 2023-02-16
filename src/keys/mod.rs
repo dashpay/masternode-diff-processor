@@ -47,12 +47,12 @@ pub trait IKey: Send + Sync + Debug {
         where Self: Sized, DPATH: IIndexPath<Item = UInt256> {
         self.private_derive_to_path(&derivation_path.base_index_path())
     }
-    fn public_derive_to_256bit_derivation_path<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH) -> Option<Self>
-        where Self: Sized {
+    fn public_derive_to_256bit_derivation_path<DPATH>(&mut self, derivation_path: &DPATH) -> Option<Self>
+        where Self: Sized, DPATH: IIndexPath<Item = UInt256> {
         self.public_derive_to_256bit_derivation_path_with_offset(derivation_path, 0)
     }
-    fn public_derive_to_256bit_derivation_path_with_offset<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH, offset: usize) -> Option<Self>
-        where Self: Sized {
+    fn public_derive_to_256bit_derivation_path_with_offset<DPATH>(&mut self, derivation_path: &DPATH, offset: usize) -> Option<Self>
+        where Self: Sized, DPATH: IIndexPath<Item = UInt256> {
         panic!("Should be overriden in implementation")
     }
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {

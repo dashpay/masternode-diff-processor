@@ -6,7 +6,7 @@ use hashes::hex::{FromHex, ToHex};
 use secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
 use secp256k1::Secp256k1;
 use crate::chain::bip::bip32::StringKey;
-use crate::chain::bip::dip14::{derive_child_private_key, derive_child_private_key_256, derive_child_public_key};
+use crate::chain::bip::dip14::{derive_child_private_key, derive_child_private_key_256, derive_child_public_key, derive_child_public_key_256};
 use crate::chain::chain::Chain;
 use crate::chain::common::ChainType;
 use crate::chain::ext::Settings;
@@ -16,7 +16,6 @@ use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, BytesDecodable, clone_into_array, Zeroable};
 use crate::crypto::{ECPoint, UInt160, UInt256, UInt512};
 use crate::derivation::BIP32_HARD;
-use crate::derivation::protocol::IDerivationPath;
 use crate::derivation::index_path::{IIndexPath, IndexPath};
 use crate::keys::{CryptoData, DHKey, IKey, KeyType};
 use crate::util::Address::is_valid_dash_private_key;
@@ -366,7 +365,6 @@ impl IKey for ECDSAKey {
     }
 
     fn private_derive_to_256bit_derivation_path<DPATH>(&self, derivation_path: &DPATH) -> Option<Self>
-        // where Self: Sized, DPATH: ChildKeyDerivation {
         where Self: Sized, DPATH: IIndexPath<Item = UInt256> {
         let mut secret = UInt512::from(self.seckey, self.chaincode);
         let mut fingerprint = 0u32;
@@ -391,37 +389,31 @@ impl IKey for ECDSAKey {
         None
     }
 
-    fn public_derive_to_256bit_derivation_path_with_offset<IPATH: IIndexPath, DPATH: IDerivationPath<IPATH>>(&mut self, derivation_path: DPATH, offset: usize) -> Option<Self> where Self: Sized {
-        // assert!(derivation_path.length() > offset, "derivationPathOffset must be smaller that the derivation path length");
-        let chain = self.chaincode;
-        let pubkey = ECPoint::from_bytes_force(&self.public_key_data());
-        todo!()
-        // for i in 0..self.length() - 1 {
-        //     ckd_priv_256(secret, chain, &self.index_at_position(i), self.hardened_at_position(i));
-        // }
-
-        // DSECPoint pubKey = *(const DSECPoint *)((const uint8_t *)self.publicKeyData.bytes);
-        // for (NSInteger i = derivationPathOffset; i < [derivationPath length] - 1; i++) {
-        //     UInt256 derivation = [derivationPath indexAtPosition:i];
-        //     BOOL isHardenedAtPosition = [derivationPath isHardenedAtPosition:i];
-        //     CKDpub256(&pubKey, &chain, derivation, isHardenedAtPosition);
-        // }
-        // NSData *publicKeyData = [NSData dataWithBytes:&pubKey length:sizeof(pubKey)];
-        // uint32_t fingerprint = publicKeyData.hash160.u32[0];
-        //
-        // UInt256 derivation = [derivationPath indexAtPosition:[derivationPath length] - 1];
-        // BOOL isHardenedAtPosition = [derivationPath isHardenedAtPosition:[derivationPath length] - 1];
-        //
-        // CKDpub256(&pubKey, &chain, derivation, isHardenedAtPosition);
-        //
-        // publicKeyData = [NSData dataWithBytes:&pubKey length:sizeof(pubKey)];
-        // DSECDSAKey *childKey = [DSECDSAKey keyWithPublicKeyData:publicKeyData];
-        // childKey.chaincode = chain;
-        // childKey.fingerprint = fingerprint;
-        // childKey.isExtended = TRUE;
-        //
-        // NSAssert(childKey, @"Public key should be created");
-        // return childKey;
+    fn public_derive_to_256bit_derivation_path_with_offset<DPATH>(&mut self, derivation_path: &DPATH, offset: usize) -> Option<Self>
+        where Self: Sized, DPATH: IIndexPath<Item = UInt256> {
+        assert!(derivation_path.length() > offset, "derivationPathOffset must be smaller that the derivation path length");
+        let mut chain = self.chaincode.clone();
+        let mut pubkey = ECPoint::from_bytes_force(&self.public_key_data());
+        (offset..derivation_path.length() - 1)
+            .into_iter()
+            .for_each(|i| {
+                derive_child_public_key_256(
+                    &mut pubkey,
+                    &mut chain,
+                    derivation_path.index_at_position(i),
+                    derivation_path.hardened_at_position(i));
+            });
+        let fingerprint = UInt160::hash160(pubkey.as_bytes()).u32_le();
+        derive_child_public_key_256(&mut pubkey, &mut chain, derivation_path.last_index(), derivation_path.last_hardened());
+        if let Some(mut child_key) = Self::key_with_public_key_data(&pubkey.as_bytes().to_vec()) {
+            child_key.chaincode = chain;
+            child_key.fingerprint = fingerprint;
+            child_key.is_extended = true;
+            Some(child_key)
+        } else {
+            assert!(false, "Public key should be created");
+            None
+        }
     }
 
 
