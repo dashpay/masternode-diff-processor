@@ -333,15 +333,12 @@ impl<'a> TryRead<'a, Endian> for LLMQType {
 impl<'a> TryWrite<Endian> for LLMQType {
     fn try_write(self, bytes: &mut [u8], _endian: Endian) -> byte::Result<usize> {
         let orig: u8 = self.into();
-        orig.consensus_encode(bytes).unwrap();
+        orig.enc(bytes);
         Ok(1)
     }
 }
 impl<'a> BytesDecodable<'a, LLMQType> for LLMQType {
     fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<LLMQType> {
-        match bytes.read_with::<LLMQType>(offset, byte::LE) {
-            Ok(data) => Some(data),
-            Err(_err) => None,
-        }
+        bytes.read_with::<LLMQType>(offset, byte::LE).ok()
     }
 }

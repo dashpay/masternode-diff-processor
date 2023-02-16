@@ -131,6 +131,9 @@ impl MasternodeEntry {
             operator_public_key,
             key_id_voting,
             is_valid,
+            mn_type,
+            platform_http_port,
+            platform_node_id
         );
         println!("MasternodeEntry:entry_hash: {:?}", entry_hash);
         Self {
@@ -162,6 +165,9 @@ impl MasternodeEntry {
         operator_public_key: OperatorPublicKey,
         key_id_voting: UInt160,
         is_valid: u8,
+        mn_type: MasternodeType,
+        platform_http_port: u16,
+        platform_node_id: UInt160,
     ) -> UInt256 {
         const HASH_IMPORTANT_DATA_LENGTH: usize = 32 + 32 + 16 + 2 + 48 + 20 + 1;
         let mut buffer: Vec<u8> = Vec::with_capacity(HASH_IMPORTANT_DATA_LENGTH);
@@ -172,7 +178,15 @@ impl MasternodeEntry {
         operator_public_key.data.enc(&mut buffer);
         key_id_voting.enc(&mut buffer);
         is_valid.enc(&mut buffer);
-
+        if operator_public_key.version == 2 /*Basic BLS*/ {
+            let mn_type_u16: u16 = mn_type.into();
+            mn_type_u16.enc(&mut buffer);
+            if mn_type == MasternodeType::HighPerformance {
+                // swap?
+                platform_http_port.enc(&mut buffer);
+                platform_node_id.enc(&mut buffer);
+            }
+        }
         UInt256(sha256d::Hash::hash(&buffer).into_inner())
     }
 
@@ -226,6 +240,9 @@ impl MasternodeEntry {
             self.operator_public_key,
             self.key_id_voting,
             u8::from(self.is_valid),
+            self.mn_type,
+            self.platform_http_port,
+            self.platform_node_id
         )
     }
 
