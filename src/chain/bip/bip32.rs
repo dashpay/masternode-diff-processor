@@ -239,7 +239,6 @@ pub fn from(data: &String, chain_type: ChainType) -> Result<Key, Error> {
 
 pub mod StringKey {
     use byte::BytesExt;
-    use hashes::hex::ToHex;
     use crate::chain::common::ChainType;
     use crate::consensus::Encodable;
     use crate::crypto::byte_util::clone_into_array;

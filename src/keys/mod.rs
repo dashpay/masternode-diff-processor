@@ -97,7 +97,7 @@ pub const CC_BLOCK_SIZE_AES128: usize = 16;
 pub const CC_ENCRYPT: u8 = 0;
 pub const CC_DECRYPT: u8 = 1;
 
-pub trait CryptoData<K: IKey>: Send + Sync + Debug {
+pub trait CryptoData<K: IKey + Clone>: Send + Sync + Debug where Vec<u8>: CryptoData<K> {
 
     #[inline]
     fn random_initialization_vector_of_size(size: usize) -> Vec<u8> {
@@ -156,5 +156,53 @@ pub trait CryptoData<K: IKey>: Send + Sync + Debug {
         self.decrypt_with_dh_key_using_iv_size(key, CC_BLOCK_SIZE_AES128)
     }
     fn decrypt_with_dh_key_using_iv_size(&self, key: &K, iv_size: usize) -> Option<Vec<u8>> where K: DHKey;
-}
 
+
+
+
+    fn encapsulated_dh_decryption_with_keys(&mut self, keys: Vec<K>) -> Option<Vec<u8>> where K: DHKey {
+        assert!(keys.len() > 0, "There should be at least one key");
+        match &keys[..] {
+            [first_key, other @ ..] if !other.is_empty() =>
+                self.decrypt_with_dh_key(first_key)
+                    .and_then(|mut data| data.encapsulated_dh_decryption_with_keys(other.to_vec())),
+            [first_key] =>
+                self.decrypt_with_dh_key(first_key),
+            _ => None
+        }
+    }
+
+    fn encapsulated_dh_decryption_with_keys_using_iv_size(&mut self, keys: Vec<K>, iv_size: usize) -> Option<Vec<u8>> where K: DHKey {
+        assert!(keys.len() > 1, "There should be at least two key (first pair)");
+        match &keys[..] {
+            [first_key, other @ ..] if other.len() > 1 =>
+                self.decrypt_with_secret_key_using_iv_size(other.first().unwrap(), first_key, iv_size)
+                    .and_then(|mut data| data.encapsulated_dh_decryption_with_keys_using_iv_size(other.to_vec(), iv_size)),
+            [first_key, second_key] =>
+                self.decrypt_with_secret_key_using_iv_size(second_key, first_key, iv_size),
+            _ => None
+        }
+    }
+
+    fn encapsulated_dh_encryption_with_keys(&mut self, keys: Vec<K>) -> Option<Vec<u8>> where K: DHKey {
+        assert!(!keys.is_empty(), "There should be at least one key");
+        match &keys[..] {
+            [first, other @ ..] if !other.is_empty() =>
+                self.encrypt_with_dh_key(first)
+                    .and_then(|mut data| data.encapsulated_dh_encryption_with_keys(other.to_vec())),
+            [first] => self.encrypt_with_dh_key(first),
+            _ => None
+        }
+    }
+
+    fn encapsulated_dh_encryption_with_keys_using_iv(&mut self, keys: Vec<K>, initialization_vector: Vec<u8>) -> Option<Vec<u8>> where K: DHKey {
+        assert!(!keys.is_empty(), "There should be at least one key");
+        match &keys[..] {
+            [first, other @ ..] if !other.is_empty() =>
+                self.encrypt_with_dh_key(first)
+                    .and_then(|mut data| data.encapsulated_dh_encryption_with_keys_using_iv(other.to_vec(), initialization_vector)),
+            [first] => self.encrypt_with_dh_key(first),
+            _ => None
+        }
+    }
+}

@@ -25,6 +25,7 @@ std = ["secp256k1/std", "bitcoin_hashes/std"]
 bip0039 = { version = "0.11.0", default-features = false, features = ["chinese-simplified", "french", "italian", "japanese", "korean", "spanish"] }
 bip39 = { version = "1.0.1", default-features = false, features = ["chinese-simplified", "french", "italian", "japanese", "korean", "spanish", "rand"] }
 bitflags = "2.0.0-rc.1"
+blake3 = "1.3.2"
 byte = "0.2"
 bitcoin_hashes = { version = "0.11.0", default-features = false }
 bitcoinconsensus = { version = "0.19.0-3", optional = true }

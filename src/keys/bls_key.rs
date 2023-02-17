@@ -493,18 +493,13 @@ impl CryptoData<BLSKey> for Vec<u8> {
     fn encrypt_with_secret_key_using_iv(&mut self, secret_key: &BLSKey, public_key: &BLSKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
         secret_key.product(public_key)
             .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
-            .and_then(|key_data: [u8; 32]| initialization_vector[..16].try_into().ok()
-                .map(|iv_data: [u8; 16]| {
-                    let mut destination = Vec::from(iv_data);
-                    let config = cryptor::Config::AES256 {
-                        mode: cryptor::Mode::CTR,
-                        iv: Some(&iv_data),
-                        key: &key_data,
-                    };
-                    let encrypted_data = <Self as CryptoData<BLSKey>>::encrypt(self, config).unwrap();
-                    destination.extend(encrypted_data.clone());
-                    destination
-                }))
+            .map(|key_data: [u8; 32]| {
+                let config = cryptor::Config::AES256 { mode: cryptor::Mode::CTR, key: &key_data, iv: initialization_vector[..16].try_into().ok() };
+                let mut destination = initialization_vector.clone();
+                let encrypted_data = <Self as CryptoData<BLSKey>>::encrypt(self, config).unwrap();
+                destination.extend(encrypted_data.clone());
+                destination
+            })
     }
 
     fn decrypt_with_secret_key_using_iv_size(&mut self, secret_key: &BLSKey, public_key: &BLSKey, iv_size: usize) -> Option<Vec<u8>> {
@@ -512,14 +507,16 @@ impl CryptoData<BLSKey> for Vec<u8> {
             return None;
         }
         secret_key.product(public_key)
-            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
-            .and_then(|key_data: [u8; 32]| self[..iv_size].try_into().ok()
-                .and_then(|iv_data: [u8; 16]|
-                    <Self as CryptoData<BLSKey>>::decrypt(self[iv_size..self.len()].to_vec(), cryptor::Config::AES256 {
-                        mode: cryptor::Mode::CTR,
-                        iv: Some(&iv_data),
-                        key: &key_data,
-                    })))
+            .and_then(|sym_key_data| {
+                sym_key_data[..32].try_into().ok()
+            })
+            .and_then(|key_data: [u8; 32]| {
+                <Self as CryptoData<BLSKey>>::decrypt(self[iv_size..self.len()].to_vec(), cryptor::Config::AES256 {
+                    mode: cryptor::Mode::CTR,
+                    iv: self[..iv_size].try_into().ok(),
+                    key: &key_data,
+                })
+            })
     }
 
     fn encrypt_with_dh_key_using_iv(&self, key: &BLSKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {

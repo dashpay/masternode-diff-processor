@@ -37,6 +37,23 @@ impl From<BLSKey> for Key {
     }
 }
 
+impl From<Key> for ECDSAKey {
+    fn from(value: Key) -> Self {
+        match value {
+            Key::ECDSA(key) => key,
+            _ => panic!("trying to unwrap bls as ecdsa")
+        }
+    }
+}
+impl From<Key> for BLSKey {
+    fn from(value: Key) -> Self {
+        match value {
+            Key::BLS(key) => key,
+            _ => panic!("trying to unwrap ecdsa as bls")
+        }
+    }
+}
+
 impl Default for KeyType {
     fn default() -> Self {
         KeyType::ECDSA

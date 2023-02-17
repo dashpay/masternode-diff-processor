@@ -1,7 +1,7 @@
 use byte::{BytesExt, LE, Result, TryRead};
 use byte::ctx::Endian;
 use std::{mem, slice};
-use hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, sha256, sha256d, sha512};
+use hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, ripemd160, sha1, sha256, sha256d, sha512};
 use secp256k1::rand::{Rng, thread_rng};
 use crate::chain::params::BIP32_SEED_KEY;
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
@@ -401,6 +401,12 @@ impl UInt160 {
     pub fn hash160(data: &[u8]) -> Self {
         UInt160(hash160::Hash::hash(data).into_inner())
     }
+    pub fn ripemd160(data: &[u8]) -> Self {
+        UInt160(ripemd160::Hash::hash(data).into_inner())
+    }
+    pub fn sha1(data: &[u8]) -> Self {
+        UInt160(sha1::Hash::hash(data).into_inner())
+    }
 
     pub fn u32_le(&self) -> u32 {
         u32::from_le_bytes(clone_into_array(&self.0[..4]))
@@ -719,6 +725,9 @@ impl secp256k1::ThirtyTwoByteHash for UInt256 {
 }
 
 impl UInt512 {
+    pub fn sha512(data: &[u8]) -> Self {
+        UInt512(sha512::Hash::hash(data).into_inner())
+    }
     pub fn hmac(key: &[u8], input: &[u8]) -> Self {
         let mut engine = HmacEngine::<sha512::Hash>::new(key);
         engine.input(input);
