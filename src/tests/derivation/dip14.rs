@@ -57,7 +57,7 @@ fn test_256_bit_path_ecdsa_derivation2() {
     let chain = manager.testnet.borrow();
     let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
     // m/9'/5'/15'/0'/0x555d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3a'/0xa137439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89b5'/0
-    let mut path = DerivationPath::derivation_path_with_indexes(
+    let path = DerivationPath::derivation_path_with_indexes(
         vec![
             UInt256::from(DerivationPathFeaturePurpose::Default),
             UInt256::from(5u64),
@@ -78,4 +78,55 @@ fn test_256_bit_path_ecdsa_derivation2() {
         },
         _ => panic!("Can't get ecdsa key at index path from seed")
     }
+}
+
+#[test]
+fn test_256_bit_path_ecdsa_derivation3() {
+    let chain_type = ChainType::TestNet;
+    let seed = Seed::from_phrase::<bip0039::English>(SEED_PHRASE, chain_type.genesis_hash()).unwrap();
+    let manager = ChainsManager::new();
+    let chain = manager.testnet.borrow();
+    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    //m/0x775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b
+    let mut path = DerivationPath::derivation_path_with_indexes(
+        vec![
+            UInt256::from_hex("775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b").unwrap(),
+        ],
+        vec![false],
+        DerivationPathType::Unknown,
+        KeyType::ECDSA,
+        DerivationPathReference::Unknown,
+        chain_type,
+        chain.borrow());
+    path.generate_extended_public_key_from_seed_no_store(&seed);
+    let serialized_ext_pubkey = path.serialized_extended_public_key().unwrap();
+    assert_eq!(serialized_ext_pubkey, "dptp1C5gGd8NzvAke5WNKyRfpDRyvV2UZ3jjrZVZU77qk9yZemMGSdZpkWp7y6wt3FzvFxAHSW8VMCaC1p6Ny5EqWuRm2sjvZLUUFMMwXhmW6eS69qjX958RYBH5R8bUCGZkCfUyQ8UVWcx9katkrRr", "serialized extended public keys should match");
+    let serialized_ext_seckey = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
+    assert_eq!(serialized_ext_seckey, "dpts1vgMVEs9mmv1YLwURCeoTn9CFMZ8JMVhyZuxQSKttNSETR3zydMFHMKTTNDQPf6nnupCCtcNnSu3nKZXAJhaguyoJWD4Ju5PE6PSkBqAKWci7HLz37qmFmZZU6GMkLvNLtST2iV8NmqqbX37c45", "serialized extended private keys should match");
+}
+
+#[test]
+fn test_256_bit_path_ecdsa_derivation4() {
+    let chain_type = ChainType::TestNet;
+    let seed = Seed::from_phrase::<bip0039::English>(SEED_PHRASE, chain_type.genesis_hash()).unwrap();
+    let manager = ChainsManager::new();
+    let chain = manager.testnet.borrow();
+    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    //m/0x775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b/0xf537439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89a6'
+    let mut path = DerivationPath::derivation_path_with_indexes(
+        vec![
+            UInt256::from_hex("775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b").unwrap(),
+            UInt256::from_hex("f537439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89a6").unwrap(),
+        ],
+        vec![false, true],
+        DerivationPathType::Unknown,
+        KeyType::ECDSA,
+        DerivationPathReference::Unknown,
+        chain_type,
+        chain.borrow());
+    path.generate_extended_public_key_from_seed_no_store(&seed);
+    let serialized_ext_pubkey = path.serialized_extended_public_key().unwrap();
+    assert_eq!(serialized_ext_pubkey, "dptp1CLkexeadp6guoi8Fbiwq6CLZm3hT1DJLwHsxWvwYSeAhjenFhcQ9HumZSftfZEr4dyQjFD7gkM5bSn6Aj7F1Jve8KTn4JsMEaj9dFyJkYs4Ga5HSUqeajxGVmzaY1pEioDmvUtZL3J1NCDCmzQ", "serialized extended public keys should match");
+    let serialized_ext_seckey = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
+    assert_eq!(serialized_ext_seckey, "dpts1vwRsaPMQfqwp59ELpx5UeuYtdaMCJyGTwiGtr8zgf6qWPMWnhPpg8R73hwR1xLibbdKVdh17zfwMxFEMxZzBKUgPwvuosUGDKW4ayZjs3AQB9EGRcVpDoFT8V6nkcc6KzksmZxvmDcd3MqiPEu", "serialized extended private keys should match");
 }
