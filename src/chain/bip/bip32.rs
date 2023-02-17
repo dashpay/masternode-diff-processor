@@ -365,13 +365,9 @@ pub mod StringKey {
             b'\0'.enc(&mut writer);         // 46 (prv) / 45 (pub)
         }
         writer.extend(key);            // 78 (prv) / 78 (pub)
-        println!("serialize_32: {}", writer.to_hex());
-        //serialize_32: 0488b21e013442193e8000000047fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141035a784662a4a20a65bf6aab9ae98a6c068a81c52e4b032c0fb5400c706cfccc56
-
         base58::check_encode_slice(&writer)
     }
-    // real: 0488b21e000000000000000000873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508210339a36013301597daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2
-    // test: 0488b21e000000000000000000873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d5080339a36013301597daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2
+
     // helper function for serializing BIP32 master public/private keys to standard export format
     fn serialize_256(depth: u8, fingerprint: u32, hardened: bool, child: UInt256, chain: UInt256, key: Vec<u8>, chain_type: ChainType) -> String {
         // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:47 + key.length + sizeof(chain)])
@@ -386,7 +382,7 @@ pub mod StringKey {
         if is_priv {
             b'\0'.enc(&mut writer);         // 75 (prv) / 74 (pub)
         }
-        key.enc(&mut writer);               // 107 (prv) / 107 (pub)
+        writer.extend(key); // 107 (prv) / 107 (pub)
         base58::check_encode_slice(&writer)
     }
 }

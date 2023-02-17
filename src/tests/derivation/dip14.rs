@@ -1,0 +1,49 @@
+use hashes::hex::FromHex;
+use crate::chain::common::chain_type::IHaveChainSettings;
+use crate::chain::common::ChainType;
+use crate::chain::ext::wallets::Wallets;
+use crate::chain::wallet::seed::Seed;
+use crate::chains_manager::ChainsManager;
+use crate::derivation::derivation_path::DerivationPath;
+use crate::derivation::derivation_path_reference::DerivationPathReference;
+use crate::derivation::derivation_path_type::DerivationPathType;
+use crate::derivation::index_path::{IIndexPath, IndexPath};
+use crate::derivation::protocol::IDerivationPath;
+use crate::keys::{Key, KeyType};
+use crate::UInt256;
+
+const SEED_PHRASE: &str = "birth kingdom trash renew flavor utility donkey gasp regular alert pave layer";
+
+#[test]
+fn test_256_bit_path_ecdsa_derivation1() {
+    let chain_type = ChainType::TestNet;
+    let seed = Seed::from_phrase::<bip0039::English>(SEED_PHRASE, chain_type.genesis_hash()).unwrap();
+    let manager = ChainsManager::new();
+    let chain = manager.testnet.borrow();
+    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    // m/0x775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b/0xf537439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89a6'/0x4c4592ca670c983fc43397dfd21a6f427fac9b4ac53cb4dcdc6522ec51e81e79/0
+
+    let mut path = DerivationPath::derivation_path_with_indexes(
+        vec![
+            UInt256::from_hex("775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b").unwrap(),
+            UInt256::from_hex("f537439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89a6").unwrap(),
+            UInt256::from_hex("4c4592ca670c983fc43397dfd21a6f427fac9b4ac53cb4dcdc6522ec51e81e79").unwrap(),
+        ],
+        vec![false, true, false],
+        DerivationPathType::Unknown,
+        KeyType::ECDSA,
+        DerivationPathReference::Unknown,
+        chain_type,
+        chain.borrow());
+    match path.private_key_at_index_path_from_seed(&IndexPath::index_path_with_index(0), &seed) {
+        Some(Key::ECDSA(key)) => {
+            assert_eq!(key.secret_key_string(), "e8781fdef72862968cd9a4d2df34edaf9dcc5b17629ec505f0d2d1a8ed6f9f09", "keys should match");
+            path.generate_extended_public_key_from_seed_no_store(&seed);
+            let serialized_ext_pubkey = path.serialized_extended_public_key().unwrap();
+            assert_eq!(serialized_ext_pubkey, "dptp1CjRySByBWNBUgwM6mo6RE3zncnqhfSSedX7De8HzSEdoYgzyuUs1Pdbprcu27dEZ6ahLrnHapqswbbMoExT3ZMq7CaaBKPfS2xqwMJLsxU3kLhXp4kfsYcpeB7ksLFseMGGFqaQ8qtpjLGHhx4", "serialized extended public keys should match");
+            let serialized_ext_seckey = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
+            assert_eq!(serialized_ext_seckey, "dpts1wL7C3vjxN7SNxNTC12E4nmD7VKVSyCQmdwW9yLM8ehJcCPjWuGHYE8wK7tRNWj764Ec7FGB25Aji74VzURCDZusNq3hvszaQmj8C5WxDjDmLgYZuhxrVyiGBXuda3Uzk5qYcnGTZC6KtJvvMo6", "serialized extended private keys should match");
+        },
+        _ => panic!("Can't get ecdsa key at index path from seed")
+    }
+}
