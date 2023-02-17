@@ -12,3 +12,4 @@ masternodes-diff-processor.iml
 .DS_Store
 .github/.DS_Store
 src/.DS_Store
+dash-spv.keychain*
