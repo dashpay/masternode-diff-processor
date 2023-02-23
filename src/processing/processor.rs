@@ -222,7 +222,8 @@ impl MasternodeProcessor {
         let merkle_tree = common::MerkleTree {
             tree_element_count: list_diff.total_transactions,
             hashes: list_diff.merkle_hashes,
-            flags: list_diff.merkle_flags.as_slice(),
+            flags: list_diff.merkle_flags,
+            hash_function: Default::default()
         };
         self.cache_masternode_list(block_hash, masternode_list.clone(), cache);
         let needed_masternode_lists = cache.needed_masternode_lists.clone();

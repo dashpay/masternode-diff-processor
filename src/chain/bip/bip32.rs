@@ -46,6 +46,17 @@ pub struct Key {
 }
 
 impl Key {
+    pub fn new(depth: u8, fingerprint: u32, child: UInt256, chain: UInt256, data: Vec<u8>, hardened: bool) -> Self {
+        Self {
+            depth,
+            fingerprint,
+            child,
+            chain,
+            data,
+            hardened
+        }
+    }
+
     pub fn to_data(&self) -> Vec<u8> {
         let mut writer = Vec::<u8>::new();
         self.fingerprint.enc(&mut writer);
@@ -159,7 +170,7 @@ fn from_message(message: Vec<u8>, chain_type: ChainType) -> Result<Key, Error> {
             // }
             // let depth = all_data[5];
             // let fingerprint = u32::from_le_bytes(clone_into_array(&all_data[6..10]));
-            // let chain = UInt256::from_bytes_force(&all_data[10..42]);
+            // let chain = UInt256::from(&all_data[10..42]);
             // let child_32 = u32::from_le_bytes(clone_into_array(&all_data[42..46]));
             // if params.bip32_script_map.xprv.eq(&all_data[..4]) {
             //

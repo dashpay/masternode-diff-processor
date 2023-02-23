@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::hash::Hash;
 use byte::BytesExt;
 
 pub trait Data {
@@ -76,4 +77,13 @@ pub fn inplace_intersection<T>(a: &mut HashSet<T>, b: &mut HashSet<T>) -> HashSe
     }
     b.retain(|v| !c.contains(v));
     c
+}
+
+pub fn extract_new_and_unique<T>(a: Vec<T>, b: Vec<T>) -> (Vec<T>, Vec<T>) where T: Clone + Eq + Hash {
+    let a_set: HashSet<_> = a.iter().cloned().collect(); // convert A to a set for fast lookup
+    let (c, d): (Vec<_>, Vec<_>) = b.into_iter()
+        .filter(|x| !a_set.contains(x)) // keep elements that are not in A
+        .partition(|x| a_set.contains(x)); // partition elements based on whether they are in A
+
+    (c, d)
 }

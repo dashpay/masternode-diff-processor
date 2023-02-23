@@ -1,4 +1,4 @@
-use crate::chain::Chain;
+use crate::chain::{Chain, Wallet};
 use crate::chain::common::chain_type::IHaveChainSettings;
 use crate::chain::common::ChainType;
 use crate::chain::wallet::seed::Seed;
@@ -10,13 +10,13 @@ use crate::util::Shared;
 
 pub trait Derivation {
     fn register_derivation_paths_for_seed(&self, seed: &Seed, chain_type: ChainType);
-    // fn identity_registration_funding_derivation_path_for_wallet(&self, coin_type: u32, wallet: &SharedWallet) -> CreditFundingDerivationPath;
-    // fn identity_topup_funding_derivation_path_for_wallet(&self, coin_type: u32, wallet: &SharedWallet) -> CreditFundingDerivationPath;
-    // fn identity_invitation_funding_derivation_path_for_wallet(&self, coin_type: u32, wallet: &SharedWallet) -> CreditFundingDerivationPath;
-    // fn identity_bls_keys_derivation_path_for_wallet(&self, coin_type: u32, wallet: &SharedWallet) -> AuthenticationKeysDerivationPath;
-    // fn identity_ecdsa_keys_derivation_path_for_wallet(&self, coin_type: u32, wallet: &SharedWallet) -> AuthenticationKeysDerivationPath;
+    fn identity_registration_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath;
+    fn identity_topup_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath;
+    fn identity_invitation_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath;
+    fn identity_bls_keys_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> AuthenticationKeysDerivationPath;
+    fn identity_ecdsa_keys_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> AuthenticationKeysDerivationPath;
 
-    // fn identity_funding_private_key_for_wallet(&self, wallet: &SharedWallet, coin_type: u32, is_for_invitation: bool, index: u32, seed: &Seed) -> Option<Key>;
+    // fn identity_funding_private_key_for_wallet(&self, wallet: Shared<Wallet>, coin_type: u32, is_for_invitation: bool, index: u32, seed: &Seed) -> Option<Key>;
 
     // fn identity_bls_keys_extended_public_key_for_wallet_from_seed(&self, coin_type: u32, wallet: &SharedWallet, seed: &Seed) -> Option<Key>;
     // fn identity_ecdsa_keys_extended_public_key_for_wallet_from_seed(&self, coin_type: u32, wallet: &SharedWallet, seed: &Seed) -> Option<Key>;
@@ -55,6 +55,29 @@ impl Derivation for Shared<Chain> {
             CreditFundingDerivationPath::identity_invitation_funding_derivation_path_for_chain(chain_type, self.borrow())
                 .generate_extended_public_key_from_seed(seed);
         }
+    }
+
+    fn identity_registration_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath {
+        todo!()
+        // self.with(|chain|
+        //     chain.derivation_factory.identity_registration_funding_derivation_path_for_wallet(
+        //         chain.r#type(), ))
+    }
+
+    fn identity_topup_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath {
+        todo!()
+    }
+
+    fn identity_invitation_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath {
+        todo!()
+    }
+
+    fn identity_bls_keys_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> AuthenticationKeysDerivationPath {
+        todo!()
+    }
+
+    fn identity_ecdsa_keys_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> AuthenticationKeysDerivationPath {
+        todo!()
     }
 
     // fn identity_funding_private_key_for_wallet(&self, wallet: &SharedWallet, coin_type: u32, is_for_invitation: bool, index: u32, seed: &Seed) -> Option<Key> {

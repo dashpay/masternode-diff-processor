@@ -4,8 +4,8 @@ use crate::chain::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 
-const DUFFS: u64 = 100000000;
-const MAX_MONEY: u64 = 21000000 * DUFFS;
+pub const DUFFS: u64 = 100000000;
+pub const MAX_MONEY: u64 = 21000000 * DUFFS;
 /// standard tx fee per b of tx size
 pub const TX_FEE_PER_B: u64 = 1;
 /// standard ix fee per input
@@ -49,6 +49,7 @@ pub const BITCOIN_PRIVKEY_TEST: u8 = 239;
 // pub const BIP38_INVALID_FLAG (0x10 | 0x08 | 0x02 | 0x01)
 
 pub const BIP32_SEED_KEY: &str = "Bitcoin seed";
+pub const ED25519_SEED_KEY: &str = "ed25519 seed";
 
 #[derive(Clone, Debug, Default)]
 pub struct ScriptMap {
@@ -101,9 +102,9 @@ impl DIP14ScriptMap {
 
 #[derive(Clone, Debug, Default)]
 pub struct SporkParams {
-    pub public_key_hex_string: Option<&'static str>,
-    pub private_key_base58_string: Option<&'static str>,
-    pub address: &'static str,
+    pub public_key_hex_string: Option<String>,
+    pub private_key_base58_string: Option<String>,
+    pub address: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -125,7 +126,7 @@ pub struct Params {
     /// for miners to enter incorrect rewards as the blocks would be rejected by full nodes.
     pub base_reward: u64,
     /// Spork parameters
-    pub spork_params: SporkParams,
+    // pub spork_params: SporkParams,
     /// Protocol parameters
     /// The minimum protocol version that peers on this chain can communicate with. This should only be changed in the case of devnets
     pub min_protocol_version: u32,
@@ -158,11 +159,11 @@ pub const MAINNET_PARAMS: Params = Params {
     max_proof_of_work_target: 0x1e0fffff,
     allow_min_difficulty_blocks: false,
     base_reward: 5 * DUFFS,
-    spork_params: SporkParams {
-        public_key_hex_string: Some("04549ac134f694c0243f503e8c8a9a986f5de6610049c40b07816809b0d1d06a21b07be27b9bb555931773f62ba6cf35a25fd52f694d4e1106ccd237a7bb899fdd"),
-        private_key_base58_string: None,
-        address: "Xgtyuk76vhuFW2iT7UAiHgNdWXCf3J34wh"
-    },
+    // spork_params: SporkParams {
+    //     public_key_hex_string: Some("04549ac134f694c0243f503e8c8a9a986f5de6610049c40b07816809b0d1d06a21b07be27b9bb555931773f62ba6cf35a25fd52f694d4e1106ccd237a7bb899fdd".to_string()),
+    //     private_key_base58_string: None,
+    //     address: "Xgtyuk76vhuFW2iT7UAiHgNdWXCf3J34wh".to_string()
+    // },
     min_protocol_version: 70218,
     protocol_version: 70219,
     standard_port: 9999,
@@ -189,11 +190,11 @@ pub const TESTNET_PARAMS: Params = Params {
     max_proof_of_work_target: 0x1e0fffff,
     allow_min_difficulty_blocks: true,
     base_reward: 50 * DUFFS,
-    spork_params: SporkParams {
-        public_key_hex_string: Some("046f78dcf911fbd61910136f7f0f8d90578f68d0b3ac973b5040fb7afb501b5939f39b108b0569dca71488f5bbf498d92e4d1194f6f941307ffd95f75e76869f0e"),
-        private_key_base58_string: None,
-        address: "yjPtiKh2uwk3bDutTEA2q9mCtXyiZRWn55"
-    },
+    // spork_params: SporkParams {
+    //     public_key_hex_string: Some("046f78dcf911fbd61910136f7f0f8d90578f68d0b3ac973b5040fb7afb501b5939f39b108b0569dca71488f5bbf498d92e4d1194f6f941307ffd95f75e76869f0e".to_string()),
+    //     private_key_base58_string: None,
+    //     address: "yjPtiKh2uwk3bDutTEA2q9mCtXyiZRWn55".to_string()
+    // },
     min_protocol_version: 70218,
     protocol_version: 70220,
     standard_port: 19999,
@@ -221,21 +222,21 @@ pub fn create_devnet_params_for_type(r#type: DevnetType) -> Params {
         max_proof_of_work_target: 0x207fffff,
         allow_min_difficulty_blocks: true,
         base_reward: 50 * DUFFS,
-        spork_params: SporkParams {
-            public_key_hex_string: None,
-            private_key_base58_string: match r#type {
-                DevnetType::Chacha => Some("cPTms6Sd7QuhPWXWQSzMbvg2VbEPsWCsLBbR4PBgvfYRzAPazbt3"),
-                DevnetType::Devnet333 => Some("cQnP9JNQp6oaZrvBtqBWRMeQERMkDyuXyvQh1qaph4FdP6cT2cVa"),
-                DevnetType::JackDaniels => Some("cTeGz53m7kHgA9L75s4vqFGR89FjYz4D9o44eHfoKjJr2ArbEtwg"),
-                DevnetType::Mojito => Some("")
-            },
-            address: match r#type {
-                DevnetType::Chacha => "ybiRzdGWFeijAgR7a8TJafeNi6Yk6h68ps",
-                DevnetType::Devnet333 => "yM6zJAMWoouAZxPvqGDbuHb6BJaD6k4raQ",
-                DevnetType::JackDaniels => "yYBanbwp2Pp2kYWqDkjvckY3MosuZzkKp7",
-                DevnetType::Mojito => "",
-            }
-        },
+        // spork_params: SporkParams {
+        //     public_key_hex_string: None,
+        //     private_key_base58_string: match r#type {
+        //         DevnetType::Chacha => Some("cPTms6Sd7QuhPWXWQSzMbvg2VbEPsWCsLBbR4PBgvfYRzAPazbt3".to_string()),
+        //         DevnetType::Devnet333 => Some("cQnP9JNQp6oaZrvBtqBWRMeQERMkDyuXyvQh1qaph4FdP6cT2cVa".to_string()),
+        //         DevnetType::JackDaniels => Some("cTeGz53m7kHgA9L75s4vqFGR89FjYz4D9o44eHfoKjJr2ArbEtwg".to_string()),
+        //         DevnetType::Mojito => Some("".to_string())
+        //     },
+        //     address: match r#type {
+        //         DevnetType::Chacha => "ybiRzdGWFeijAgR7a8TJafeNi6Yk6h68ps".to_string(),
+        //         DevnetType::Devnet333 => "yM6zJAMWoouAZxPvqGDbuHb6BJaD6k4raQ".to_string(),
+        //         DevnetType::JackDaniels => "yYBanbwp2Pp2kYWqDkjvckY3MosuZzkKp7".to_string(),
+        //         DevnetType::Mojito => "".to_string(),
+        //     }
+        // },
         min_protocol_version: 70219,
         protocol_version: 70225,
         standard_port: 20001,

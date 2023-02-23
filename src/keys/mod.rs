@@ -1,6 +1,7 @@
 pub mod bls_key;
 pub mod key;
 pub mod ecdsa_key;
+pub mod ed25519_key;
 
 pub use self::key::Key;
 pub use self::key::KeyType;
@@ -11,8 +12,12 @@ use std::fmt::Debug;
 use common_crypto::cryptor;
 use crate::UInt256;
 use crate::chain::ScriptMap;
+use crate::chain::tx::protocol::SIGHASH_ALL;
+use crate::consensus::Encodable;
 use crate::derivation::index_path::{IIndexPath, IndexPath};
 use crate::util::Address::with_public_key_data;
+use crate::util::data_append::DataAppend;
+use crate::util::script::ScriptElement;
 
 pub trait IKey: Send + Sync + Debug {
     fn r#type(&self) -> KeyType {
@@ -27,6 +32,18 @@ pub trait IKey: Send + Sync + Debug {
     fn verify(&mut self, message_digest: &Vec<u8>, signature: &Vec<u8>) -> bool {
         panic!("Should be overriden in implementation")
     }
+    fn secret_key(&self) -> UInt256 {
+        panic!("Should be overriden in implementation")
+    }
+
+    fn chaincode(&self) -> UInt256 {
+        panic!("Should be overriden in implementation")
+    }
+
+    fn fingerprint(&self) -> u32 {
+        panic!("Should be overriden in implementation")
+    }
+
     fn private_key_data(&self) -> Option<Vec<u8>> {
         panic!("Should be overriden in implementation")
     }
@@ -62,6 +79,24 @@ pub trait IKey: Send + Sync + Debug {
     }
     fn forget_private_key(&mut self) {
         panic!("Should be overriden in implementation")
+    }
+
+    fn create_signature(&self, tx_input_script: &Vec<u8>, tx_data: &Vec<u8>) -> Vec<u8> {
+        let mut sig = Vec::<u8>::new();
+        let hash = UInt256::sha256d(tx_data);
+        let mut s = self.sign(&hash.0.to_vec());
+        let elem = tx_input_script.script_elements();
+        (SIGHASH_ALL as u8).enc(&mut s);
+        s.append_script_push_data(&mut sig);
+        // sig.append_script_push_data(s);
+        if elem.len() >= 2 {
+            if let ScriptElement::Data([0x88 /*OP_EQUALVERIFY*/, ..], ..) = elem[elem.len() - 2] {
+                // pay-to-pubkey-hash scriptSig
+                self.public_key_data().append_script_push_data(&mut sig);
+                // sig.append_script_push_data(self.public_key_data());
+            }
+        }
+        sig
     }
 }
 

@@ -2,7 +2,6 @@ use hashes::{Hash, sha256d};
 use crate::blockdata::opcodes::all::{OP_CHECKSIG, OP_DUP, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4, OP_RETURN, OP_SHAPESHIFT, OP_SHAPESHIFT_SCRIPT};
 use crate::chain::params::{BITCOIN_SCRIPT_ADDRESS, ScriptMap};
 use crate::consensus::Encodable;
-use crate::consensus::encode::VarInt;
 use crate::util::base58;
 use crate::util::script::{op_len, ScriptElement};
 
@@ -16,13 +15,13 @@ pub trait DataAppend: std::io::Write {
 
     fn append_coinbase_message<W: std::io::Write>(&self, message: &String, height: u32, writer: W) -> W;
     fn append_devnet_genesis_coinbase_message(identifier: &String, version: u16, protocol_version: u32, writer: Self) -> Self;
-    fn append_counted_data(data: Vec<u8>, writer: Self) -> Self;
     fn append_credit_burn_script_pub_key_for_address(address: &String, script_map: &ScriptMap, writer: Self) -> Self;
     fn append_proposal_info(proposal_info: &Vec<u8>, writer: Self) -> Self;
     fn append_script_pub_key_for_address(address: &String, script_map: &ScriptMap, writer: Self) -> Self;
-    fn append_script_push_data<W: std::io::Write>(&self, writer: W) -> W;
+    fn append_script_push_data<W: std::io::Write>(&self, writer: W);
+    // fn append_script_push_data(&mut self, data: Vec<u8>);
     fn append_shapeshift_memo_for_address(address: String, writer: Self) -> Self;
-    fn append_string(data: String, writer: Self) -> Self;
+    // fn append_string(&mut self, data: String);
 
     fn script_elements(&self) -> Vec<ScriptElement>;
 }
@@ -100,18 +99,13 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         writer
     }
 
-
-    fn append_counted_data(data: Vec<u8>, mut writer: Self) -> Self {
-        VarInt(data.len() as u64).enc(&mut writer);
-        data.enc(&mut writer);
-        writer
-    }
-
     fn append_credit_burn_script_pub_key_for_address(address: &String, script_map: &ScriptMap, mut writer: Self) -> Self {
         // todo: check impl base58checkToData
         match base58::from_check(address.as_str()) {
             Ok(d) if d.len() == 21 => {
                 OP_RETURN.into_u8().enc(&mut writer);
+                // d[1..].to_vec().append_script_push_data(&mut writer);
+                // writer.append_script_push_data(d[1..].to_vec());
                 d[1..].to_vec().append_script_push_data(&mut writer);
                 writer
             },
@@ -122,7 +116,9 @@ impl DataAppend for Vec<u8> /* io::Write */ {
     fn append_proposal_info(proposal_info: &Vec<u8>, mut writer: Self) -> Self {
         let hash = sha256d::Hash::hash(proposal_info).into_inner();
         OP_RETURN.into_u8().enc(&mut writer);
-        hash.to_vec().append_script_push_data(&mut writer);
+        hash.to_vec().enc(&mut writer);
+        // writer.append_script_push_data(hash.to_vec());
+        // hash.to_vec().append_script_push_data(&mut writer);
         writer
     }
 
@@ -132,13 +128,15 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                 [v, data @ ..] if *v == script_map.pubkey => {
                     OP_DUP.into_u8().enc(&mut writer);
                     OP_HASH160.into_u8().enc(&mut writer);
+                    // writer.append_script_push_data(data.to_vec());
                     data.to_vec().append_script_push_data(&mut writer);
                     OP_EQUALVERIFY.into_u8().enc(&mut writer);
                     OP_CHECKSIG.into_u8().enc(&mut writer);
                 },
                 [v, data @ ..] if *v == script_map.script => {
                     OP_HASH160.into_u8().enc(&mut writer);
-                    data.to_vec().append_script_push_data(&mut writer);
+                    writer.append_script_push_data(data.to_vec());
+                    // data.to_vec().append_script_push_data(&mut writer);
                     OP_EQUAL.into_u8().enc(&mut writer);
                 },
                 _ => {}
@@ -148,11 +146,33 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         writer
     }
 
-    fn append_script_push_data<W: std::io::Write>(&self, mut writer: W) -> W {
+    // fn append_script_push_data(&mut self, data: Vec<u8>) {
+    //     let len = data.len();
+    //     match len {
+    //         0 => { return },
+    //         1..=0x4b => {
+    //             (len as u8).enc(self);
+    //         }
+    //         0x4c..=0xffff => {
+    //             OP_PUSHDATA1.into_u8().enc(self);
+    //             (len as u8).enc(self);
+    //         },
+    //         0x10000..=0xffffffff => {
+    //             OP_PUSHDATA2.into_u8().enc(self);
+    //             (len as u16).enc(self);
+    //         },
+    //         _ => {
+    //             OP_PUSHDATA4.into_u8().enc(self);
+    //             (len as u32).enc(self);
+    //         },
+    //     }
+    //     self.extend(data);
+    // }
+    fn append_script_push_data<W: std::io::Write>(&self, mut writer: W) {
         // todo: migrate into slice
         let len = self.len();
         match len {
-            0 => { return writer; },
+            0 => { return; },
             1..=0x4b => {
                 (len as u8).enc(&mut writer);
             }
@@ -170,7 +190,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
             },
         }
         self.enc(&mut writer);
-        writer
+        // writer
     }
 
     fn append_shapeshift_memo_for_address(address: String, mut writer: Self) -> Self {
@@ -185,6 +205,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                 }
                 script_push.extend(d.clone().drain(1..d.len()));
                 OP_RETURN.into_u8().enc(&mut writer);
+                // writer.append_script_push_data(script_push);
                 script_push.append_script_push_data(&mut writer);
             },
             _ => panic!("can't convert from base58 check")
@@ -192,14 +213,13 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         writer
     }
 
-    fn append_string(data: String, mut writer: Self) -> Self {
-        // NSUInteger l = [s lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-        // [self appendVarInt:l];
-        // [self appendBytes:s.UTF8String length:l];
-        VarInt(data.len() as u64).enc(&mut writer);
-        data.enc(&mut writer);
-        writer
-    }
+    // fn append_string(&mut self, data: String) {
+    //     // NSUInteger l = [s lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+    //     // [self appendVarInt:l];
+    //     // [self appendBytes:s.UTF8String length:l];
+    //     VarInt(data.len() as u64).enc(self);
+    //     data.enc(self);
+    // }
 
     fn script_elements(&self) -> Vec<ScriptElement> {
         let mut a = Vec::<ScriptElement>::new();

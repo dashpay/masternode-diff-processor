@@ -56,7 +56,7 @@ impl IndexHardSoft for UInt256 {
             let start = i << 2;
             let end = start + 4;
             let hard = u32::from_le_bytes(clone_into_array(&self.0[start..end])) | BIP32_HARD;
-            v[start..end].clone_from_slice(&hard.to_le_bytes())
+            v[start..end].copy_from_slice(&hard.to_le_bytes())
         }
         UInt256(v)
     }
@@ -67,7 +67,7 @@ impl IndexHardSoft for UInt256 {
             let start = i << 2;
             let end = start + 4;
             let hard = u32::from_le_bytes(clone_into_array(&self.0[start..end])) & !BIP32_HARD;
-            v[start..end].clone_from_slice(&hard.to_le_bytes())
+            v[start..end].copy_from_slice(&hard.to_le_bytes())
         }
         UInt256(v)
     }

@@ -1,2 +1,3 @@
-pub mod seeds;
 pub mod constants;
+pub mod masternodes;
+pub mod seeds;

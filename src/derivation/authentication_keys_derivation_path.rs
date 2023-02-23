@@ -220,6 +220,15 @@ impl AuthenticationKeysDerivationPath {
             chain)
     }
 
+    pub fn platform_node_keys_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
+        Self::provider_keys_derivation_path_for_chain(
+            DerivationPathReference::PlatformNodeKeys,
+            KeyType::ED25519,
+            3,
+            chain_type,
+            chain)
+    }
+
     pub fn identity_ecdsa_keys_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
         Self::identity_keys_derivation_path_for_chain(KeyType::ECDSA, 0, chain_type, chain)
     }
@@ -248,6 +257,15 @@ impl AuthenticationKeysDerivationPath {
 
     pub fn provider_operator_keys_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
         let mut path = AuthenticationKeysDerivationPath::provider_operator_keys_derivation_path_for_chain(chain_type, chain);
+        path.set_wallet(wallet);
+        if load && path.has_extended_public_key() {
+            path.load_addresses();
+        }
+        path
+    }
+
+    pub fn platform_node_keys_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
+        let mut path = AuthenticationKeysDerivationPath::platform_node_keys_derivation_path_for_chain(chain_type, chain);
         path.set_wallet(wallet);
         if load && path.has_extended_public_key() {
             path.load_addresses();

@@ -3,20 +3,17 @@ use std::fmt::Debug;
 use byte::BytesExt;
 use hashes::{Hash, sha256};
 use hashes::hex::ToHex;
-use crate::{BytesDecodable, derivation, UInt256, util};
+use crate::{derivation, UInt256, util};
 use crate::chain::{Chain, Wallet};
 use crate::chain::bip::bip32;
 use crate::chain::bip::bip32::StringKey;
-use crate::chain::bip::dip14::{ChildKeyDerivation, derive_child_private_key_256};
 use crate::chain::common::ChainType;
 use crate::chain::wallet::seed::Seed;
-use crate::crypto::{ECPoint, UInt512};
-use crate::crypto::byte_util::AsBytes;
 use crate::derivation::derivation_path_reference::DerivationPathReference;
 use crate::derivation::index_path::{IIndexPath, IndexHardSoft, IndexPath};
 use crate::derivation::uint256_index_path::UInt256IndexPath;
 use crate::derivation::{standalone_extended_public_key_location_string_for_unique_id, wallet_based_extended_public_key_location_string_for_unique_id};
-use crate::keys::{ECDSAKey, IKey, Key, KeyType};
+use crate::keys::{IKey, Key, KeyType};
 use crate::util::Address::with_public_key_data;
 use crate::util::data_ops::short_hex_string_from;
 use crate::util::shared::Shared;
@@ -28,6 +25,10 @@ pub trait IDerivationPath<IPATH: IIndexPath = UInt256IndexPath>: Send + Sync + D
     fn set_wallet(&mut self, wallet: Shared<Wallet>);
     fn wallet_unique_id(&self) -> Option<String>;
     fn set_wallet_unique_id(&mut self, unique_id: String);
+    fn set_wallet_with_unique_id(&mut self, wallet: Shared<Wallet>, unique_id: String) {
+        self.set_wallet_unique_id(unique_id);
+        self.set_wallet(wallet);
+    }
     // https://github.com/rust-lang/rust/issues/94980
     // fn params(&self) -> &Params;
     // fn context(&self) -> Weak<ManagedContext>;
@@ -41,6 +42,12 @@ pub trait IDerivationPath<IPATH: IIndexPath = UInt256IndexPath>: Send + Sync + D
     fn extended_public_key_data_mut(&mut self) -> Option<Vec<u8>> {
         self.extended_public_key_mut().and_then(|key| key.extended_public_key_data())
     }
+    fn private_key_from_seed(&self, seed: &Vec<u8>) -> Option<Key> where Self: IIndexPath<Item = UInt256> {
+        self.signing_algorithm()
+            .key_with_seed_data(seed)
+            .and_then(|seed_key| seed_key.private_derive_to_256bit_derivation_path(self))
+    }
+
     fn has_extended_public_key(&self) -> bool;
     fn serialized_extended_public_key(&self) -> Option<String> where Self: IIndexPath<Item = UInt256> {
         // todo make sure this works with BLS keys
@@ -49,28 +56,14 @@ pub trait IDerivationPath<IPATH: IIndexPath = UInt256IndexPath>: Send + Sync + D
                 println!("serialized_extended_public_key.key_data: {}", key_data.to_hex());
                 let fingerprint = key_data.read_with::<u32>(&mut 0, byte::LE).unwrap();
                 let chain = key_data.read_with::<UInt256>(&mut 4, byte::LE).unwrap();
-                let pub_key = key_data.read_with::<ECPoint>(&mut 36, byte::LE).unwrap();
+                // let pub_key = key_data.read_with::<ECPoint>(&mut 36, byte::LE).unwrap();
+                let pubkey = key_data[36..].to_vec();
                 let (child, is_hardened) = if self.is_empty() {
                     (UInt256::MIN, false)
                 } else {
                     (self.last_index(), self.last_hardened())
                 };
-                println!("serialized_extended_public_key.fingerprint: {}", fingerprint);
-                println!("serialized_extended_public_key.chain: {}", chain);
-                println!("serialized_extended_public_key.pub_key: {}", pub_key);
-                println!("serialized_extended_public_key.child: {}", child);
-                println!("serialized_extended_public_key.is_hardened: {}", is_hardened);
-                println!("serialized_extended_public_key.depth: {}", self.depth());
-                // serialized_extended_public_key.key_data: 3442193e47fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141035a784662a4a20a65bf6aab9ae98a6c068a81c52e4b032c0fb5400c706cfccc56
-                // serialized_extended_public_key.fingerprint: 1041842740
-                // serialized_extended_public_key.chain: 47fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141
-                // serialized_extended_public_key.pub_key: 035a784662a4a20a65bf6aab9ae98a6c068a81c52e4b032c0fb5400c706cfccc56
-                // serialized_extended_public_key.child: 0000000000000000000000000000000000000000000000000000000000000000
-                // serialized_extended_public_key.is_hardened: 1
-                // serialized_extended_public_key.depth: 
-                // Printing description of derivationPath->_extendedPublicKey->_pubkey:
-                // <035a7846 62a4a20a 65bf6aab 9ae98a6c 068a81c5 2e4b032c 0fb5400c 706cfccc 56>
-                Some(StringKey::serialize(self.depth(), fingerprint, is_hardened, child, chain, pub_key.as_bytes().to_vec(), self.chain_type()))
+                Some(StringKey::serialize(self.depth(), fingerprint, is_hardened, child, chain, pubkey, self.chain_type()))
             },
             _ => None
         }
@@ -81,48 +74,28 @@ pub trait IDerivationPath<IPATH: IIndexPath = UInt256IndexPath>: Send + Sync + D
             Some(key_data) if key_data.len() >= 36 => {
                 let fingerprint = key_data.read_with::<u32>(&mut 0, byte::LE).unwrap();
                 let chain = key_data.read_with::<UInt256>(&mut 4, byte::LE).unwrap();
-                let pub_key = key_data.read_with::<ECPoint>(&mut 36, byte::LE).unwrap();
+                // let pub_key = key_data.read_with::<ECPoint>(&mut 36, byte::LE).unwrap();
+                let pubkey = key_data[36..].to_vec();
                 let (child, is_hardened) = if self.is_empty() {
                     (UInt256::MIN, false)
                 } else {
                     (self.last_index(), self.last_hardened())
                 };
-                Some(StringKey::serialize(self.depth(), fingerprint, is_hardened, child, chain, pub_key.as_bytes().to_vec(), self.chain_type()))
+                Some(StringKey::serialize(self.depth(), fingerprint, is_hardened, child, chain, pubkey, self.chain_type()))
             },
             _ => None
         }
     }
     fn serialized_extended_private_key_from_seed(&self, seed: &Vec<u8>) -> Option<String> where Self: IIndexPath<Item = UInt256> {
-        let mut secret_key = UInt512::bip32_seed_key(seed);
-        match secp256k1::SecretKey::from_slice( &secret_key.0[..32]) {
-            Err(err) => None,
-            Ok(seckey) => {
-                let mut fingerprint = 0u32;
-                let mut index = UInt256::MIN;
-                let mut hardened = false;
-                if !self.is_empty() {
-                    for i in 0..self.length() - 1 {
-                        derive_child_private_key_256(&mut secret_key, &self.index_at_position(i), self.hardened_at_position(i))
-                    }
-                    if let Some(mut key) = ECDSAKey::key_with_secret_slice(&secret_key.0[..32], true) {
-                        fingerprint = key.hash160().u32_le();
-                        index = self.last_index();
-                        hardened = self.last_hardened();
-                        // account 0H
-                        derive_child_private_key_256(&mut secret_key, &index, hardened);
-                    }
-                }
-                let key = bip32::Key {
-                    depth: self.length() as u8,
-                    fingerprint,
-                    child: index,
-                    chain: UInt256::from_bytes_force(&secret_key.0[32..]),
-                    data: secret_key.0[..32].to_vec(),
-                    hardened
-                };
-                Some(key.serialize(self.chain_type()))
-            }
-        }
+        self.private_key_from_seed(seed)
+            .map(|seed_key| bip32::Key::new(
+                self.length() as u8,
+                seed_key.fingerprint(),
+                self.last_index(),
+                seed_key.chaincode(),
+                seed_key.secret_key().0.to_vec(),
+                self.last_hardened())
+                .serialize(self.chain_type()))
     }
     fn is_derivation_path_equal(&self, other: &Self) -> bool where Self: Sized + PartialEq {
         self == other
@@ -199,7 +172,7 @@ pub trait IDerivationPath<IPATH: IIndexPath = UInt256IndexPath>: Send + Sync + D
         // where Self: Sized + IDerivationPath + ChildKeyDerivation {
         where Self: Sized + IDerivationPath + IIndexPath<Item = UInt256> {
         <Self as IDerivationPath<IPATH>>::signing_algorithm(self)
-            .key_with_seed_data(seed)
+            .key_with_seed_data(&seed.data)
             .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(self)
                 .and_then(|key| key.private_derive_to_path(index_path)))
 
@@ -212,7 +185,7 @@ pub trait IDerivationPath<IPATH: IIndexPath = UInt256IndexPath>: Send + Sync + D
             vec![]
         } else {
             <Self as IDerivationPath<IPATH>>::signing_algorithm(self)
-                .key_with_seed_data(seed)
+                .key_with_seed_data(&seed.data)
                 .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(self)
                     .map(|key| index_paths.iter()
                         .filter_map(|index_path| key.private_derive_to_path(index_path))
@@ -288,12 +261,5 @@ pub trait IDerivationPath<IPATH: IIndexPath = UInt256IndexPath>: Send + Sync + D
 impl<IPATH: IIndexPath> PartialEq for dyn IDerivationPath<IPATH> {
     fn eq(&self, other: &Self) -> bool {
         todo!()
-    }
-}
-
-
-impl<IPATH: IIndexPath> ChildKeyDerivation for dyn IDerivationPath<IPATH>  {
-    fn derive(&self, k: &mut UInt512, index: usize) where Self: IIndexPath {
-
     }
 }

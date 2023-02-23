@@ -15,6 +15,24 @@ pub mod masternode_holdings_derivation_path;
 pub mod authentication_keys_derivation_path;
 pub mod factory;
 
+pub use self::derivation_path::DerivationPath;
+pub use self::derivation_path_feature_purpose::DerivationPathFeaturePurpose;
+pub use self::derivation_path_kind::DerivationPathKind;
+pub use self::derivation_path_reference::DerivationPathReference;
+pub use self::derivation_path_type::DerivationPathType;
+pub use self::funds_derivation_path::FundsDerivationPath;
+pub use self::incoming_funds_derivation_path::IncomingFundsDerivationPath;
+pub use self::index_path::{IIndexPath, IndexPath};
+pub use self::protocol::IDerivationPath;
+pub use self::sequence_gap_limit::SequenceGapLimit;
+pub use self::uint256_index_path::UInt256IndexPath;
+pub use self::credit_funding_derivation_path::CreditFundingDerivationPath;
+pub use self::simple_indexed_derivation_path::{ISimpleIndexedDerivationPath, SimpleIndexedDerivationPath};
+pub use self::masternode_holdings_derivation_path::MasternodeHoldingsDerivationPath;
+pub use self::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
+pub use self::factory::Factory;
+
+
 use crate::chain::bip::bip32;
 use crate::chain::common::ChainType;
 use crate::keys::KeyType;

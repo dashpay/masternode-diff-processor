@@ -15,8 +15,8 @@ pub fn test_bls_sign() {
     // In dash we use SHA256_2, however these test vectors from the BLS library use a single SHA256
     let seed1 = Seed::with_data([1u8,2,3,4,5].to_vec());
     let seed2 = Seed::with_data([1u8,2,3,4,5,6].to_vec());
-    let keypair1 = BLSKey::key_with_seed_data(&seed1, true);
-    let keypair2 = BLSKey::key_with_seed_data(&seed2, true);
+    let keypair1 = BLSKey::key_with_seed_data(&seed1.data, true);
+    let keypair2 = BLSKey::key_with_seed_data(&seed2.data, true);
     let message1: Vec<u8> = vec![7,8,9];
     let message2: Vec<u8> = vec![1,2,3];
     let message3: Vec<u8> = vec![1,2,3,4];
@@ -36,7 +36,7 @@ pub fn test_bls_sign() {
 fn test_bls_verify() {
     let seed1 = Seed::with_data([1u8,2,3,4,5].to_vec());
     let message1: Vec<u8> = vec![7, 8, 9];
-    let mut key_pair1 = BLSKey::key_with_seed_data(&seed1, true);
+    let mut key_pair1 = BLSKey::key_with_seed_data(&seed1.data, true);
     assert_eq!(key_pair1.public_key_data().to_hex(), "02a8d2aaa6a5e2e08d4b8d406aaf0121a2fc2088ed12431e6b0663028da9ac5922c9ea91cde7dd74b7d795580acc7a61");
     assert_eq!(key_pair1.private_key_data().unwrap().to_hex(), "022fb42c08c12de3a6af053880199806532e79515f94e83461612101f9412f9e");
     let signature1 = key_pair1.sign_data(&message1);
@@ -63,7 +63,7 @@ fn test_bls_multiplication() {
 fn test_bls_encryption_and_decryption() {
     let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
     let alice_seed = Seed::with_data([1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10].to_vec());
-    let alice_key_pair = BLSKey::key_with_seed_data(&alice_seed, true);
+    let alice_key_pair = BLSKey::key_with_seed_data(&alice_seed.data, true);
     let alice_public_key_data = alice_key_pair.public_key_data();
     let alice_private_key_data = alice_key_pair.private_key_data().unwrap();
     let alice_public_key_data_base64 = base64_engine.encode(&alice_public_key_data);
@@ -81,7 +81,7 @@ fn test_bls_encryption_and_decryption() {
     assert_eq!(alice_address.as_str(), alice_test_address, "BLS Address::with_public_key_data for testnet is incorrect");
 
     let bob_seed = Seed::with_data([10u8, 9, 8, 7, 6, 6, 7, 8, 9, 10].to_vec());
-    let bob_key_pair = BLSKey::key_with_seed_data(&bob_seed, true);
+    let bob_key_pair = BLSKey::key_with_seed_data(&bob_seed.data, true);
     let bob_public_key_data = bob_key_pair.public_key_data();
     let bob_private_key_data = bob_key_pair.private_key_data().unwrap();
     assert_eq!(bob_public_key_data, Vec::from_hex("0e2f9055c17eb13221d8b41833468ab49f7d4e874ddf4b217f5126392a608fd48ccab3510548f1da4f397c1ad4f8e01a").unwrap(), "BLS publicKeyData is incorrect");

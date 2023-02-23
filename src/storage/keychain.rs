@@ -132,13 +132,13 @@ impl Keychain {
         todo!("Implement bindings for keychain")
     }
 
-    // pub fn set_object<T>(object: Box<dyn IKeychainObject<T>>, key: String, authenticated: bool) -> Result<bool, KeychainError> {
-    //     todo!("Implement bindings for keychain")
-    // }
-    //
-    // pub fn get_object<T>(key: String) -> Result<dyn IKeychainObject<T>, KeychainError> {
-    //     todo!("Implement bindings for keychain")
-    // }
+    pub fn set_object<T>(object: T, key: String, authenticated: bool) -> Result<(), security_framework::base::Error> {
+        todo!("Implement bindings for keychain")
+    }
+
+    pub fn get_object<T>(key: String) -> Result<T, security_framework::base::Error> {
+        todo!("Implement bindings for keychain")
+    }
 
     // pub fn set_json(dict: serde_json::Value, key: String, authenticated: bool) -> Result<bool, KeychainError> {
     //     todo!("Implement bindings for keychain")

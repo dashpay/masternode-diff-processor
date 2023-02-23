@@ -32,17 +32,21 @@ bitcoinconsensus = { version = "0.19.0-3", optional = true }
 bls-signatures = { git = "https://github.com/dashevo/bls-signatures", branch = "rust-bindings-enhancement" }
 common-crypto = "0.3.0"
 core2 = { version = "0.4.0", optional = true, default-features = false }
+ed25519-dalek = "2.0.0-pre.0"
 futures = "0.3.25"
 libc = "0.2.132"
+murmur3 = "0.5.2"
+os-timer = "1.0.10"
 rs-x11-hash = "0.1.2"
 secp256k1 = { version = "0.26.0", features = [ "recovery", "rand-std", "bitcoin_hashes" ] }
 security-framework = "2.8.2"
+serde = { version = "1.0.144", features = ["derive"] }
+serde_json = "1.0.85"
+tokio = "1.25.0"
 unicode-normalization = "0.1.22"
 
 [dev-dependencies]
 secp256k1 = { version = "0.26.0", features = [ "recovery", "rand-std" ] }
-serde = { version = "1.0.144", features = ["derive"] }
-serde_json = "1.0.85"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 base64 = "0.21.0"
 
@@ -54,7 +58,7 @@ name = "dash_spv_masternode_processor"
 #crate-type = ["staticlib", "cdylib"]
 #proc-macro = true
 
-[profile.release]
-lto = "thin"
-opt-level = 3
-#debug = true
+#[profile.release]
+#lto = "thin"
+#opt-level = 3
+##debug = true

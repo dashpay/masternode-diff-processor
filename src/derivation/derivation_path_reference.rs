@@ -15,6 +15,7 @@ pub enum DerivationPathReference {
     BlockchainIdentityCreditRegistrationFunding = 11,
     BlockchainIdentityCreditTopupFunding = 12,
     BlockchainIdentityCreditInvitationFunding = 13,
+    PlatformNodeKeys = 14,
     Root = 255,
 }
 
@@ -81,6 +82,7 @@ impl From<DerivationPathReference> for u32 {
             DerivationPathReference::BlockchainIdentityCreditRegistrationFunding => 11,
             DerivationPathReference::BlockchainIdentityCreditTopupFunding => 12,
             DerivationPathReference::BlockchainIdentityCreditInvitationFunding => 13,
+            DerivationPathReference::PlatformNodeKeys => 14,
             DerivationPathReference::Root => 255,
         }
     }
@@ -102,6 +104,7 @@ impl From<&DerivationPathReference> for u32 {
             DerivationPathReference::BlockchainIdentityCreditRegistrationFunding => 11,
             DerivationPathReference::BlockchainIdentityCreditTopupFunding => 12,
             DerivationPathReference::BlockchainIdentityCreditInvitationFunding => 13,
+            DerivationPathReference::PlatformNodeKeys => 14,
             DerivationPathReference::Root => 255,
         }
     }

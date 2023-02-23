@@ -4,7 +4,6 @@ use common_crypto::cryptor;
 use hashes::{Hash, sha256, sha256d};
 use hashes::hex::{FromHex, ToHex};
 use crate::chain::params::ScriptMap;
-use crate::chain::wallet::seed::Seed;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, BytesDecodable, Zeroable};
 use crate::crypto::{UInt256, UInt384, UInt768};
@@ -30,7 +29,7 @@ impl BLSKey {
     pub fn key_with_secret_hex(string: &str, use_legacy: bool) -> Option<Self> {
         Vec::from_hex(string)
             .ok()
-            .map(|data| Self::key_with_seed_data(&Seed::with_data(data), use_legacy))
+            .map(|data| Self::key_with_seed_data(&data, use_legacy))
     }
 
     pub fn key_with_private_key(data: &Vec<u8>, use_legacy: bool) -> Option<Self> {
@@ -65,10 +64,22 @@ impl IKey for BLSKey {
         KeyType::BLS // &KeyType::BLSBasic
     }
     fn sign(&self, data: &Vec<u8>) -> Vec<u8> {
-        self.sign_digest( UInt256::from_bytes_force(data)).as_bytes().to_vec()
+        self.sign_digest(UInt256::from(data)).as_bytes().to_vec()
     }
     fn verify(&mut self, message_digest: &Vec<u8>, signature: &Vec<u8>) -> bool {
-        self.verify_uint768(UInt256::from_bytes_force(message_digest), UInt768::from_bytes_force(signature))
+        self.verify_uint768(UInt256::from(message_digest), UInt768::from(signature))
+    }
+
+    fn secret_key(&self) -> UInt256 {
+        self.secret_key
+    }
+
+    fn chaincode(&self) -> UInt256 {
+        self.chain_code
+    }
+
+    fn fingerprint(&self) -> u32 {
+        self.public_key_fingerprint()
     }
 
     fn private_key_data(&self) -> Option<Vec<u8>> where Self: Sized {
@@ -166,17 +177,17 @@ impl BLSKey {
         }
     }
 
-    pub fn key_with_seed_data(seed: &Seed, use_legacy: bool) -> Self {
-        let bls_private_key = PrivateKey::from_bip32_seed(&seed.data);
+    pub fn key_with_seed_data(seed: &Vec<u8>, use_legacy: bool) -> Self {
+        let bls_private_key = PrivateKey::from_bip32_seed(seed);
         let bls_public_key = bls_private_key.g1_element().unwrap();
         println!("key_with_seed_data.private_key.serialize: {:?}", &*bls_private_key.serialize());
-        let secret_key = UInt256::from_bytes_force(&*bls_private_key.serialize());
+        let secret_key = UInt256::from(&*bls_private_key.serialize());
         let public_key = UInt384(*if use_legacy {
             bls_public_key.serialize_legacy()
         } else {
             bls_public_key.serialize()
         });
-        println!("key_with_seed_data.seed: {:?}", seed.data.to_hex());
+        println!("key_with_seed_data.seed: {:?}", seed.to_hex());
         println!("key_with_seed_data.secret_key: {:?}", secret_key);
         println!("key_with_seed_data.public_key: {:?}", public_key);
         println!("key_with_seed_data.use_legacy: {:?}", use_legacy);
@@ -258,8 +269,8 @@ impl BLSKey {
         }
     }
 
-    pub fn extended_private_key_with_seed_data(seed: &Seed, use_legacy: bool) -> Option<Self> {
-        ExtendedPrivateKey::from_seed(&seed.data)
+    pub fn extended_private_key_with_seed_data(seed: &Vec<u8>, use_legacy: bool) -> Option<Self> {
+        ExtendedPrivateKey::from_seed(seed)
             .ok()
             .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
     }

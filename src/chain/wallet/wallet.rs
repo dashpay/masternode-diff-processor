@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 use crate::chain::wallet::Account;
 use crate::chain::wallet::ext::constants::mnemonic_unique_id_for_unique_id;
 use crate::chain::wallet::seed::Seed;
@@ -75,7 +75,7 @@ impl Wallet {
         Self { chain, ..Default::default() }
     }
 
-    fn init_with_chain_and_unique_id(unique_id: String, is_transient: bool, chain: Shared<Chain>) -> Self {
+    pub fn init_with_chain_and_unique_id(unique_id: String, is_transient: bool, chain: Shared<Chain>) -> Self {
         let mut wallet = Self::init_with_chain(chain);
         wallet.unique_id_string = unique_id;
         wallet.is_transient = is_transient;

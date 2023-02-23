@@ -1,9 +1,11 @@
 use byte::{BytesExt, LE, Result, TryRead};
 use byte::ctx::Endian;
 use std::{mem, slice};
+use std::net::IpAddr;
+use ed25519_dalek::VerifyingKey;
 use hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, ripemd160, sha1, sha256, sha256d, sha512};
 use secp256k1::rand::{Rng, thread_rng};
-use crate::chain::params::BIP32_SEED_KEY;
+use crate::chain::params::{BIP32_SEED_KEY, ED25519_SEED_KEY};
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
 use crate::hashes::{hex::{FromHex, ToHex}, hex};
 use crate::util::base58;
@@ -31,9 +33,6 @@ pub trait ConstDecodable<'a, T: TryRead<'a, Endian>> {
 }
 pub trait BytesDecodable<'a, T: TryRead<'a, Endian>> {
     fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<T>;
-    fn from_bytes_force(bytes: &'a [u8]) -> T {
-        Self::from_bytes(bytes, &mut 0).unwrap()
-    }
 }
 
 // todo: migrate?
@@ -61,6 +60,10 @@ pub struct UInt768(pub [u8; 96]);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ECPoint(pub [u8; 33]);
+
+// impl TryFrom<AsRef<[u8]>> for UInt256 {
+//
+// }
 
 #[macro_export]
 macro_rules! impl_bytes_decodable {
@@ -111,6 +114,38 @@ macro_rules! impl_decodable {
         }
     }
 }
+#[macro_export]
+macro_rules! define_try_from_bytes {
+    ($var_type: ident) => {
+        // impl TryInto<$var_type> for &[u8] {
+        //     type Error = byte::Error;
+        //     fn try_into(self) -> std::result::Result<$var_type, Self::Error> {
+        //         self.read_with::<$var_type>(&mut 0, byte::LE)
+        //     }
+        // }
+        impl AsRef<[u8]> for $var_type {
+            fn as_ref(&self) -> &[u8] {
+                &self.0
+            }
+        }
+        impl From<&[u8]> for $var_type {
+            fn from(value: &[u8]) -> Self {
+                value.read_with::<$var_type>(&mut 0, byte::LE).unwrap()
+            }
+        }
+        impl From<Vec<u8>> for $var_type {
+            fn from(value: Vec<u8>) -> Self {
+                value.read_with::<$var_type>(&mut 0, byte::LE).unwrap()
+            }
+        }
+        impl From<&Vec<u8>> for $var_type {
+            fn from(value: &Vec<u8>) -> Self {
+                value.read_with::<$var_type>(&mut 0, byte::LE).unwrap()
+            }
+        }
+
+    }
+}
 
 #[macro_export]
 macro_rules! define_try_read_to_big_uint {
@@ -135,6 +170,8 @@ macro_rules! define_bytes_to_big_uint {
     ($uint_type: ident, $byte_len: expr) => {
 
         define_try_read_to_big_uint!($uint_type, $byte_len);
+        impl_decodable!($uint_type, $byte_len);
+        define_try_from_bytes!($uint_type);
 
         impl std::default::Default for $uint_type {
             fn default() -> Self {
@@ -216,7 +253,6 @@ macro_rules! define_bytes_to_big_uint {
                 &self.0[..]
             }
         }
-        impl_decodable!($uint_type, $byte_len);
     }
 }
 
@@ -277,7 +313,7 @@ pub(crate) fn clone_into_array<A, T>(slice: &[T]) -> A
 impl From<u32> for UInt256 {
     fn from(value: u32) -> Self {
         let mut r = [0u8; 32];
-        r[..4].clone_from_slice(&value.to_le_bytes());
+        r[..4].copy_from_slice(&value.to_le_bytes());
         UInt256(r)
     }
 }
@@ -285,7 +321,7 @@ impl From<u32> for UInt256 {
 impl From<u64> for UInt256 {
     fn from(value: u64) -> Self {
         let mut r = [0u8; 32];
-        r[..8].clone_from_slice(&value.to_le_bytes());
+        r[..8].copy_from_slice(&value.to_le_bytes());
         UInt256(r)
     }
 }
@@ -293,10 +329,10 @@ impl From<u64> for UInt256 {
 impl From<[u64; 4]> for UInt256 {
     fn from(value: [u64; 4]) -> Self {
         let mut r = [0u8; 32];
-        r[..8].clone_from_slice(&value[0].to_le_bytes());
-        r[8..16].clone_from_slice(&value[1].to_le_bytes());
-        r[16..24].clone_from_slice(&value[2].to_le_bytes());
-        r[24..].clone_from_slice(&value[3].to_le_bytes());
+        r[..8].copy_from_slice(&value[0].to_le_bytes());
+        r[8..16].copy_from_slice(&value[1].to_le_bytes());
+        r[16..24].copy_from_slice(&value[2].to_le_bytes());
+        r[24..].copy_from_slice(&value[3].to_le_bytes());
         UInt256(r)
     }
 }
@@ -329,7 +365,7 @@ impl std::ops::Shl<usize> for UInt256 {
 
 pub fn add_one_le(a: UInt256) -> UInt256 {
     let mut r = [0u8; 32];
-    r[0..8].clone_from_slice(&1u64.to_le_bytes());
+    r[0..8].copy_from_slice(&1u64.to_le_bytes());
     add_le(a, UInt256(r))
 }
 
@@ -341,7 +377,7 @@ pub fn add_le(x: UInt256, a: UInt256) -> UInt256 {
         let xb: [u8; 4] = clone_into_array(&x.0[i..len]);
         let ab: [u8; 4] = clone_into_array(&a.0[i..len]);
         let sum = u32::from_le_bytes(xb) as u64 + u32::from_le_bytes(ab) as u64 + carry;
-        r[i..len].clone_from_slice(&(sum as u32).to_le_bytes());
+        r[i..len].copy_from_slice(&(sum as u32).to_le_bytes());
         carry = sum >> 32;
     }
     UInt256(r)
@@ -355,7 +391,7 @@ fn multiply_u32_le(mut a: UInt256, b: u32) -> UInt256 {
         let len = i + 4;
         let ab: [u8; 4] = clone_into_array(&a.0[i..len]);
         let n = carry + (b as u64) * (u32::from_le_bytes(ab) as u64);
-        a.0[i..len].clone_from_slice(&(n as u32 & 0xffffffff).to_le_bytes());
+        a.0[i..len].copy_from_slice(&(n as u32 & 0xffffffff).to_le_bytes());
         carry = n >> 32;
     }
     return a;
@@ -413,6 +449,29 @@ impl UInt160 {
     }
 }
 
+impl UInt128 {
+    pub fn ip_address_from_i32(value: i32) -> Self {
+        //UInt128 address = {.u32 = {0, 0, CFSwapInt32HostToBig(0xffff), CFSwapInt32HostToBig(self.address)}};
+        let mut writer = Vec::<u8>::new();
+        0u64.enc(&mut writer);
+        0xffffi32.swap_bytes().enc(&mut writer);
+        value.swap_bytes().enc(&mut writer);
+        UInt128(clone_into_array(&writer))
+    }
+
+    pub fn ip_address_to_i32(&self) -> i32 {
+        // todo: check impl
+        // if (p.address.u64[0] != 0 || p.address.u32[2] != CFSwapInt32HostToBig(0xffff)) continue; // skip IPv6 for now
+        // CFSwapInt32BigToHost(p.address.u32[3])
+        i32::from_be_bytes(clone_into_array(&self.0[12..]))
+    }
+
+    pub fn to_ip_addr(&self) -> IpAddr {
+        IpAddr::from(self.0)
+    }
+}
+
+
 impl UInt256 {
     pub fn sha256(data: &[u8]) -> Self {
         UInt256(sha256::Hash::hash(data).into_inner())
@@ -453,7 +512,7 @@ impl UInt256 {
             let xb: [u8; 4] = clone_into_array(&self.0[i..len]);
             let ab: [u8; 4] = clone_into_array(&a.0[i..len]);
             let sum = u32::from_le_bytes(xb) as u64 + u32::from_le_bytes(ab) as u64 + carry;
-            r[i..len].clone_from_slice(&(sum as u32).to_le_bytes());
+            r[i..len].copy_from_slice(&(sum as u32).to_le_bytes());
             carry = sum >> 32;
         }
         UInt256(r)
@@ -468,7 +527,7 @@ impl UInt256 {
             let xb: [u8; 4] = clone_into_array(&self.0[ix..len]);
             let ab: [u8; 4] = clone_into_array(&a.0[ix..len]);
             let sum = u32::from_le_bytes(xb) as u64 + u32::from_le_bytes(ab) as u64 + carry;
-            r[ix..len].clone_from_slice(&(sum as u32).to_le_bytes());
+            r[ix..len].copy_from_slice(&(sum as u32).to_le_bytes());
             carry = sum >> 32;
         }
         UInt256(r)
@@ -481,7 +540,7 @@ impl UInt256 {
     // add 1u64
     pub fn add_one_le(&self) -> UInt256 {
         let mut r = [0u8; 32];
-        r[..8].clone_from_slice(&1u64.to_le_bytes());
+        r[..8].copy_from_slice(&1u64.to_le_bytes());
         let one = UInt256(r);
         self.add_le(one)
     }
@@ -545,7 +604,7 @@ impl UInt256 {
             let len = i + 4;
             let ab: [u8; 4] = clone_into_array(&self.0[i..len]);
             let n = carry + (b as u64) * (u32::from_le_bytes(ab) as u64);
-            r[i..len].clone_from_slice(&(n as u32 & 0xffffffff).to_le_bytes());
+            r[i..len].copy_from_slice(&(n as u32 & 0xffffffff).to_le_bytes());
             carry = n >> 32;
         }
         UInt256(r)
@@ -665,7 +724,7 @@ impl UInt256 {
     pub fn set_compact_le(compact: i32) -> UInt256 {
         let size = compact >> 24;
         let mut word = Self::MIN;
-        word.0[..4].clone_from_slice(&(compact as i32 & 0x007fffff).to_le_bytes());
+        word.0[..4].copy_from_slice(&(compact as i32 & 0x007fffff).to_le_bytes());
         if size <= 3 {
             word = word.shift_right_le((8 * (3 - size)) as u8);
         } else {
@@ -724,6 +783,14 @@ impl secp256k1::ThirtyTwoByteHash for UInt256 {
     }
 }
 
+impl From<VerifyingKey> for ECPoint {
+    fn from(value: VerifyingKey) -> Self {
+        let mut data = [0u8; 33];
+        data[1..33].copy_from_slice(value.as_bytes());
+        Self(data)
+    }
+}
+
 impl UInt512 {
     pub fn sha512(data: &[u8]) -> Self {
         UInt512(sha512::Hash::hash(data).into_inner())
@@ -736,6 +803,10 @@ impl UInt512 {
 
     pub fn bip32_seed_key(input: &[u8]) -> Self {
         Self::hmac(BIP32_SEED_KEY.as_bytes(), input)
+    }
+
+    pub fn ed25519_seed_key(input: &[u8]) -> Self {
+        Self::hmac(ED25519_SEED_KEY.as_bytes(), input)
     }
 
     pub fn from(a: UInt256, b: UInt256) -> Self {

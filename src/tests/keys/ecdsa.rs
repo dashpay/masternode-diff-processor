@@ -2,8 +2,7 @@ use hashes::hex::{FromHex, ToHex};
 use hashes::{sha256, Hash};
 
 use crate::UInt256;
-use crate::chain::ext::Settings;
-use crate::chain::Chain;
+use crate::chain::common::ChainType;
 use crate::keys::{CryptoData, DHKey, ECDSAKey, IKey};
 use crate::util::Address::is_valid_dash_private_key;
 use crate::util::base58;
@@ -51,27 +50,27 @@ fn test_restore_compact_signatures_from_base58(signature: &str, message: &str, t
 
 #[test]
 pub fn test_key_with_private_key() {
-    let chain = Chain::create_mainnet();
+    let chain_type = ChainType::MainNet;
     // wrong private key
-    assert!(!is_valid_dash_private_key("7s18Ypj1scza76SPf56Jm9zraxSrv58TgzmxwuDXoauvV84ud61", &chain.script()), "valid when invalid");
-    assert!(ECDSAKey::key_with_private_key("hello", &chain).is_none(), "valid when totally invalid");
+    assert!(!is_valid_dash_private_key("7s18Ypj1scza76SPf56Jm9zraxSrv58TgzmxwuDXoauvV84ud61", &chain_type.script_map()), "valid when invalid");
+    assert!(ECDSAKey::key_with_private_key("hello", chain_type).is_none(), "valid when totally invalid");
     // uncompressed private key
-    assert!(is_valid_dash_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", &chain.script()), "invalid when valid");
-    match ECDSAKey::key_with_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", &chain) {
+    assert!(is_valid_dash_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", &chain_type.script_map()), "invalid when valid");
+    match ECDSAKey::key_with_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", chain_type) {
         Some(mut key) => {
-            let addr = key.address_with_public_key_data(&chain.script());
+            let addr = key.address_with_public_key_data(&chain_type.script_map());
             assert_eq!("Xj74g7h8pZTzqudPSzVEL7dFxNZY95Emcy", addr.as_str(), "addresses don't match");
         },
         None => { assert!(false, "Key is invalid"); }
     }
 
     // compressed private key
-    match ECDSAKey::key_with_private_key("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", &chain) {
+    match ECDSAKey::key_with_private_key("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", chain_type) {
         Some(mut key) => {
-            let addr = key.address_with_public_key_data(&chain.script());
+            let addr = key.address_with_public_key_data(&chain_type.script_map());
             assert_eq!("XbKPGyV1BpzzxNAggx6Q9a6o7GaBWTLhJS", addr.as_str(), "addresses don't match");
             // compressed private key export
-            assert_eq!("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", key.serialized_private_key_for_script(&chain.script()).as_str(), "serialized_private_key_for_script");
+            assert_eq!("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", key.serialized_private_key_for_script(&chain_type.script_map()).as_str(), "serialized_private_key_for_script");
         },
         None => { assert!(false, "Key is invalid"); }
     };

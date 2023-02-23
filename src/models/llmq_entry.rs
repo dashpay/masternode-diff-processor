@@ -29,6 +29,13 @@ pub struct LLMQEntry {
     pub saved: bool,
     pub commitment_hash: Option<UInt256>,
 }
+
+impl LLMQEntry {
+    pub fn use_legacy_bls_scheme(&self) -> bool {
+        self.version >= 4.into()
+    }
+}
+
 impl std::fmt::Debug for LLMQEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LLMQEntry")

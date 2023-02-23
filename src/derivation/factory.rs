@@ -9,7 +9,7 @@ use crate::derivation::masternode_holdings_derivation_path::MasternodeHoldingsDe
 use crate::derivation::protocol::IDerivationPath;
 use crate::util::Shared;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Factory {
     voting_keys_derivation_path_by_wallet: Option<HashMap<String, AuthenticationKeysDerivationPath>>,
     owner_keys_derivation_path_by_wallet: Option<HashMap<String, AuthenticationKeysDerivationPath>>,
@@ -44,86 +44,74 @@ impl Factory {
         Self::new_const_default()
     }
 
-    pub fn provider_operator_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
-        let repo = self.operator_keys_derivation_path_by_wallet.get_or_insert(HashMap::new());
+    fn path<T, F>(unique_id: String, chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, creator: F, repo: &mut HashMap<String, T>) -> T
+    where T: IDerivationPath + Clone,
+          F: Fn(ChainType, Shared<Wallet>, Shared<Chain>, bool) -> T {
         repo.get(&unique_id).cloned().unwrap_or_else(|| {
-            let path = AuthenticationKeysDerivationPath::provider_operator_keys_derivation_path_for_wallet(chain_type, wallet, chain, true);
+            let path = creator(chain_type, wallet, chain, true);
             repo.insert(unique_id, path.clone());
             path
         })
+    }
+
+    pub fn provider_operator_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
+        Self::path(unique_id, chain_type, wallet, chain,
+            AuthenticationKeysDerivationPath::provider_operator_keys_derivation_path_for_wallet,
+            self.operator_keys_derivation_path_by_wallet.get_or_insert(HashMap::new()))
+        // repo.get(&unique_id).cloned().unwrap_or_else(|| {
+        //     let path = AuthenticationKeysDerivationPath::provider_operator_keys_derivation_path_for_wallet(chain_type, wallet, chain, true);
+        //     repo.insert(unique_id, path.clone());
+        //     path
+        // })
     }
 
     pub fn provider_owner_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
-        let repo = self.owner_keys_derivation_path_by_wallet.get_or_insert(HashMap::new());
-        repo.get(&unique_id).cloned().unwrap_or_else(|| {
-            let path = AuthenticationKeysDerivationPath::provider_owner_keys_derivation_path_for_wallet(chain_type, wallet, chain, true);
-            repo.insert(unique_id, path.clone());
-            path
-        })
+        Self::path(unique_id, chain_type, wallet, chain,
+                   AuthenticationKeysDerivationPath::provider_owner_keys_derivation_path_for_wallet,
+                   self.owner_keys_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
     pub fn provider_voting_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
-        let repo = self.voting_keys_derivation_path_by_wallet.get_or_insert(HashMap::new());
-        repo.get(&unique_id).cloned().unwrap_or_else(|| {
-            let path = AuthenticationKeysDerivationPath::provider_voting_keys_derivation_path_for_wallet(chain_type, wallet, chain, true);
-            repo.insert(unique_id, path.clone());
-            path
-        })
+        Self::path(unique_id, chain_type, wallet, chain,
+                   AuthenticationKeysDerivationPath::provider_voting_keys_derivation_path_for_wallet,
+                   self.voting_keys_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
     pub fn provider_funds_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> MasternodeHoldingsDerivationPath {
-        let repo = self.provider_funds_derivation_path_by_wallet.get_or_insert(HashMap::new());
-        repo.get(&unique_id).cloned().unwrap_or_else(|| {
-            let path = MasternodeHoldingsDerivationPath::provider_funds_derivation_path_for_wallet(chain_type, wallet, chain, true);
-            repo.insert(unique_id, path.clone());
-            path
-        })
+        Self::path(unique_id, chain_type, wallet, chain,
+                   MasternodeHoldingsDerivationPath::provider_funds_derivation_path_for_wallet,
+                   self.provider_funds_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
     pub fn identity_registration_funding_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> CreditFundingDerivationPath {
-        let repo = self.identity_registration_funding_derivation_path_by_wallet.get_or_insert(HashMap::new());
-        repo.get(&unique_id).cloned().unwrap_or_else(|| {
-            let path = CreditFundingDerivationPath::identity_registration_funding_derivation_path_for_wallet(chain_type, wallet, chain, true);
-            repo.insert(unique_id, path.clone());
-            path
-        })
+        Self::path(unique_id, chain_type, wallet, chain,
+                   CreditFundingDerivationPath::identity_registration_funding_derivation_path_for_wallet,
+                   self.identity_registration_funding_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
     pub fn identity_topup_funding_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> CreditFundingDerivationPath {
-        let repo = self.identity_topup_funding_derivation_path_by_wallet.get_or_insert(HashMap::new());
-        repo.get(&unique_id).cloned().unwrap_or_else(|| {
-            let path = CreditFundingDerivationPath::identity_topup_funding_derivation_path_for_wallet(chain_type, wallet, chain, true);
-            repo.insert(unique_id, path.clone());
-            path
-        })
+        Self::path(unique_id, chain_type, wallet, chain,
+                   CreditFundingDerivationPath::identity_topup_funding_derivation_path_for_wallet,
+                   self.identity_topup_funding_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
     pub fn identity_invitation_funding_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> CreditFundingDerivationPath {
-        let repo = self.identity_invitation_funding_derivation_path_by_wallet.get_or_insert(HashMap::new());
-        repo.get(&unique_id).cloned().unwrap_or_else(|| {
-            let path = CreditFundingDerivationPath::identity_invitation_funding_derivation_path_for_wallet(chain_type, wallet, chain, true);
-            repo.insert(unique_id, path.clone());
-            path
-        })
+        Self::path(unique_id, chain_type, wallet, chain,
+                   CreditFundingDerivationPath::identity_invitation_funding_derivation_path_for_wallet,
+                   self.identity_invitation_funding_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
     /// Identity Authentication
     pub fn identity_bls_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
-        let repo = self.identity_bls_derivation_path_by_wallet.get_or_insert(HashMap::new());
-        repo.get(&unique_id).cloned().unwrap_or_else(|| {
-            let path = AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_wallet(chain_type, wallet, chain, true);
-            repo.insert(unique_id, path.clone());
-            path
-        })
+        Self::path(unique_id, chain_type, wallet, chain,
+                   AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_wallet,
+                   self.identity_bls_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
     pub fn identity_ecdsa_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
-        let repo = self.identity_ecdsa_derivation_path_by_wallet.get_or_insert(HashMap::new());
-        repo.get_mut(&unique_id).cloned().unwrap_or_else(|| {
-            let path = AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_wallet(chain_type, wallet, chain, true);
-            repo.insert(unique_id, path.clone());
-            path
-        })
+        Self::path(unique_id, chain_type, wallet, chain,
+                   AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_wallet,
+                   self.identity_ecdsa_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
     pub fn loaded_specialized_derivation_paths_for_wallet(&mut self, chain_type: ChainType, wallet: Shared<Wallet>) -> Vec<DerivationPathKind> {

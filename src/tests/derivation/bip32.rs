@@ -19,7 +19,7 @@ use crate::derivation::derivation_path_type::DerivationPathType;
 use crate::derivation::index_path::{IIndexPath, IndexPath};
 use crate::derivation::protocol::IDerivationPath;
 use crate::keys::{BLSKey, CryptoData, ECDSAKey, IKey, Key, KeyType};
-use crate::{BytesDecodable, UInt256};
+use crate::UInt256;
 use crate::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
 use crate::derivation::incoming_funds_derivation_path::IncomingFundsDerivationPath;
 use crate::util::{base58, Shared};
@@ -37,11 +37,11 @@ fn fingerprint_for_short_bip32_seed() {
 fn test_bls_fingerprint_from_seed() {
     let seed = Seed::with_data([1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10].to_vec());
     assert_eq!(
-        BLSKey::key_with_seed_data(&seed, true)
+        BLSKey::key_with_seed_data(&seed.data, true)
             .public_key_fingerprint(),
         0xddad59bb, "Testing BLS private child public key fingerprint");
-    let seed = Seed::with_data([1u8, 50, 6, 244, 24, 199, 1, 25].to_vec());
-    assert_eq!(BLSKey::extended_private_key_with_seed_data(&seed, true)
+    let seed_data = [1u8, 50, 6, 244, 24, 199, 1, 25].to_vec();
+    assert_eq!(BLSKey::extended_private_key_with_seed_data(&seed_data, true)
                 .expect("Can't get extended_private_key from seed")
                 .public_key_fingerprint(),
             0xa4700b27, "Testing BLS extended private child public key fingerprint");
@@ -50,9 +50,9 @@ fn test_bls_fingerprint_from_seed() {
 #[test]
 fn test_bls_derivation() {
     let chain_type = ChainType::MainNet;
-    let chain = Shared::Owned(Arc::new(Mutex::new(Chain::create_mainnet())));
-    let seed = Seed::with_data([1u8, 50, 6, 244, 24, 199, 1, 25].to_vec());
-    let mut key_pair = BLSKey::extended_private_key_with_seed_data(&seed, true).unwrap();
+    let chain = Chain::create_mainnet();
+    let seed_data = [1u8, 50, 6, 244, 24, 199, 1, 25].to_vec();
+    let mut key_pair = BLSKey::extended_private_key_with_seed_data(&seed_data, true).unwrap();
     let chain_code = key_pair.chain_code;
     assert_eq!(chain_code.0.to_hex(), "d8b12555b4cc5578951e4a7c80031e22019cc0dce168b3ed88115311b8feb1e3", "Testing BLS derivation chain code");
     let derivation_path_indexes1 = vec![UInt256::from(77u64)];
@@ -129,7 +129,7 @@ fn test_bip32_serializations_basic() {
     let hardened_root = Vec::<bool>::new();
     let mut root_derivation_path = DerivationPath::derivation_path_with_indexes(indexes_root, hardened_root, DerivationPathType::Unknown, KeyType::ECDSA, DerivationPathReference::Root, chain_type, chain.borrow());
     root_derivation_path.set_wallet(wallet.borrow());
-    root_derivation_path.generate_extended_public_key_from_seed_no_store(&seed);
+    root_derivation_path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_root_extended_public_key = root_derivation_path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_root_extended_public_key, "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8", "serialized extended public key is wrong");
     let serialized_root_extended_private_key = root_derivation_path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -161,7 +161,7 @@ fn test_bip32_serializations_basic() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub6ASuArnXKPbfEwhqN6e3mwBcDTgzisQN1wXN9BJcM47sSikHjJf3UFHKkNAWbWMiGj7Wf5uMash7SyYq527Hqck2AxYysAA7xmALppuCkwQ", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -179,7 +179,7 @@ fn test_bip32_serializations_basic() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub6D4BDPcP2GT577Vvch3R8wDkScZWzQzMMUm3PWbmWvVJrZwQY4VUNgqFJPMM3No2dFDFGTsxxpG5uJh7n7epu4trkrX7x7DogT5Uv6fcLW5", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -196,7 +196,7 @@ fn test_bip32_serializations_basic() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -213,7 +213,7 @@ fn test_bip32_serializations_basic() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -227,7 +227,7 @@ fn test_bip32_serializations_advanced() {
     let seed_data = Vec::from_hex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542").unwrap();
     let chain = manager.mainnet.borrow();
     let seed = Seed::from::<bip0039::English>(seed_data, chain_type.genesis_hash());
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
     //--------------------------------------------------------------------------------------------------//
     // m //
     //--------------------------------------------------------------------------------------------------//
@@ -240,7 +240,7 @@ fn test_bip32_serializations_advanced() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -257,7 +257,7 @@ fn test_bip32_serializations_advanced() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub69H7F5d8KSRgmmdJg2KhpAK8SR3DjMwAdkxj3ZuxV27CprR9LgpeyGmXUbC6wb7ERfvrnKZjXoUmmDznezpbZb7ap6r1D3tgFxHmwMkQTPH", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -274,7 +274,7 @@ fn test_bip32_serializations_advanced() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub6ASAVgeehLbnwdqV6UKMHVzgqAG8Gr6riv3Fxxpj8ksbH9ebxaEyBLZ85ySDhKiLDBrQSARLq1uNRts8RuJiHjaDMBU4Zn9h8LZNnBC5y4a", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -291,7 +291,7 @@ fn test_bip32_serializations_advanced() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub6DF8uhdarytz3FWdA8TvFSvvAh8dP3283MY7p2V4SeE2wyWmG5mg5EwVvmdMVCQcoNJxGoWaU9DCWh89LojfZ537wTfunKau47EL2dhHKon", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -308,7 +308,7 @@ fn test_bip32_serializations_advanced() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -325,7 +325,7 @@ fn test_bip32_serializations_advanced() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -339,7 +339,7 @@ fn test_bip32_serializations_leading_zeroes() {
     let seed_data = Vec::from_hex("4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be").unwrap();
     let chain = manager.mainnet.borrow();
     let seed = Seed::from::<bip0039::English>(seed_data, chain_type.genesis_hash());
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
     //--------------------------------------------------------------------------------------------------//
     // m //
     //--------------------------------------------------------------------------------------------------//
@@ -352,7 +352,7 @@ fn test_bip32_serializations_leading_zeroes() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub661MyMwAqRbcEZVB4dScxMAdx6d4nFc9nvyvH3v4gJL378CSRZiYmhRoP7mBy6gSPSCYk6SzXPTf3ND1cZAceL7SfJ1Z3GC8vBgp2epUt13", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -369,7 +369,7 @@ fn test_bip32_serializations_leading_zeroes() {
         chain_type,
         chain.borrow());
     path.set_wallet(wallet.borrow());
-    path.generate_extended_public_key_from_seed_no_store(&seed);
+    path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_extended_public_key = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_extended_public_key, "xpub68NZiKmJWnxxS6aaHmn81bvJeTESw724CRDs6HbuccFQN9Ku14VQrADWgqbhhTHBaohPX4CjNLf9fq9MYo6oDaPPLPxSb7gwQN3ih19Zm4Y", "serialized extended public key is wrong");
     let serialized_extended_private_key = path.serialized_extended_private_key_from_seed(&seed.data).unwrap();
@@ -382,7 +382,7 @@ fn test_bip32_sequence_master_public_key_from_seed() {
     let seed_data = Vec::from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
     let chain = manager.mainnet.borrow();
     let seed = Seed::from::<bip0039::English>(seed_data, chain_type.genesis_hash());
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
 
     wallet.with(|w| {
         let account = w.account_with_number_mut(0).unwrap();
@@ -402,7 +402,7 @@ fn test_bip32_sequence_public_key() {
     let seed_data = Vec::from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
     let chain = manager.mainnet.borrow();
     let seed = Seed::from::<bip0039::English>(seed_data, chain_type.genesis_hash());
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
     wallet.with(|w| {
         let account = w.account_with_number_mut(0).unwrap();
         let bip32_derivation_path = account.bip32_derivation_path.as_mut().unwrap();
@@ -430,7 +430,7 @@ fn test_bip32_sequence_serialized_master_public_key() {
     let chain = manager.mainnet.borrow();
     let seed_data = Vec::from_hex("bb22c8551ef39739fa007efc150975fce0187e675d74c804ab32f87fe0b9ad387fe9b044b8053dfb26cf9d7e4857617fa66430c880e7f4c96554b4eed8a0ad2f").unwrap();
     let seed = Seed::from::<bip0039::English>(seed_data, chain_type.genesis_hash());
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
     wallet.with(|w| {
         let account = w.account_with_number_mut(0).unwrap();
         let path = account.bip32_derivation_path.as_mut().unwrap();
@@ -463,7 +463,7 @@ fn test_bip44_sequence_serialized_master_public_key() {
     let chain = manager.mainnet.borrow();
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
     wallet.with(|w| {
         let account = w.account_with_number_mut(0).unwrap();
         let path = account.bip44_derivation_path.as_mut().unwrap();
@@ -483,8 +483,8 @@ fn test_31_bit_derivation() {
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
     let i = UInt512::bip32_seed_key(&seed.data);
-    let secret = UInt256(clone_into_array(&i.0[..32]));
-    let mut chain = UInt256(clone_into_array(&i.0[32..]));
+    let secret = UInt256::from(&i.0[..32]);
+    let mut chain = UInt256::from(&i.0[32..]);
     let mut child_chain = chain.clone();
     let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
     let parent_public_key = parent_secret.public_key_data();
@@ -494,7 +494,7 @@ fn test_31_bit_derivation() {
     let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
     chain = UInt256(clone_into_array(&private_key_data.0[32..]));
     let public_key = ECDSAKey::key_with_secret(&child_secret, true).unwrap().public_key_data();
-    let mut pubkey = ECPoint::from_bytes_force(&parent_public_key);
+    let mut pubkey = ECPoint::from(&parent_public_key);
     derive_child_public_key(&mut pubkey, &mut child_chain, 0);
     assert_eq!(chain, child_chain, "the bip32 chains must match");
     assert_eq!(&public_key, pubkey.as_bytes(), "the public keys must match");
@@ -506,8 +506,8 @@ fn test_31_bit_compatibility_mode_derivation() {
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
     let i = UInt512::bip32_seed_key(&seed.data);
-    let secret = UInt256(clone_into_array(&i.0[..32]));
-    let mut chain = UInt256(clone_into_array(&i.0[32..]));
+    let secret = UInt256::from(&i.0[..32]);
+    let mut chain = UInt256::from(&i.0[32..]);
     let mut child_chain = chain.clone();
     let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
     let parent_public_key = parent_secret.public_key_data();
@@ -517,7 +517,7 @@ fn test_31_bit_compatibility_mode_derivation() {
     let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
     chain = UInt256(clone_into_array(&private_key_data.0[32..]));
     let public_key = ECDSAKey::key_with_secret(&child_secret, true).unwrap().public_key_data();
-    let mut pubkey = ECPoint::from_bytes_force(&parent_public_key);
+    let mut pubkey = ECPoint::from(&parent_public_key);
     derive_child_public_key_256(&mut pubkey, &mut child_chain, derivation, false);
     assert_eq!(chain, child_chain, "the bip32 chains must match");
     assert_eq!(&public_key, pubkey.as_bytes(), "the public keys must match");
@@ -530,7 +530,7 @@ fn test_ecdsa_private_derivation() {
     let chain = manager.mainnet.borrow();
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
     let mut path = AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_wallet(chain_type, wallet, chain.borrow(), true);
     let key = path.generate_extended_public_key_from_seed(&seed);
     let index_path1 = IndexPath::index_path_with_indexes(vec![1, 5]);
@@ -557,10 +557,10 @@ fn test_256_bit_derivation() {
     let chain = manager.mainnet.borrow();
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
     let i = UInt512::bip32_seed_key(&seed.data);
-    let secret = UInt256(clone_into_array(&i.0[..32]));
-    let mut chain = UInt256(clone_into_array(&i.0[32..]));
+    let secret = UInt256::from(&i.0[..32]);
+    let mut chain = UInt256::from(&i.0[32..]);
     let mut child_chain = chain.clone();
     let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
     let parent_public_key = parent_secret.public_key_data();
@@ -570,7 +570,7 @@ fn test_256_bit_derivation() {
     let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
     chain = UInt256(clone_into_array(&private_key_data.0[32..]));
     let public_key = ECDSAKey::key_with_secret(&child_secret, true).unwrap().public_key_data();
-    let mut pubkey = ECPoint::from_bytes_force(&parent_public_key);
+    let mut pubkey = ECPoint::from(&parent_public_key);
     derive_child_public_key_256(&mut pubkey, &mut child_chain, derivation, false);
     assert_eq!(chain, child_chain, "the bip32 chains must match");
     assert_eq!(&public_key, pubkey.as_bytes(), "the public keys must match");
@@ -584,11 +584,11 @@ fn test_dashpay_derivation() {
     let chain = manager.mainnet.borrow();
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
     wallet.with(|w| {
         let account = w.account_with_number_mut(0).unwrap();
         let path = account.master_contacts_derivation_path.as_mut().unwrap();
-        path.generate_extended_public_key_from_seed_no_store(&seed);
+        path.generate_extended_public_key_from_seed_no_store(&seed.data);
         let source_identity_unique_id = UInt256::sha256(&[0x01]);
         let destination_identity_unique_id = UInt256::sha256(&[0x02]);
         let mut incoming_path = IncomingFundsDerivationPath::contact_based_derivation_path_with_destination_identity_unique_id(destination_identity_unique_id, source_identity_unique_id, 0, chain_type, chain.borrow());
@@ -609,11 +609,11 @@ fn test_base64_extended_public_key_size() {
     let chain = manager.mainnet.borrow();
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = Seed::from_phrase::<bip0039::English>(seed_phrase, chain_type.genesis_hash()).unwrap();
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
     wallet.with(|w| {
         let account = w.account_with_number_mut(0).unwrap();
         let path = account.master_contacts_derivation_path.as_mut().unwrap();
-        path.generate_extended_public_key_from_seed_no_store(&seed);
+        path.generate_extended_public_key_from_seed_no_store(&seed.data);
         let source_identity_unique_id = UInt256::sha256(&[0x01]);
         let destination_identity_unique_id = UInt256::sha256(&[0x02]);
         let mut incoming_path = IncomingFundsDerivationPath::contact_based_derivation_path_with_destination_identity_unique_id(destination_identity_unique_id, source_identity_unique_id, 0, chain_type, chain.borrow());
@@ -621,7 +621,7 @@ fn test_base64_extended_public_key_size() {
         let ext_pubkey_from_master_contact_path = incoming_path.base.generate_extended_public_key_from_parent_derivation_path(path, None).unwrap();
         let bob_seed = [10u8, 9, 8, 7, 6, 6, 7, 8, 9, 10];
 
-        let bob_keypair_bls = BLSKey::key_with_seed_data(&Seed::with_data(bob_seed.to_vec()), true);
+        let bob_keypair_bls = BLSKey::key_with_seed_data(&bob_seed.to_vec(), true);
         let path_bls = AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_wallet(chain_type, wallet.borrow(), chain.borrow(), true);
         let private_key_bls = path_bls.private_key_at_index(0, &seed).unwrap();
         let mut pubkey_data_bls = ext_pubkey_from_master_contact_path.extended_public_key_data().unwrap();

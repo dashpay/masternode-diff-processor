@@ -1,4 +1,3 @@
-use std::sync::{Mutex, Weak};
 use crate::chain::Wallet;
 use crate::{default_shared, util};
 use crate::util::Shared;

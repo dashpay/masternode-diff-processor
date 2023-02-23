@@ -2,6 +2,7 @@ use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, TryWrite};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::BytesDecodable;
+use crate::encode::VarInt;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
@@ -294,6 +295,26 @@ impl From<LLMQType> for u8 {
             LLMQType::LlmqtypeDevnetDIP0024 => 105,
             LLMQType::LlmqtypeDevnet333DIP0024 => 106,
             LLMQType::LlmqtypeChachaBLSv19 => 205,
+        }
+    }
+}
+
+impl From<LLMQType> for VarInt {
+    fn from(value: LLMQType) -> Self {
+        match value {
+            LLMQType::LlmqtypeUnknown => VarInt(0),
+            LLMQType::Llmqtype50_60 => VarInt(1),
+            LLMQType::Llmqtype400_60 => VarInt(2),
+            LLMQType::Llmqtype400_85 => VarInt(3),
+            LLMQType::Llmqtype100_67 => VarInt(4),
+            LLMQType::Llmqtype60_75 => VarInt(5),
+            LLMQType::LlmqtypeTest => VarInt(100),
+            LLMQType::LlmqtypeDevnet => VarInt(101),
+            LLMQType::LlmqtypeTestV17 => VarInt(102),
+            LLMQType::LlmqtypeTestDIP0024 => VarInt(103),
+            LLMQType::LlmqtypeDevnetDIP0024 => VarInt(105),
+            LLMQType::LlmqtypeDevnet333DIP0024 => VarInt(106),
+            LLMQType::LlmqtypeChachaBLSv19 => VarInt(205),
         }
     }
 }

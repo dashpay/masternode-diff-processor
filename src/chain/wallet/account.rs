@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Mutex, Weak};
+use std::sync::Weak;
 use crate::chain::Wallet;
 use crate::chain::wallet::seed::Seed;
 use crate::derivation::derivation_path::DerivationPath;
@@ -10,6 +10,7 @@ use crate::derivation::incoming_funds_derivation_path::IncomingFundsDerivationPa
 use crate::derivation::protocol::IDerivationPath;
 use crate::{default_shared, UInt256};
 use crate::chain::common::ChainType;
+use crate::chain::tx::ITransaction;
 use crate::util::shared::Shared;
 
 #[derive(Clone, Debug)]
@@ -20,7 +21,6 @@ pub struct Account {
     pub bip44_derivation_path: Option<FundsDerivationPath>,
     pub bip32_derivation_path: Option<FundsDerivationPath>,
     pub master_contacts_derivation_path: Option<DerivationPath>,
-    // pub wallet: &'a Wallet<'a>,
     pub wallet: Shared<Wallet>,
     pub account_number: u32,
     /// current wallet balance excluding transactions known to be invalid
@@ -90,6 +90,20 @@ impl Default for Account {
 }
 
 impl Account {
+
+//     - (instancetype)initAsViewOnlyWithAccountNumber:(uint32_t)accountNumber withDerivationPaths:(NSArray<DSFundsDerivationPath *> *)derivationPaths inContext:(NSManagedObjectContext *)context {
+//     NSParameterAssert(derivationPaths);
+//
+//     if (!(self = [self initWithAccountNumber:accountNumber withDerivationPaths:derivationPaths inContext:context])) return nil;
+//     self.isViewOnlyAccount = TRUE;
+//     self.transactionsToSave = [NSMutableArray array];
+//     self.transactionsToSaveInBlockSave = [NSMutableDictionary dictionary];
+//
+//     return self;
+// }
+    pub fn view_only_account_with_number(account_number: u32) -> Self {
+        Self { account_number, is_view_only_account: true, ..Default::default() }
+    }
 
     pub fn account_with_generated_extended_public_key_for_account_number(account_number: u32, master_contacts_derivation_path: DerivationPath, bip32_derivation_path: Option<FundsDerivationPath>, bip44_derivation_path: FundsDerivationPath, chain_type: ChainType, seed: &Seed) -> Self {
         Self::init_with(0, master_contacts_derivation_path, bip32_derivation_path, bip44_derivation_path, chain_type)
@@ -173,32 +187,25 @@ impl Account {
 
     pub fn bind_to_wallet_with_unique_id(&mut self, unique_id: String, wallet: Shared<Wallet>) {
         if let Some(path) = self.bip32_derivation_path.as_mut() {
-            path.set_wallet_unique_id(unique_id.clone());
-            path.set_wallet(wallet.borrow());
+            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
         }
         if let Some(path) = self.bip44_derivation_path.as_mut() {
-            path.set_wallet_unique_id(unique_id.clone());
-            path.set_wallet(wallet.borrow());
+            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
         }
         if let Some(path) = self.master_contacts_derivation_path.as_mut() {
-            path.set_wallet_unique_id(unique_id.clone());
-            path.set_wallet(wallet.borrow());
+            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
         }
         if let Some(path) = self.default_derivation_path.as_mut() {
-            path.set_wallet_unique_id(unique_id.clone());
-            path.set_wallet(wallet.borrow());
+            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
         }
         self.fund_derivation_paths.iter_mut().for_each(|path| {
-            path.set_wallet_unique_id(unique_id.clone());
-            path.set_wallet(wallet.borrow());
+            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
         });
         self.contact_incoming_fund_derivation_paths_dictionary.values_mut().for_each(|path| {
-            path.set_wallet_unique_id(unique_id.clone());
-            path.set_wallet(wallet.borrow());
+            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
         });
         self.contact_outgoing_fund_derivation_paths_dictionary.values_mut().for_each(|path| {
-            path.set_wallet_unique_id(unique_id.clone());
-            path.set_wallet(wallet.borrow());
+            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
         });
         self.wallet = wallet;
     }
@@ -257,5 +264,12 @@ impl Account {
     //     //0 is for type 0
     //     account_unique_id_from(self.wallet.unique_id_as_str(), self.account_number)
     // }
+
+    /// Proposal Transaction Creation
+    pub fn proposal_collateral_transaction_with_data(&mut self, data: Vec<u8>) -> Option<&dyn ITransaction> {
+        todo!()
+        // let script = Vec::<u8>::proposal_info(data);
+        // self.transaction_for_amounts(vec![PROPOSAL_COST], vec![script], true)
+    }
 
 }

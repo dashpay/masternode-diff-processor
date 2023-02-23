@@ -11,6 +11,7 @@ macro_rules! default_shared {
     ($T:ty) => {
         impl Default for Shared<$T> {
             fn default() -> Self {
+                use std::sync::{Mutex, Weak};
                 Shared::Borrowed(Weak::<Mutex<$T>>::new())
             }
         }

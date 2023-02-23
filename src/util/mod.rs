@@ -10,6 +10,7 @@ pub mod psbt;
 pub mod script;
 pub mod time;
 pub mod shared;
+pub mod timer;
 
 pub use self::address::address as Address;
 pub use self::error::Error;

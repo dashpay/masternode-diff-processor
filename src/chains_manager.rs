@@ -1,5 +1,6 @@
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 use crate::chain::Chain;
+use crate::chain::common::ChainType;
 use crate::default_shared;
 use crate::environment::{Environment, Language};
 use crate::manager::authentication_manager::AuthenticationManager;
@@ -21,12 +22,24 @@ impl Shareable for ChainsManager {}
 impl ChainsManager {
     pub fn new() -> Self {
         ChainsManager {
-            mainnet: Shared::Owned(Arc::new(Mutex::new(Chain::create_mainnet()))),
-            testnet: Shared::Owned(Arc::new(Mutex::new(Chain::create_testnet()))),
+            mainnet: Chain::create_mainnet(),
+            testnet: Chain::create_testnet(),
             devnet_chains: Shared::Owned(Arc::new(Mutex::new(vec![]))),
             environment: Environment::new(Language::English),
             authentication_manager: AuthenticationManager::default()
         }
     }
+    pub fn new_shared() -> Shared<Self> {
+        Self::new().to_shared()
+    }
+}
 
+impl ChainsManager {
+    pub fn start_with_seed_phrase<L: bip0039::Language>(&self, seed_phrase: &str, chain_type: ChainType) {
+        match chain_type {
+            ChainType::MainNet => self.mainnet.start_with_seed_phrase::<L>(seed_phrase),
+            ChainType::TestNet => self.testnet.start_with_seed_phrase::<L>(seed_phrase),
+            ChainType::DevNet(_) => panic!("devnets aren't supported yet")
+        }
+    }
 }

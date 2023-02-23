@@ -19,7 +19,7 @@ fn test_example() {
     let seed = Seed::from_phrase::<bip0039::English>(SEED_PHRASE, chain_type.genesis_hash()).unwrap();
     let manager = ChainsManager::new();
     let chain = manager.testnet.borrow();
-    let wallet = chain.borrow().transient_wallet_with_seed::<bip0039::English>(seed.clone());
+    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
     let path = AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_wallet(chain_type, wallet, chain.borrow(), false);
     let key0: BLSKey = path.private_key_at_index(0, &seed).unwrap().into();
     // let key1: BLSKey = path.private_key_at_index(1, &seed).unwrap().into();

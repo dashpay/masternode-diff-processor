@@ -16,3 +16,4 @@ pub use self::byte_util::UInt384;
 pub use self::byte_util::UInt512;
 pub use self::byte_util::UInt768;
 pub use self::byte_util::ECPoint;
+pub use self::utxo::UTXO;

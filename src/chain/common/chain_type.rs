@@ -1,8 +1,11 @@
 use hashes::hex::FromHex;
 use crate::chain::common::LLMQType;
-use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap};
+use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
+use crate::chain::params::DUFFS;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
+use crate::manager::peer_manager::SETTINGS_FIXED_PEER_KEY;
+use crate::util::data_ops::short_hex_string_from;
 
 // pub const USER_AGENT: String = format!("/dash-spv-core:{}", env!("CARGO_PKG_VERSION"));
 
@@ -71,6 +74,14 @@ impl DevnetType {
 impl ChainType {
     pub fn is_mainnet(&self) -> bool {
         *self == ChainType::MainNet
+    }
+
+    pub fn is_testnet(&self) -> bool {
+        *self == ChainType::TestNet
+    }
+
+    pub fn is_devnet_any(&self) -> bool {
+        !self.is_mainnet() && !self.is_testnet()
     }
 
     pub fn user_agent(&self) -> String {
@@ -220,4 +231,135 @@ impl IHaveChainSettings for DevnetType {
     fn is_evolution_enabled(&self) -> bool {
         false
     }
+}
+
+// Params
+impl ChainType {
+    pub fn allow_min_difficulty_blocks(&self) -> bool {
+        !self.is_mainnet()
+    }
+
+    pub fn max_proof_of_work(&self) -> UInt256 {
+        if self.is_devnet_any() {
+            UInt256::from_hex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap()
+        } else {
+            UInt256::from_hex("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap()
+        }.reversed()
+    }
+
+    pub fn max_proof_of_work_target(&self) -> u32 {
+        if self.is_devnet_any() { 0x207fffff } else { 0x1e0fffff }
+    }
+
+    pub fn min_protocol_version(&self) -> u32 {
+        match self {
+            ChainType::MainNet => 70218,
+            ChainType::TestNet => 70218,
+            ChainType::DevNet(_) => 70219
+        }
+    }
+
+    pub fn protocol_version(&self) -> u32 {
+        match self {
+            ChainType::MainNet => 70219,
+            ChainType::TestNet => 70220,
+            ChainType::DevNet(_) => 70225
+        }
+    }
+
+    pub fn standard_port(&self) -> u16 {
+        match self {
+            ChainType::MainNet => 9999,
+            ChainType::TestNet => 19999,
+            ChainType::DevNet(_) => 20001
+        }
+    }
+
+    pub fn base_reward(&self) -> u64 {
+        match self {
+            ChainType::MainNet => 5 * DUFFS,
+            _ => 50 * DUFFS
+        }
+    }
+
+    pub fn header_max_amount(&self) -> u64 {
+        2000
+    }
+
+    pub fn spork_params(&self) -> SporkParams {
+        match self {
+            ChainType::MainNet => SporkParams {
+                public_key_hex_string: Some("04549ac134f694c0243f503e8c8a9a986f5de6610049c40b07816809b0d1d06a21b07be27b9bb555931773f62ba6cf35a25fd52f694d4e1106ccd237a7bb899fdd".to_string()),
+                private_key_base58_string: None,
+                address: "Xgtyuk76vhuFW2iT7UAiHgNdWXCf3J34wh".to_string()
+            },
+            ChainType::TestNet => SporkParams {
+                public_key_hex_string: Some("046f78dcf911fbd61910136f7f0f8d90578f68d0b3ac973b5040fb7afb501b5939f39b108b0569dca71488f5bbf498d92e4d1194f6f941307ffd95f75e76869f0e".to_string()),
+                private_key_base58_string: None,
+                address: "yjPtiKh2uwk3bDutTEA2q9mCtXyiZRWn55".to_string()
+            },
+            ChainType::DevNet(devnet) => SporkParams {
+                public_key_hex_string: None,
+                private_key_base58_string: match devnet {
+                    DevnetType::Chacha => Some("cPTms6Sd7QuhPWXWQSzMbvg2VbEPsWCsLBbR4PBgvfYRzAPazbt3".to_string()),
+                    DevnetType::Devnet333 => Some("cQnP9JNQp6oaZrvBtqBWRMeQERMkDyuXyvQh1qaph4FdP6cT2cVa".to_string()),
+                    DevnetType::JackDaniels => Some("cTeGz53m7kHgA9L75s4vqFGR89FjYz4D9o44eHfoKjJr2ArbEtwg".to_string()),
+                    DevnetType::Mojito => Some("".to_string())
+                },
+                address: match devnet {
+                    DevnetType::Chacha => "ybiRzdGWFeijAgR7a8TJafeNi6Yk6h68ps".to_string(),
+                    DevnetType::Devnet333 => "yM6zJAMWoouAZxPvqGDbuHb6BJaD6k4raQ".to_string(),
+                    DevnetType::JackDaniels => "yYBanbwp2Pp2kYWqDkjvckY3MosuZzkKp7".to_string(),
+                    DevnetType::Mojito => "".to_string(),
+                }
+            }
+        }
+    }
+
+    pub fn use_legacy_bls(&self) -> bool {
+        !self.is_devnet_any()
+    }
+
+    pub fn peer_misbehaving_threshold(&self) -> usize {
+        match self {
+            ChainType::MainNet => 20,
+            ChainType::TestNet => 40,
+            ChainType::DevNet(_) => 4
+        }
+    }
+
+}
+
+const CHAIN_WALLETS_KEY: &str = "CHAIN_WALLETS_KEY";
+const CHAIN_STANDALONE_DERIVATIONS_KEY: &str = "CHAIN_STANDALONE_DERIVATIONS_KEY";
+const REGISTERED_PEERS_KEY: &str = "REGISTERED_PEERS_KEY";
+const CHAIN_VOTING_KEYS_KEY: &str = "CHAIN_VOTING_KEYS_KEY";
+
+impl ChainType {
+    pub fn unique_id(&self) -> String {
+        short_hex_string_from(&self.genesis_hash().0)
+    }
+
+    /// Keychain Strings
+
+    pub fn chain_wallets_key(&self) -> String {
+        format!("{}_{}", CHAIN_WALLETS_KEY, self.unique_id())
+    }
+
+    pub fn chain_standalone_derivation_paths_key(&self) -> String {
+        format!("{}_{}", CHAIN_STANDALONE_DERIVATIONS_KEY, self.unique_id())
+    }
+
+    pub fn registered_peers_key(&self) -> String {
+        format!("{}_{}", REGISTERED_PEERS_KEY, self.unique_id())
+    }
+
+    pub fn settings_fixed_peer_key(&self) -> String {
+        format!("{}_{}", SETTINGS_FIXED_PEER_KEY, self.unique_id())
+    }
+
+    pub fn voting_keys_key(&self) -> String {
+        format!("{}_{}", CHAIN_VOTING_KEYS_KEY, self.unique_id())
+    }
+
 }

@@ -19,7 +19,7 @@ fn test_multiple_merkle_hashes() {
         UInt256::from_hex("bd6a344573ba1d6faf24f021324fa3360562404536246503c4cba372f94bfa4a")
             .unwrap();
     let tree_element_count = 4;
-    let flags = merkle_flags.as_slice();
+    // let flags = merkle_flags;
     let mut hashes = Vec::<UInt256>::new();
     let hashes_count = merkle_hashes.len() / 32;
     for i in 0..hashes_count {
@@ -31,7 +31,8 @@ fn test_multiple_merkle_hashes() {
     let merkle_tree = MerkleTree {
         tree_element_count,
         hashes: hashes.clone(),
-        flags,
+        flags: merkle_flags.clone(),
+        hash_function: Default::default()
     };
     let has_valid_coinbase = merkle_tree.has_root(desired_merkle_root);
     println!(
