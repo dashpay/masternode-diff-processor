@@ -3,11 +3,11 @@ use crate::chain::common::ChainType;
 use crate::chain::ext::wallets::Wallets;
 use crate::chain::wallet::seed::Seed;
 use crate::chains_manager::ChainsManager;
-use crate::crypto::UInt512;
+use crate::crypto::{ECPoint, UInt512};
 use crate::derivation::{DerivationPath, DerivationPathReference, DerivationPathType, IDerivationPath};
 use crate::keys::{IKey, KeyType};
 use crate::UInt256;
-use crate::util::base58;
+
 // Test vectors taken from  https://github.com/satoshilabs/slips/blob/master/slip-0010.md
 #[test]
 pub fn test_key_with_private_key() {
@@ -19,21 +19,13 @@ pub fn test_key_with_private_key() {
     // private: 171cb88b1b3c1db25add599712e36245d75bc65a1a5c9e18d76f9f2b1eab4012
     // public: 008fe9693f8fa62a4305a140b9764c5ee01e455963744fe18204b4fb948249308a
     //--------------------------------------------------------------------------------------------------//
-
     let i = UInt512::ed25519_seed_key(&seed_data);
-
     let seckey = ed25519_dalek::SecretKey::try_from(&i.0[..32]).unwrap();
-    let mut signing_key = ed25519_dalek::SigningKey::from_bytes(&seckey);
-
-    let mut public_key = [0u8; 33];
-    public_key[1..].copy_from_slice(&ed25519_dalek::VerifyingKey::from(&signing_key).to_bytes());
-
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(&seckey);
+    let public_key = ECPoint::from(ed25519_dalek::VerifyingKey::from(&signing_key));
     let chaincode = UInt256::from(&i.0[32..]);
-    println!("chain code: {}", chaincode);
-    println!("private_key: {}", signing_key.to_bytes().to_hex());
-    println!("public_key: {}", public_key.to_hex());
     assert_eq!(signing_key.to_bytes().to_hex(), "171cb88b1b3c1db25add599712e36245d75bc65a1a5c9e18d76f9f2b1eab4012", "private key is wrong");
-    assert_eq!(public_key.to_hex(), "008fe9693f8fa62a4305a140b9764c5ee01e455963744fe18204b4fb948249308a", "public key is wrong");
+    assert_eq!(public_key.0.to_hex(), "008fe9693f8fa62a4305a140b9764c5ee01e455963744fe18204b4fb948249308a", "public key is wrong");
 }
 
 #[test]

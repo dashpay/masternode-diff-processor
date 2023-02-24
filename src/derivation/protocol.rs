@@ -76,26 +76,33 @@ pub trait IDerivationPath<IPATH: IIndexPath = UInt256IndexPath>: Send + Sync + D
                 let chain = key_data.read_with::<UInt256>(&mut 4, byte::LE).unwrap();
                 // let pub_key = key_data.read_with::<ECPoint>(&mut 36, byte::LE).unwrap();
                 let pubkey = key_data[36..].to_vec();
-                let (child, is_hardened) = if self.is_empty() {
+                let (child, hardened) = if self.is_empty() {
                     (UInt256::MIN, false)
                 } else {
                     (self.last_index(), self.last_hardened())
                 };
-                Some(StringKey::serialize(self.depth(), fingerprint, is_hardened, child, chain, pubkey, self.chain_type()))
+                Some(StringKey::serialize(self.depth(), fingerprint, hardened, child, chain, pubkey, self.chain_type()))
             },
             _ => None
         }
     }
     fn serialized_extended_private_key_from_seed(&self, seed: &Vec<u8>) -> Option<String> where Self: IIndexPath<Item = UInt256> {
         self.private_key_from_seed(seed)
-            .map(|seed_key| bip32::Key::new(
-                self.length() as u8,
-                seed_key.fingerprint(),
-                self.last_index(),
-                seed_key.chaincode(),
-                seed_key.secret_key().0.to_vec(),
-                self.last_hardened())
-                .serialize(self.chain_type()))
+            .map(|seed_key| {
+                let (child, hardened) = if self.is_empty() {
+                    (UInt256::MIN, false)
+                } else {
+                    (self.last_index(), self.last_hardened())
+                };
+                bip32::Key::new(
+                    self.length() as u8,
+                    seed_key.fingerprint(),
+                    child,
+                    seed_key.chaincode(),
+                    seed_key.secret_key().0.to_vec(),
+                    hardened)
+                    .serialize(self.chain_type())
+            })
     }
     fn is_derivation_path_equal(&self, other: &Self) -> bool where Self: Sized + PartialEq {
         self == other

@@ -194,20 +194,15 @@ pub fn derive_child_public_key_256(k: &mut ECPoint, c: &mut UInt256, i: UInt256,
 // The HMAC-SHA512 function is specified in RFC 4231.
 fn ckd_priv_ed25519(signing_key: &mut ed25519_dalek::SigningKey, chain: &mut UInt256, key: &[u8]) {
     let i = UInt512::hmac(&chain.0, key);
-    let mut scalar: [u8; 32] = i.0[..32].try_into().unwrap();
-    // scalar[0] &= 0b1111_1000;
-    // scalar[31] &= 0b0111_1111;
-    // scalar[31] |= 0b0100_0000;
+    let scalar: [u8; 32] = i.0[..32].try_into().unwrap();
     signing_key.clone_from(&ed25519_dalek::SigningKey::from(&scalar));
     chain.0.copy_from_slice(&i.0[32..]);
 }
 pub fn derive_child_private_key_ed25519(signing_key: &mut ed25519_dalek::SigningKey, chaincode: &mut UInt256, i: u32) {
     let buf = &mut [0u8; 37];
-    println!("derive_child_private_key_ed25519: {}", i & BIP32_HARD);
     if i & BIP32_HARD != 0 {
         buf[1..33].copy_from_slice(&signing_key.to_bytes());
     } else {
-        // buf[0] = 0;
         buf[1..33].copy_from_slice(signing_key.verifying_key().as_bytes());
     }
     buf[33..37].copy_from_slice(i.to_be_bytes().as_slice());

@@ -272,7 +272,8 @@ pub mod StringKey {
                     None => None
                 }
             }
-            Ok(all_data) if all_data.len() == 111 => deserialize_256(data, depth, fingerprint, hardened, child, chain, chain_type),
+            Ok(all_data) if all_data.len() == 111 =>
+                deserialize_256(data, depth, fingerprint, hardened, child, chain, chain_type),
             _ => None
         }
     }

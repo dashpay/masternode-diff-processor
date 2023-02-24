@@ -1,4 +1,3 @@
-use hashes::hex::ToHex;
 use crate::crypto::{ECPoint, UInt160, UInt512};
 use crate::derivation::{IIndexPath, IndexPath};
 use crate::keys::{CryptoData, DHKey, IKey, KeyType};
