@@ -29,7 +29,7 @@ impl From<u16> for MasternodeType {
         match orig {
             0 => Self::Regular,
             1 => Self::HighPerformance,
-            i => panic!("Unknown MasternodeType")
+            i => panic!("Unknown MasternodeType {}", i)
         }
     }
 }

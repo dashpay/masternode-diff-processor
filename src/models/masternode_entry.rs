@@ -57,7 +57,7 @@ impl std::fmt::Debug for MasternodeEntry {
 
 impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
     fn try_read(bytes: &'a [u8], context: MasternodeReadContext) -> byte::Result<(Self, usize)> {
-        let MasternodeReadContext (block_height, protocol_version, bls_version) = context;
+        let MasternodeReadContext (block_height, protocol_version, diff_version) = context;
         let offset = &mut 0;
         let provider_registration_transaction_hash =
             bytes.read_with::<UInt256>(offset, byte::LE)?;
@@ -69,7 +69,7 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
         let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
         let is_valid = bytes.read_with::<u8>(offset, byte::LE)
             .unwrap_or(0);
-        let mn_type = if protocol_version >= 70227 {
+        let mn_type = if protocol_version >= 70227 && diff_version >= 2 {
             bytes.read_with::<MasternodeType>(offset, byte::LE)?
         } else {
             MasternodeType::Regular
@@ -85,7 +85,7 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
             confirmed_hash,
             socket_address,
             key_id_voting,
-            OperatorPublicKey { data: operator_public_key, version: bls_version },
+            OperatorPublicKey { data: operator_public_key, version: diff_version },
             is_valid,
             mn_type,
             platform_http_port,
