@@ -32,4 +32,15 @@ impl UserDefaults {
         todo!()
     }
 
+    pub fn has<T>(key: &str) -> bool {
+        todo!()
+    }
+
+    pub fn get<T>(key: &str) -> Option<T> {
+        todo!()
+    }
+
+    pub fn set<T>(key: &str, value: T) {
+        todo!()
+    }
 }

@@ -335,6 +335,12 @@ const CHAIN_STANDALONE_DERIVATIONS_KEY: &str = "CHAIN_STANDALONE_DERIVATIONS_KEY
 const REGISTERED_PEERS_KEY: &str = "REGISTERED_PEERS_KEY";
 const CHAIN_VOTING_KEYS_KEY: &str = "CHAIN_VOTING_KEYS_KEY";
 
+pub const LAST_SYNCED_GOVERANCE_OBJECTS: &str = "LAST_SYNCED_GOVERANCE_OBJECTS";
+pub const LAST_SYNCED_MASTERNODE_LIST: &str = "LAST_SYNCED_MASTERNODE_LIST";
+pub const SYNC_STARTHEIGHT_KEY: &str = "SYNC_STARTHEIGHT";
+pub const TERMINAL_SYNC_STARTHEIGHT_KEY: &str = "TERMINAL_SYNC_STARTHEIGHT";
+pub const FEE_PER_BYTE_KEY: &str = "FEE_PER_BYTE";
+
 impl ChainType {
     pub fn unique_id(&self) -> String {
         short_hex_string_from(&self.genesis_hash().0)
@@ -362,4 +368,11 @@ impl ChainType {
         format!("{}_{}", CHAIN_VOTING_KEYS_KEY, self.unique_id())
     }
 
+    pub fn chain_sync_start_height_key(&self) -> String {
+        format!("{}_{}", SYNC_STARTHEIGHT_KEY, self.unique_id())
+    }
+
+    pub fn terminal_sync_start_height_key(&self) -> String {
+        format!("{}_{}", TERMINAL_SYNC_STARTHEIGHT_KEY, self.unique_id())
+    }
 }

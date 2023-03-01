@@ -1,25 +1,19 @@
-use std::cell::RefCell;
 use std::sync::Arc;
 use tokio::runtime::{Builder, Runtime};
-use crate::util::Shared;
-use crate::util::shared::Shareable;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct NetworkContext {
-    // pub runtime: RefCell<Runtime>,
+    pub runtime: Arc<Runtime>,
 }
-
-// impl Shareable for NetworkContext {}
-
-// shareable!(NetworkContext);
 
 impl Default for NetworkContext {
     fn default() -> Self {
         Self {
-            // runtime: RefCell::new(Builder::new_multi_thread()
-            //     .worker_threads(1)
-            //     .build()
-            //     .unwrap())
+            // runtime: Arc::<Runtime>::new_uninit()
+            runtime: Arc::new(Builder::new_multi_thread()
+                .worker_threads(1)
+                .build()
+                .unwrap())
         }
     }
 }
@@ -27,10 +21,10 @@ impl Default for NetworkContext {
 impl NetworkContext {
     pub fn new() -> Self {
         Self {
-            // runtime: RefCell::new(Builder::new_multi_thread()
-            //     .worker_threads(1)
-            //     .build()
-            //     .unwrap())
+            runtime: Arc::new(Builder::new_multi_thread()
+                .worker_threads(1)
+                .build()
+                .unwrap())
         }
     }
 }

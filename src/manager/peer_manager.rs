@@ -11,6 +11,7 @@ use crate::crypto::byte_util::{AsBytes, Zeroable};
 use crate::chain::chain::Chain;
 use crate::chain::common::ChainType;
 use crate::chain::ext::masternodes::ChainMasternodes;
+use crate::chain::ext::sync::SyncProgress;
 use crate::chain::ext::transactions::Transactions;
 // use crate::chain::dispatch_context::DispatchContext;
 use crate::chain::SyncType;
@@ -107,7 +108,18 @@ pub struct PeerManager {
     pub chain_type: ChainType,
     // context: &'static ManagedContext,
     // @property (nonatomic, readonly) NSUInteger connectFailures, misbehavingCount, maxConnectCount;
+}
 
+impl PeerManager {
+    pub fn new(chain_type: ChainType) -> Self {
+        Self {
+            chain_type,
+            // todo: init peer_context in networking queue
+            // context: chain.peer_context(),
+            max_connect_count: PEER_MAX_CONNECTIONS,
+            ..Default::default()
+        }
+    }
 }
 
 impl PeerManager {
@@ -143,15 +155,6 @@ impl PeerManager {
 }
 
 impl PeerManager {
-    pub fn new(chain_type: ChainType) -> Self {
-        Self {
-            chain_type,
-            // todo: init peer_context in networking queue
-            // context: chain.peer_context(),
-            max_connect_count: PEER_MAX_CONNECTIONS,
-            ..Default::default()
-        }
-    }
 
     // Managers
     // pub fn masternode_manager(&self) -> &MasternodeManager {
@@ -359,19 +362,11 @@ impl PeerManager {
     }
 
     pub fn trusted_peer_host(&self) -> Option<String> {
-        if UserDefaults::has_key(&self.chain_type.settings_fixed_peer_key()) {
-            UserDefaults::string_for_key(&self.chain_type.settings_fixed_peer_key())
-        } else {
-            None
-        }
+        UserDefaults::get(&self.chain_type.settings_fixed_peer_key())
     }
 
     pub fn set_trusted_peer_host(&self, host: Option<String>) {
-        if let Some(host) = host {
-            UserDefaults::set_object_for_key(&self.chain_type.settings_fixed_peer_key(), host)
-        } else {
-            UserDefaults::remove_object_for_key(&self.chain_type.settings_fixed_peer_key())
-        }
+        UserDefaults::set(&self.chain_type.settings_fixed_peer_key(), host);
     }
 
     /// Peer Registration
@@ -570,9 +565,10 @@ impl PeerManager {
     /// Peer Registration
     pub fn connect(&mut self) {
         self.desired_state = PeerManagerDesiredState::Connected;
-        /*
-        DispatchContext::network_context().queue(|| {
-            if self.chain.syncs_blockchain() && !self.chain.can_construct_a_filter() {
+        // DispatchContext::network_context().queue(|| {
+        let chain = self.chain.borrow();
+        chain.with(|chain| {
+            if chain.syncs_blockchain() && !chain.can_construct_a_filter() {
                 // check to make sure the wallet has been created if only are a basic wallet with no dash features
                 return;
             }
@@ -580,8 +576,8 @@ impl PeerManager {
                 // this attempt is a manual retry
                 self.connect_failures = 0;
             }
-            if self.chain.terminal_header_sync_progress() < 1.0 {
-                self.chain.reset_terminal_sync_start_height();
+            if chain.terminal_header_sync_progress() < 1.0 {
+                chain.reset_terminal_sync_start_height();
                 // todo: background ops
                 /*#if TARGET_OS_IOS
                 if (self.blockLocatorsSaveTaskId == UIBackgroundTaskInvalid) { // start a background task for the chain sync
@@ -594,8 +590,8 @@ impl PeerManager {
                 }
                 #endif*/
             }
-            if self.chain.chain_sync_progress() < 1.0 {
-                self.chain.reset_chain_sync_start_height();
+            if chain.chain_sync_progress() < 1.0 {
+                chain.reset_chain_sync_start_height();
                 // todo: background ops
                 /*#if TARGET_OS_IOS
                 if (self.terminalHeadersSaveTaskId == UIBackgroundTaskInvalid) { // start a background task for the chain sync
@@ -608,48 +604,42 @@ impl PeerManager {
                 }
                 #endif*/
             }
-
-            self.mutable_connected_peers = self.mutable_connected_peers.into_iter().filter(|peer| peer.status() != PeerStatus::Disconnected).collect();
-            self.fixed_peer = if let Some(trusted) = self.trusted_peer_host() {
-                Peer::peer_with_host(trusted, self.chain.borrow())
-            } else {
-                None
-            };
+            // remove all disconnected peers
+            self.mutable_connected_peers.retain(|peer| peer.status() != PeerStatus::Disconnected);
+            self.fixed_peer = self.trusted_peer_host().and_then(|trusted| Peer::peer_with_host(&trusted, self.chain.borrow()));
             self.max_connect_count = if self.fixed_peer.is_some() { 1 } else { PEER_MAX_CONNECTIONS };
             if self.connected_peers.len() >= self.max_connect_count {
                 // already connected to maxConnectCount peers
                 return;
             }
-            let mut peers = self.peers.clone();
-            if peers.len() > 100 {
-                peers.drain(100..);
-            }
+            let mut peers = if self.peers.len() <= 100 {
+                self.peers.clone()
+            } else {
+                self.peers[..100].to_vec()
+            };
             if peers.len() > 0 && self.connected_peers.len() < self.max_connect_count {
-                let earliest_wallet_creation_time = self.chain.earliest_wallet_creation_time();
+                let earliest_wallet_creation_time = chain.earliest_wallet_creation_time();
                 while !peers.is_empty() && self.connected_peers.len() < self.max_connect_count {
                     // pick a random peer biased towards peers with more recent timestamps
-                    if let Some(peer) = peers.get_mut(thread_rng().gen_range(0..peers.len())) {
-                        if !self.connected_peers.contains(&peer) {
-                            // todo: implement delegate traits for peer
-                            //[peer setChainDelegate:self.chain.chainManager peerDelegate:self transactionDelegate:self.transactionManager governanceDelegate:self.governanceSyncManager sporkDelegate:self.sporkManager masternodeDelegate:self.masternodeManager queue:self.networkingQueue];
-                            peer.earliest_key_time = earliest_wallet_creation_time;
-                            self.mutable_connected_peers.insert(*peer);
-                            println!("Will attempt to connect to peer {}", peer.host());
-                            peer.connect();
-                        }
-                        if let Some(index) = peers.iter().position(|p| p == peer) {
-                            peers.remove(index);
-                        }
+                    let random_index = ((thread_rng().gen_range(0..peers.len()) as f64).powi(2) / peers.len() as f64) as usize;
+                    let peer = peers.iter_mut().nth(random_index).unwrap();
+                    if !self.connected_peers.contains(peer) {
+                        // peer.chain_delegate = chain;
+                        self.mutable_connected_peers.push(peer.clone());
+                        println!("Will attempt to connect to peer {}", peer.host());
+                        peer.connect();
                     }
+                    peers.remove(random_index);
                 }
             }
-            if self.connected_peers.len() == 0 {
+            if self.connected_peers.is_empty() {
                 self.chain_sync_stopped();
-                DispatchContext::main_context().queue(||
-                    NotificationCenter::post(
-                        Notification::ChainSyncFailed(self.chain, &Some(Error::NoPeersFound))));
+                // DispatchContext::main_context().queue(||
+                //     NotificationCenter::post(
+                //         Notification::ChainSyncFailed(self.chain, &Some(Error::NoPeersFound))));
             }
-        });*/
+
+        });
     }
 
     pub fn disconnect(&mut self) {

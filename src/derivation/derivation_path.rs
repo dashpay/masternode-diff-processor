@@ -283,7 +283,7 @@ impl DerivationPath {
             chain_type,
             chain
         );
-        path.extended_public_key = key_type.key_with_extended_public_key_data(&key.to_data());
+        path.extended_public_key = key_type.key_with_extended_public_key_data(&key.extended_key_data());
         path.depth = key.depth;
         path.standalone_save_extended_public_key_to_keychain();
         path.load_addresses();
@@ -452,8 +452,9 @@ impl DerivationPath {
     }
 
     pub fn deserialized_extended_private_key_for_chain(extended_private_key_string: &String, chain_type: ChainType) -> Option<Vec<u8>> {
-        bip32::from(extended_private_key_string, chain_type)
-            .map(|key| key.to_data())
+        (extended_private_key_string.as_str(), chain_type)
+            .try_into()
+            .map(|key: bip32::Key| key.extended_key_data())
             .ok()
     }
 

@@ -10,6 +10,7 @@ use crate::{default_shared, UInt256};
 use crate::chain::block::Block;
 use crate::chain::network::Peer;
 use crate::chain::wallet::Account;
+use crate::chain::wallet::ext::constants::BIP39_CREATION_TIME;
 use crate::chain::wallet::seed::Seed;
 use crate::derivation::{DerivationPath, DerivationPathKind};
 use crate::derivation::factory::Factory;
@@ -17,9 +18,8 @@ use crate::manager::authentication_manager::AuthenticationManager;
 use crate::manager::masternode_manager::MasternodeManager;
 use crate::manager::PeerManager;
 use crate::manager::transaction_manager::TransactionManager;
-use crate::network::network_context::NetworkContext;
 use crate::storage::context::StoreContext;
-use crate::storage::Keychain;
+use crate::storage::{Keychain, UserDefaults};
 use crate::util::shared::{Shareable, Shared};
 use crate::util::TimeUtil;
 
@@ -44,7 +44,12 @@ pub struct Chain {
     pub sync_phase: SyncPhase,
     viewing_account: Option<Account>,
 
-    pub network_context: NetworkContext,
+    // pub network_context: NetworkContext,
+
+
+    pub chain_sync_start_height: u32,
+    pub terminal_sync_start_height: u32,
+
 }
 
 impl Shareable for Chain {}
@@ -154,7 +159,7 @@ impl Chain {
             peer_manager: PeerManager::new(chain_type),
             spork_manager: spork::Manager::new(chain_type),
             transaction_manager: TransactionManager::new(chain_type),
-            network_context: NetworkContext::new(),
+            // network_context: NetworkContext::new(),
             ..Default::default()
         }.to_shared();
         chain.with(|c| {
@@ -277,6 +282,46 @@ impl Chain {
     pub fn can_construct_a_filter(&mut self) -> bool {
         todo!()
         // self.has_a_standalone_derivation_path() || self.has_a_wallet()
+    }
+
+    /// This is a time interval since 1970
+    pub fn earliest_wallet_creation_time(&self) -> u64 {
+        self.wallets.iter()
+            .map(|wallet| wallet.wallet_creation_time())
+            .min_by(|t1, t2| t1.cmp(t2))
+            .unwrap_or(BIP39_CREATION_TIME as u64)
+    }
+
+    pub fn reset_chain_sync_start_height(&mut self) {
+        let key = self.params.chain_type.chain_sync_start_height_key();
+        if self.chain_sync_start_height == 0 {
+            self.chain_sync_start_height = UserDefaults::get::<u32>(key.as_str()).unwrap_or(0);
+        }
+        if self.chain_sync_start_height == 0 {
+            self.chain_sync_start_height = self.last_sync_block_height();
+            UserDefaults::set(key.as_str(), self.chain_sync_start_height);
+        }
+    }
+
+    pub fn restart_chain_sync_start_height(&mut self) {
+        self.chain_sync_start_height = 0;
+        UserDefaults::set(self.params.chain_type.chain_sync_start_height_key().as_str(), 0u32);
+    }
+
+    pub fn reset_terminal_sync_start_height(&mut self) {
+        let key = self.params.chain_type.terminal_sync_start_height_key();
+        if self.terminal_sync_start_height == 0 {
+            self.terminal_sync_start_height = UserDefaults::get::<u32>(key.as_str()).unwrap_or(0);
+        }
+        if self.terminal_sync_start_height == 0 {
+            self.terminal_sync_start_height = self.last_terminal_block_height();
+            UserDefaults::set(key.as_str(), self.terminal_sync_start_height);
+        }
+    }
+
+    pub fn restart_chain_terminal_sync_start_height(&mut self) {
+        self.terminal_sync_start_height = 0;
+        UserDefaults::set(self.params.chain_type.terminal_sync_start_height_key().as_str(), 0u32);
     }
 
 }

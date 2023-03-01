@@ -92,7 +92,7 @@ pub fn wallet_based_extended_public_key_location_string_for_unique_id_and_key_ty
 
 
 fn deserialized_extended_public_key_for_chain(extended_public_key_string: &String, chain_type: ChainType) -> Result<bip32::Key, bip32::Error> {
-    bip32::from(extended_public_key_string, chain_type)
+    (extended_public_key_string.as_str(), chain_type).try_into()
 }
 
 

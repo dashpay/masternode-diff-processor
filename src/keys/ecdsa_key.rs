@@ -5,7 +5,7 @@ use hashes::sha256;
 use hashes::hex::{FromHex, ToHex};
 use secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
 use secp256k1::Secp256k1;
-use crate::chain::bip::bip32::StringKey;
+use crate::chain::bip::bip32;
 use crate::chain::bip::dip14::{derive_child_private_key, derive_child_private_key_256, derive_child_public_key, derive_child_public_key_256};
 use crate::chain::common::ChainType;
 use crate::chain::params::ScriptMap;
@@ -481,7 +481,9 @@ impl ECDSAKey {
 
     pub fn serialized_private_master_key_from_seed(seed: &Vec<u8>, chain_type: ChainType) -> String {
         let i = UInt512::bip32_seed_key(seed);
-        StringKey::serialize(0, 0, false, UInt256::MIN, UInt256::from(&i.0[32..]), i.0[..32].to_vec(), chain_type)
+        bip32::Key::new(0,0, UInt256::MIN, UInt256::from(&i.0[32..]), i.0[..32].to_vec(), false)
+            .serialize(chain_type)
+        // StringKey::serialize(0, 0, false, UInt256::MIN, UInt256::from(&i.0[32..]), i.0[..32].to_vec(), chain_type)
     }
 
     pub fn public_key_from_extended_public_key_data(data: &Vec<u8>, index_path: &IndexPath<u32>) -> Option<Vec<u8>> {

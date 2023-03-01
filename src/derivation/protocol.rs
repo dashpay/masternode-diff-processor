@@ -1,12 +1,9 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
-use byte::BytesExt;
 use hashes::{Hash, sha256};
-use hashes::hex::ToHex;
 use crate::{derivation, UInt256, util};
 use crate::chain::{Chain, Wallet};
 use crate::chain::bip::bip32;
-use crate::chain::bip::bip32::StringKey;
 use crate::chain::common::ChainType;
 use crate::chain::wallet::seed::Seed;
 use crate::derivation::derivation_path_reference::DerivationPathReference;
@@ -49,42 +46,32 @@ pub trait IDerivationPath<IPATH: IIndexPath = UInt256IndexPath>: Send + Sync + D
     }
 
     fn has_extended_public_key(&self) -> bool;
+    fn to_bip32_key_with_key_data(&self, key_data: Vec<u8>) -> Option<bip32::Key> where Self: IIndexPath<Item = UInt256> {
+        (key_data.len() >= 36).then_some({
+            let (child, hardened) = if self.is_empty() {
+                (UInt256::MIN, false)
+            } else {
+                (self.last_index(), self.last_hardened())
+            };
+            bip32::Key::new(
+                self.depth(),
+                u32::from_le_bytes(key_data[..4].try_into().unwrap()),
+                child,
+                UInt256::from(&key_data[4..36]),
+                key_data[36..].to_vec(),
+                hardened)
+        })
+    }
     fn serialized_extended_public_key(&self) -> Option<String> where Self: IIndexPath<Item = UInt256> {
-        // todo make sure this works with BLS keys
-        match self.extended_public_key_data() {
-            Some(key_data) if key_data.len() >= 36 => {
-                println!("serialized_extended_public_key.key_data: {}", key_data.to_hex());
-                let fingerprint = key_data.read_with::<u32>(&mut 0, byte::LE).unwrap();
-                let chain = key_data.read_with::<UInt256>(&mut 4, byte::LE).unwrap();
-                // let pub_key = key_data.read_with::<ECPoint>(&mut 36, byte::LE).unwrap();
-                let pubkey = key_data[36..].to_vec();
-                let (child, is_hardened) = if self.is_empty() {
-                    (UInt256::MIN, false)
-                } else {
-                    (self.last_index(), self.last_hardened())
-                };
-                Some(StringKey::serialize(self.depth(), fingerprint, is_hardened, child, chain, pubkey, self.chain_type()))
-            },
-            _ => None
-        }
+        self.extended_public_key_data()
+            .and_then(|key_data| self.to_bip32_key_with_key_data(key_data)
+                .map(|key| key.serialize(self.chain_type())))
     }
     fn serialized_extended_public_key_mut(&mut self) -> Option<String> where Self: IIndexPath<Item = UInt256> {
+        self.extended_public_key_data_mut()
+            .and_then(|key_data| self.to_bip32_key_with_key_data(key_data)
+                .map(|key| key.serialize(self.chain_type())))
         // todo make sure this works with BLS keys
-        match self.extended_public_key_data() {
-            Some(key_data) if key_data.len() >= 36 => {
-                let fingerprint = key_data.read_with::<u32>(&mut 0, byte::LE).unwrap();
-                let chain = key_data.read_with::<UInt256>(&mut 4, byte::LE).unwrap();
-                // let pub_key = key_data.read_with::<ECPoint>(&mut 36, byte::LE).unwrap();
-                let pubkey = key_data[36..].to_vec();
-                let (child, hardened) = if self.is_empty() {
-                    (UInt256::MIN, false)
-                } else {
-                    (self.last_index(), self.last_hardened())
-                };
-                Some(StringKey::serialize(self.depth(), fingerprint, hardened, child, chain, pubkey, self.chain_type()))
-            },
-            _ => None
-        }
     }
     fn serialized_extended_private_key_from_seed(&self, seed: &Vec<u8>) -> Option<String> where Self: IIndexPath<Item = UInt256> {
         self.private_key_from_seed(seed)

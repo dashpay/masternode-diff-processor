@@ -117,7 +117,7 @@ impl PeerSporkDelegate for Manager {
 impl Manager {
 
     pub fn new(chain_type: ChainType) -> Self {
-        let mut s = Self { chain_type, ..Default::default() };
+        let s = Self { chain_type, ..Default::default() };
         //s.load_in_context(&s.context);
         // s.check_triggers();
         s
@@ -250,19 +250,16 @@ impl Manager {
     }
 
     pub fn check_triggers_for_spork(&mut self, spork: &Spork) {
-        let mut changed = false;
-        let identifier = &spork.identifier;
-        if !self.spork_dictionary.contains_key(identifier) || self.spork_dictionary.get(identifier).unwrap().value != spork.value
-            /*(self.spork_dictionary.contains_key(identifier) &&
-                self.spork_dictionary[identifier].value != spork.value)*/ {
-            changed = true;
-        }
-        if Identifier::Spork15DeterministicMasternodesEnabled.eq(identifier) {
+        // let mut changed = false;
+        // let identifier = &spork.identifier;
+        // let changed = !self.spork_dictionary.contains_key(identifier) || self.spork_dictionary.get(identifier).unwrap().value != spork.value;
+
+        // if Identifi/**/er::Spork15DeterministicMasternodesEnabled.eq(identifier) {
             /*if self.chain_type.is_devnet_any() && self.chain.estimated_block_height() as u64 >= spork.value && self.chain_type.min_protocol_version() < SPORK_15_MIN_PROTOCOL_VERSION {
                 //use estimated block height here instead
                 self.chain.set_min_protocol_version(SPORK_15_MIN_PROTOCOL_VERSION);
             }*/
-        }
+        // }
         // todo: ?? unused var
     }
 

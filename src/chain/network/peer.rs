@@ -771,7 +771,7 @@ impl Peer {
         let mut block_hashes = Vec::<UInt256>::new();
         let mut spork_hashes = Vec::<UInt256>::new();
         let mut governance_object_hashes = Vec::<UInt256>::new();
-        let mut governance_object_vote_hashes = Vec::<UInt256>::new();
+        let governance_object_vote_hashes = Vec::<UInt256>::new();
         let mut only_private_send_transactions = false;
         (count.len()..count.len() + 36 * count.0 as usize)
             .step_by(36)
@@ -1095,7 +1095,7 @@ impl Peer {
             (((last_timestamp + DAY_TIME_INTERVAL * 2) >= self.earliest_key_time) &&
                 (!self.chain.with(|chain| chain.needs_initial_terminal_headers_sync()))) {
             let mut offset = offset.clone();
-            let mut first_block_hash = UInt256::x11_hash(message.read_with(&mut offset, Bytes::Len(80)).unwrap());
+            let first_block_hash = UInt256::x11_hash(message.read_with(&mut offset, Bytes::Len(80)).unwrap());
             let last_offset = &mut (offset + 81 * (num_headers as usize - 1));
             let mut last_block_hash = UInt256::x11_hash(message.read_with(last_offset, Bytes::Len(80)).unwrap());
             if last_timestamp + DAY_TIME_INTERVAL * 2 >= self.earliest_key_time &&

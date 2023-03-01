@@ -169,3 +169,42 @@ impl Wallet {
 }
 
 
+impl Wallet {
+
+    /// Wallet Creation Time
+
+    pub fn wallet_creation_time(&self) -> u64 {
+        todo!()
+        // self.verify_wallet_creation_time();
+        // if let Some(time) = self.wallet_creation_time {
+        //     return time;
+        // }
+        // if !self.checked_wallet_creation_time {
+        //
+        //     match Keychain::get_data(self.creation_time_unique_id()) {
+        //         Ok(data) => {
+        //             if data.len() == std::mem::size_of::<u64>() {
+        //                 let potential_wallet_creation_time = data.read_with::<u64>(&mut 0, byte::LE).unwrap();
+        //                 if potential_wallet_creation_time > BIP39_CREATION_TIME as u64 {
+        //                     self.wallet_creation_time = Some(potential_wallet_creation_time);
+        //                     return potential_wallet_creation_time;
+        //                 }
+        //             }
+        //             self.checked_wallet_creation_time = true;
+        //         },
+        //         Err(err) => {
+        //
+        //         }
+        //     }
+        // }
+        // if Environment::watch_only() {
+        //     BIP39_WALLET_UNKNOWN_CREATION_TIME
+        // } else if let Some(time) = self.guessed_wallet_creation_time() {
+        //     time
+        // } else {
+        //     BIP39_CREATION_TIME
+        // }
+    }
+
+}
+

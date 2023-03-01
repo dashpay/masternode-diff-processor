@@ -38,7 +38,6 @@ impl Wallets for Shared<Chain> {
 
     fn transient_wallet_with_seed(self, seed: Seed) -> Shared<Wallet> {
         self.with(|chain| {
-            println!("transient_wallet_with_seed_data: {:?}", seed);
             self.register_derivation_paths_for_seed(&seed, chain.r#type());
             Wallet::standard_wallet_with_seed(
                 seed,
@@ -52,11 +51,9 @@ impl Wallets for Shared<Chain> {
     fn standard_wallet_with_seed_phrase<L: Language>(self, seed_phrase: &str, created_at: u64, is_transient: bool) -> Option<Shared<Wallet>> {
         self.with(|chain| Seed::from_phrase::<L>(seed_phrase, chain.genesis())
             .and_then(|seed| {
-                println!("standard_wallet_with_seed_phrase: {:?}", seed);
                 Keychain::save_seed_phrase(seed_phrase, created_at, seed.unique_id_as_str())
                     .ok()
                     .map(|()| {
-                        println!("standard_wallet: seed saved");
                         self.register_derivation_paths_for_seed(&seed, chain.r#type());
                         Wallet::standard_wallet_with_seed(
                             seed,

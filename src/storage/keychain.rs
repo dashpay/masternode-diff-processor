@@ -11,55 +11,58 @@ pub struct Keychain {}
 
 impl Keychain {
 
-    #[cfg(not(test))]
+    // #[cfg(not(test))]
+    // fn default_keychain() -> Result<SecKeychain, security_framework::base::Error> {
+    //     SecKeychain::default()
+    // }
+
+    // #[cfg(test)]
     fn default_keychain() -> Result<SecKeychain, security_framework::base::Error> {
-        SecKeychain::default()
-    }
-    // cargo test -- --test-threads=1 or
-    #[cfg(test)]
-    fn default_keychain() -> Result<SecKeychain, security_framework::base::Error> {
-        println!("Accessing default keychain...");
-        use security_framework::os::macos::keychain::{CreateOptions, KeychainSettings};
+        use security_framework::os::macos::keychain::CreateOptions;
         use std::env;
         use std::path::Path;
-        let keychain_path = Path::new(env::current_dir().unwrap().as_path()).join("dash-spv.keychain");
+        let exe_path = env::current_exe().unwrap();
+        let exe_name = Path::new(&exe_path)
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
+
+        let keychain_name = if exe_name.len() >= 16 {
+            format!("dash-spv-{}.keychain", &exe_name[exe_name.len() - 16..])
+        } else {
+            format!("dash-spv-main.keychain")
+        };
+        let keychain_path = exe_path.parent().unwrap().join(keychain_name);
+        // let keychain_path = Path::new(env::current_dir().unwrap().as_path())
+        //     .join(format!("target/debug/deps/dash-spv-{}.keychain", &exe_name[exe_name.len() - 16..]));
         match CreateOptions::new()
             .password("")
             .create(keychain_path.clone()) {
-            Ok(mut keychain) => {
-                let mut settings = KeychainSettings::new();
-                settings.set_lock_interval(Some(u32::MAX-1));
-                keychain.set_settings(&settings).unwrap();
-                keychain.unlock(Some("")).expect("Can't unlock keychain");
-                println!("Keychain created at {:?}", keychain_path);
-                Ok(keychain)
+            Ok(keychain) => SecKeychain::disable_user_interaction().map(|_| keychain),
+            Err(err) if err.code() == -25296 => match SecKeychain::open(keychain_path) {
+                Ok(keychain) => SecKeychain::disable_user_interaction().map(|_| keychain),
+                Err(err) =>  panic!("Keychain::open: {:?} {:?}", err.code(), err.message())
             },
-            Err(err) if err.code() == -25296 => {
-                println!("Keychain exist at {:?}, so'll use it", keychain_path);
-                match SecKeychain::open(keychain_path) {
-                    Ok(mut keychain) => {
-                        keychain.unlock(Some("")).expect("Can't unlock keychain");
-                        Ok(keychain)
-                    },
-                    _ => panic!("Can't create or open keychain")
-                }
-            },
-            Err(err) => {
-                println!("Keychain error {:?}: {:?}", err.code(), err.message());
-                Err(err)
-            }
+            Err(err) => panic!("Keychain::create: {:?} {:?}", err.code(), err.message())
         }
     }
 
     pub fn set_data(key: String, data: Option<Vec<u8>>, authenticated: bool) -> Result<(), security_framework::base::Error> {
         let account = key.as_str();
+        // Here we also check keychain item for presence (-25299)
+        // This scheme allows not to use single-threaded testing (cargo test -- --test-threads=1)
         Self::default_keychain()
             .and_then(|keychain| {
                 match (data, keychain.find_generic_password(SEC_ATTR_SERVICE, account)) {
                     (Some(data), Ok((_, mut item))) =>
                         item.set_password(data.as_slice()),
                     (Some(data), Err(err)) =>
-                        keychain.add_generic_password(SEC_ATTR_SERVICE, account, data.as_slice()),
+                        match keychain.add_generic_password(SEC_ATTR_SERVICE, account, data.as_slice()) {
+                            Ok(..) => Ok(()),
+                            Err(err) if err.code() == -25299 => Ok(()),
+                            Err(err) => Err(err),
+                    },
                     (None, Ok((_, item))) => {
                         item.delete();
                         Ok(())
@@ -155,50 +158,50 @@ impl Keychain {
         assert_ne!(created_at, 0, "error setting wallet");
         // in version 2.0.0 wallet creation times were migrated from reference date,
         // since this is now fixed just add this line so verification only happens once
-        // Self::set_string(phrase.to_string(), mnemonic_unique_id_for_unique_id(unique_id), true)
-        //     .and(Self::set_data(creation_time_unique_id_for_unique_id(unique_id), Some(created_at.to_le_bytes().to_vec()), false))
-        //     .and(Self::set_int(1, did_verify_creation_time_unique_id_for_unique_id(unique_id), false))
+        Self::set_string(phrase.to_string(), mnemonic_unique_id_for_unique_id(unique_id), true)
+            .and(Self::set_data(creation_time_unique_id_for_unique_id(unique_id), Some(created_at.to_le_bytes().to_vec()), false))
+            .and(Self::set_int(1, did_verify_creation_time_unique_id_for_unique_id(unique_id), false))
 
-        match Self::set_string(phrase.to_string(), mnemonic_unique_id_for_unique_id(unique_id), true) {
-            Ok(()) => {
-                match Self::set_data(creation_time_unique_id_for_unique_id(unique_id), Some(created_at.to_le_bytes().to_vec()), false) {
-                    Ok(()) => {
-                        match Self::set_int(1, did_verify_creation_time_unique_id_for_unique_id(unique_id), false) {
-                            Ok(()) => Ok(()),
-                            Err(err) => {
-                                println!("Keychain error.3 {:?}: {:?}", err.code(), err.message());
-                                Err(err)
-                            }
-
-                        }
-                    },
-                    Err(err) => {
-                        println!("Keychain error.2 {:?}: {:?}", err.code(), err.message());
-                        Err(err)
-                    }
-                }
-            },
-            Err(err) if err.code() == -25299 => match Self::set_data(creation_time_unique_id_for_unique_id(unique_id), Some(created_at.to_le_bytes().to_vec()), false) {
-                Ok(()) => {
-                    match Self::set_int(1, did_verify_creation_time_unique_id_for_unique_id(unique_id), false) {
-                        Ok(()) => Ok(()),
-                        Err(err) => {
-                            println!("Keychain error.23 {:?}: {:?}", err.code(), err.message());
-                            Err(err)
-                        }
-
-                    }
-                },
-                Err(err) => {
-                    println!("Keychain error.22 {:?}: {:?}", err.code(), err.message());
-                    Err(err)
-                }
-            },
-            Err(err) => {
-                println!("Keychain error.1 {:?}: {:?}", err.code(), err.message());
-                Err(err)
-            }
-        }
+        // match Self::set_string(phrase.to_string(), mnemonic_unique_id_for_unique_id(unique_id), true) {
+        //     Ok(()) => {
+        //         match Self::set_data(creation_time_unique_id_for_unique_id(unique_id), Some(created_at.to_le_bytes().to_vec()), false) {
+        //             Ok(()) => {
+        //                 match Self::set_int(1, did_verify_creation_time_unique_id_for_unique_id(unique_id), false) {
+        //                     Ok(()) => Ok(()),
+        //                     Err(err) => {
+        //                         println!("Keychain error.3 {:?}: {:?}", err.code(), err.message());
+        //                         Err(err)
+        //                     }
+        //
+        //                 }
+        //             },
+        //             Err(err) => {
+        //                 println!("Keychain error.2 {:?}: {:?}", err.code(), err.message());
+        //                 Err(err)
+        //             }
+        //         }
+        //     },
+        //     Err(err) if err.code() == -25299 => match Self::set_data(creation_time_unique_id_for_unique_id(unique_id), Some(created_at.to_le_bytes().to_vec()), false) {
+        //         Ok(()) => {
+        //             match Self::set_int(1, did_verify_creation_time_unique_id_for_unique_id(unique_id), false) {
+        //                 Ok(()) => Ok(()),
+        //                 Err(err) => {
+        //                     println!("Keychain error.23 {:?}: {:?}", err.code(), err.message());
+        //                     Err(err)
+        //                 }
+        //
+        //             }
+        //         },
+        //         Err(err) => {
+        //             println!("Keychain error.22 {:?}: {:?}", err.code(), err.message());
+        //             Err(err)
+        //         }
+        //     },
+        //     Err(err) => {
+        //         println!("Keychain error.1 {:?}: {:?}", err.code(), err.message());
+        //         Err(err)
+        //     }
+        // }
 
     }
 

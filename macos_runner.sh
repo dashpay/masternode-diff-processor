@@ -1,8 +1,11 @@
 #!/bin/bash
-echo "MacOS runner: codesigning $1"
+echo "MacOS runner: start (masternodes-diff-processor) $1"
+pwd
+rm -fv target/debug/deps/dash-spv-*.keychain*
 identity=$(security find-identity -p codesigning -v | grep -oE "Apple Development: (.*?) \(M62AAKG43G\)" -m 1)
-codesign --force --sign "$identity" --options runtime --timestamp --entitlements dash-spv.entitlements "$1";
-echo "MacOS runner: verifying $1"
-codesign --verify --verbose=2 "$1"
-echo "MacOS runner: exec target....."
+echo "MacOS runner: identity: $identity"
+codesign -s "$identity" --entitlements dash-spv.entitlements -fv "$1"
+echo "MacOS runner: signed"
+codesign --verify --verbose=4 "$1"
+echo "MacOS runner: verified"
 exec "$@"
