@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
 use hashes::hex::FromHex;
-use crate::common::chain_type::DevnetType;
+use crate::common::chain_type::{DevnetType, IHaveChainSettings};
 use crate::common::ChainType;
 use crate::{boxed, models, process_mnlistdiff_from_message, processor_create_cache, register_processor, ToFFI, types, UInt256};
 use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, MerkleBlock, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::tests::block_store::init_testnet_store;
 use crate::tests::llmq_rotation::validate_llmq_callback_throuh_rust_bls;
 
 unsafe extern "C" fn get_merkle_root_for_chacha(
@@ -267,4 +268,52 @@ fn test_core_19_beta_6() {
     let result = unsafe { *result };
     println!("Result: {:#?}", &result);
     assert_diff_result(context, result);
+}
+
+
+#[test]
+fn test_core_19_rc_2_testnet() {
+    let chain = ChainType::TestNet;
+    let processor = unsafe {
+        register_processor(
+            get_merkle_root_by_hash_default,
+            get_block_height_by_hash_from_context,
+            get_block_hash_by_height_from_context,
+            get_llmq_snapshot_by_block_hash_default,
+            save_llmq_snapshot_in_cache,
+            get_masternode_list_mojito,
+            masternode_list_save_in_cache,
+            masternode_list_destroy_default,
+            add_insight_lookup_default,
+            should_process_llmq_of_type_white_russian,
+            validate_llmq_callback_throuh_rust_bls,
+            hash_destroy_default,
+            snapshot_destroy_default,
+            should_process_diff_with_range_default,
+            log_default,
+        )
+    };
+    let cache = unsafe { &mut *processor_create_cache() };
+    let context = &mut (FFIContext {
+        chain,
+        is_dip_0024: false,
+        cache,
+        blocks: init_testnet_store()
+    });
+    let bytes = message_from_file("MNL_TESTNET_CORE_19.dat".to_string());
+    let result = unsafe { process_mnlistdiff_from_message(
+        bytes.as_ptr(),
+        bytes.len(),
+        false,
+        true,
+        70223,
+        chain.genesis_hash().0.as_ptr(),
+        processor,
+        context.cache,
+        context as *mut _ as *mut std::ffi::c_void,
+    )};
+    let result = unsafe { *result };
+    println!("Result: {:#?}", &result);
+    // todo: need add new blocks to the testnet store
+    //assert_diff_result(context, result);
 }
