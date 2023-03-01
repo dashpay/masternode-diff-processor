@@ -69,7 +69,7 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
         let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
         let is_valid = bytes.read_with::<u8>(offset, byte::LE)
             .unwrap_or(0);
-        let mn_type = if protocol_version >= 70227 && diff_version >= 2 {
+        let mn_type = if diff_version == 2 {
             bytes.read_with::<MasternodeType>(offset, byte::LE)?
         } else {
             MasternodeType::Regular
