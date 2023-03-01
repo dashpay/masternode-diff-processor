@@ -189,6 +189,7 @@ impl MasternodeProcessor {
         should_process_quorums: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
+        let skip_removed_masternodes = list_diff.version > 2;
         let base_block_hash = list_diff.base_block_hash;
         let block_hash = list_diff.block_hash;
         let block_height = list_diff.block_height;
@@ -210,6 +211,7 @@ impl MasternodeProcessor {
             list_diff.added_quorums,
             list_diff.deleted_quorums,
             should_process_quorums,
+            skip_removed_masternodes,
             cache,
         );
         let masternode_list = models::MasternodeList::new(
@@ -318,6 +320,7 @@ impl MasternodeProcessor {
         added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
         deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
         should_process_quorums: bool,
+        skip_removed_masternodes: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> (
         BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
@@ -340,6 +343,7 @@ impl MasternodeProcessor {
                             self.validate_quorum(
                                 quorum,
                                 has_valid_quorums,
+                                skip_removed_masternodes,
                                 llmq_block_hash,
                                 masternodes,
                                 cache,
@@ -376,6 +380,7 @@ impl MasternodeProcessor {
         &self,
         quorum: &mut models::LLMQEntry,
         has_valid_quorums: bool,
+        skip_removed_masternodes: bool,
         block_hash: UInt256,
         masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
         cache: &mut MasternodeProcessorCache,
@@ -390,7 +395,8 @@ impl MasternodeProcessor {
                 &mut cache.llmq_indexed_members,
                 &cache.mn_lists,
                 &cache.llmq_snapshots,
-                &mut cache.needed_masternode_lists
+                &mut cache.needed_masternode_lists,
+                skip_removed_masternodes,
             )
         } else {
             Self::get_masternodes_for_quorum(
@@ -556,6 +562,7 @@ impl MasternodeProcessor {
         previous_quarters: [Vec<Vec<models::MasternodeEntry>>; 3],
         cached_lists: &BTreeMap<UInt256, models::MasternodeList>,
         unknown_lists: &mut Vec<UInt256>,
+        skip_removed_masternodes: bool,
     ) -> Vec<Vec<models::MasternodeEntry>> {
         let quorum_count = params.signing_active_quorum_count;
         let num_quorums = quorum_count as usize;
@@ -576,19 +583,19 @@ impl MasternodeProcessor {
                     } else {
                         let mut masternodes_used_at_h = Vec::<models::MasternodeEntry>::new();
                         let mut masternodes_unused_at_h = Vec::<models::MasternodeEntry>::new();
-                        let mut masternodes_used_at_h_index =
+                        let mut masternodes_used_at_h_indexed =
                             Vec::<Vec<models::MasternodeEntry>>::with_capacity(num_quorums);
                         for i in 0..num_quorums {
-                            masternodes_used_at_h_index.insert(i, vec![]);
+                            masternodes_used_at_h_indexed.insert(i, vec![]);
                         }
                         (0..num_quorums).into_iter().for_each(|i| {
                             // for quarters h - c, h -2c, h -3c
                             previous_quarters.iter().for_each(|q| {
                                 if let Some(quarter) = q.get(i) {
                                     quarter.iter().for_each(|node| {
-                                        if node.is_valid {
+                                        if node.is_valid && (!skip_removed_masternodes || masternode_list.masternodes.contains_key(&node.provider_registration_transaction_hash)) {
                                             masternodes_used_at_h.push(node.clone());
-                                            masternodes_used_at_h_index[i].push(node.clone());
+                                            masternodes_used_at_h_indexed[i].push(node.clone());
                                         }
                                     });
                                 }
@@ -630,18 +637,27 @@ impl MasternodeProcessor {
                             if quarter_quorum_members.get(i).is_none() {
                                 quarter_quorum_members.insert(i, vec![]);
                             }
-                            while quarter_quorum_members.get(i).unwrap().len() < quarter_size {
+                            let masternodes_used_at_h_indexed_at_i = masternodes_used_at_h_indexed.get_mut(i).unwrap();
+                            let used_mns_count = masternodes_used_at_h_indexed_at_i.len();
+                            let sorted_combined_mns_list_len = sorted_combined_mns_list.len();
+                            let mut updated = false;
+                            let initial_loop_idx = idx;
+                            while quarter_quorum_members.get(i).unwrap().len() < quarter_size &&
+                                used_mns_count + quarter_quorum_members.get(i).unwrap().len() < sorted_combined_mns_list_len {
                                 let mn = sorted_combined_mns_list.get(idx as usize).unwrap();
-                                if masternodes_used_at_h_index
-                                    .get(i)
-                                    .unwrap()
+                                let mut skip = true;
+                                if masternodes_used_at_h_indexed_at_i
                                     .iter()
                                     .filter(|&node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash)
                                     .count()
                                     == 0
                                 {
+                                    masternodes_used_at_h_indexed_at_i.push(mn.clone());
                                     quarter_quorum_members.get_mut(i).unwrap().push(mn.clone());
-                                } else {
+                                    updated = true;
+                                    skip = false;
+                                }
+                                if skip {
                                     let skip_index = idx - first_skipped_index;
                                     if first_skipped_index == 0 {
                                         first_skipped_index = idx;
@@ -649,8 +665,17 @@ impl MasternodeProcessor {
                                     skip_list.push(idx);
                                 }
                                 idx += 1;
-                                if idx == sorted_combined_mns_list.len() as i32 {
+                                if idx == sorted_combined_mns_list_len as i32 {
                                     idx = 0;
+                                }
+                                if idx == initial_loop_idx {
+                                    // we made full "while" loop
+                                    if !updated {
+                                        // there are not enough MNs, there is nothing we can do here
+                                        break;
+                                    }
+                                    // reset and try again
+                                    updated = false;
                                 }
                             }
                         });
@@ -687,6 +712,7 @@ impl MasternodeProcessor {
         cached_lists: &BTreeMap<UInt256, models::MasternodeList>,
         cached_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>,
         unknown_lists: &mut Vec<UInt256>,
+        skip_removed_masternodes: bool,
     ) -> Vec<Vec<models::MasternodeEntry>> {
         let num_quorums = llmq_params.signing_active_quorum_count as usize;
         let cycle_length = llmq_params.dkg_params.interval;
@@ -723,6 +749,7 @@ impl MasternodeProcessor {
             ],
             cached_lists,
             unknown_lists,
+            skip_removed_masternodes,
         );
         (0..num_quorums).for_each(|i| {
             Self::add_quorum_members_from_quarter(&mut rotated_members, &prev_q_h_m_3c, i);
@@ -745,6 +772,7 @@ impl MasternodeProcessor {
         cached_mn_lists: &BTreeMap<UInt256, models::MasternodeList>,
         cached_llmq_snapshots: &BTreeMap<UInt256, models::LLMQSnapshot>,
         cached_needed_masternode_lists: &mut Vec<UInt256>,
+        skip_removed_masternodes: bool,
     ) -> Vec<models::MasternodeEntry> {
         let map_by_type_opt = cached_llmq_members.get_mut(&llmq_type);
         if map_by_type_opt.is_some() {
@@ -781,6 +809,7 @@ impl MasternodeProcessor {
                     cached_mn_lists,
                     cached_llmq_snapshots,
                     cached_needed_masternode_lists,
+                    skip_removed_masternodes,
                 );
                 let map_indexed_quorum_members_of_type =
                     cached_llmq_indexed_members.get_mut(&llmq_type).unwrap();

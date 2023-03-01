@@ -298,12 +298,8 @@ pub mod tests {
     }
 
     pub fn message_from_file(name: String) -> Vec<u8> {
-        let executable = env::current_exe().unwrap();
-        let path = match executable.parent() {
-            Some(name) => name,
-            _ => panic!(),
-        };
-        let filepath = format!("{}/../../../files/{}", path.display(), name.as_str());
+        let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+        let filepath = format!("{}/files/{}", crate_dir, name.as_str());
         println!("{:?}", filepath);
         get_file_as_byte_vec(&filepath)
     }

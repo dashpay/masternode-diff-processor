@@ -49,6 +49,10 @@ impl ChainType {
         *self == ChainType::MainNet
     }
 
+    pub fn is_testnet(&self) -> bool {
+        *self == ChainType::TestNet
+    }
+
 }
 
 impl IHaveChainSettings for ChainType {
