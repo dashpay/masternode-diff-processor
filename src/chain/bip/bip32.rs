@@ -43,7 +43,6 @@ impl From<byte::Error> for Error {
             byte::Error::BadInput { err } => Self::BadInput(err),
             byte::Error::BadOffset(offset) => Self::InvalidLength(offset),
             byte::Error::Incomplete => Self::BadInput("Incomplete")
-
         }
     }
 }
@@ -58,20 +57,20 @@ pub struct Key {
     pub depth: u8,
     pub fingerprint: u32,
     pub child: UInt256,
-    pub chain: UInt256,
+    pub chaincode: UInt256,
     pub data: Vec<u8>,
     pub hardened: bool
 }
 
 impl Key {
-    pub fn new(depth: u8, fingerprint: u32, child: UInt256, chain: UInt256, data: Vec<u8>, hardened: bool) -> Self {
-        Self { depth, fingerprint, child, chain, data, hardened }
+    pub fn new(depth: u8, fingerprint: u32, child: UInt256, chaincode: UInt256, data: Vec<u8>, hardened: bool) -> Self {
+        Self { depth, fingerprint, child, chaincode, data, hardened }
     }
 
     pub fn extended_key_data(&self) -> Vec<u8> {
         let mut writer = Vec::<u8>::new();
         self.fingerprint.enc(&mut writer);
-        self.chain.enc(&mut writer);
+        self.chaincode.enc(&mut writer);
         writer.extend_from_slice(&self.data);
         writer
     }
@@ -103,7 +102,6 @@ impl<'a> TryRead<'a, ChainType> for Key {
             (true, 82) /* 32 */ => {
                 if chain_type.bip32_script_map().xpub.ne(&header) &&
                     chain_type.bip32_script_map().xprv.ne(&header) {
-                    // return Err(byte::Error::BadInput { err: "Invalid address" });
                     return Err(Error::InvalidAddress(header).into());
                 }
                 let depth = data.read_with::<u8>(&mut offset, byte::LE).unwrap();
@@ -115,11 +113,10 @@ impl<'a> TryRead<'a, ChainType> for Key {
                 }
                 let hardened = (child_32 & BIP32_HARD) > 0;
                 let child = UInt256::from(child_32 & !BIP32_HARD);
-                Ok((Key { depth, fingerprint, child, chain, data: Vec::from(&data[*offset..]), hardened }, len))
+                Ok((Key { depth, fingerprint, child, chaincode: chain, data: Vec::from(&data[*offset..]), hardened }, len))
             },
             (true, 111) /* 256 */ => {
                 if chain_type.dip14_script_map().dps.ne(&header) && chain_type.dip14_script_map().dpp.ne(&header) {
-                    // return Err(byte::Error::BadInput { err: "Invalid address" });
                     return Err(Error::InvalidAddress(header).into());
                 }
                 let depth = data.read_with::<u8>(&mut offset, byte::LE).unwrap();
@@ -127,18 +124,60 @@ impl<'a> TryRead<'a, ChainType> for Key {
                 let hardened = data.read_with::<u8>(&mut offset, byte::LE).unwrap() > 0;
                 let child = data.read_with::<UInt256>(&mut offset, byte::LE).unwrap();
                 let chain = data.read_with::<UInt256>(&mut offset, byte::LE).unwrap();
-                if data.eq(&if chain_type == ChainType::MainNet { chain_type.dip14_script_map().dps } else { chain_type.bip32_script_map().xprv }) {
+                if data.eq(&if chain_type.is_mainnet() { chain_type.dip14_script_map().dps } else { chain_type.bip32_script_map().xprv }) {
                     *offset += 1;
                 }
-                Ok((Key { depth, fingerprint, child, chain, data: Vec::from(&data[*offset..]), hardened }, len))
+                Ok((Key { depth, fingerprint, child, chaincode: chain, data: Vec::from(&data[*offset..]), hardened }, len))
             },
             (true, _) => Err(Error::InvalidLength(len).into()),
             _ => Err(Error::BadChecksum(expected, actual).into()),
         }
-
     }
 }
 
+/*impl TryWrite<ChainType> for Key {
+    fn try_write(self, bytes: &mut [u8], chain_type: ChainType) -> byte::Result<usize> {
+        if self.child.is_31_bits() {
+            let mut child = u32::from_le_bytes(clone_into_array(&self.child.0[..4]));
+            if self.hardened {
+                child |= BIP32_HARD;
+            }
+            child = child.swap_bytes();
+            let is_priv = self.data.len() < 33;
+            bytes[..4].copy_from_slice(&if is_priv { chain_type.bip32_script_map().xprv } else { chain_type.bip32_script_map().xpub });
+            bytes[4] = self.depth;
+            bytes[5..9].copy_from_slice(&self.fingerprint.to_le_bytes());
+            bytes[9..13].copy_from_slice(&child.to_le_bytes());
+            bytes[13..45].copy_from_slice(&self.chaincode.0);
+            if is_priv {
+                bytes[45] = 0;
+                bytes[46..].copy_from_slice(&self.data);
+            } else {
+                bytes[45..].copy_from_slice(&self.data);
+            }
+            Ok(bytes.len())
+        } else {
+            // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:47 + key.length + sizeof(chain)])
+            let is_priv = self.data.len() < 33;
+            let head: [u8; 4] = if is_priv { chain_type.dip14_script_map().dps } else { chain_type.dip14_script_map().dpp };
+            head.enc(bytes);
+            self.depth.enc(bytes);
+            self.fingerprint.enc(bytes);
+            self.hardened.enc(bytes);
+            self.depth.enc(bytes);                // 5
+            self.fingerprint.enc(bytes);          // 9
+            self.hardened.enc(bytes);             // 10
+            self.child.enc(bytes);                // 42
+            self.chaincode.enc(bytes);                // 74
+            if is_priv {
+                0u8.enc(bytes);                 // 75 (prv) / 74 (pub)
+                bytes[46..].copy_from_slice(&self.data);
+            }
+            self.data.enc(bytes);
+            Ok(bytes.len())
+        }
+    }
+}*/
 
 
 impl Key {
@@ -156,7 +195,7 @@ impl Key {
             self.depth.enc(&mut writer);                // 5
             self.fingerprint.enc(&mut writer);          // 9
             child.enc(&mut writer);                     // 13
-            self.chain.enc(&mut writer);                // 45
+            self.chaincode.enc(&mut writer);                // 45
             if is_priv {
                 b'\0'.enc(&mut writer);                 // 46 (prv) / 45 (pub)
             }
@@ -171,70 +210,12 @@ impl Key {
             self.fingerprint.enc(&mut writer);          // 9
             self.hardened.enc(&mut writer);             // 10
             self.child.enc(&mut writer);                // 42
-            self.chain.enc(&mut writer);                // 74
+            self.chaincode.enc(&mut writer);                // 74
             if is_priv {
                 b'\0'.enc(&mut writer);                 // 75 (prv) / 74 (pub)
             }
             writer.extend_from_slice(&self.data); // 107 (prv) / 107 (pub)
             base58::check_encode_slice(&writer)
         }
-    }
-}
-
-fn split_msg(message: Vec<u8>, mid: usize) -> (Vec<u8>, Vec<u8>) {
-    let (data, checked_data) = message.split_at(mid);
-    (data.to_vec(), checked_data.to_vec())
-}
-
-// helper function for serializing BIP32 master public/private keys to standard export format
-fn from_message(message: Vec<u8>, chain_type: ChainType) -> Result<Key, Error> {
-    let len = message.len();
-    let mid = len - 4;
-    let (data, checked_data) = split_msg(message, len - 4);
-    let (head, tail) = split_msg(data.clone(), 4);
-    let expected = endian::slice_to_u32_le(&sha256d::Hash::hash(&data)[..4]);
-    let actual = endian::slice_to_u32_le(&checked_data);
-    let header: [u8; 4] = clone_into_array(&head);
-    let mut offset = &mut 4;
-    match (expected == actual, len) {
-        (true, 82) => {
-            // 32
-            // todo: maybe we need to check testnet script map too
-            if chain_type.bip32_script_map().xpub.ne(&header) &&
-                chain_type.bip32_script_map().xprv.ne(&header) {
-                return Err(Error::InvalidAddress(header));
-            }
-            let depth = data.read_with::<u8>(&mut offset, byte::LE).unwrap();
-            let fingerprint = data.read_with::<u32>(&mut offset, byte::LE).unwrap();
-            let child_32 = data.read_with::<u32>(&mut offset, byte::BE).unwrap();
-            let chain = data.read_with::<UInt256>(&mut offset, byte::LE).unwrap();
-            if chain_type.bip32_script_map().xprv.eq(&header) {
-                *offset += 1;
-            }
-            let hardened = (child_32 & BIP32_HARD) > 0;
-            let child = UInt256::from(child_32 & !BIP32_HARD);
-            let d = Vec::<u8>::from(&data[*offset..]);
-            Ok(Key { depth, fingerprint, child, chain, data: d, hardened })
-        },
-        (true, 111) => {
-            // 256
-            // todo: maybe we need to check testnet script map too
-            if chain_type.dip14_script_map().dps.ne(&header) && chain_type.dip14_script_map().dpp.ne(&header) {
-                return Err(Error::InvalidAddress(header));
-            }
-            let depth = data.read_with::<u8>(&mut offset, byte::LE).unwrap();
-            let fingerprint = data.read_with::<u32>(&mut offset, byte::LE).unwrap();
-            let hardened = data.read_with::<u8>(&mut offset, byte::LE).unwrap() > 0;
-            let child = data.read_with::<UInt256>(&mut offset, byte::LE).unwrap();
-            let chain = data.read_with::<UInt256>(&mut offset, byte::LE).unwrap();
-            if data.eq(&if chain_type == ChainType::MainNet { chain_type.dip14_script_map().dps } else { chain_type.bip32_script_map().xprv }) {
-                *offset += 1;
-            }
-            let mut d = Vec::<u8>::new();
-            d.extend_from_slice(&data[*offset..]);
-            Ok(Key { depth, fingerprint, child, chain, data: d, hardened })
-        },
-        (true, _) => Err(Error::InvalidLength(len)),
-        _ => Err(Error::BadChecksum(expected, actual)),
     }
 }

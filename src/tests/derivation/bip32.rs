@@ -10,7 +10,7 @@ use crate::chain::common::ChainType;
 use crate::chain::ext::wallets::WalletCreation;
 use crate::chain::wallet::seed::Seed;
 use crate::chains_manager::ChainsManager;
-use crate::crypto::byte_util::{AsBytes, clone_into_array};
+use crate::crypto::byte_util::AsBytes;
 use crate::crypto::{ECPoint, UInt512};
 use crate::derivation::BIP32_HARD;
 use crate::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
@@ -93,10 +93,13 @@ fn test_bip32_sequence_private_key_from_string() {
     let mnemonic = bip0039::Mnemonic::<bip0039::English>::from_phrase(seed_phrase);
     assert!(mnemonic.is_ok(), "Error parsing seed");
     let seed_data = Vec::from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
-    let seed = Seed::with_data(seed_data);
+    let seed = Seed::with_data(seed_data.clone());
     let chain_type = ChainType::MainNet;
-    let wallet_arc = manager.wallet_with_seed_phrase::<bip0039::English>(seed_phrase, true, SystemTime::seconds_since_1970(), chain_type).unwrap();
-    let wallet = wallet_arc.try_write().unwrap();
+    // let wallet_arc = manager.wallet_with_seed_phrase::<bip0039::English>(seed_phrase, true, SystemTime::seconds_since_1970(), chain_type).unwrap();
+    // let wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(Seed::with_data(seed_data.clone()), false, chain_type);
+    let chain = manager.mainnet.read().unwrap();
+    let wallet = chain.wallets.first().unwrap();
     let account = wallet.account_with_number(0).unwrap();
     let derivation_path = account.bip32_derivation_path.as_ref().unwrap();
     let mut pk = derivation_path.private_key_string_at_index(2 | BIP32_HARD, true, &seed).unwrap();
@@ -115,8 +118,11 @@ fn test_bip32_serializations_basic() {
     let manager = ChainsManager::new();
     let chain_type = ChainType::MainNet;
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
-    let wallet_arc = manager.wallet_with_seed_phrase::<bip0039::English>(seed_phrase, true, SystemTime::seconds_since_1970(), chain_type).unwrap();
-    let mut wallet = wallet_arc.try_write().unwrap();
+    // let wallet_arc = manager.wallet_with_seed_phrase::<bip0039::English>(seed_phrase, true, SystemTime::seconds_since_1970(), chain_type).unwrap();
+    // let mut wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed_phrase::<bip0039::English>(seed_phrase, false, SystemTime::seconds_since_1970(), chain_type);
+    let mut chain = manager.mainnet.try_write().unwrap();
+    let wallet = chain.wallets.first_mut().unwrap();
     //--------------------------------------------------------------------------------------------------//
     // m //
     //--------------------------------------------------------------------------------------------------//
@@ -182,6 +188,8 @@ fn test_bip32_serializations_basic() {
         KeyType::ECDSA,
         DerivationPathReference::Root,
         chain_type,
+
+
         Weak::new());
     path.set_is_transient(true);
     path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
@@ -234,8 +242,9 @@ fn test_bip32_serializations_advanced() {
     let chain_type = ChainType::MainNet;
     let seed_data = Vec::from_hex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542").unwrap();
     let seed = chain_type.seed_for_seed_data::<bip0039::English>(seed_data);
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let chain = manager.mainnet.read().unwrap();
+    let wallet = chain.wallets.first().unwrap();
     //--------------------------------------------------------------------------------------------------//
     // m //
     //--------------------------------------------------------------------------------------------------//
@@ -352,8 +361,9 @@ fn test_bip32_serializations_leading_zeroes() {
     let chain_type = ChainType::MainNet;
     let seed_data = Vec::from_hex("4b381541583be4423346c643850da4b320e46a87ae3d2a4e6da11eba819cd4acba45d239319ac14f863b8d5ab5a0d0c64d2e8a1e7d1457df2e5a3c51c73235be").unwrap();
     let seed = chain_type.seed_for_seed_data::<bip0039::English>(seed_data);
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let chain = manager.mainnet.read().unwrap();
+    let wallet = chain.wallets.first().unwrap();
     //--------------------------------------------------------------------------------------------------//
     // m //
     //--------------------------------------------------------------------------------------------------//
@@ -397,8 +407,9 @@ fn test_bip32_sequence_master_public_key_from_seed() {
     let chain_type = ChainType::MainNet;
     let seed_data = Vec::from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
     let seed = chain_type.seed_for_seed_data::<bip0039::English>(seed_data);
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let mut wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let mut chain = manager.mainnet.try_write().unwrap();
+    let wallet = chain.wallets.first_mut().unwrap();
     let account = wallet.account_with_number_mut(0).unwrap();
     let bip32_derivation_path = account.bip32_derivation_path.as_mut().unwrap();
     bip32_derivation_path.generate_extended_public_key_from_seed(&seed)
@@ -414,8 +425,9 @@ fn test_bip32_sequence_public_key() {
     let chain_type = ChainType::MainNet;
     let seed_data = Vec::from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
     let seed = chain_type.seed_for_seed_data::<bip0039::English>(seed_data);
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let mut wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let mut chain = manager.mainnet.try_write().unwrap();
+    let wallet = chain.wallets.first_mut().unwrap();
     let account = wallet.account_with_number_mut(0).unwrap();
     let bip32_derivation_path = account.bip32_derivation_path.as_mut().unwrap();
     bip32_derivation_path.generate_extended_public_key_from_seed(&seed);
@@ -436,29 +448,35 @@ fn test_bip32_sequence_serialized_private_master_from_seed() {
 #[test]
 fn test_bip32_sequence_serialized_master_public_key() {
     // stay issue box trade stock chaos raccoon candy obey wet refuse carbon silent guide crystal
+    let manager = ChainsManager::new();
     let chain_type = ChainType::MainNet;
-    let seed_data = Vec::from_hex("bb22c8551ef39739fa007efc150975fce0187e675d74c804ab32f87fe0b9ad387fe9b044b8053dfb26cf9d7e4857617fa66430c880e7f4c96554b4eed8a0ad2f").unwrap();
-    let seed = chain_type.seed_for_seed_data::<bip0039::English>(seed_data);
-    let wallet_arc = ChainsManager::new().mainnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let mut wallet = wallet_arc.try_write().unwrap();
-    let path = wallet.account_with_number_mut(0).unwrap().bip32_derivation_path.as_mut().unwrap();
-    path.generate_extended_public_key_from_seed(&seed);
-    let xpub = path.serialized_extended_public_key().unwrap();
-    println!("bb22c8551ef39739fa007efc150975fce0187e675d74c804ab32f87fe0b9ad387fe9b044b8053dfb26cf9d7e4857617fa66430c880e7f4c96554b4eed8a0ad2f xpub = {}", xpub);
-    assert_eq!(xpub, "xpub6949NHhpyXW7qCtj5eKxLG14JgbFdxUwRdmZ4M51t2Bcj95bCREEDmvdWhC6c31SbobAf5X86SLg76A5WirhTYFCG5F9wkeY6314q4ZtA68", "wrong serialized extended public key");
-
-
-    let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
-    let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(seed_phrase).unwrap();
-    assert_eq!(seed.data.to_hex(), "467c2dd58bbd29427fb3c5467eee339021a87b21309eeabfe9459d31eeb6eba9b2a1213c12a173118c84fd49e8b4bf9282272d67bf7b7b394b088eab53b438bc", "wrong key derived from phrase");
-    let wallet_arc2 = ChainsManager::new().wallet_with_seed_phrase::<bip0039::English>(seed_phrase, true, SystemTime::seconds_since_1970(), chain_type).unwrap();
-    let mut wallet2 = wallet_arc2.try_write().unwrap();
-    let path = wallet2.account_with_number_mut(0).unwrap().bip32_derivation_path.as_mut().unwrap();
-    path.generate_extended_public_key_from_seed(&seed);
-    let mpk = path.extended_public_key_data().unwrap();
-    assert_eq!(mpk.to_hex(), "c93fa1867e984d7255df4736e7d7d6243026b9744e62374cbb54a0a47cc0fe0c334f876e02cdfeed62990ac98b6932e0080ce2155b4f5c7a8341271e9ee9c90cd87300009c", "extended public key data is wrong");
-    let xpub = path.serialized_extended_public_key().unwrap();
-    assert_eq!(xpub, "xpub69NHuRQrRn5GbT7j881uR64arreu3TFmmPAMnTeHdGd68BmAFxssxhzhmyvQoL3svMWTSbymV5FdHoypDDmaqV1C5pvnKbcse1vgrENbau7", "serialized extended public key is wrong");
+    {
+        let seed_data = Vec::from_hex("bb22c8551ef39739fa007efc150975fce0187e675d74c804ab32f87fe0b9ad387fe9b044b8053dfb26cf9d7e4857617fa66430c880e7f4c96554b4eed8a0ad2f").unwrap();
+        let seed = chain_type.seed_for_seed_data::<bip0039::English>(seed_data);
+        manager.mainnet.wallet_with_seed(seed.clone(), false, chain_type);
+        let mut chain = manager.mainnet.try_write().unwrap();
+        let wallet = chain.wallets.first_mut().unwrap();
+        let path = wallet.account_with_number_mut(0).unwrap().bip32_derivation_path.as_mut().unwrap();
+        path.generate_extended_public_key_from_seed(&seed);
+        let xpub = path.serialized_extended_public_key().unwrap();
+        println!("bb22c8551ef39739fa007efc150975fce0187e675d74c804ab32f87fe0b9ad387fe9b044b8053dfb26cf9d7e4857617fa66430c880e7f4c96554b4eed8a0ad2f xpub = {}", xpub);
+        assert_eq!(xpub, "xpub6949NHhpyXW7qCtj5eKxLG14JgbFdxUwRdmZ4M51t2Bcj95bCREEDmvdWhC6c31SbobAf5X86SLg76A5WirhTYFCG5F9wkeY6314q4ZtA68", "wrong serialized extended public key");
+    }
+    {
+        let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
+        let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(seed_phrase).unwrap();
+        assert_eq!(seed.data.to_hex(), "467c2dd58bbd29427fb3c5467eee339021a87b21309eeabfe9459d31eeb6eba9b2a1213c12a173118c84fd49e8b4bf9282272d67bf7b7b394b088eab53b438bc", "wrong key derived from phrase");
+        manager.mainnet.wallet_with_seed_phrase::<bip0039::English>(seed_phrase, false, SystemTime::seconds_since_1970(), chain_type);
+        let mut chain = manager.mainnet.try_write().unwrap();
+        // chain = manager.mainnet.try_write().unwrap();
+        let wallet2 = chain.wallets.get_mut(1).unwrap();
+        let path = wallet2.account_with_number_mut(0).unwrap().bip32_derivation_path.as_mut().unwrap();
+        path.generate_extended_public_key_from_seed(&seed);
+        let mpk = path.extended_public_key_data().unwrap();
+        assert_eq!(mpk.to_hex(), "c93fa1867e984d7255df4736e7d7d6243026b9744e62374cbb54a0a47cc0fe0c334f876e02cdfeed62990ac98b6932e0080ce2155b4f5c7a8341271e9ee9c90cd87300009c", "extended public key data is wrong");
+        let xpub = path.serialized_extended_public_key().unwrap();
+        assert_eq!(xpub, "xpub69NHuRQrRn5GbT7j881uR64arreu3TFmmPAMnTeHdGd68BmAFxssxhzhmyvQoL3svMWTSbymV5FdHoypDDmaqV1C5pvnKbcse1vgrENbau7", "serialized extended public key is wrong");
+    }
 }
 
 #[test]
@@ -467,8 +485,9 @@ fn test_bip44_sequence_serialized_master_public_key() {
     let chain_type = ChainType::MainNet;
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(seed_phrase).unwrap();
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let mut wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let mut chain = manager.mainnet.try_write().unwrap();
+    let wallet = chain.wallets.first_mut().unwrap();
     let path = wallet.account_with_number_mut(0).unwrap().bip44_derivation_path.as_mut().unwrap();
     path.generate_extended_public_key_from_seed(&seed);
     let mpk = path.extended_public_key_data().unwrap();
@@ -485,17 +504,18 @@ fn test_31_bit_derivation() {
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(seed_phrase).unwrap();
     let i = UInt512::bip32_seed_key(&seed.data);
-    let secret = UInt256::from(&i.0[..32]);
+    let mut secret = UInt256::from(&i.0[..32]);
     let mut chain = UInt256::from(&i.0[32..]);
     let mut child_chain = chain.clone();
     let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
     let parent_public_key = parent_secret.public_key_data();
     let derivation = 0u32;
-    let mut private_key_data = UInt512::from(secret, chain);
-    derive_child_private_key(&mut private_key_data, derivation);
-    let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
-    chain = UInt256(clone_into_array(&private_key_data.0[32..]));
-    let public_key = ECDSAKey::key_with_secret(&child_secret, true).unwrap().public_key_data();
+    // let mut private_key_data = UInt512::from(secret, chain);
+    // let mut secret = sec
+    derive_child_private_key(&mut secret, &mut chain, derivation);
+    // let child_secret = secret.clone();
+    // chain = UInt256(clone_into_array(&private_key_data.0[32..]));
+    let public_key = ECDSAKey::key_with_secret(&secret, true).unwrap().public_key_data();
     let mut pubkey = ECPoint::from(&parent_public_key);
     derive_child_public_key(&mut pubkey, &mut child_chain, 0);
     assert_eq!(chain, child_chain, "the bip32 chains must match");
@@ -508,17 +528,17 @@ fn test_31_bit_compatibility_mode_derivation() {
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(seed_phrase).unwrap();
     let i = UInt512::bip32_seed_key(&seed.data);
-    let secret = UInt256::from(&i.0[..32]);
+    let mut secret = UInt256::from(&i.0[..32]);
     let mut chain = UInt256::from(&i.0[32..]);
     let mut child_chain = chain.clone();
     let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
     let parent_public_key = parent_secret.public_key_data();
-    let mut private_key_data = UInt512::from(secret, chain);
+    // let mut private_key_data = UInt512::from(secret, chain);
     let derivation = UInt256::MIN;
-    derive_child_private_key_256(&mut private_key_data, &derivation, false);
-    let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
-    chain = UInt256(clone_into_array(&private_key_data.0[32..]));
-    let public_key = ECDSAKey::key_with_secret(&child_secret, true).unwrap().public_key_data();
+    derive_child_private_key_256(&mut secret, &mut chain, derivation.clone(), false);
+    // let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
+    // chain = UInt256(clone_into_array(&private_key_data.0[32..]));
+    let public_key = ECDSAKey::key_with_secret(&secret, true).unwrap().public_key_data();
     let mut pubkey = ECPoint::from(&parent_public_key);
     derive_child_public_key_256(&mut pubkey, &mut child_chain, derivation, false);
     assert_eq!(chain, child_chain, "the bip32 chains must match");
@@ -531,8 +551,9 @@ fn test_ecdsa_private_derivation() {
     let chain_type = ChainType::MainNet;
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(seed_phrase).unwrap();
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let chain = manager.mainnet.try_read().unwrap();
+    let wallet = chain.wallets.first().unwrap();
     let mut path = AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_wallet(chain_type, true,wallet.unique_id_as_str().to_string(), Weak::new(), true);
     let key = path.generate_extended_public_key_from_seed(&seed);
     let index_path1 = IndexPath::index_path_with_indexes(vec![1, 5]);
@@ -558,20 +579,20 @@ fn test_256_bit_derivation() {
     let chain_type = ChainType::MainNet;
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(seed_phrase).unwrap();
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let wallet = manager.mainnet.read().unwrap().wallets.first().unwrap();
     let i = UInt512::bip32_seed_key(&seed.data);
-    let secret = UInt256::from(&i.0[..32]);
+    let mut secret = UInt256::from(&i.0[..32]);
     let mut chain = UInt256::from(&i.0[32..]);
     let mut child_chain = chain.clone();
     let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
     let parent_public_key = parent_secret.public_key_data();
     let derivation = UInt256::from([5, 12, 15, 1337]);
-    let mut private_key_data = UInt512::from(secret, chain);
-    derive_child_private_key_256(&mut private_key_data, &derivation, false);
-    let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
-    chain = UInt256(clone_into_array(&private_key_data.0[32..]));
-    let public_key = ECDSAKey::key_with_secret(&child_secret, true).unwrap().public_key_data();
+    // let mut private_key_data = UInt512::from(secret, chain);
+    derive_child_private_key_256(&mut secret, &mut chain, derivation.clone(), false);
+    // let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
+    // chain = UInt256(clone_into_array(&private_key_data.0[32..]));
+    let public_key = ECDSAKey::key_with_secret(&secret, true).unwrap().public_key_data();
     let mut pubkey = ECPoint::from(&parent_public_key);
     derive_child_public_key_256(&mut pubkey, &mut child_chain, derivation, false);
     assert_eq!(chain, child_chain, "the bip32 chains must match");
@@ -585,8 +606,9 @@ fn test_dashpay_derivation() {
     let chain_type = ChainType::MainNet;
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(seed_phrase).unwrap();
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let mut wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let mut chain = manager.mainnet.try_write().unwrap();
+    let wallet = chain.wallets.first_mut().unwrap();
     let account = wallet.account_with_number_mut(0).unwrap();
     let path = account.master_contacts_derivation_path.as_mut().unwrap();
     path.generate_extended_public_key_from_seed_no_store(&seed.data);
@@ -609,8 +631,9 @@ fn test_base64_extended_public_key_size() {
     let chain_type = ChainType::MainNet;
     let seed_phrase = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(seed_phrase).unwrap();
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let mut wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let mut chain = manager.mainnet.try_write().unwrap();
+    let wallet = chain.wallets.first_mut().unwrap();
     let account = wallet.account_with_number_mut(0).unwrap();
     let path = account.master_contacts_derivation_path.as_mut().unwrap();
     path.generate_extended_public_key_from_seed_no_store(&seed.data);

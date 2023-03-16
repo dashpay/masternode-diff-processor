@@ -21,7 +21,7 @@
 
 use futures::{future, Future, FutureExt, TryFutureExt};
 use futures::task::Poll as Async;
-use futures::task::{Spawn, SpawnExt, Waker};
+use futures::task::Waker;
 
 use std::{
     cmp::min,
@@ -36,7 +36,7 @@ use std::{
 use std::net::SocketAddrV4;
 use futures::future::Either;
 use futures_timer::Delay;
-use mio::{Events, Interest, Poll, Token};
+use mio::{Interest, Poll, Token};
 use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
 use crate::chain::Chain;

@@ -17,8 +17,10 @@ fn test_example() {
     let chain_type = ChainType::MainNet;
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(SEED_PHRASE).unwrap();
     let manager = ChainsManager::new();
-    let wallet_arc = manager.testnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.testnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let mut chain = manager.testnet.try_write().unwrap();
+    let wallet = chain.wallets.first_mut().unwrap();
+
     let path = AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_wallet(chain_type, true, wallet.unique_id_as_str().to_string(), Weak::new(), false);
     let key0: BLSKey = path.private_key_at_index(0, &seed).unwrap().into();
     // let key1: BLSKey = path.private_key_at_index(1, &seed).unwrap().into();

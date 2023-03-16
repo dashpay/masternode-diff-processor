@@ -1,4 +1,3 @@
-use std::sync::Weak;
 use byte::BytesExt;
 use hashes::hex::FromHex;
 use crate::chain::chain_lock;
@@ -7,10 +6,11 @@ use crate::chain::common::ChainType;
 use crate::consensus::Encodable;
 use crate::crypto::UInt768;
 use crate::UInt256;
+use crate::util::Shared;
 
 #[test]
 fn test_chain_lock_deserialization() {
-    let read_context = chain_lock::ReadContext(ChainType::MainNet, Weak::new());
+    let read_context = chain_lock::ReadContext(ChainType::MainNet, Shared::None);
     let mut writer = Vec::<u8>::new();
     1177907u32.enc(&mut writer);
     UInt256::from_hex("0000000000000027b4f24c02e3e81e41e2ec4db8f1c42ee1f3923340a22680ee").unwrap().enc(&mut writer);

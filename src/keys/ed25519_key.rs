@@ -1,3 +1,4 @@
+use ed25519_dalek::Signer;
 use crate::crypto::{ECPoint, UInt160, UInt512};
 use crate::derivation::{IIndexPath, IndexPath};
 use crate::keys::{CryptoData, DHKey, IKey, KeyType};
@@ -21,6 +22,28 @@ impl IKey for ED25519Key {
         KeyType::ED25519
     }
 
+    fn sign(&self, data: &Vec<u8>) -> Vec<u8> {
+        if self.seckey.is_zero() {
+            println!("There is no seckey for sign");
+            return vec![];
+        }
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(&self.seckey.0);
+        match signing_key.try_sign(data) {
+            Ok(signature) => signature.to_vec(),
+            Err(err) => {
+                println!("ED25519Key::sign::error {}", err);
+                vec![]
+            }
+        }
+    }
+
+    fn verify(&mut self, message_digest: &Vec<u8>, signature: &Vec<u8>) -> bool {
+        // ed25519_dalek::Signature::from_slice(signature)
+        //     .and_then(|s| s.)
+        false
+    }
+
+
     fn secret_key(&self) -> UInt256 {
         self.seckey
     }
@@ -33,22 +56,42 @@ impl IKey for ED25519Key {
         self.fingerprint
     }
 
+    fn private_key_data(&self) -> Option<Vec<u8>> {
+        (!self.seckey.is_zero())
+            .then_some(self.seckey.0.to_vec())
+    }
+
     fn public_key_data(&self) -> Vec<u8> {
         let signing_key = ed25519_dalek::SigningKey::from_bytes(&self.seckey.0);
         let public_key = ed25519_dalek::VerifyingKey::from(&signing_key);
         ECPoint::from(signing_key.verifying_key()).0.to_vec()
     }
 
-    fn extended_public_key_data(&self) -> Option<Vec<u8>> {
+    fn extended_private_key_data(&self) -> Option<Vec<u8>> {
         if !self.is_extended {
             None
+        } else if let Some(private_key_data) = self.private_key_data() {
+            // TODO: secure data
+            //NSMutableData *data = [NSMutableData secureData];
+            let mut writer = Vec::<u8>::new();
+            self.fingerprint.enc(&mut writer);
+            self.chaincode.enc(&mut writer);
+            writer.extend(private_key_data);
+            // private_key_data.enc(&mut writer);
+            Some(writer)
         } else {
+            None
+        }
+    }
+
+    fn extended_public_key_data(&self) -> Option<Vec<u8>> {
+        self.is_extended.then_some({
             let mut writer = Vec::<u8>::new();
             self.fingerprint.enc(&mut writer);
             self.chaincode.enc(&mut writer);
             writer.extend(self.public_key_data());
-            Some(writer)
-        }
+            writer
+        })
     }
 
     fn private_derive_to_256bit_derivation_path<DPATH>(&self, derivation_path: &DPATH) -> Option<Self>
@@ -58,12 +101,12 @@ impl IKey for ED25519Key {
         let mut fingerprint = 0u32;
         if !derivation_path.is_empty() {
             (0..derivation_path.length()).into_iter().for_each(|i| {
-                if i == derivation_path.length() - 1 {
+                if i + 1 == derivation_path.length() {
                     fingerprint = UInt160::hash160(ECPoint::from(ed25519_dalek::VerifyingKey::from(&signing_key)).as_ref()).u32_le();
                 }
                 let derivation = derivation_path.index_at_position(i);
                 let is_hardened = derivation_path.hardened_at_position(i);
-                derive_child_private_key_256_ed25519(&mut signing_key, &mut chaincode, &derivation, is_hardened);
+                derive_child_private_key_256_ed25519(&mut signing_key, &mut chaincode, derivation, is_hardened);
             });
         }
         let seckey = UInt256(signing_key.to_bytes());

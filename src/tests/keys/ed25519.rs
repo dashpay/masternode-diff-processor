@@ -36,8 +36,9 @@ pub fn test_vector_1_derivation() {
     // let mut chain = ;
     // Test Vector 1
     let seed_data = Vec::from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(Seed::with_data(seed_data.clone()), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(Seed::with_data(seed_data.clone()), false, chain_type);
+    let chain = manager.mainnet.read().unwrap();
+    let wallet = chain.wallets.first().unwrap();
     //--------------------------------------------------------------------------------------------------//
     // Chain m
     // • fingerprint: 00000000
@@ -199,8 +200,9 @@ pub fn test_vector_2_derivation() {
     let chain_type = ChainType::MainNet;
     // Test Vector 1
     let seed_data = Vec::from_hex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542").unwrap();
-    let wallet_arc = manager.mainnet.transient_wallet_with_seed(Seed::with_data(seed_data.clone()), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.mainnet.wallet_with_seed(Seed::with_data(seed_data.clone()), false, chain_type);
+    let chain = manager.mainnet.read().unwrap();
+    let wallet = chain.wallets.first().unwrap();
     //--------------------------------------------------------------------------------------------------//
     // Chain m
     // • fingerprint: 00000000

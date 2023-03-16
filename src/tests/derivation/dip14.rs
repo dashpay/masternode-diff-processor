@@ -19,8 +19,8 @@ fn test_256_bit_path_ecdsa_derivation1() {
     let chain_type = ChainType::TestNet;
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(SEED_PHRASE).unwrap();
     let manager = ChainsManager::new();
-    let wallet_arc = manager.testnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.testnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let wallet = manager.testnet.try_write().unwrap().wallets.first().unwrap();
 
     // m/0x775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b/0xf537439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89a6'/0x4c4592ca670c983fc43397dfd21a6f427fac9b4ac53cb4dcdc6522ec51e81e79/0
 
@@ -54,8 +54,8 @@ fn test_256_bit_path_ecdsa_derivation2() {
     let chain_type = ChainType::TestNet;
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(SEED_PHRASE).unwrap();
     let manager = ChainsManager::new();
-    let wallet_arc = manager.testnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.testnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let wallet = manager.testnet.try_write().unwrap().wallets.first().unwrap();
     // m/9'/5'/15'/0'/0x555d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3a'/0xa137439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89b5'/0
     let path = DerivationPath::derivation_path_with_indexes(
         vec![
@@ -85,8 +85,8 @@ fn test_256_bit_path_ecdsa_derivation3() {
     let chain_type = ChainType::TestNet;
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(SEED_PHRASE).unwrap();
     let manager = ChainsManager::new();
-    let wallet_arc = manager.testnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.testnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let wallet = manager.testnet.try_write().unwrap().wallets.first().unwrap();
     //m/0x775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b
     let mut path = DerivationPath::derivation_path_with_indexes(
         vec![
@@ -110,8 +110,8 @@ fn test_256_bit_path_ecdsa_derivation4() {
     let chain_type = ChainType::TestNet;
     let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(SEED_PHRASE).unwrap();
     let manager = ChainsManager::new();
-    let wallet_arc = manager.testnet.transient_wallet_with_seed(seed.clone(), chain_type);
-    let wallet = wallet_arc.try_write().unwrap();
+    manager.testnet.wallet_with_seed(seed.clone(), false, chain_type);
+    let wallet = manager.testnet.try_write().unwrap().wallets.first().unwrap();
     //m/0x775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b/0xf537439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89a6'
     let mut path = DerivationPath::derivation_path_with_indexes(
         vec![
