@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use crate::chain::block::MerkleBlock;
 use crate::chain::{Chain, ChainLock, tx, Wallet};
 use crate::chain::network::Peer;
@@ -9,14 +10,14 @@ pub trait PeerTransactionDelegate {
     /// called when the peer relays either a merkleblock or a block header, headers will have 0 totalTransactions
     fn peer_relayed_header(&self, peer: &Peer, block: &MerkleBlock);
     fn peer_relayed_block(&self, peer: &Peer, block: &MerkleBlock);
-    fn peer_relayed_chain_lock(&self, peer: &Peer, chain_lock: &ChainLock);
+    fn peer_relayed_chain_lock(&self, peer: &Peer, chain_lock: ChainLock);
     fn peer_relayed_too_many_orphan_blocks(&self, peer: &Peer, orphan_block_count: usize);
     fn peer_relayed_not_found_messages_with_transaction_hashes(&self, peer: &Peer, tx_hashes: Vec<UInt256>, block_hashes: Vec<UInt256>);
     fn peer_relayed_transaction(&self, peer: &Peer, transaction: &tx::Kind, block: &MerkleBlock);
     fn peer_relayed_instant_send_transaction_lock(&self, peer: &Peer, transaction_lock: InstantSendLock);
     fn peer_requested_transaction(&self, peer: &Peer, tx_hash: &UInt256) -> Option<tx::Kind>;
     fn peer_has_transaction_with_hash(&self, peer: &Peer, tx_hash: &UInt256);
-    fn peer_rejected_transaction(&self, peer: &Peer, tx_hash: &UInt256, code: u8);
+    fn peer_rejected_transaction(&self, peer: &Peer, tx_hash: UInt256, code: u8);
     fn peer_has_instant_send_lock_hashes(&self, peer: &Peer, hashes: Vec<UInt256>);
     fn peer_has_instant_send_deterministic_lock_hashes(&self, peer: &Peer, hashes: Vec<UInt256>);
     fn peer_has_chain_lock_hashes(&self, peer: &Peer, hashes: Vec<UInt256>);
@@ -34,7 +35,7 @@ impl PeerTransactionDelegate for Shared<Chain> {
         todo!()
     }
 
-    fn peer_relayed_chain_lock(&self, peer: &Peer, chain_lock: &ChainLock) {
+    fn peer_relayed_chain_lock(&self, peer: &Peer, chain_lock: ChainLock) {
         todo!()
     }
 
@@ -62,7 +63,7 @@ impl PeerTransactionDelegate for Shared<Chain> {
         todo!()
     }
 
-    fn peer_rejected_transaction(&self, peer: &Peer, tx_hash: &UInt256, code: u8) {
+    fn peer_rejected_transaction(&self, peer: &Peer, tx_hash: UInt256, code: u8) {
         todo!()
     }
 
@@ -96,10 +97,10 @@ pub trait Transactions {
     fn direction_of_transaction(&self, transaction: tx::Kind) -> TransactionDirection;
     fn trigger_updates_for_local_references(&self, transaction: tx::Kind);
 
-    fn clear_transaction_relays_for_peer(&self, peer: &Peer);
+    // fn clear_transaction_relays_for_peer(&self, peer: &Peer);
 }
 
-impl Transactions for Shared<Chain> {
+impl Transactions for Arc<Chain> {
     fn transaction_for_hash(&self, hash: &UInt256) -> Option<tx::Kind> {
         self.transaction_and_wallet_for_hash(hash).map(|(_, tx)| tx)
     }
@@ -166,7 +167,7 @@ impl Transactions for Shared<Chain> {
         transaction.trigger_updates_for_local_references();
     }
 
-    fn clear_transaction_relays_for_peer(&self, peer: &Peer) {
-        self.with(|chain| chain.transaction_manager.clear_transaction_relays_for_peer(peer));
-    }
+    // fn clear_transaction_relays_for_peer(&self, peer: &Peer) {
+    //     self.transaction_manager.clear_transaction_relays_for_peer(peer);
+    // }
 }

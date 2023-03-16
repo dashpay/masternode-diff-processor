@@ -4,22 +4,18 @@ use std::time::SystemTime;
 use crate::crypto::UInt256;
 use crate::chain::Chain;
 use crate::chain::common::ChainType;
-// use crate::chain::dispatch_context::DispatchContext;
 use crate::chain::spork::{Identifier, Spork};
 use crate::chain::network::Peer;
 use crate::default_shared;
-// use crate::notifications::{Notification, NotificationCenter};
 use crate::storage::manager::managed_context::ManagedContext;
-// use crate::storage::models::chain::spork::SporkEntity;
-use crate::util::Shared;
-use crate::util::time::TimeUtil;
+use crate::util::{Shared, TimeUtil};
 use crate::util::timer::Timer;
 
 pub const SPORK_15_MIN_PROTOCOL_VERSION: u32 = 70213;
 
 pub trait PeerSporkDelegate: Send + Sync + Debug {
-    fn peer_relayed_spork(&mut self, peer: &mut Peer, spork: Spork);
-    fn peer_has_spork_hashes(&mut self, peer: &Peer, hashes: Vec<UInt256>);
+    fn peer_relayed_spork(&self, peer: &mut Peer, spork: Spork);
+    fn peer_has_spork_hashes(&self, peer: &Peer, hashes: Vec<UInt256>);
 }
 
 #[derive(Clone, Default)]
@@ -47,6 +43,42 @@ pub struct Manager {
     spork_hashes_marked_for_retrieval: Vec<UInt256>,
     spork_timer: Option<Timer>,
 }
+
+impl Manager {
+    pub fn update_with_spork(&mut self, spork: Spork) -> bool {
+        self.last_synced_sporks = SystemTime::seconds_since_1970();
+        let identifier = &spork.identifier;
+        let current_spork: Option<Spork> = self.spork_dictionary.get(identifier).cloned();
+        let mut updated_spork: Option<Spork> = None;
+        self.check_triggers_for_spork(&spork);
+        if let Some(ref old_spork) = current_spork {
+            if !spork.eq(old_spork) {
+                self.spork_dictionary.insert(identifier.clone(), spork.clone());
+                updated_spork = current_spork;
+            } else {
+                return false;
+            }
+        } else {
+            self.spork_dictionary.insert(identifier.clone(), spork.clone());
+        }
+        if /*current_spork.as_ref().is_none() ||*/ updated_spork.is_some() {
+            todo!("save and notify")
+        }
+        true
+    }
+
+    pub fn update_with_spork_hashes(&mut self, peer: &Peer, hashes: Vec<UInt256>) {
+        let new_sporks = hashes.iter()
+            .filter_map(|hash| (!self.spork_hashes_marked_for_retrieval.contains(&hash))
+                .then_some(hash)).collect::<Vec<_>>();
+        let need_request = !new_sporks.is_empty();
+        self.spork_hashes_marked_for_retrieval.extend(new_sporks);
+        if need_request {
+            self.get_sporks();
+        }
+    }
+}
+
 default_shared!(Manager);
 
 // impl<'a> Default for &'a Manager {
@@ -58,59 +90,6 @@ default_shared!(Manager);
 impl Debug for Manager {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.spork_dictionary.fmt(f)
-    }
-}
-
-impl PeerSporkDelegate for Manager {
-    fn peer_relayed_spork(&mut self, peer: &mut Peer, spork: Spork) {
-        if !spork.is_valid {
-            self.chain.with(|chain| chain.peer_manager.peer_misbehaving(peer, "Spork is not valid"));
-            return;
-        }
-        self.last_synced_sporks = SystemTime::seconds_since_1970();
-        // let mut updated = false;
-        // let mut current_spork: Option<&mut Spork> = self.spork_dictionary.get_mut(&spork.identifier);
-        // let mut updated_spork: Option<&Spork> = None;
-        // if let Some(current_spork) = updated_spork {
-        //     // there was already a spork
-        //     if spork.eq(current_spork) {
-        //         // set it to new one
-        //         self.set_spork_value(spork, spork.identifier.clone());
-        //         updated_spork = Some(current_spork);
-        //         updated = true;
-        //     } else {
-        //         // lets check triggers anyways in case of an update of trigger code
-        //         self.check_triggers_for_spork(&spork, &spork.identifier);
-        //         return;
-        //     }
-        // } else {
-        //     self.set_spork_value(spork, spork.identifier.clone());
-        // }
-
-        // if current_spork.is_none() || updated {
-        //
-            /*self.chain.chain_context().perform_block_and_wait(|context| {
-                // todo: think maybe it's better to store spork hashes separately
-                SporkEntity::update_with_spork(&spork, spork.calculate_spork_hash(), context)
-                    .expect("Can't update spork entity");
-            });
-            DispatchContext::main_context().queue(|| NotificationCenter::post(Notification::SporkListDidUpdate {
-                chain: self.chain,
-                old: updated_spork,
-                new: Some(&spork),
-            }));*/
-        // }
-    }
-
-    fn peer_has_spork_hashes(&mut self, peer: &Peer, hashes: Vec<UInt256>) {
-        let new_sporks = hashes.iter()
-            .filter_map(|hash| (!self.spork_hashes_marked_for_retrieval.contains(&hash))
-                .then_some(hash)).collect::<Vec<_>>();
-        let need_request = !new_sporks.is_empty();
-        self.spork_hashes_marked_for_retrieval.extend(new_sporks);
-        if need_request {
-            self.get_sporks();
-        }
     }
 }
 
@@ -156,37 +135,37 @@ impl Manager {
     pub fn instant_send_active(&mut self) -> bool {
         self.spork_dictionary
             .get(&Identifier::Spork2InstantSendEnabled)
-            .map_or(true,|spork| self.chain.is_spork_activated(spork))
+            .map_or(true,|spork| self.chain.with(|chain| chain.has_spork_activated(spork)))
     }
 
     pub fn sporks_updated_signatures(&mut self) -> bool {
         self.spork_dictionary
             .get(&Identifier::Spork6NewSigs)
-            .map_or(false, |spork| self.chain.is_spork_activated(spork))
+            .map_or(false, |spork| self.chain.with(|chain| chain.has_spork_activated(spork)))
     }
 
     pub fn deterministic_masternode_list_enabled(&mut self) -> bool {
         self.spork_dictionary
             .get(&Identifier::Spork15DeterministicMasternodesEnabled)
-            .map_or(true, |spork| self.chain.is_spork_activated(spork))
+            .map_or(true, |spork| self.chain.with(|chain| chain.has_spork_activated(spork)))
     }
 
     pub fn llmq_instant_send_enabled(&mut self) -> bool {
         self.spork_dictionary
             .get(&Identifier::Spork20InstantSendLLMQBased)
-            .map_or(true, |spork| self.chain.is_spork_activated(spork))
+            .map_or(true, |spork| self.chain.with(|chain| chain.has_spork_activated(spork)))
     }
 
     pub fn quorum_dkg_enabled(&mut self) -> bool {
         self.spork_dictionary
             .get(&Identifier::Spork17QuorumDKGEnabled)
-            .map_or(true, |spork| self.chain.is_spork_activated(spork))
+            .map_or(true, |spork| self.chain.with(|chain| chain.has_spork_activated(spork)))
     }
 
     pub fn chain_locks_enabled(&mut self) -> bool {
         self.spork_dictionary
             .get(&Identifier::Spork19ChainLocksEnabled)
-            .map_or(true, |spork| self.chain.is_spork_activated(spork))
+            .map_or(true, |spork| self.chain.with(|chain| chain.has_spork_activated(spork)))
     }
 }
 
@@ -215,7 +194,7 @@ impl Manager {
 
 
     pub fn get_sporks(&mut self) {
-        // if !self.chain.with(|chain| chain.options.sync_type.contains(SyncType::Sporks)) {
+        // if !self.chain_type.sync_type().contains(SyncType::Sporks)) {
         //     // make sure we care about sporks
         //     return;
         // } else if self.spork_timer.is_none() {
@@ -249,7 +228,7 @@ impl Manager {
 
     }
 
-    pub fn check_triggers_for_spork(&mut self, spork: &Spork) {
+    pub fn check_triggers_for_spork(&self, spork: &Spork) {
         // let mut changed = false;
         // let identifier = &spork.identifier;
         // let changed = !self.spork_dictionary.contains_key(identifier) || self.spork_dictionary.get(identifier).unwrap().value != spork.value;

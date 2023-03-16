@@ -157,7 +157,7 @@ impl ProviderUpdateRegistrarTransaction {
     }
 
     pub fn payload_hash(&self) -> UInt256 {
-        UInt256::sha256d(&self.payload_data_for_hash())
+        UInt256::sha256d(self.payload_data_for_hash())
     }
 
     pub fn check_payload_signature_with_key(&mut self, key: &mut ECDSAKey) -> bool {
@@ -210,7 +210,7 @@ impl ProviderUpdateRegistrarTransaction {
             input.input_hash.enc(&mut writer);
             input.index.enc(&mut writer);
         });
-        self.inputs_hash = UInt256::sha256d(&writer);
+        self.inputs_hash = UInt256::sha256d(writer);
     }
 
 }
@@ -248,7 +248,7 @@ impl<'a> TryRead<'a, ReadContext> for ProviderUpdateRegistrarTransaction {
         };
         // todo verify inputs hash
         assert_eq!(tx.payload_data().len(), offset, "Payload length doesn't match ");
-        tx.base.tx_hash = UInt256::sha256d(&tx.to_data());
+        tx.base.tx_hash = UInt256::sha256d(tx.to_data());
         Ok((tx, offset))
     }
 }

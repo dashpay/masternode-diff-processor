@@ -11,11 +11,11 @@ use crate::crypto::{UInt160, UInt256, UInt384, UInt768, VarBytes};
 use crate::crypto::byte_util::{BytesDecodable, Reversable};
 use crate::crypto::var_array::VarArray;
 use crate::hashes::hex::FromHex;
-use crate::lib_tests::tests::message_from_file;
 use crate::models;
 use crate::models::OperatorPublicKey;
 use crate::tx::CoinbaseTransaction;
 use crate::util::base58;
+use crate::util::file::message_from_file;
 
 #[derive(Serialize, Deserialize)]
 struct Masternode {

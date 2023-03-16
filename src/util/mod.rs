@@ -11,6 +11,7 @@ pub mod script;
 pub mod time;
 pub mod shared;
 pub mod timer;
+pub mod file;
 
 pub use self::address::address as Address;
 pub use self::error::Error;

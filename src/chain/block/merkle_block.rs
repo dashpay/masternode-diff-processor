@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use byte::{BytesExt, TryRead};
 use crate::chain::block::{Block, BLOCK_UNKNOWN_HEIGHT, IBlock, Kind};
 use crate::chain::Chain;
@@ -133,7 +134,7 @@ impl IBlock for MerkleBlock {
     }
 
 
-    fn set_chain_locked_with_chain_lock(&mut self, chain_lock: Shared<ChainLock>) {
+    fn set_chain_locked_with_chain_lock(&mut self, chain_lock: Arc<ChainLock>) {
         self.base.set_chain_locked_with_chain_lock(chain_lock);
     }
 
@@ -149,7 +150,7 @@ impl IBlock for MerkleBlock {
         self.base.has_unverified_chain_lock()
     }
 
-    fn chain_lock_awaiting_processing(&self) -> Option<Shared<ChainLock>> {
+    fn chain_lock_awaiting_processing(&self) -> Option<Arc<ChainLock>> {
         self.base.chain_lock_awaiting_processing()
     }
 
@@ -184,6 +185,13 @@ impl MerkleBlock {
     pub fn init_with_checkpoint(checkpoint: &Checkpoint, chain_type: ChainType, chain: Shared<Chain>) -> Self {
         let base = Block::init_with_version(2, checkpoint.timestamp, checkpoint.height, checkpoint.hash, UInt256::MIN, checkpoint.chain_work, checkpoint.merkle_root, checkpoint.target, chain_type, chain);
         assert!(!checkpoint.chain_work.is_zero(), "Chain work must be set");
+        Self { base, ..Default::default() }
+    }
+    pub fn with(version: u32, block_hash: UInt256, prev_block: UInt256, merkle_root: UInt256, timestamp: u32, target: u32, chain_work: UInt256, nonce: u32, total_transactions: u32, hashes: Vec<UInt256>, flags: Vec<u8>, height: u32, chain_lock: Option<Arc<ChainLock>>, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+        let mut base = Block::init_with_version(version, timestamp, height, block_hash, prev_block, chain_work, merkle_root, target, chain_type, chain);
+        if let Some(lock) = chain_lock {
+            base.set_chain_locked_with_chain_lock(lock);
+        }
         Self { base, ..Default::default() }
     }
 

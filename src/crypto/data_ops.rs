@@ -87,3 +87,7 @@ pub fn extract_new_and_unique<T>(a: Vec<T>, b: Vec<T>) -> (Vec<T>, Vec<T>) where
 
     (c, d)
 }
+
+pub fn extend_unique<T>(a: &mut Vec<T>, b: Vec<T>) where T: PartialEq + Clone {
+    a.extend(b.iter().filter(|x| !a.contains(x)).cloned().collect::<Vec<_>>());
+}

@@ -172,7 +172,7 @@ impl<'a> TryRead<'a, ReadContext> for QuorumCommitmentTransaction {
         };
         // todo verify inputs hash
         assert_eq!(tx.payload_data().len(), offset, "Payload length doesn't match ");
-        tx.base.tx_hash = UInt256::sha256d(&tx.to_data());
+        tx.base.tx_hash = UInt256::sha256d(tx.to_data());
         Ok((tx, offset))
     }
 }

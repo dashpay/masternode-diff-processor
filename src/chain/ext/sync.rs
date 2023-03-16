@@ -8,7 +8,7 @@ pub trait SyncProgress {
     fn terminal_headers_to_sync(&mut self) -> u32;
     fn terminal_header_sync_progress(&mut self) -> f64;
     fn combined_sync_progress(&mut self) -> f64;
-    fn start_sync(&self);
+    fn start_sync(&mut self);
     fn stop_sync(&mut self);
     fn remove_non_mainnet_trusted_peer(&mut self);
     fn reset_sync_count_info(&mut self, sync_count_info: SyncCountInfo, context: &ManagedContext) {
@@ -116,11 +116,22 @@ impl SyncProgress for Chain {
 
     /// Blockchain Sync
 
-    fn start_sync(&self) {
-        /*DispatchContext::main_context().queue(||
-            NotificationCenter::post(
-                Notification::ChainWillStartSyncing(self)));
-        self.peer_manager().connect();*/
+    fn start_sync(&mut self) {
+        // dispatch_async(dispatch_get_main_queue(), ^{
+        //     [[NSNotificationCenter defaultCenter] postNotificationName:DSChainManagerSyncWillStartNotification
+        //     object:nil
+        //     userInfo:@{DSChainManagerNotificationChainKey: self.chain}];
+        // });
+        if self.can_connect() {
+            if self.terminal_header_sync_progress() < 1.0 {
+                self.reset_terminal_sync_start_height();
+            }
+            if self.chain_sync_progress() < 1.0 {
+                self.reset_chain_sync_start_height();
+            }
+            let earliest_wallet_creation_time = self.earliest_wallet_creation_time();
+            self.peer_manager.connect(earliest_wallet_creation_time);
+        }
     }
 
     fn stop_sync(&mut self) {

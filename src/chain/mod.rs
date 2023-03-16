@@ -8,7 +8,6 @@ pub mod constants;
 pub mod ext;
 pub mod governance;
 pub mod network;
-pub mod options;
 pub mod params;
 pub mod spork;
 pub mod sync_count_info;

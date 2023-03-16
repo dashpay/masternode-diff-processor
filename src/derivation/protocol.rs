@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
+use std::sync::Weak;
 use hashes::{Hash, sha256};
 use crate::{derivation, UInt256, util};
-use crate::chain::{Chain, Wallet};
 use crate::chain::bip::bip32;
 use crate::chain::common::ChainType;
 use crate::chain::wallet::seed::Seed;
@@ -11,21 +11,24 @@ use crate::derivation::index_path::{IIndexPath, IndexHardSoft, IndexPath};
 use crate::derivation::uint256_index_path::UInt256IndexPath;
 use crate::derivation::{standalone_extended_public_key_location_string_for_unique_id, wallet_based_extended_public_key_location_string_for_unique_id};
 use crate::keys::{IKey, Key, KeyType};
+use crate::storage::manager::managed_context::ManagedContext;
 use crate::util::Address::with_public_key_data;
 use crate::util::data_ops::short_hex_string_from;
-use crate::util::shared::Shared;
 
 pub trait IDerivationPath<IPATH: IIndexPath = UInt256IndexPath>: Send + Sync + Debug {
-    fn chain(&self) -> &Shared<Chain>;
+    // fn chain(&self) -> Weak<Chain>;
     fn chain_type(&self) -> ChainType;
-    fn wallet(&self) -> &Option<Shared<Wallet>>;
-    fn set_wallet(&mut self, wallet: Shared<Wallet>);
+    fn context(&self) -> Weak<ManagedContext>;
+    // fn wallet(&self) -> &Option<Weak<Wallet>>;
+    // fn set_wallet(&mut self, wallet: Weak<Wallet>);
+    fn is_transient(&self) -> bool;
+    fn set_is_transient(&mut self, is_transient: bool);
     fn wallet_unique_id(&self) -> Option<String>;
     fn set_wallet_unique_id(&mut self, unique_id: String);
-    fn set_wallet_with_unique_id(&mut self, wallet: Shared<Wallet>, unique_id: String) {
-        self.set_wallet_unique_id(unique_id);
-        self.set_wallet(wallet);
-    }
+    // fn set_wallet_with_unique_id(&mut self, wallet: Weak<Wallet>, unique_id: String) {
+    //     self.set_wallet_unique_id(unique_id);
+    //     self.set_wallet(wallet);
+    // }
     // https://github.com/rust-lang/rust/issues/94980
     // fn params(&self) -> &Params;
     // fn context(&self) -> Weak<ManagedContext>;

@@ -8,8 +8,8 @@ pub mod peer_type;
 
 pub use self::bloom_filter::BloomFilter;
 pub use self::governance_request_state::GovernanceRequestState;
-pub use self::message::r#type::Type;
-pub use self::message::request::{IRequest, Request};
+pub use self::message::message::MessageType;
+pub use self::message::request::Request;
 pub use self::message::inv_type::InvType;
 pub use self::peer::Peer;
 pub use self::peer_status::PeerStatus;

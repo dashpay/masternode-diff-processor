@@ -1,10 +1,50 @@
 use std::collections::{BTreeSet, HashMap};
+use byte::{BytesExt, TryRead, TryWrite};
+use byte::ctx::Endian;
 use security_framework::os::macos::keychain::SecKeychain;
+use crate::chain::common::ChainType;
 use crate::chain::wallet::ext::constants::{accounts_known_key_for_wallet_unique_id, creation_time_unique_id_for_unique_id, did_verify_creation_time_unique_id_for_unique_id, mnemonic_unique_id_for_unique_id};
+use crate::consensus::Encodable;
 use crate::derivation::{wallet_based_extended_private_key_location_string_for_unique_id, wallet_based_extended_public_key_location_string_for_unique_id_and_key_type};
+use crate::encode::VarInt;
 use crate::keys::KeyType;
 
 pub const SEC_ATTR_SERVICE: &str = "org.dashfoundation.dash-spv";
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VarString {
+    pub length: VarInt,
+    pub string: String,
+}
+
+impl<'a> TryRead<'a, Endian> for VarString {
+    fn try_read(bytes: &'a [u8], endian: Endian) -> byte::Result<(Self, usize)> {
+        let offset = &mut 0;
+        let length = bytes.read_with::<VarInt>(offset, endian)?;
+        let string = bytes.read_with::<&str>(offset, byte::ctx::Str::Len(length.0 as usize)).unwrap().to_string();
+        Ok((Self { length, string }, *offset))
+    }
+}
+
+impl TryWrite<Endian> for VarString {
+    fn try_write(self, bytes: &mut [u8], endian: Endian) -> byte::Result<usize> {
+        // let offset = &mut 0;
+        // bytes.write_with(offset, self.length, ())?;
+        // bytes.write_with(offset, self.string, endian)?;
+        self.string.enc(bytes);
+        Ok(self.length.0 as usize)
+    }
+}
+
+
+impl Encodable for VarString {
+    #[inline]
+    fn consensus_encode<S: std::io::Write>(&self, mut s: S) -> Result<usize, std::io::Error> {
+        self.string.enc(&mut s);
+        Ok(std::mem::size_of::<VarString>())
+    }
+}
+
 
 #[derive(Debug, Default)]
 pub struct Keychain {}
@@ -111,6 +151,26 @@ impl Keychain {
         Self::get_data(key).map(|data| String::from_utf8(data).unwrap_or("".to_string()))
     }
 
+    pub fn set_string_array(arr: Vec<String>, key: String, authenticated: bool) -> Result<(), security_framework::base::Error> {
+        let mut writer = Vec::<u8>::new();
+        arr.iter().for_each(|string| {
+            string.enc(&mut writer);
+        });
+        Self::set_data(key, Some(writer), authenticated)
+    }
+
+    pub fn get_string_array(key: String) -> Result<Vec<String>, security_framework::base::Error> {
+        Self::get_data(key).map(|data| {
+            let mut offset = &mut 0;
+            let mut result = Vec::<String>::new();
+            let mut iter: byte::Iter<VarString, _> = data.read_iter(&mut offset, byte::LE);
+            while let Some(var_string) = iter.next() {
+                result.push(var_string.string.clone())
+            }
+            result
+        })
+    }
+
     pub fn set_dict<K, V>(dict: HashMap<K, V>, key: String, authenticated: bool) -> Result<(), security_framework::base::Error> {
         todo!("Implement bindings for keychain")
     }
@@ -119,13 +179,44 @@ impl Keychain {
         todo!("Implement bindings for keychain")
     }
 
-    pub fn set_array<V>(arr: Vec<V>, key: String, authenticated: bool) -> Result<(), security_framework::base::Error> {
-        todo!("Implement bindings for keychain")
+    pub fn set_array<T>(arr: Vec<T>, key: String, authenticated: bool) -> Result<(), security_framework::base::Error> where T: Encodable {
+        let mut writer = Vec::<u8>::new();
+        VarInt(arr.len() as u64).enc(&mut writer);
+        arr.iter().for_each(|item| {
+            item.enc(&mut writer);
+        });
+
+        Self::set_data(key, Some(writer), authenticated)
     }
 
-    pub fn get_array<V>(key: String, classes: Vec<String>) -> Result<Vec<V>, security_framework::base::Error> {
-        todo!("Implement bindings for keychain")
+    pub fn get_array<'a, T>(key: String) -> Result<Vec<T>, security_framework::base::Error> where T: TryRead<'a, Endian> {
+        todo!()
+        // Self::get_data(key).and_then(|data| {
+        //     let mut offset = &mut 0;
+        //     let bytes = data.into_boxed_slice();
+        //     let len = bytes.read_with::<VarInt>(offset, byte::LE).unwrap().0 as usize;
+        //     // let mut iter = ;
+        //     let mut items = Vec::<T>::new();
+        //     while let Some(item) = bytes.read_iter::<T>(&mut offset, byte::LE).next() {
+        //         items.push(item);
+        //     }
+        //     for _i in 0..len {
+        //         items.push(bytes.read_with::<T>(offset, byte::LE).unwrap());
+        //     }
+        //     Ok(items)
+        // })
     }
+// impl TryInto<Key> for (&str, ChainType) {
+//     type Error = Error;
+//
+//     fn try_into(self) -> Result<Key, Self::Error> {
+//         base58::from(self.0)
+//             .map_err(base58::Error::into)
+//             .and_then(|message| message.read_with::<Key>(&mut 0, self.1)
+//                 .map_err(byte::Error::into))
+//     }
+// }
+
 
     pub fn set_ordered_set<V>(arr: BTreeSet<V>, key: String, authenticated: bool) -> Result<(), security_framework::base::Error> {
         todo!("Implement bindings for keychain")
@@ -228,5 +319,14 @@ impl Keychain {
 
     pub fn save_extended_private_key(wallet_unique_id: &str, data: Option<Vec<u8>>) -> Result<(), security_framework::base::Error> {
         Self::set_data(wallet_based_extended_private_key_location_string_for_unique_id(wallet_unique_id), data, true)
+    }
+
+
+    pub fn get_wallet_ids(chain_type: ChainType) -> Result<Vec<String>, security_framework::base::Error> {
+        Self::get_string_array(chain_type.chain_wallets_key())
+    }
+
+    pub fn get_standalone_derivation_path_ids(chain_type: ChainType) -> Result<Vec<String>, security_framework::base::Error> {
+        Self::get_string_array(chain_type.chain_wallets_key())
     }
 }

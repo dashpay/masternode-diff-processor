@@ -1,37 +1,66 @@
+use std::io::{Error, Write};
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
+use crate::consensus::Encodable;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd, Hash, Ord)]
 pub enum InvType {
     #[default]
     Error = 0,
+    // The hash is a TXID
     Tx = 1,
+    // The hash is of a block header
     Block = 2,
+    // The hash is of a block header; identical to MSG_BLOCK. When used in a getdata message,
+    // this indicates the response should be a merkleblock message rather than a block message
+    // (only works if a bloom filter was previously configured). Only for use in getdata messages.
     Merkleblock = 3,
+    // The hash is an Instant Send transaction lock request. Transactions received this way are
+    // automatically converted to a standard tx message as of Dash Core 0.15.0.
     TxLockRequest = 4,
+    // The hash is an Instant Send transaction vote. Deprecated in 0.15.0
+    // #[deprecated]
     TxLockVote = 5,
+    // The hash is Spork ID
     Spork = 6,
     MasternodePaymentVote = 7,
     MasternodePaymentBlock = 8,
     MasternodeBroadcast = 14,
     MasternodePing = 15,
+    // The hash is CoinJoin Broadcast TX
     DSTx = 16,
+    // The hash is a Governance Object
     GovernanceObject = 17,
+    // The hash is a Governance Object Vote
     GovernanceObjectVote = 18,
     MasternodeVerify = 19,
+    // The hash is of a block header; identical to Block. When used in a getdata message,
+    // this indicates the response should be a cmpctblock message. Only for use in getdata messages
     CompactBlock = 20, // Defined in BIP152
+    // The hash is a long-living masternode quorum final commitment. Added in 0.13.0
     QuorumFinalCommitment = 21,
     DummyCommitment = 22, // only valid on testnet/devnet/regtest
+    // The hash is a long-living masternode quorum contribution. Added in 0.14.0
     QuorumContribution = 23,
+    // The hash is a long-living masternode quorum complaint. Added in 0.14.0
     QuorumComplaint = 24,
+    // The hash is a long-living masternode quorum justification. Added in 0.14.0
     QuorumJustification = 25,
+    // The hash is a long-living masternode quorum premature commitment. Added in 0.14.0
     QuorumPrematureCommitment = 26,
     QuorumDebugStatus = 27,
+    // The hash is a long-living masternode quorum recovered signature.
+    // Note: Only relayed to other masternodes in the same quorum and nodes that have sent a
+    // qwatch message as of Dash Core 0.17.0
     QuorumRecoveredSignature = 28,
+    // The hash is a ChainLock signature. Added in 0.14.0
     ChainLockSignature = 29,
+    // The hash is an LLMQ-based InstantSend lock (DIP10). Added in 0.14.0
     InstantSendLock = 30,
+    // The hash is an LLMQ-based deterministic InstantSend lock (DIP22). Added in 0.18.0
     InstantSendDeterministicLock = 31,
 }
+
 impl From<InvType> for u32 {
     fn from(value: InvType) -> Self {
         match value {
@@ -136,5 +165,13 @@ impl<'a> TryRead<'a, Endian> for InvType {
         let offset = &mut 0;
         let value = bytes.read_with::<u32>(offset, endian).unwrap();
         Ok((InvType::from(value), std::mem::size_of::<u32>()))
+    }
+}
+
+impl Encodable for InvType {
+    fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
+        // let uu32: u32 = self.into();
+        u32::from(*self).enc(&mut writer);
+        Ok(4)
     }
 }

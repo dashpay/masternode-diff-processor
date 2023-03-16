@@ -7,7 +7,7 @@ use crate::UInt256;
 
 #[test]
 fn test_base64_hash_size() {
-    let hash = UInt256::sha256d(&Vec::from_hex("aaaa").unwrap());
+    let hash = UInt256::sha256d(Vec::from_hex("aaaa").unwrap());
     let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
     let base64_data = base64_engine.encode(hash.0);
     assert_eq!(base64_data.len(), 44, "The size of the base64 should be 44");

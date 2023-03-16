@@ -15,8 +15,8 @@ pub const WALLET_MASTERNODE_OPERATORS_KEY: &str = "WALLET_MASTERNODE_OPERATORS_K
 pub const VERIFIED_WALLET_CREATION_TIME_KEY: &str = "VERIFIED_WALLET_CREATION_TIME";
 pub const REFERENCE_DATE_2001: u64 = 978307200;
 
-// pub const BIP39_CREATION_TIME: u64 = 1425492298;
-pub const BIP39_CREATION_TIME: u32 = 1425492298;
+pub const BIP39_CREATION_TIME: u64 = 1425492298;
+// pub const BIP39_CREATION_TIME: u32 = 1425492298;
 //1546810296.0 <- that would be block 1M
 pub const BIP39_WALLET_UNKNOWN_CREATION_TIME: u64 = 0;
 
@@ -24,8 +24,8 @@ pub fn accounts_known_key_for_wallet_unique_id(unique_id: &str) -> String {
     format!("{}_{}", WALLET_ACCOUNTS_KNOWN_KEY, unique_id)
 }
 
-pub fn account_unique_id_from(unique_id: &str, account_number: u32) -> String {
-    format!("{}-0-{}", unique_id, account_number)
+pub fn account_unique_id_from<S: AsRef<str>>(unique_id: S, account_number: u32) -> String {
+    format!("{}-0-{}", unique_id.as_ref(), account_number)
 }
 
 pub fn wallet_identities_key(unique_id: &str) -> String {
@@ -61,7 +61,7 @@ pub fn creation_time_unique_id_for_unique_id(unique_id: &str) -> String {
     format!("{}_{}", WALLET_CREATION_GUESS_TIME_KEY, unique_id)
 }
 
-fn creation_guess_time_unique_id_for_unique_id(unique_id: &str) -> String {
+pub fn creation_guess_time_unique_id_for_unique_id(unique_id: &str) -> String {
     format!("{}_{}", WALLET_CREATION_GUESS_TIME_KEY, unique_id)
 }
 

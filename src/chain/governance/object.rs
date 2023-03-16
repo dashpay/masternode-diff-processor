@@ -99,7 +99,7 @@ impl Object {
         u32::MAX.enc(&mut writer);
         (signature.len() as u8).enc(&mut writer);
         signature.to_vec().enc(&mut writer);
-        UInt256::sha256d(&writer)
+        UInt256::sha256d(writer)
     }
 
     pub fn data_message(&self) -> Vec<u8> {

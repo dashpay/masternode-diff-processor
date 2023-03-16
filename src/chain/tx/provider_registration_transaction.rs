@@ -5,16 +5,12 @@ use crate::chain::tx::protocol::{MAX_ECDSA_SIGNATURE_SIZE, ReadContext, SIGHASH_
 use crate::chain::chain::Chain;
 use crate::chain::common::ChainType;
 use crate::chain::constants::DASH_MESSAGE_MAGIC;
-use crate::chain::ext::masternodes::ChainMasternodes;
-use crate::chain::ext::wallets::Wallets;
+use crate::chain::ext::masternodes::TriggerUpdates;
 use crate::consensus::Encodable;
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{Reversable, Zeroable};
 use crate::crypto::UTXO;
 use crate::keys::ecdsa_key::ECDSAKey;
-// use crate::storage::manager::managed_context::ManagedContext;
-// use crate::storage::models::chain::chain::ChainEntity;
-// use crate::storage::models::tx::transaction::NewTransactionEntity;
 use crate::util::{Address, Shared};
 
 pub const MASTERNODE_COST: u64 = 100000000000;
@@ -204,11 +200,15 @@ impl ITransaction for ProviderRegistrationTransaction {
     // }
     //
     fn trigger_updates_for_local_references(&self) {
-        if self.chain().wallet_having_provider_owner_authentication_hash(&self.owner_key_hash).is_some() ||
-            self.chain().wallet_having_provider_voting_authentication_hash(&self.voting_key_hash).is_some() ||
-            self.chain().wallet_having_provider_operator_authentication_key(&self.operator_key).is_some() {
-            self.chain().local_masternode_from_provider_registration_transaction(self, true);
-        }
+        self.chain().create_local_masternode_if_need(self);
+        // self.chain().with(|chain| {
+        //     if
+        //     chain.wallet_having_provider_owner_authentication_hash(&self.owner_key_hash).is_some() ||
+        //         chain.wallet_having_provider_voting_authentication_hash(&self.voting_key_hash).is_some() ||
+        //         chain.wallet_having_provider_operator_authentication_key(&self.operator_key).is_some() {
+        //         chain.masternode_manager.local_masternode_from_provider_registration_transaction(self, true);
+        //     }
+        // });
     }
     // fn load_blockchain_identities_from_derivation_paths(&mut self, derivation_paths: Vec<&dyn IDerivationPath>) {
     //     self.base.load_blockchain_identities_from_derivation_paths(derivation_paths)
@@ -218,7 +218,7 @@ impl ITransaction for ProviderRegistrationTransaction {
 impl ProviderRegistrationTransaction {
 
     pub fn payload_hash(&self) -> UInt256 {
-        UInt256::sha256d(&self.payload_data_for_hash())
+        UInt256::sha256d(self.payload_data_for_hash())
     }
 
     pub fn payload_collateral_string(&self) -> String {
@@ -237,7 +237,7 @@ impl ProviderRegistrationTransaction {
         self.payload_collateral_string().enc(&mut writer);
         // writer.append_string(DASH_MESSAGE_MAGIC.to_string());
         // writer.append_string(self.payload_collateral_string());
-        UInt256::sha256d(&writer)
+        UInt256::sha256d(writer)
     }
 
     pub fn check_payload_signature_with_key(&self, key: &mut ECDSAKey) -> bool {
@@ -319,7 +319,7 @@ impl ProviderRegistrationTransaction {
             input.input_hash.enc(&mut writer);
             input.index.enc(&mut writer);
         });
-        self.inputs_hash = UInt256::sha256d(&writer);
+        self.inputs_hash = UInt256::sha256d(writer);
     }
 
     // pub fn local_masternode(&self) -> Option<&LocalMasternode> {
@@ -375,7 +375,7 @@ impl<'a> TryRead<'a, ReadContext> for ProviderRegistrationTransaction {
         };
         // todo verify inputs hash
         assert_eq!(tx.payload_data().len(), offset, "Payload length doesn't match ");
-        tx.base.tx_hash = UInt256::sha256d(&tx.to_data());
+        tx.base.tx_hash = UInt256::sha256d(tx.to_data());
         Ok((tx, offset))
     }
 }

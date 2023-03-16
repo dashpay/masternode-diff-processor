@@ -1,4 +1,5 @@
-use crate::chain::Chain;
+use byte::TryRead;
+use crate::chain::{Chain, tx};
 use crate::chain::common::ChainType;
 use crate::chain::tx::coinbase_transaction::CoinbaseTransaction;
 use crate::chain::tx::credit_funding_transaction::CreditFundingTransaction;
@@ -9,6 +10,8 @@ use crate::chain::tx::provider_update_revocation_transaction::ProviderUpdateRevo
 use crate::chain::tx::provider_update_service_transaction::ProviderUpdateServiceTransaction;
 use crate::chain::tx::quorum_commitment_transaction::QuorumCommitmentTransaction;
 use crate::chain::tx::transaction::Transaction;
+use crate::network::p2p::state::PeerState;
+use crate::network::p2p::state_flags::PeerStateFlags;
 use crate::UInt256;
 use crate::util::Shared;
 
@@ -111,5 +114,20 @@ impl ITransaction for Kind {
 
     fn is_coinbase_classic_transaction(&self) -> bool {
         self.tx().is_coinbase_classic_transaction()
+    }
+}
+
+impl<'a, T: PeerState> TryRead<'a, &T> for Kind {
+    fn try_read(bytes: &'a [u8], state: &T) -> byte::Result<(Self, usize)> {
+        let tx = tx::Factory::transaction_with_message(bytes, tx::ReadContext(state.chain_type(), state.chain()));
+        if tx.is_none() && !tx::Factory::should_ignore_transaction_message(bytes) {
+            Err(byte::Error::BadInput { err: "malformed tx message" })
+        } else if !state.flags().intersects(PeerStateFlags::SENT_FILTER | PeerStateFlags::SENT_GETDATATXBLOCKS) {
+            Err(byte::Error::BadInput { err: "got tx message before loading a filter" })
+        } else if let Some(tx) = tx {
+            Ok((tx, bytes.len()))
+        } else {
+            Err(byte::Error::Incomplete)
+        }
     }
 }

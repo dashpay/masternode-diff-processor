@@ -4,8 +4,9 @@ use hashes::hex::FromHex;
 use crate::chain::common::chain_type::DevnetType;
 use crate::chain::common::ChainType;
 use crate::{boxed, models, process_mnlistdiff_from_message, processor_create_cache, register_processor, ToFFI, types, UInt256};
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_llmq_snapshot_by_block_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, MerkleBlock, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_llmq_snapshot_by_block_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, MerkleBlock, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
 use crate::tests::llmq_rotation::validate_llmq_callback_throuh_rust_bls;
+use crate::util::file::message_from_file;
 
 unsafe extern "C" fn get_merkle_root_for_chacha(
     block_hash: *mut [u8; 32],

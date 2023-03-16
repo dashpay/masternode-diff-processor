@@ -1,7 +1,6 @@
-use crate::chain::common::chain_type::IHaveChainSettings;
+use std::sync::Weak;
 use crate::chain::common::ChainType;
-use crate::chain::ext::wallets::Wallets;
-use crate::chain::wallet::seed::Seed;
+use crate::chain::ext::wallets::WalletCreation;
 use crate::chains_manager::ChainsManager;
 use crate::crypto::byte_util::{AsBytes, Random};
 use crate::crypto::UInt512;
@@ -16,11 +15,11 @@ const SEED_PHRASE: &str = "upper renew that grow pelican pave subway relief desc
 #[test]
 fn test_example() {
     let chain_type = ChainType::MainNet;
-    let seed = Seed::from_phrase::<bip0039::English>(SEED_PHRASE, chain_type.genesis_hash()).unwrap();
+    let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(SEED_PHRASE).unwrap();
     let manager = ChainsManager::new();
-    let chain = manager.testnet.borrow();
-    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
-    let path = AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_wallet(chain_type, wallet, chain.borrow(), false);
+    let wallet_arc = manager.testnet.transient_wallet_with_seed(seed.clone(), chain_type);
+    let wallet = wallet_arc.try_write().unwrap();
+    let path = AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_wallet(chain_type, true, wallet.unique_id_as_str().to_string(), Weak::new(), false);
     let key0: BLSKey = path.private_key_at_index(0, &seed).unwrap().into();
     // let key1: BLSKey = path.private_key_at_index(1, &seed).unwrap().into();
     // let key2: BLSKey = path.private_key_at_index(2, &seed).unwrap().into();

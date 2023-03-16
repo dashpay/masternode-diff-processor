@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::SystemTime;
+use crate::UInt256;
 use crate::chain::{block, Chain};
 use crate::chain::block::MAX_TIME_DRIFT;
 use crate::chain::chain_lock::ChainLock;
 use crate::chain::common::ChainType;
-use crate::UInt256;
 use crate::util::{Shared, TimeUtil};
 
 pub trait IBlock: Send + Sync {
@@ -21,13 +22,13 @@ pub trait IBlock: Send + Sync {
     fn transaction_hashes(&self) -> Vec<UInt256>;
     fn chain_work(&self) -> UInt256;
     fn set_chain_work(&mut self, chain_work: UInt256);
-    fn set_chain_locked_with_chain_lock(&mut self, chain_lock: Shared<ChainLock>);
+    fn set_chain_locked_with_chain_lock(&mut self, chain_lock: Arc<ChainLock>);
     // v14
     fn set_chain_locked_with_equivalent_block(&mut self, block: &dyn IBlock);
 
     fn chain_locked(&self) -> bool;
     fn has_unverified_chain_lock(&self) -> bool;
-    fn chain_lock_awaiting_processing(&self) -> Option<Shared<ChainLock>>;
+    fn chain_lock_awaiting_processing(&self) -> Option<Arc<ChainLock>>;
     // true if merkle tree and timestamp are valid
     // NOTE: This only checks if the block difficulty matches the difficulty target in the header. It does not check if the
     // target is correct for the block's height in the chain. Use verifyDifficultyFromPreviousBlock: for that.

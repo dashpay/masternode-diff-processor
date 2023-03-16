@@ -1,17 +1,17 @@
 use std::collections::HashMap;
-use std::time::SystemTime;
+use std::sync::{Arc, RwLock, Weak};
 use crate::chain::common::chain_type::{DevnetType, IHaveChainSettings};
-use crate::chain::ext::{Derivation, Settings};
+use crate::chain::ext::Settings;
 use crate::chain::params::{create_devnet_params_for_type, MAINNET_PARAMS, Params, TESTNET_PARAMS};
-use crate::chain::{spork, SyncPhase, SyncType, Wallet};
-use crate::chain::options::Options;
+use crate::chain::{block, Checkpoint, spork, SyncPhase, Wallet};
 use crate::chain::spork::Spork;
 use crate::{default_shared, UInt256};
-use crate::chain::block::Block;
+use crate::chain::block::{BLOCK_UNKNOWN_HEIGHT, IBlock, MerkleBlock};
 use crate::chain::network::Peer;
+use crate::chain::network::peer::WEEK_TIME_INTERVAL;
 use crate::chain::wallet::Account;
 use crate::chain::wallet::ext::constants::BIP39_CREATION_TIME;
-use crate::chain::wallet::seed::Seed;
+use crate::crypto::byte_util::Zeroable;
 use crate::derivation::{DerivationPath, DerivationPathKind};
 use crate::derivation::factory::Factory;
 use crate::manager::authentication_manager::AuthenticationManager;
@@ -21,7 +21,9 @@ use crate::manager::transaction_manager::TransactionManager;
 use crate::storage::context::StoreContext;
 use crate::storage::{Keychain, UserDefaults};
 use crate::util::shared::{Shareable, Shared};
-use crate::util::TimeUtil;
+
+/// This is about the time if we consider a block every 10 mins (for 500 blocks)
+pub const HEADER_WINDOW_BUFFER_TIME: u64 = WEEK_TIME_INTERVAL / 2;
 
 #[derive(Clone, Debug, Default)]
 pub struct Chain {
@@ -30,25 +32,48 @@ pub struct Chain {
     pub store_context: StoreContext,
     pub derivation_factory: Factory,
 
-    pub last_sync_block: Option<Block>,
-    pub last_terminal_block: Option<Block>,
-    pub terminal_blocks: HashMap<UInt256, Block>,
-    pub sync_blocks: HashMap<UInt256, Block>,
+    pub last_sync_block: Option<Weak<block::Kind>>,
+    pub last_terminal_block: Option<Weak<block::Kind>>,
+    pub terminal_blocks: HashMap<UInt256, Arc<block::Kind>>,
+    pub sync_blocks: HashMap<UInt256, Arc<block::Kind>>,
 
     pub authentication_manager: Shared<AuthenticationManager>,
     pub masternode_manager: MasternodeManager,
     pub peer_manager: PeerManager,
     pub spork_manager: spork::Manager,
     pub transaction_manager: TransactionManager,
-    pub options: Options,
     pub sync_phase: SyncPhase,
-    viewing_account: Option<Account>,
+    viewing_account: Account,
 
     // pub network_context: NetworkContext,
 
 
     pub chain_sync_start_height: u32,
     pub terminal_sync_start_height: u32,
+    best_estimated_block_height: Option<u32>,
+
+    /// An array of known hardcoded checkpoints for the chain
+    pub checkpoints: Vec<Checkpoint>,
+    terminal_headers_override_use_checkpoint: Option<Checkpoint>,
+    sync_headers_override_use_checkpoint: Option<Checkpoint>,
+    // last_checkpoint: Option<Checkpoint>,
+
+
+    last_persisted_chain_sync_block_hash: UInt256,
+    last_persisted_chain_sync_block_chain_work: UInt256,
+    last_persisted_chain_sync_block_height: u32,
+    last_persisted_chain_sync_timestamp: u64,
+    last_persisted_chain_sync_locators: Vec<UInt256>,
+
+    last_persisted_chain_terminal_block_hash: UInt256,
+    last_persisted_chain_terminal_block_chain_work: UInt256,
+    last_persisted_chain_terminal_block_height: u32,
+    last_persisted_chain_terminal_timestamp: u64,
+    last_persisted_chain_terminal_locators: Vec<UInt256>,
+
+    pub sync_from_genesis: bool,
+    pub should_sync_from_height: bool,
+    pub sync_from_height: u32,
 
 }
 
@@ -56,25 +81,6 @@ impl Shareable for Chain {}
 
 default_shared!(Chain);
 default_shared!(Vec<Wallet>);
-
-// impl PartialEq for Shared<Chain> {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.with(|chain| chain).eq(&other.with(|chain| chain))
-//     }
-// }
-
-// impl<'a> Default for &'a Chain<'a> {
-//     fn default() -> &'a Chain<'a> {
-//         static VALUE: Chain = Chain {
-//             params: MAINNET_PARAMS,
-//             wallets: vec![],
-//             store_context: StoreContext::new_const_default(),
-//             derivation_factory: Factory::new_const_default(),
-//             // environment: Environment::new_const_default(),
-//         };
-//         &VALUE
-//     }
-// }
 
 impl PartialEq<Self> for Chain {
     fn eq(&self, other: &Self) -> bool {
@@ -84,71 +90,106 @@ impl PartialEq<Self> for Chain {
 
 impl Eq for Chain {}
 
-/// Managers
-impl Shared<Chain> {
-    pub fn setup(&self) {
+impl Chain {
+
+    pub fn setup(&mut self) {
         self.restore_wallets_and_standalone_derivation_paths();
     }
 
-
-    // pub fn spork_manager(&self) -> spork::Manager {
-    //     self.with(|chain| chain.spork_manager)
-    // }
-    // pub fn peer_manager(&self) -> PeerManager {
-    //     self.with(|chain| chain.peer_manager)
-    // }
-    /// required for SPV wallets
-    pub fn syncs_blockchain(&self) -> bool {
-        self.with(|chain| chain.options.sync_type.bits() & SyncType::NeedsWalletSyncType.bits() == 0)
-        // self.options.sync_type.bits() & SyncType::NeedsWalletSyncType.bits() == 0
-        // !(self.options.sync_type & SyncType::NeedsWalletSyncType)
-    }
-    pub fn send_filter_if_need(&self, peer: &mut Peer) {
-        self.with(|chain| if chain.syncs_blockchain() && chain.can_construct_a_filter() {
-            peer.send_filterload_message(chain.transaction_manager.transactions_bloom_filter_for_peer_hash(peer.hash()).to_data());
-        });
-    }
-
-    pub fn can_construct_a_filter(&self) -> bool {
-        self.with(|chain| chain.can_construct_a_filter())
-    }
-
-    pub fn should_continue_sync_blockchain_after_height(&self, height: u32) -> bool {
-        self.with(|chain| chain.syncs_blockchain() &&
-            (chain.last_sync_block_height() != chain.last_terminal_block_height()) ||
-            chain.last_sync_block_height() < height)
-    }
-
-    pub fn restore_wallets_and_standalone_derivation_paths(&self) {
-        self.with(|chain| {
-            match Keychain::get_array::<String>(chain.r#type().chain_wallets_key(), vec![]) {
-                Ok(wallet_ids) => {
-                    wallet_ids.into_iter().for_each(|wallet_id| {
-                        chain.add_wallet(Wallet::init_with_chain_and_unique_id(wallet_id, false, self.borrow()));
-                    });
-                    // we should load identities after all wallets are in the chain, as identities
-                    // might be on different wallets and have interactions between each other
-                    chain.wallets.iter().for_each(|wallet| wallet.load_identities());
-                },
-                Err(err) => println!("Error restoring wallets {:?}", err)
+    pub fn set_sync_from_genesis(&mut self, sync_from_genesis: bool) {
+        if sync_from_genesis {
+            self.sync_from_height = 0;
+            self.should_sync_from_height = true;
+        } else if let Some(sync_from_height) = UserDefaults::uint_for_key::<u32>("syncFromHeight") {
+            if self.sync_from_height == 0 {
+                UserDefaults::delete("syncFromHeight");
+                self.should_sync_from_height = false;
             }
-            match Keychain::get_array::<String>(chain.r#type().chain_standalone_derivation_paths_key(), vec![]) {
-                Ok(derivation_path_ids) => {
-                    derivation_path_ids.into_iter().for_each(|derivation_path_id| {
-                        if let Some(path) = DerivationPath::init_with_extended_public_key_identifier(derivation_path_id.as_str(), chain.r#type(), self.borrow()) {
-                            chain.add_standalone_derivation_path(DerivationPathKind::Default(path));
-                        }
-                    });
-                },
-                Err(err) => println!("Error restoring standalone derivation paths {:?}", err)
-            }
-        });
+        }
+    }
+
+    pub fn sync_from_genesis(&self) -> bool {
+        if UserDefaults::has("syncFromHeight") {
+            self.sync_from_height == 0 && self.should_sync_from_height
+        } else {
+            false
+        }
+        // UserDefaults::object_for_key::<u32>("syncFromHeight")
+        //     .map_or(false, self.sync_from_height == 0 && self.should_sync_from_height)
+
     }
 
 
+
+    pub fn should_continue_sync_blockchain_after_height(&mut self, height: u32) -> bool {
+        self.r#type().syncs_blockchain() &&
+            (self.last_sync_block_height() != self.last_terminal_block_height()) ||
+            self.last_sync_block_height() < height
+    }
+
+    pub fn restore_wallets_and_standalone_derivation_paths(&mut self) {
+
+        // match Keychain::get_array::<String>(self.r#type().chain_wallets_key(), vec![]) {
+        //     Ok(wallet_ids) => {
+        //         wallet_ids.into_iter().for_each(|wallet_id| {
+        //             self.add_wallet(Wallet::init_with_chain_and_unique_id(wallet_id, false, self.clone()));
+        //         });
+        //         // we should load identities after all wallets are in the chain, as identities
+        //         // might be on different wallets and have interactions between each other
+        //         self.wallets.iter().for_each(|wallet| wallet.load_identities());
+        //     },
+        //     Err(err) => println!("Error restoring wallets {:?}", err)
+        // }
+        // match Keychain::get_array::<String>(self.r#type().chain_standalone_derivation_paths_key(), vec![]) {
+        //     Ok(derivation_path_ids) => {
+        //         derivation_path_ids.into_iter().for_each(|derivation_path_id| {
+        //             if let Some(path) = DerivationPath::init_with_extended_public_key_identifier(derivation_path_id.as_str(), self.r#type(), self.borrow()) {
+        //                 self.add_standalone_derivation_path(DerivationPathKind::Default(path));
+        //             }
+        //         });
+        //     },
+        //     Err(err) => println!("Error restoring standalone derivation paths {:?}", err)
+        // }
+    }
 }
+
+// /// Managers
+// impl Arc<Chain> {
+//
+//
+//
+    // pub fn restore_wallets_and_standalone_derivation_paths(&mut self) {
+        // self.with(|chain| {
+        //     match Keychain::get_array::<String>(chain.r#type().chain_wallets_key(), vec![]) {
+        //         Ok(wallet_ids) => {
+        //             wallet_ids.into_iter().for_each(|wallet_id| {
+        //
+        //                 chain.add_wallet(Wallet::init_with_chain_and_unique_id(wallet_id, false, self.clone()));
+        //             });
+        //             // we should load identities after all wallets are in the chain, as identities
+        //             // might be on different wallets and have interactions between each other
+        //             chain.wallets.iter().for_each(|wallet| wallet.load_identities());
+        //         },
+        //         Err(err) => println!("Error restoring wallets {:?}", err)
+        //     }
+        //     match Keychain::get_array::<String>(chain.r#type().chain_standalone_derivation_paths_key(), vec![]) {
+        //         Ok(derivation_path_ids) => {
+        //             derivation_path_ids.into_iter().for_each(|derivation_path_id| {
+        //                 if let Some(path) = DerivationPath::init_with_extended_public_key_identifier(derivation_path_id.as_str(), chain.r#type(), self.borrow()) {
+        //                     chain.add_standalone_derivation_path(DerivationPathKind::Default(path));
+        //                 }
+        //             });
+        //         },
+        //         Err(err) => println!("Error restoring standalone derivation paths {:?}", err)
+        //     }
+        // });
+    // }
+//
+//
+// }
+
 impl Chain {
-    fn create(params: Params) -> Shared<Self> {
+    fn create_shared(params: Params) -> Arc<RwLock<Self>> {
         let chain_type = params.chain_type.clone();
         let chain = Self {
             params,
@@ -159,75 +200,305 @@ impl Chain {
             peer_manager: PeerManager::new(chain_type),
             spork_manager: spork::Manager::new(chain_type),
             transaction_manager: TransactionManager::new(chain_type),
+            viewing_account: Account::view_only_account_with_number(0),
             // network_context: NetworkContext::new(),
             ..Default::default()
-        }.to_shared();
-        chain.with(|c| {
-            c.masternode_manager.chain = chain.borrow();
-            c.peer_manager.chain = chain.borrow();
-            c.spork_manager.chain = chain.borrow();
-            c.transaction_manager.chain = chain.borrow();
-        });
-        chain
-    }
-    pub fn create_mainnet() -> Shared<Self> {
-        Self::create(MAINNET_PARAMS)
-    }
-
-    pub fn create_testnet() -> Shared<Self> {
-        Self::create(TESTNET_PARAMS)
-    }
-
-    pub fn create_devnet(r#type: DevnetType) -> Shared<Self> {
-        Self::create(create_devnet_params_for_type(r#type))
-    }
-}
-
-impl Chain {
-
-
-    pub fn start_sync(&mut self) {
-        // dispatch_async(dispatch_get_main_queue(), ^{
-        //     [[NSNotificationCenter defaultCenter] postNotificationName:DSChainManagerSyncWillStartNotification
-        //     object:nil
-        //     userInfo:@{DSChainManagerNotificationChainKey: self.chain}];
-        // });
-        self.peer_manager.connect()
-    }
-
-}
-
-impl Chain {
-    pub fn add_wallet(&mut self, wallet: Wallet) -> bool {
-        let not_present_yet = self.wallets.iter().find(|w| wallet.unique_id_string() == w.unique_id_string()).is_none();
-        if not_present_yet {
-            self.wallets.push(wallet);
+        };
+        let arc_chain = Arc::new(RwLock::new(chain));
+        if let Ok(mut c) = arc_chain.try_write() {
+            c.masternode_manager.chain = Shared::RwLock(arc_chain.clone());
+            c.peer_manager.chain = Shared::RwLock(arc_chain.clone());
+            c.spork_manager.chain = Shared::RwLock(arc_chain.clone());
+            c.transaction_manager.chain = Shared::RwLock(arc_chain.clone());
+            match Keychain::get_wallet_ids(chain_type) {
+                Ok(wallet_ids) => {
+                    c.wallets.extend(wallet_ids.into_iter().map(|unique_id| Wallet::init_with_chain_and_unique_id(unique_id, false, arc_chain.clone())));
+                    // we should load identities after all wallets are in the chain, as identities
+                    // might be on different wallets and have interactions between each other
+                    c.wallets.iter().for_each(|wallet| wallet.load_identities())
+                },
+                Err(err) => println!("Error restoring wallets {:?}", err)
+            }
+            match Keychain::get_standalone_derivation_path_ids(chain_type) {
+                Ok(derivation_path_ids) => {
+                    derivation_path_ids.into_iter().for_each(|derivation_path_id| {
+                        if let Some(path) = DerivationPath::init_with_extended_public_key_identifier(derivation_path_id.as_str(), chain_type, Weak::new()) {
+                            c.add_standalone_derivation_path(DerivationPathKind::Default(path));
+                        }
+                    });
+                },
+                Err(err) => println!("Error restoring standalone derivation paths {:?}", err)
+            }
         }
-        not_present_yet
+        arc_chain
     }
+
+    pub fn create_shared_mainnet() -> Arc<RwLock<Self>> {
+        Self::create_shared(MAINNET_PARAMS)
+    }
+
+    pub fn create_shared_testnet() -> Arc<RwLock<Self>> {
+        Self::create_shared(TESTNET_PARAMS)
+    }
+
+    pub fn create_shared_devnet(r#type: DevnetType) -> Arc<RwLock<Self>> {
+        Self::create_shared(create_devnet_params_for_type(r#type))
+    }
+}
+
+impl Chain {
+    // pub fn add_wallet(&mut self, wallet: Arc<RwLock<Wallet>>) -> bool {
+    //     let not_present_yet = self.wallets.iter().find(|w| wallet.unique_id_string() == w.unique_id_string()).is_none();
+    //     if not_present_yet {
+    //         self.wallets.push(wallet);
+    //     }
+    //     not_present_yet
+    // }
 
     pub fn add_standalone_derivation_path(&mut self, path: DerivationPathKind) {
-        if let Some(mut acc) = self.viewing_account.take() {
-            acc.add_derivation_path(path);
+        self.viewing_account.add_derivation_path(path);
+        // if let Some(mut acc) = self.viewing_account.take() {
+        //     acc.add_derivation_path(path);
+        // } else {
+        //     let mut acc = Account::view_only_account_with_number(0);
+        //     acc.add_derivation_path(path);
+        //     self.viewing_account = Some(acc);
+        // }
+    }
+
+
+    pub fn start_sync_from_time(&mut self) -> u64 {
+        if self.r#type().syncs_blockchain() {
+            self.earliest_wallet_creation_time()
         } else {
-            let mut acc = Account::view_only_account_with_number(0);
-            acc.add_derivation_path(path);
-            self.viewing_account = Some(acc);
+            self.checkpoints.last().map_or(0, |checkpoint| checkpoint.timestamp.into())
         }
     }
-    pub fn last_sync_block_height(&mut self) -> u32 {
-        todo!()
-        // self.last_terminal_block().unwrap().height()
+
+
+    pub fn last_sync_block_with_use_checkpoints(&mut self, use_checkpoints: bool) -> Option<Weak<block::Kind>> {
+        self.last_sync_block.take().or_else(|| {
+            let mut last: Option<Weak<block::Kind>> = None;
+            if !self.last_persisted_chain_sync_block_hash.is_zero() &&
+                !self.last_persisted_chain_sync_block_chain_work.is_zero() &&
+                self.last_persisted_chain_sync_block_height != BLOCK_UNKNOWN_HEIGHT as u32 {
+                let block = Arc::new(block::Kind::MerkleBlock(MerkleBlock::with(
+                    2,
+                    self.last_persisted_chain_sync_block_hash.clone(),
+                    UInt256::MIN,
+                    UInt256::MIN,
+                    self.last_persisted_chain_sync_timestamp as u32,
+                    0,
+                    self.last_persisted_chain_sync_block_chain_work,
+                    0,
+                    0,
+                    vec![],
+                    vec![],
+                    self.last_persisted_chain_sync_block_height,
+                    None,
+                    self.r#type(),
+                    Shared::BorrowedRwLock(Weak::new()),
+                )));
+
+                last = Some(Arc::downgrade(&block));
+                self.last_sync_block = last.clone();
+            }
+            if self.last_sync_block.is_none() && use_checkpoints {
+                println!("No last Sync Block, setting it from checkpoints");
+                self.set_last_sync_block_from_checkpoints();
+            }
+            last
+        })
     }
+
+    // pub fn set_last_sync_block_from_checkpoints(&mut self) {
+    //     let checkpoint = if let Some(cp) = self.sync_headers_override_use_checkpoint.as_ref() {
+    //         Some(cp)
+    //     } else if self.options.sync_from_genesis() {
+    //         self.checkpoints.get(self.r#type().genesis_height() as usize)
+    //     } else if self.options.should_sync_from_height {
+    //         self.last_checkpoint_on_or_before_height(self.options.sync_from_height)
+    //     } else {
+    //         let start_sync_time = self.start_sync_from_time();
+    //         let timestamp = if start_sync_time as u32 == BIP39_CREATION_TIME { BIP39_CREATION_TIME } else { (start_sync_time - HEADER_WINDOW_BUFFER_TIME) as u32 };
+    //         self.last_checkpoint_on_or_before_timestamp(timestamp)
+    //     };
+    //     if let Some(cp) = checkpoint {
+    //         if let Some(sb) = self.sync_blocks.get(&cp.hash) {
+    //             self.last_sync_block = Some(Arc::downgrade(sb));
+    //         } else {
+    //             let sb = Arc::new(block::Kind::MerkleBlock(MerkleBlock::init_with_checkpoint(&cp, self.r#type(), Shared::None)));
+    //             self.last_sync_block = Some(Arc::downgrade(&sb));
+    //             self.sync_blocks.insert(cp.hash.clone(), sb);
+    //         }
+    //     }
+    // }
+    pub fn set_last_sync_block_from_checkpoints(&mut self) {
+        let checkpoint = if let Some(cp) = self.sync_headers_override_use_checkpoint.as_ref() {
+            Some(cp)
+        } else if self.sync_from_genesis() {
+            self.checkpoints.get(self.r#type().genesis_height() as usize)
+        } else if self.should_sync_from_height {
+            self.last_checkpoint_on_or_before_height(self.sync_from_height)
+        } else {
+            let start_sync_time = self.start_sync_from_time();
+            let timestamp = if start_sync_time == BIP39_CREATION_TIME { BIP39_CREATION_TIME } else { start_sync_time - HEADER_WINDOW_BUFFER_TIME };
+            self.last_checkpoint_on_or_before_timestamp(timestamp as u32)
+        };
+        if let Some(cp) = checkpoint {
+            if let Some(sb) = self.sync_blocks.get(&cp.hash) {
+                self.last_sync_block = Some(Arc::downgrade(sb));
+            } else {
+                let sb = Arc::new(block::Kind::MerkleBlock(MerkleBlock::init_with_checkpoint(&cp, self.r#type(), Shared::BorrowedRwLock(Weak::new()))));
+                let sb_weak = Arc::downgrade(&sb);
+                self.sync_blocks.insert(cp.hash.clone(), sb);
+                self.last_sync_block = Some(sb_weak);
+            }
+        }
+    }
+    pub fn set_last_terminal_block_from_checkpoints(&mut self) {
+        let checkpoint = if let Some(cp) = self.terminal_headers_override_use_checkpoint.as_ref() {
+            Some(cp)
+        } else if let Some(cp) = self.last_checkpoint() {
+            Some(cp)
+        } else {
+            None
+        };
+        if let Some(cp) = checkpoint {
+            if let Some(tb) = self.terminal_blocks.get(&cp.hash) {
+                self.last_terminal_block = Some(Arc::downgrade(tb));
+            } else {
+                let tb = Arc::new(block::Kind::MerkleBlock(MerkleBlock::init_with_checkpoint(&cp, self.r#type(), Shared::BorrowedRwLock(Weak::new()))));
+                let tb_weak = Arc::downgrade(&tb);
+                self.terminal_blocks.insert(cp.hash.clone(), tb);
+                self.last_terminal_block = Some(tb_weak);
+            }
+        }
+    }
+    // pub fn set_last_terminal_block_from_checkpoints(&mut self) {
+    //     if let Some(cp) = self.terminal_headers_override_use_checkpoint.as_ref() {
+    //         if let Some(tb) = self.terminal_blocks.get(&cp.hash) {
+    //             self.last_terminal_block = Some(Arc::downgrade(tb));
+    //         } else {
+    //             let tb = Arc::new(block::Kind::MerkleBlock(MerkleBlock::init_with_checkpoint(&cp, self.r#type(), Shared::None)));
+    //             self.last_terminal_block = Some(Arc::downgrade(&tb));
+    //             self.terminal_blocks.insert(cp.hash.clone(), tb);
+    //         }
+    //     } else if let Some(cp) = self.last_checkpoint() {
+    //         if let Some(tb) = self.terminal_blocks.get(&cp.hash) {
+    //             self.last_terminal_block = Some(Arc::downgrade(tb));
+    //         } else {
+    //             let tb = Arc::new(block::Kind::MerkleBlock(MerkleBlock::init_with_checkpoint(&cp, self.r#type(), Shared::None)));
+    //             self.last_terminal_block = Some(Arc::downgrade(&tb));
+    //             self.terminal_blocks.insert(cp.hash.clone(), tb);
+    //         }
+    //     }
+    // }
+
+    pub fn last_sync_block(&mut self) -> Option<Weak<block::Kind>> {
+        self.last_sync_block_with_use_checkpoints(true)
+    }
+
+    pub fn last_terminal_block(&mut self) -> Option<Weak<block::Kind>> {
+        self.last_terminal_block.take().or({
+            // if let Ok(entity) = BlockEntity::get_last_terminal_block(self.r#type(), self.chain_context()) {
+            //     if let Some(b) = MerkleBlock::from_entity(&entity, self) {
+            //         self.last_terminal_block = Some(&b);
+            //         println!("last terminal block at height {} recovered from db (hash is {})", b.height(), b.block_hash());
+            //     }
+            // }
+            if self.last_terminal_block.is_none() {
+                let last_sync_block_height = self.last_sync_block_height();
+
+                let last_checkpoint = if let Some(cp) = self.terminal_headers_override_use_checkpoint.as_ref() {
+                    Some(cp)
+                } else if let Some(cp) = self.last_checkpoint() {
+                    Some(cp)
+                } else {
+                    None
+                };
+                if last_checkpoint.is_some() && last_checkpoint.unwrap().height >= last_sync_block_height {
+                    self.set_last_terminal_block_from_checkpoints();
+                } else {
+                    self.last_terminal_block = self.last_sync_block.clone();
+                }
+            }
+            if let Some(b) = &self.last_terminal_block {
+                if let Some(tb) = b.upgrade() {
+                    if tb.height() > self.estimated_block_height() {
+                        self.best_estimated_block_height = Some(tb.height());
+                    }
+                }
+            }
+            self.last_terminal_block.clone()
+        })
+
+        // if (_lastTerminalBlock) return _lastTerminalBlock;
+        //
+        // if (!_lastTerminalBlock) {
+        //     // if we don't have any headers yet, use the latest checkpoint
+        //     DSCheckpoint *lastCheckpoint = self.terminalHeadersOverrideUseCheckpoint ? self.terminalHeadersOverrideUseCheckpoint : self.lastCheckpoint;
+        //     uint32_t lastSyncBlockHeight = self.lastSyncBlockHeight;
+        //
+        //     if (lastCheckpoint.height >= lastSyncBlockHeight) {
+        //         [self setLastTerminalBlockFromCheckpoints];
+        //     } else {
+        //         _lastTerminalBlock = self.lastSyncBlock;
+        //     }
+        // }
+        //
+        // if (_lastTerminalBlock.height > self.estimatedBlockHeight) _bestEstimatedBlockHeight = _lastTerminalBlock.height;
+        //
+        // return _lastTerminalBlock;
+
+    }
+
+    pub fn last_sync_block_height(&mut self) -> u32 {
+        self.last_sync_block()
+            .and_then(|b| b.upgrade().map(|b| b.height()))
+            .unwrap_or(0)
+    }
+
 
     pub fn last_terminal_block_height(&mut self) -> u32 {
-        todo!()
-        // self.last_terminal_block().unwrap().height()
+        self.last_terminal_block()
+            .and_then(|b| b.upgrade().map(|b| b.height()))
+            .unwrap_or(0)
     }
 
+
+    /// Checkpoints
+
+    pub fn block_height_has_checkpoint(&self, block_height: u32) -> bool {
+        self.last_checkpoint_on_or_before_height(block_height)
+            .map_or(false, |checkpoint| checkpoint.height == block_height)
+    }
+
+    pub fn last_checkpoint(&self) -> Option<&Checkpoint> {
+        self.checkpoints.last()
+    }
+
+    fn last_checkpoint_where<F>(&self, expression: F) -> Option<&Checkpoint> where F: Fn(&Checkpoint) -> bool {
+        self.checkpoints
+            .iter()
+            .rev()
+            .find(|checkpoint| checkpoint.height == self.r#type().genesis_height() || !self.r#type().syncs_blockchain() || expression(checkpoint))
+    }
+
+    pub fn last_checkpoint_on_or_before_height(&self, height: u32) -> Option<&Checkpoint> {
+        // if we don't have any blocks yet, use the latest checkpoint that's at least a week older than earliest_key_time
+        self.last_checkpoint_where(|checkpoint| checkpoint.height <= height)
+    }
+
+    pub fn last_checkpoint_on_or_before_timestamp(&self, timestamp: u32) -> Option<&Checkpoint> {
+        // if we don't have any blocks yet, use the latest checkpoint that's at least a week older than earliest_key_time
+        self.last_checkpoint_where(|checkpoint| checkpoint.timestamp <= timestamp)
+    }
+
+
     pub fn should_request_merkle_blocks_for_next_sync_block_height(&mut self) -> bool {
-        todo!()
-        // self.should_request_merkle_blocks_for_zone_after_height(self.last_sync_block_height() + 1)
+        let block_height = self.last_sync_block_height() + 1;
+        self.should_request_merkle_blocks_for_zone_after_height(block_height)
     }
 
     pub fn should_request_merkle_blocks_for_zone_after_height(&mut self, block_height: u32) -> bool {
@@ -275,68 +546,72 @@ impl Chain {
         //     locators.clone()
         // }
     }
-    pub fn syncs_blockchain(&self) -> bool {
-        self.options.sync_type.bits() & SyncType::NeedsWalletSyncType.bits() == 0
+
+    pub fn can_connect(&self) -> bool {
+        !self.r#type().syncs_blockchain() || self.can_construct_a_filter()
     }
 
-    pub fn can_construct_a_filter(&mut self) -> bool {
-        todo!()
-        // self.has_a_standalone_derivation_path() || self.has_a_wallet()
+    pub fn has_a_wallet(&self) -> bool {
+        !self.wallets.is_empty()
+    }
+
+    pub fn has_a_standalone_derivation_path(&self) -> bool {
+        !self.viewing_account.fund_derivation_paths().is_empty()
+    }
+
+    pub fn can_construct_a_filter(&self) -> bool {
+        println!("can_construct_a_filter: has_a_standalone_derivation_path: {} has_a_wallet: {}", self.has_a_standalone_derivation_path(), self.has_a_wallet());
+        self.has_a_standalone_derivation_path() || self.has_a_wallet()
     }
 
     /// This is a time interval since 1970
-    pub fn earliest_wallet_creation_time(&self) -> u64 {
-        self.wallets.iter()
+    pub fn earliest_wallet_creation_time(&mut self) -> u64 {
+        self.wallets.iter_mut()
             .map(|wallet| wallet.wallet_creation_time())
             .min_by(|t1, t2| t1.cmp(t2))
-            .unwrap_or(BIP39_CREATION_TIME as u64)
+            .unwrap_or(BIP39_CREATION_TIME)
     }
 
     pub fn reset_chain_sync_start_height(&mut self) {
         let key = self.params.chain_type.chain_sync_start_height_key();
         if self.chain_sync_start_height == 0 {
-            self.chain_sync_start_height = UserDefaults::get::<u32>(key.as_str()).unwrap_or(0);
+            self.chain_sync_start_height = UserDefaults::uint_for_key::<u32>(key.as_str()).unwrap_or(0u32);
         }
         if self.chain_sync_start_height == 0 {
             self.chain_sync_start_height = self.last_sync_block_height();
-            UserDefaults::set(key.as_str(), self.chain_sync_start_height);
+            UserDefaults::set_num(key, self.chain_sync_start_height);
         }
     }
 
     pub fn restart_chain_sync_start_height(&mut self) {
         self.chain_sync_start_height = 0;
-        UserDefaults::set(self.params.chain_type.chain_sync_start_height_key().as_str(), 0u32);
+        UserDefaults::set_num(self.params.chain_type.chain_sync_start_height_key(), 0u32);
     }
 
     pub fn reset_terminal_sync_start_height(&mut self) {
         let key = self.params.chain_type.terminal_sync_start_height_key();
         if self.terminal_sync_start_height == 0 {
-            self.terminal_sync_start_height = UserDefaults::get::<u32>(key.as_str()).unwrap_or(0);
+            self.terminal_sync_start_height = UserDefaults::uint_for_key(key.as_str()).unwrap_or(0);
         }
         if self.terminal_sync_start_height == 0 {
             self.terminal_sync_start_height = self.last_terminal_block_height();
-            UserDefaults::set(key.as_str(), self.terminal_sync_start_height);
+            UserDefaults::set_num(key, self.terminal_sync_start_height);
         }
     }
 
     pub fn restart_chain_terminal_sync_start_height(&mut self) {
         self.terminal_sync_start_height = 0;
-        UserDefaults::set(self.params.chain_type.terminal_sync_start_height_key().as_str(), 0u32);
+        UserDefaults::set_num(self.params.chain_type.terminal_sync_start_height_key(), 0u32);
     }
 
-}
-
-impl Shared<Chain> {
-    pub fn is_spork_activated(&self, spork: &Spork) -> bool {
-        self.with(|chain| spork.value <= chain.last_terminal_block_height() as u64)
+    pub fn has_spork_activated(&mut self, spork: &Spork) -> bool {
+        spork.value <= self.last_terminal_block_height() as u64
     }
 
-    pub fn should_request_merkle_blocks_for_zone_after_last_sync_height(&self) -> bool {
-        self.with(|chain|
-            !chain.needs_initial_terminal_headers_sync() &&
-            chain.should_request_merkle_blocks_for_next_sync_block_height())
+    pub fn should_request_merkle_blocks_for_zone_after_last_sync_height(&mut self) -> bool {
+        !self.needs_initial_terminal_headers_sync() &&
+                self.should_request_merkle_blocks_for_next_sync_block_height()
     }
-
     pub fn remove_estimated_block_heights_of_peer(&mut self, peer: &Peer) {
         // for (height, mut announcers) in self.estimated_block_heights {
         //     if let Some(pos) = announcers.iter().position(|x| x == peer) {
@@ -351,35 +626,9 @@ impl Shared<Chain> {
         //     }
         // }
     }
+
     pub fn reset_last_relayed_item_time(&self) {
         //self.last_chain_relay_time = 0;
-    }
-
-    pub fn start_with_seed_phrase<L: bip0039::Language>(&self, seed_phrase: &str) {
-        self.with(|chain| {
-            match Seed::from_phrase::<L>(seed_phrase, chain.genesis()) {
-                Some(seed) => {
-                    match Keychain::save_seed_phrase(seed_phrase, SystemTime::seconds_since_1970(), seed.unique_id_as_str())
-                        .ok()
-                        .map(|()| {
-                            self.register_derivation_paths_for_seed(&seed, chain.r#type());
-                            Wallet::standard_wallet_with_seed(
-                                seed,
-                                0,
-                                true,
-                                chain.r#type(),
-                                self.borrow())
-                        }) {
-                        Some(wallet) => {
-                            chain.start_sync();
-                        },
-                        _ => {},
-                    }
-
-                },
-                _ => {}
-            }
-        });
     }
 
 }

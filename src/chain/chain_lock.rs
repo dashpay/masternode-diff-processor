@@ -3,7 +3,7 @@ use crate::chain::Chain;
 use crate::chain::common::chain_type::IHaveChainSettings;
 use crate::chain::common::ChainType;
 use crate::consensus::Encodable;
-use crate::crypto::UInt768;
+use crate::crypto::{UInt384, UInt768};
 use crate::encode::VarInt;
 use crate::keys::BLSKey;
 use crate::models::{LLMQEntry, MasternodeList};
@@ -66,7 +66,7 @@ impl ChainLock {
         let mut writer: Vec<u8> = Vec::new();
         "clsig".to_string().enc(&mut writer);
         self.height.enc(&mut writer);
-        let req_id = UInt256::sha256d(&writer);
+        let req_id = UInt256::sha256d(writer);
         req_id
     }
 
@@ -82,22 +82,22 @@ impl ChainLock {
         })
     }
 
-    pub fn sign_id_for_quorum_entry(&self, entry: &LLMQEntry) -> UInt256 {
+    pub fn sign_id_for_quorum_entry(&self, llmq_hash: UInt256) -> UInt256 {
         let mut buffer: Vec<u8> = Vec::new();
         let chain_locks_type = VarInt(u8::from(self.chain_type.chain_locks_type()) as u64);
         chain_locks_type.enc(&mut buffer);
-        entry.llmq_hash.enc(&mut buffer);
+        llmq_hash.enc(&mut buffer);
         self.get_request_id().enc(&mut buffer);
         self.block_hash.enc(&mut buffer);
-        UInt256::sha256d(&buffer)
+        UInt256::sha256d(buffer)
     }
 
-    pub fn verify_signature_against_quorum(&mut self, entry: &LLMQEntry) -> bool {
-        let public_key = entry.public_key;
-        let use_legacy = entry.version.use_bls_legacy();
-        let sign_id = self.sign_id_for_quorum_entry(entry);
-        println!("verifying signature <REDACTED> with public key <REDACTED> for transaction hash <REDACTED> against quorum {:?}", entry);
-        BLSKey::verify_with_public_key(sign_id, self.signature, public_key, use_legacy)
+    pub fn verify_signature_against_quorum(&mut self, public_key: UInt384, llmq_hash: UInt256, use_legacy_bls_scheme: bool) -> bool {
+        // let public_key = entry.public_key;
+        // let use_legacy = entry.version.use_bls_legacy();
+        let sign_id = self.sign_id_for_quorum_entry(llmq_hash);
+        println!("verifying signature <REDACTED> with public key <REDACTED> for transaction hash <REDACTED> against quorum {:?}", llmq_hash);
+        BLSKey::verify_with_public_key(sign_id, self.signature, public_key, use_legacy_bls_scheme)
     }
 
     pub fn verify_signature_with_quorum_offset(&mut self, offset: u32) -> bool {

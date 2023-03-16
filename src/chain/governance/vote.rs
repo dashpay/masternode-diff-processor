@@ -68,7 +68,7 @@ impl Vote {
         signal.enc(&mut writer);
         outcome.enc(&mut writer);
         timestamp.enc(&mut writer);
-        UInt256::sha256d(&writer)
+        UInt256::sha256d(writer)
     }
 
     pub fn data_message(&self) -> Vec<u8> {

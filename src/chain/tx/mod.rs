@@ -22,7 +22,7 @@ pub use self::credit_funding_transaction::CreditFundingTransaction;
 pub use self::factory::Factory;
 pub use self::instant_send_lock::InstantSendLock;
 pub use self::kind::Kind;
-pub use self::protocol::ITransaction;
+pub use self::protocol::{ITransaction, ReadContext};
 pub use self::provider_registration_transaction::ProviderRegistrationTransaction;
 pub use self::provider_update_registrar_transaction::ProviderUpdateRegistrarTransaction;
 pub use self::provider_update_revocation_transaction::ProviderUpdateRevocationTransaction;

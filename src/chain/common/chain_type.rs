@@ -1,7 +1,12 @@
+use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use hashes::hex::FromHex;
+use serde::Deserialize;
 use crate::chain::common::LLMQType;
-use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
+use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams, SyncType};
+use crate::chain::network::peer::LOCAL_HOST;
 use crate::chain::params::DUFFS;
+use crate::chain::wallet::seed::Seed;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 use crate::manager::peer_manager::SETTINGS_FIXED_PEER_KEY;
@@ -11,6 +16,7 @@ use crate::util::data_ops::short_hex_string_from;
 
 pub trait IHaveChainSettings {
     fn genesis_hash(&self) -> UInt256;
+    fn genesis_height(&self) -> u32;
     fn is_llmq_type(&self) -> LLMQType;
     fn isd_llmq_type(&self) -> LLMQType;
     fn chain_locks_type(&self) -> LLMQType;
@@ -150,6 +156,9 @@ impl IHaveChainSettings for ChainType {
             ChainType::DevNet(devnet_type) => devnet_type.genesis_hash(),
         }
     }
+    fn genesis_height(&self) -> u32 {
+        self.is_devnet_any().into()
+    }
 
     fn is_llmq_type(&self) -> LLMQType {
         match self {
@@ -205,6 +214,10 @@ impl IHaveChainSettings for DevnetType {
         }).unwrap().reversed()
     }
 
+    fn genesis_height(&self) -> u32 {
+        1
+    }
+
     fn is_llmq_type(&self) -> LLMQType {
         LLMQType::LlmqtypeDevnetDIP0024
     }
@@ -235,6 +248,14 @@ impl IHaveChainSettings for DevnetType {
 
 // Params
 impl ChainType {
+    pub fn magic(&self) -> u32 {
+        match self {
+            ChainType::MainNet => 0xbd6b0cbf,
+            ChainType::TestNet => 0xffcae2ce,
+            ChainType::DevNet(_) => 0xceffcae2,
+        }
+    }
+
     pub fn allow_min_difficulty_blocks(&self) -> bool {
         !self.is_mainnet()
     }
@@ -273,6 +294,10 @@ impl ChainType {
             ChainType::TestNet => 19999,
             ChainType::DevNet(_) => 20001
         }
+    }
+
+    pub fn localhost(&self) -> SocketAddr {
+        SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::from(LOCAL_HOST), self.standard_port()))
     }
 
     pub fn base_reward(&self) -> u64 {
@@ -341,6 +366,8 @@ pub const SYNC_STARTHEIGHT_KEY: &str = "SYNC_STARTHEIGHT";
 pub const TERMINAL_SYNC_STARTHEIGHT_KEY: &str = "TERMINAL_SYNC_STARTHEIGHT";
 pub const FEE_PER_BYTE_KEY: &str = "FEE_PER_BYTE";
 
+
+
 impl ChainType {
     pub fn unique_id(&self) -> String {
         short_hex_string_from(&self.genesis_hash().0)
@@ -374,5 +401,82 @@ impl ChainType {
 
     pub fn terminal_sync_start_height_key(&self) -> String {
         format!("{}_{}", TERMINAL_SYNC_STARTHEIGHT_KEY, self.unique_id())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct PeerPlist {
+    array: Vec<u32>,
+}
+
+// const MAINNET_FIXED_PEERS: &str = include_str!("../../../resources/FixedPeers.plist");
+// const TESTNET_FIXED_PEERS: &str = include_str!("../../../resources/TestnetFixedPeers.plist");
+
+const FIXED_PEERS: &[u8] = include_bytes!("../../../resources/FixedPeers.plist");
+// const TESTNET_FIXED_PEERS: &[u8] = include_bytes!("../../../resources/TestnetFixedPeers.plist");
+
+impl ChainType {
+    pub fn load_fixed_peer_addresses(&self) -> Vec<IpAddr> {
+        match self {
+            Self::MainNet => {
+                // plist::from_bytes()
+                let plist = plist::from_bytes::<HashMap<String, Vec<u32>>>(FIXED_PEERS).unwrap();
+                let peers = plist.get("mainnet").cloned().unwrap();
+                peers
+                // plist::Value::from_file("../../../resources/FixedPeers.plist").unwrap().as_array().iter().map(|v|)
+                // get_plist::<PeerPlist>(MAINNET_FIXED_PEERS).unwrap().array
+            },
+            Self::TestNet => {
+                let plist = plist::from_bytes::<HashMap<String, Vec<u32>>>(FIXED_PEERS).unwrap();
+                let peers = plist.get("testnet").cloned().unwrap();
+                peers
+                // plist::from_bytes::<HashMap<String, Vec<u32>>>(FIXED_PEERS).unwrap().get("testnet").unwrap()
+                // plist::from_bytes::<PeerPlist>(TESTNET_FIXED_PEERS).unwrap().array
+                // get_plist::<PeerPlist>(TESTNET_FIXED_PEERS).unwrap().array
+            },
+            _ => panic!("No fixed peers for devnet"),
+        }.into_iter().map(|value| IpAddr::from(value.to_be_bytes())).collect()
+    }
+}
+
+impl ChainType {
+    pub fn seed_for_seed_phrase<L: bip0039::Language>(&self, seed_phrase: &str) -> Option<Seed> {
+        Seed::from_phrase::<L>(seed_phrase, self.genesis_hash())
+    }
+    pub fn seed_for_seed_data<L: bip0039::Language>(&self, seed_data: Vec<u8>) -> Seed {
+        Seed::from::<L>(seed_data, self.genesis_hash())
+    }
+}
+
+impl ChainType {
+    pub fn syncs_blockchain(&self) -> bool {
+        self.sync_type().bits() & SyncType::NeedsWalletSyncType.bits() != 0
+    }
+
+    pub fn sync_type(&self) -> SyncType {
+        SyncType::Default
+    }
+    pub fn keep_headers(&self) -> bool {
+        false
+    }
+
+    pub fn use_checkpoint_masternode_lists(&self) -> bool {
+        true
+    }
+
+    pub fn smart_outputs(&self) -> bool {
+        true
+    }
+
+    pub fn should_use_checkpoint_file(&self) -> bool {
+        true
+    }
+
+    pub fn sync_governance_objects_interval(&self) -> u64 {
+        600
+    }
+
+    pub fn sync_masternode_list_interval(&self) -> u64 {
+        600
     }
 }

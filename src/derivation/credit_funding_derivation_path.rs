@@ -1,5 +1,6 @@
 use std::collections::HashSet;
-use crate::chain::{Chain, ScriptMap, Wallet};
+use std::sync::Weak;
+use crate::chain::ScriptMap;
 use crate::chain::common::ChainType;
 use crate::chain::wallet::seed::Seed;
 use crate::crypto::UInt160;
@@ -11,8 +12,8 @@ use crate::derivation::protocol::IDerivationPath;
 use crate::derivation::simple_indexed_derivation_path::{ISimpleIndexedDerivationPath, SimpleIndexedDerivationPath};
 use crate::derivation::uint256_index_path::UInt256IndexPath;
 use crate::keys::{Key, KeyType};
+use crate::storage::manager::managed_context::ManagedContext;
 use crate::UInt256;
-use crate::util::Shared;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct CreditFundingDerivationPath {
@@ -36,20 +37,32 @@ impl IIndexPath for CreditFundingDerivationPath {
 
 impl IDerivationPath for CreditFundingDerivationPath {
 
-    fn chain(&self) -> &Shared<Chain> {
-        self.base.chain()
-    }
+    // fn chain(&self) -> Weak<Chain> {
+    //     self.base.chain()
+    // }
 
     fn chain_type(&self) -> ChainType {
         self.base.chain_type()
     }
 
-    fn wallet(&self) -> &Option<Shared<Wallet>> {
-        self.base.wallet()
+    // fn wallet(&self) -> &Option<Weak<Wallet>> {
+    //     self.base.wallet()
+    // }
+    //
+    // fn set_wallet(&mut self, wallet: Weak<Wallet>) {
+    //     self.base.set_wallet(wallet);
+    // }
+
+    fn context(&self) -> Weak<ManagedContext> {
+        self.base.context()
     }
 
-    fn set_wallet(&mut self, wallet: Shared<Wallet>) {
-        self.base.set_wallet(wallet);
+    fn is_transient(&self) -> bool {
+        self.base.is_transient()
+    }
+
+    fn set_is_transient(&mut self, is_transient: bool) {
+        self.base.set_is_transient(is_transient);
     }
 
     fn wallet_unique_id(&self) -> Option<String> {
@@ -160,7 +173,7 @@ impl ISimpleIndexedDerivationPath for CreditFundingDerivationPath {
 }
 
 impl CreditFundingDerivationPath {
-    fn identity_funding_derivation_path_for_chain(reference: DerivationPathReference, last_index: u32, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    fn identity_funding_derivation_path_for_chain(reference: DerivationPathReference, last_index: u32, chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self {
             base: SimpleIndexedDerivationPath::simple_indexed_derivation_path(
                     vec![
@@ -174,60 +187,63 @@ impl CreditFundingDerivationPath {
                     KeyType::ECDSA,
                     reference,
                     chain_type,
-                    chain
+                    context
                 ),
             ..Default::default()
         }
     }
 
-    pub fn identity_registration_funding_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn identity_registration_funding_derivation_path_for_chain(chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self::identity_funding_derivation_path_for_chain(
             DerivationPathReference::BlockchainIdentityCreditRegistrationFunding,
             u32::from(DerivationPathFeaturePurpose::IdentitiesSubfeatureRegistration),
             chain_type,
-            chain
+            context
         )
     }
 
-    pub fn identity_topup_funding_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn identity_topup_funding_derivation_path_for_chain(chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self::identity_funding_derivation_path_for_chain(
             DerivationPathReference::BlockchainIdentityCreditTopupFunding,
             u32::from(DerivationPathFeaturePurpose::IdentitiesSubfeatureTopup),
             chain_type,
-            chain
+            context
         )
     }
 
-    pub fn identity_invitation_funding_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn identity_invitation_funding_derivation_path_for_chain(chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self::identity_funding_derivation_path_for_chain(
             DerivationPathReference::BlockchainIdentityCreditInvitationFunding,
             u32::from(DerivationPathFeaturePurpose::IdentitiesSubfeatureInvitations),
             chain_type,
-            chain
+            context
         )
     }
 
-    pub fn identity_registration_funding_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
-        let mut path = Self::identity_registration_funding_derivation_path_for_chain(chain_type, chain);
-        path.set_wallet(wallet);
+    pub fn identity_registration_funding_derivation_path_for_wallet(chain_type: ChainType, is_transient: bool, wallet_unique_id: String, context: Weak<ManagedContext>, load: bool) -> Self {
+        let mut path = Self::identity_registration_funding_derivation_path_for_chain(chain_type, context);
+        path.set_wallet_unique_id(wallet_unique_id);
+        path.set_is_transient(is_transient);
         if load && path.has_extended_public_key() {
             path.load_addresses();
         }
         path
     }
 
-    pub fn identity_topup_funding_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
-        let mut path = Self::identity_topup_funding_derivation_path_for_chain(chain_type, chain);
-        path.set_wallet(wallet);
+    pub fn identity_topup_funding_derivation_path_for_wallet(chain_type: ChainType, is_transient: bool, wallet_unique_id: String, context: Weak<ManagedContext>, load: bool) -> Self {
+        let mut path = Self::identity_topup_funding_derivation_path_for_chain(chain_type, context);
+        path.set_wallet_unique_id(wallet_unique_id);
+        path.set_is_transient(is_transient);
         if load && path.has_extended_public_key() {
             path.load_addresses();
         }
         path
     }
 
-    pub fn identity_invitation_funding_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
-        let mut path = Self::identity_invitation_funding_derivation_path_for_chain(chain_type, chain);
-        path.set_wallet(wallet);
+    pub fn identity_invitation_funding_derivation_path_for_wallet(chain_type: ChainType, is_transient: bool, wallet_unique_id: String, context: Weak<ManagedContext>, load: bool) -> Self {
+        let mut path = Self::identity_invitation_funding_derivation_path_for_chain(chain_type, context);
+        path.set_wallet_unique_id(wallet_unique_id);
+        path.set_is_transient(is_transient);
         if load && path.has_extended_public_key() {
             path.load_addresses();
         }

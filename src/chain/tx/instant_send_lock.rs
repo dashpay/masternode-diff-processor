@@ -1,7 +1,8 @@
+use std::sync::{Arc, Weak};
 use byte::{BytesExt, TryRead};
 use crate::consensus::Encodable;
 use crate::consensus::encode::VarInt;
-use crate::crypto::{UInt256, UInt768};
+use crate::crypto::{UInt256, UInt384, UInt768};
 use crate::crypto::byte_util::Zeroable;
 use crate::models::{LLMQEntry, MasternodeList};
 use crate::chain::chain::Chain;
@@ -10,11 +11,14 @@ use crate::chain::common::ChainType;
 use crate::chain::network::message;
 use crate::crypto::UTXO;
 use crate::keys::{BLSKey, IKey};
-// use crate::storage::models::chain::instant_send_lock::InstantSendLockEntity;
 use crate::util::Shared;
 
 #[derive(Clone)]
-pub struct ReadContext(pub ChainType, pub Shared<Chain>, pub bool /*deterministic*/);
+pub struct ReadContext {
+    pub chain_type: ChainType,
+    pub chain: Shared<Chain>,
+    pub deterministic: bool,
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct InstantSendLock {
@@ -26,7 +30,7 @@ pub struct InstantSendLock {
     pub quorum_verified: bool,
     pub signature_verified: bool,
     // verifies the signature and quorum together
-    pub intended_quorum: Option<Shared<LLMQEntry>>,
+    pub intended_quorum: Option<Weak<LLMQEntry>>,
     pub saved: bool,
     pub deterministic: bool,
     pub request_id: UInt256,
@@ -70,7 +74,7 @@ impl<'a> TryRead<'a, ReadContext> for InstantSendLock {
         // if !chain.spork_manager().deterministic_masternode_list_enabled || !chain.spork_manager().llmq_instant_send_enabled {
         //     return None;
         // }
-        let deterministic = context.2;
+        let deterministic = context.deterministic;
         let offset = &mut 0;
         let version = if deterministic {
             bytes.read_with::<u8>(offset, byte::LE)?
@@ -96,8 +100,8 @@ impl<'a> TryRead<'a, ReadContext> for InstantSendLock {
             signature,
             input_outpoints,
             cycle_hash,
-            chain_type: context.0,
-            chain: context.1,
+            chain_type: context.chain_type,
+            chain: context.chain,
             quorum_verified: false,
             signature_verified: false,
             intended_quorum: None,
@@ -126,27 +130,27 @@ impl InstantSendLock {
         if !self.request_id.is_zero() { return self.request_id }
         let mut writer: Vec<u8> = Vec::new();
         // TODO: shall we write isdlock here?
-        let is_lock_type: String = message::Type::Islock.into();
+        let is_lock_type: String = message::MessageType::Islock.into();
         is_lock_type.enc(&mut writer);
         VarInt(self.input_outpoints.len() as u64).enc(&mut writer);
         self.input_outpoints.iter().for_each(|utxo| {
             utxo.enc(&mut writer);
         });
-        let req_id = UInt256::sha256d(&writer);
+        let req_id = UInt256::sha256d(writer);
         self.request_id = req_id;
         println!("the request ID is {}", req_id);
         req_id
     }
 
-    pub fn sign_id_for_quorum_entry(&mut self, quorum: &LLMQEntry) -> UInt256 {
+    pub fn sign_id_for_quorum_entry(&mut self, llmq_hash: UInt256) -> UInt256 {
         let mut writer = Vec::<u8>::new();
         // todo: check is vs isd type locks
         let var_int: VarInt = self.chain_type.is_llmq_type().into();
         var_int.enc(&mut writer);
-        quorum.llmq_hash.enc(&mut writer);
+        llmq_hash.enc(&mut writer);
         self.request_id().enc(&mut writer);
         self.transaction_hash.enc(&mut writer);
-        UInt256::sha256d(&writer)
+        UInt256::sha256d(writer)
     }
 
     pub fn find_signing_quorum_and_masternode_list(&mut self) -> Option<(&LLMQEntry, &MasternodeList)> {
@@ -171,10 +175,10 @@ impl InstantSendLock {
                             .then(|| (quorum, list))))*/
     }
 
-    fn verify_signature_against_quorum(&mut self, quorum: &LLMQEntry) -> bool {
+    fn verify_signature_against_quorum(&mut self, public_key: UInt384, llmq_hash: UInt256, use_legacy_bls_scheme: bool) -> bool {
         // todo: check use_legacy_bls has taken from appropriate place
-        let mut key = BLSKey::key_with_public_key(quorum.public_key.clone(), quorum.use_legacy_bls_scheme());
-        let sign_id = self.sign_id_for_quorum_entry(quorum);
+        let mut key = BLSKey::key_with_public_key(public_key, use_legacy_bls_scheme);
+        let sign_id = self.sign_id_for_quorum_entry(llmq_hash);
         key.verify(&sign_id.0.to_vec(), &self.signature.0.to_vec())
     }
 
@@ -183,23 +187,26 @@ impl InstantSendLock {
         let quorum = self.chain.with(|chain| chain.masternode_manager.quorum_entry_for_instant_send_request_id(&request_id, offset));
         match quorum {
             Some(quorum) => {
-                quorum.with(|q| {
-                    if q.verified {
-                        self.signature_verified = self.verify_signature_against_quorum(q);
-                        println!("verifying IS signature with offset {}: {}", offset, self.signature_verified);
-                        if self.signature_verified {
-                            self.intended_quorum = Some(quorum.borrow());
-                        } else if offset == 8 {
-                            // try again a few blocks more in the past
-                            println!("trying with offset 0");
-                            return self.verify_signature_with_quorum_offset(0);
+                match quorum.upgrade() {
+                    Some(quorum) => {
+                        if quorum.verified {
+                            self.signature_verified = self.verify_signature_against_quorum(quorum.public_key, quorum.llmq_hash, quorum.use_legacy_bls_scheme());
+                            println!("verifying IS signature with offset {}: {}", offset, self.signature_verified);
+                            if self.signature_verified {
+                                self.intended_quorum = Some(Arc::downgrade(&quorum));
+                            } else if offset == 8 {
+                                // try again a few blocks more in the past
+                                println!("trying with offset 0");
+                                return self.verify_signature_with_quorum_offset(0);
+                            }
+                        } else {
+                            println!("llmq entry ({}) found but is not yet verified", quorum.llmq_hash);
                         }
-                    } else {
-                        println!("llmq entry ({}) found but is not yet verified", q.llmq_hash);
-                    }
-                    println!("returning signature verified {} with offset {}", self.signature_verified, offset);
-                    self.signature_verified
-                })
+                        println!("returning signature verified {} with offset {}", self.signature_verified, offset);
+                        self.signature_verified
+                    },
+                    None => false
+                }
             },
             None => {
                 println!("no quorum entry found");

@@ -1,19 +1,21 @@
+use std::net::SocketAddr;
 use std::time::SystemTime;
+use crate::chain::common::ChainType;
 use crate::consensus::Encodable;
 use crate::consensus::encode::VarInt;
-use crate::crypto::{UInt128, UInt256};
+use crate::crypto::UInt256;
 use crate::crypto::byte_util::Zeroable;
 use crate::chain::network::message::inv_type::InvType;
-use crate::chain::network::message::r#type::Type;
+use crate::chain::network::message::message::{MessageType, Payload};
 use crate::chain::network::net_address::NetAddress;
 use crate::chain::network::peer::{ENABLED_SERVICES, LOCAL_HOST};
 use crate::crypto::UTXO;
 use crate::util::time::TimeUtil;
 
-pub trait IRequest {
-    fn r#type(&self) -> Type;
-    fn to_data(self) -> Vec<u8>;
-}
+// pub trait IRequest {
+//     fn r#type(&self) -> MessageType;
+//     fn to_data(self) -> Vec<u8>;
+// }
 
 // #[derive(Debug, Default)]
 // pub enum GovernanceSyncRequest {
@@ -52,7 +54,18 @@ pub trait IRequest {
 //         }
 //     }
 // }
+fn array_of_hashes_enc(hashes: &Vec<UInt256>, inv_type: InvType, s: &mut Vec<u8>) {
+    let inv = u32::from(inv_type);
+    let mut writer = Vec::<u8>::new();
+    hashes.iter().for_each(|hash| {
+        inv.enc(&mut writer);
+        hash.enc(&mut writer);
+    });
+    s.extend(writer);
+}
 
+
+#[derive(Clone)]
 pub enum Request {
     Addr,
     FilterLoad(Vec<u8>),
@@ -61,7 +74,7 @@ pub enum Request {
     Inv(InvType, Vec<UInt256>),
     NotFound(Vec<u8>),
     Ping(u64),
-    Version(UInt128, u16, u32, u64, u16, u64, String),
+    Version(SocketAddr, u64, u64, ChainType),
     GovernanceHashes(InvType, Vec<UInt256>),
     GovernanceSync(UInt256, Vec<u8>),
     GovernanceSyncObjects,
@@ -72,154 +85,149 @@ pub enum Request {
     GetDataForTransactionHash(UInt256),
     GetDataForTransactionHashes(Option<Vec<UInt256>>, Option<Vec<UInt256>>, Option<Vec<UInt256>>, Option<Vec<UInt256>>, Option<Vec<UInt256>>),
     TransactionInv(Vec<UInt256>, Vec<UInt256>),
-    Default(Type),
+    Default(MessageType),
 }
 
-fn array_of_hashes_enc(hashes: &Vec<UInt256>, inv_type: InvType, s: &mut Vec<u8>) {
-    // if let Some(hashes) = hashes {
-        let inv_type_clone = inv_type.clone(); // Create a clone of the reference
-        let inv: u32 = inv_type_clone.into();
-        let mut buf = Vec::<u8>::new();
-        hashes.iter().for_each(|hash| {
-            inv.enc(&mut buf); // Use the clone in the closure
-            hash.enc(&mut buf);
-        });
-        s.extend(buf);
-    // }
+impl Payload for Request {
+    // type Item = Self;
 
-}
-
-impl IRequest for Request {
-    fn r#type(&self) -> Type {
+    fn r#type(&self) -> MessageType {
         match self {
-            Request::Addr => Type::Addr,
-            Request::FilterLoad(..) => Type::Filterload,
-            Request::GetBlocks(..) => Type::Getblocks,
-            Request::GetHeaders(..) => Type::Getheaders,
+            Request::Addr => MessageType::Addr,
+            Request::FilterLoad(..) => MessageType::Filterload,
+            Request::GetBlocks(..) => MessageType::Getblocks,
+            Request::GetHeaders(..) => MessageType::Getheaders,
             Request::Inv(..) |
-            Request::TransactionInv(..) => Type::Inv,
-            Request::NotFound(..) => Type::NotFound,
-            Request::Ping(..) => Type::Ping,
-            Request::Version(..) => Type::Version,
+            Request::TransactionInv(..) => MessageType::Inv,
+            Request::NotFound(..) => MessageType::NotFound,
+            Request::Ping(..) => MessageType::Ping,
+            Request::Version(..) => MessageType::Version,
             Request::GovernanceHashes(..) |
             Request::GetDataForTransactionHash(..) |
-            Request::GetDataForTransactionHashes(..) => Type::Getdata,
-            Request::GovernanceSync(..) => Type::Govsync,
-            Request::DSeg(..) => Type::Dseg,
-            Request::GetMNListDiff(..) => Type::Getmnlistd,
-            Request::GetQRInfo(..) => Type::Getqrinfo,
+            Request::GetDataForTransactionHashes(..) => MessageType::Getdata,
+            Request::GovernanceSync(..) => MessageType::Govsync,
+            Request::DSeg(..) => MessageType::Dseg,
+            Request::GetMNListDiff(..) => MessageType::Getmnlistd,
+            Request::GetQRInfo(..) => MessageType::Getqrinfo,
             Request::Default(r#type) => r#type.clone(),
-            Request::GovernanceSyncObjects => Type::Govsync,
-            Request::GovernanceSyncVotes => Type::Govobjvote,
+            Request::GovernanceSyncObjects => MessageType::Govsync,
+            Request::GovernanceSyncVotes => MessageType::Govobjvote,
         }
     }
+}
 
-    fn to_data(self) -> Vec<u8> {
-        let mut buffer: Vec<u8> = Vec::new();
+impl Request {
+
+    pub(crate) fn compile(&self) -> Vec<u8> {
+        let mut writer: Vec<u8> = Vec::new();
         match self {
             Request::Default(..) => {},
             Request::Addr => {
                 // TODO: send peer addresses we know about
-                VarInt(0).enc(&mut buffer);
+                0u8.enc(&mut writer);
             },
             Request::FilterLoad(data) => {
-                data.enc(&mut buffer);
+                data.enc(&mut writer);
             },
             Request::GetBlocks(locators, hash_stop, protocol_version) |
             Request::GetHeaders(locators, hash_stop, protocol_version) => {
-                protocol_version.enc(&mut buffer);
-                VarInt(locators.len() as u64).enc(&mut buffer);
+                protocol_version.enc(&mut writer);
+                VarInt(locators.len() as u64).enc(&mut writer);
                 locators.iter().for_each(|locator| {
-                    locator.enc(&mut buffer);
+                    locator.enc(&mut writer);
                 });
-                hash_stop.enc(&mut buffer);
+                hash_stop.enc(&mut writer);
             },
             Request::NotFound(data) => {
-                VarInt((data.len() / 36) as u64).enc(&mut buffer);
-                data.enc(&mut buffer);
+                VarInt((data.len() / 36) as u64).enc(&mut writer);
+                data.enc(&mut writer);
             },
             Request::Ping(local_nonce) => {
-                local_nonce.enc(&mut buffer);
+                local_nonce.enc(&mut writer);
             },
-            Request::Version(address, port, protocol_version, services, standard_port, local_nonce, useragent) => {
-                protocol_version.enc(&mut buffer);
-                ENABLED_SERVICES.enc(&mut buffer);
-                SystemTime::seconds_since_1970().enc(&mut buffer);
-                services.enc(&mut buffer);
-                address.enc(&mut buffer);
-                port.swap_bytes().enc(&mut buffer);
-                NetAddress::new(LOCAL_HOST, standard_port, ENABLED_SERVICES).enc(&mut buffer);
-                local_nonce.enc(&mut buffer);
-                useragent.enc(&mut buffer);
-                0u32.enc(&mut buffer); // last block received
-                0u8.enc(&mut buffer); // relay transactions (no for SPV bloom filter mode)
+            Request::Version(socket_addr, services, local_nonce, chain_type) => {
+                chain_type.protocol_version().enc(&mut writer);
+                ENABLED_SERVICES.enc(&mut writer);
+                SystemTime::seconds_since_1970().enc(&mut writer);
+                services.enc(&mut writer);
+                socket_addr.enc(&mut writer);
+                NetAddress::new(LOCAL_HOST, chain_type.standard_port(), ENABLED_SERVICES).enc(&mut writer);
+                local_nonce.enc(&mut writer);
+                chain_type.user_agent().enc(&mut writer);
+                0u32.enc(&mut writer); // last block received
+                0u8.enc(&mut writer); // relay transactions (no for SPV bloom filter mode)
             },
             Request::GovernanceSync(parent_hash, filter_data) => {
-                parent_hash.enc(&mut buffer);
-                filter_data.enc(&mut buffer);
+                parent_hash.enc(&mut writer);
+                filter_data.enc(&mut writer);
             },
             Request::Inv(inv_type, hashes) |
             Request::GovernanceHashes(inv_type, hashes) => {
-                VarInt(hashes.len() as u64).enc(&mut buffer);
-                array_of_hashes_enc(&hashes, inv_type, &mut buffer);
+                VarInt(hashes.len() as u64).enc(&mut writer);
+                array_of_hashes_enc(&hashes, *inv_type, &mut writer);
             },
             Request::DSeg(utxo) => {
-                utxo.hash.enc(&mut buffer);
+                utxo.hash.enc(&mut writer);
                 if utxo.hash.is_zero() {
-                    u32::MAX.enc(&mut buffer);
+                    u32::MAX.enc(&mut writer);
                 } else {
-                    utxo.n.enc(&mut buffer);
+                    utxo.n.enc(&mut writer);
                 }
-                0u8.enc(&mut buffer);
-                u32::MAX.enc(&mut buffer);
+                0u8.enc(&mut writer);
+                u32::MAX.enc(&mut writer);
             },
             Request::GetMNListDiff(base_block_hash, block_hash) => {
-                base_block_hash.enc(&mut buffer);
-                block_hash.enc(&mut buffer);
+                base_block_hash.enc(&mut writer);
+                block_hash.enc(&mut writer);
             },
             Request::GetQRInfo(base_block_hashes, block_hash, extra_share) => {
-                // Number of masternode lists the light client knows
-                VarInt(base_block_hashes.len() as u64).enc(&mut buffer);
-                // The base block hashes of the masternode lists the light client knows
+                // Number of masternode lists the spv client knows
+                VarInt(base_block_hashes.len() as u64).enc(&mut writer);
+                // The base block hashes of the masternode lists the spv client knows
                 base_block_hashes.iter().for_each(|hash| {
-                    hash.enc(&mut buffer);
+                    hash.enc(&mut writer);
                 });
                 // Hash of the height the client requests
-                block_hash.enc(&mut buffer);
+                block_hash.enc(&mut writer);
                 // Flag to indicate if an extra share is requested
-                if extra_share { 1u8 } else { 0u8 }.enc(&mut buffer);
+                u8::from(*extra_share).enc(&mut writer);
             },
             Request::GetDataForTransactionHash(tx_hash) => {
-                VarInt(1u64).enc(&mut buffer);
-                let tx_type: u32 = InvType::Tx.into();
-                tx_type.enc(&mut buffer);
-                tx_hash.enc(&mut buffer);
+                VarInt(1u64).enc(&mut writer);
+                InvType::Tx.enc(&mut writer);
+                tx_hash.enc(&mut writer);
             },
             Request::GetDataForTransactionHashes(tx_hashes, block_hashes, is_lock_hashes, isd_lock_hashes, c_lock_hashes) => {
-                let tx_hashes = tx_hashes.unwrap_or(vec![]);
-                let block_hashes = block_hashes.unwrap_or(vec![]);
-                let is_lock_hashes = is_lock_hashes.unwrap_or(vec![]);
-                let isd_lock_hashes = isd_lock_hashes.unwrap_or(vec![]);
-                let c_lock_hashes = c_lock_hashes.unwrap_or(vec![]);
-                let size = tx_hashes.len() + block_hashes.len() + is_lock_hashes.len() + isd_lock_hashes.len() + c_lock_hashes.len();
-                VarInt(size as u64).enc(&mut buffer);
-                array_of_hashes_enc(&tx_hashes, InvType::Tx, &mut buffer);
-                array_of_hashes_enc(&is_lock_hashes, InvType::InstantSendLock, &mut buffer);
-                array_of_hashes_enc(&isd_lock_hashes, InvType::InstantSendDeterministicLock, &mut buffer);
-                array_of_hashes_enc(&block_hashes, InvType::Merkleblock, &mut buffer);
-                array_of_hashes_enc(&c_lock_hashes, InvType::ChainLockSignature, &mut buffer);
+                let size = tx_hashes.as_ref().map_or(0, |h| h.len()) +
+                    block_hashes.as_ref().map_or(0, |h| h.len()) +
+                    is_lock_hashes.as_ref().map_or(0, |h| h.len()) +
+                    isd_lock_hashes.as_ref().map_or(0, |h| h.len()) +
+                    c_lock_hashes.as_ref().map_or(0, |h| h.len());
+                VarInt(size as u64).enc(&mut writer);
+                if let Some(tx_hashes) = tx_hashes {
+                    array_of_hashes_enc(tx_hashes, InvType::Tx, &mut writer);
+                }
+                if let Some(is_lock_hashes) = is_lock_hashes {
+                    array_of_hashes_enc(is_lock_hashes, InvType::InstantSendLock, &mut writer);
+                }
+                if let Some(isd_lock_hashes) = isd_lock_hashes {
+                    array_of_hashes_enc(isd_lock_hashes, InvType::InstantSendDeterministicLock, &mut writer);
+                }
+                if let Some(block_hashes) = block_hashes {
+                    array_of_hashes_enc(block_hashes, InvType::Merkleblock, &mut writer);
+                }
+                if let Some(c_lock_hashes) = c_lock_hashes {
+                    array_of_hashes_enc(c_lock_hashes, InvType::ChainLockSignature, &mut writer);
+                }
             },
             Request::TransactionInv(tx_hashes, tx_lock_request_hashes) => {
-                let tx_hashes_len = tx_hashes.len();
-                let tx_lock_request_hashes_len = tx_lock_request_hashes.len();
-                let size = tx_hashes_len + tx_lock_request_hashes_len;
-                VarInt(size as u64).enc(&mut buffer);
-                array_of_hashes_enc(&tx_hashes, InvType::Tx, &mut buffer);
-                array_of_hashes_enc(&tx_lock_request_hashes, InvType::TxLockRequest, &mut buffer);
+                VarInt((tx_hashes.len() + tx_lock_request_hashes.len()) as u64).enc(&mut writer);
+                array_of_hashes_enc(tx_hashes, InvType::Tx, &mut writer);
+                array_of_hashes_enc(tx_lock_request_hashes, InvType::TxLockRequest, &mut writer);
             },
             Request::GovernanceSyncObjects |
             Request::GovernanceSyncVotes => {},
         }
-        buffer
+        writer
     }
 }

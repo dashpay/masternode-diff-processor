@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use crate::chain::block::{Block, IBlock, Kind};
 use crate::chain::Chain;
 use crate::chain::chain_lock::ChainLock;
@@ -22,11 +23,11 @@ impl PartialEq for FullBlock {
 
 impl IBlock for FullBlock {
     fn chain(&self) -> Shared<Chain> {
-        todo!()
+        self.base.chain()
     }
 
     fn chain_type(&self) -> ChainType {
-        todo!()
+        self.base.chain_type()
     }
 
     fn height(&self) -> u32 {
@@ -74,7 +75,7 @@ impl IBlock for FullBlock {
         self.base.set_chain_work(chain_work)
     }
 
-    fn set_chain_locked_with_chain_lock(&mut self, chain_lock: Shared<ChainLock>) {
+    fn set_chain_locked_with_chain_lock(&mut self, chain_lock: Arc<ChainLock>) {
         self.base.set_chain_locked_with_chain_lock(chain_lock);
     }
 
@@ -90,7 +91,7 @@ impl IBlock for FullBlock {
         self.base.has_unverified_chain_lock()
     }
 
-    fn chain_lock_awaiting_processing(&self) -> Option<Shared<ChainLock>> {
+    fn chain_lock_awaiting_processing(&self) -> Option<Arc<ChainLock>> {
         self.base.chain_lock_awaiting_processing()
     }
 

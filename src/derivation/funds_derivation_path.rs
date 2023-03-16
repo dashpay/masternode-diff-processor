@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Weak;
 use hashes::hex::ToHex;
 use crate::{UInt256, util};
-use crate::chain::{Chain, Wallet};
 use crate::chain::common::ChainType;
 use crate::chain::wallet::ext::constants::account_unique_id_from;
 use crate::chain::wallet::seed::Seed;
@@ -14,7 +14,8 @@ use crate::derivation::protocol::IDerivationPath;
 use crate::derivation::sequence_gap_limit::SequenceGapLimit;
 use crate::keys::{ECDSAKey, IKey, Key, KeyType};
 use crate::storage::keychain::Keychain;
-use crate::util::{Address, Shared};
+use crate::storage::manager::managed_context::ManagedContext;
+use crate::util::Address;
 
 #[derive(Clone, Debug, Default)]
 pub struct FundsDerivationPath {
@@ -49,22 +50,22 @@ impl IIndexPath for FundsDerivationPath {
 }
 
 impl IDerivationPath for FundsDerivationPath {
-    fn chain(&self) -> &Shared<Chain> {
-        self.base.chain()
-    }
 
     fn chain_type(&self) -> ChainType {
         self.base.chain_type()
     }
 
-    fn wallet(&self) -> &Option<Shared<Wallet>> {
-        self.base.wallet()
+    fn context(&self) -> Weak<ManagedContext> {
+        self.base.context()
     }
 
-    fn set_wallet(&mut self, wallet: Shared<Wallet>) {
-        self.base.set_wallet(wallet);
+    fn is_transient(&self) -> bool {
+        self.base.is_transient()
     }
 
+    fn set_is_transient(&mut self, is_transient: bool) {
+        self.base.set_is_transient(is_transient);
+    }
     fn wallet_unique_id(&self) -> Option<String> {
         self.base.wallet_unique_id()
     }
@@ -72,18 +73,6 @@ impl IDerivationPath for FundsDerivationPath {
     fn set_wallet_unique_id(&mut self, unique_id: String) {
         self.base.set_wallet_unique_id(unique_id);
     }
-
-    // fn params(&self) -> &Params {
-    //     self.base.params()
-    // }
-    //
-    // fn wallet(&self) -> Weak<Wallet> {
-    //     self.base.wallet()
-    // }
-    //
-    // fn context(&self) -> Weak<ManagedContext> {
-    //     self.base.context()
-    // }
 
     fn signing_algorithm(&self) -> KeyType {
         self.base.signing_algorithm()
@@ -183,7 +172,7 @@ impl IDerivationPath for FundsDerivationPath {
 
 impl FundsDerivationPath {
 
-    pub fn bip32_derivation_path(account_number: u32, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn bip32_derivation_path(account_number: u32, chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self {
             base: DerivationPath::derivation_path_with_indexes(
                 vec![UInt256::from(account_number)],
@@ -192,14 +181,14 @@ impl FundsDerivationPath {
                 KeyType::ECDSA,
                 DerivationPathReference::BIP32,
                 chain_type,
-                chain
+                context
             ),
             account_number,
             ..Default::default()
         }
     }
 
-    pub fn bip44_derivation_path(account_number: u32, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn bip44_derivation_path(account_number: u32, chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self {
             base: DerivationPath::derivation_path_with_indexes(
                 vec![
@@ -212,7 +201,7 @@ impl FundsDerivationPath {
                 KeyType::ECDSA,
                 DerivationPathReference::BIP44,
                 chain_type,
-                chain
+                context
             ),
             account_number,
             ..Default::default()
@@ -243,16 +232,9 @@ impl FundsDerivationPath {
     }
 
     fn has_known_balance_unique_id_string(&self) -> String {
-        if let Some(w) = self.wallet() {
-            let w = w.borrow();
-            w.with(|w|
-                has_known_balance_unique_id(
-                    account_unique_id_from(w.unique_id_string(), self.account_number),
-                    u32::from(self.reference()))
-            )
-        } else {
-            String::new()
-        }
+        self.wallet_unique_id()
+            .map_or(String::new(), |unique_id|
+                has_known_balance_unique_id(account_unique_id_from(unique_id, self.account_number), u32::from(self.reference())))
     }
 
     /// Wallets are composed of chains of addresses. Each chain is traversed until a gap of a certain number of addresses is
@@ -260,96 +242,88 @@ impl FundsDerivationPath {
     /// following the last used address in the chain. The internal chain is used for change addresses and the external chain
     /// for receive addresses.
     pub fn register_addresses_with_gap_limit(&mut self, gap_limit: u32, internal: bool) -> Result<HashSet<String>, util::Error> {
-        if let Some(w) = self.wallet() {
-            let chain = self.base.chain().borrow();
-            let wallet = w.borrow();
-            chain.with(|chain| {
-                wallet.with(|wallet| {
-                    if !wallet.is_transient() {
-                        assert!(self.base.addresses_loaded, "addresses must be loaded before calling this function");
+        if self.wallet_unique_id().is_some() {
+            if !self.is_transient() {
+                assert!(self.base.addresses_loaded, "addresses must be loaded before calling this function");
+            }
+            let mut arr = if internal { self.internal_addresses.clone() } else { self.external_addresses.clone() };
+            let mut i = arr.len();
+            // keep only the trailing contiguous block of addresses with no transactions
+            while i > 0 && !arr.iter().last().map_or(false, |value| self.used_addresses().contains(value)) {
+                i -= 1;
+            }
+            if i > 0 {
+                arr.drain(..i);
+            }
+            let limit = gap_limit as usize;
+            if arr.len() >= limit {
+                return Ok(arr.iter().take(limit).cloned().collect());
+            }
+            if limit > 1 { // get receiveAddress and changeAddress first to avoid blocking
+                self.receive_address();
+                self.change_address();
+            }
+            // It seems weird to repeat this, but it's correct because of the original call receive address and change address
+            arr = if internal { self.internal_addresses.clone() } else { self.external_addresses.clone() };
+            i = arr.len();
+            let mut n = i as u32;
+            // keep only the trailing contiguous block of addresses with no transactions
+            while i > 0 && !arr.iter().last().map_or(false, |value| self.used_addresses().contains(value)) {
+                i -= 1;
+            }
+            if i > 0 {
+                arr.drain(..i);
+            }
+            if arr.len() >= limit {
+                return Ok(arr.iter().take(limit).cloned().collect());
+            }
+            let mut add_addresses = HashMap::<u32, String>::new();
+            while arr.len() < limit { // generate new addresses up to gapLimit
+                if let Some(addr) = self.public_key_data_at_index(n, internal)
+                    .and_then(|pub_key| ECDSAKey::key_with_public_key_data(&pub_key)
+                        .map(|key| Address::with_public_key_data(&key.public_key_data(), &self.chain_type().script_map()))) {
+                    self.base.all_addresses.push(addr.clone());
+                    if internal {
+                        self.internal_addresses.push(addr.clone());
+                    } else {
+                        self.external_addresses.push(addr.clone());
                     }
-                    let mut arr = if internal { self.internal_addresses.clone() } else { self.external_addresses.clone() };
-                    let mut i = arr.len();
-                    // keep only the trailing contiguous block of addresses with no transactions
-                    while i > 0 && !arr.iter().last().map_or(false, |value| self.used_addresses().contains(value)) {
-                        i -= 1;
-                    }
-                    if i > 0 {
-                        arr.drain(..i);
-                    }
-                    let limit = gap_limit as usize;
-                    if arr.len() >= limit {
-                        return Ok(arr.iter().take(limit).cloned().collect());
-                    }
-                    if limit > 1 { // get receiveAddress and changeAddress first to avoid blocking
-                        self.receive_address();
-                        self.change_address();
-                    }
-                    // It seems weird to repeat this, but it's correct because of the original call receive address and change address
-                    arr = if internal { self.internal_addresses.clone() } else { self.external_addresses.clone() };
-                    i = arr.len();
-                    let mut n = i as u32;
-                    // keep only the trailing contiguous block of addresses with no transactions
-                    while i > 0 && !arr.iter().last().map_or(false, |value| self.used_addresses().contains(value)) {
-                        i -= 1;
-                    }
-                    if i > 0 {
-                        arr.drain(..i);
-                    }
-                    if arr.len() >= limit {
-                        return Ok(arr.iter().take(limit).cloned().collect());
-                    }
-                    let mut add_addresses = HashMap::<u32, String>::new();
-                    while arr.len() < limit { // generate new addresses up to gapLimit
-                        if let Some(addr) = self.public_key_data_at_index(n, internal)
-                            .and_then(|pub_key| ECDSAKey::key_with_public_key_data(&pub_key)
-                                .map(|key| Address::with_public_key_data(&key.public_key_data(), &self.chain_type().script_map()))) {
-                            self.base.all_addresses.push(addr.clone());
-                            if internal {
-                                self.internal_addresses.push(addr.clone());
-                            } else {
-                                self.external_addresses.push(addr.clone());
-                            }
-                            arr.push(addr.clone());
-                            add_addresses.insert(n, addr.clone());
-                            n += 1;
-                        } else {
-                            println!("error generating keys");
-                            // return None;
-                            return Err(util::Error::DefaultWithCode(format!("Error generating public keys"), 500));
-                        }
-                    }
-                    // TODO: store addresses
-                    // if !wallet.is_transient() {
-                    //     match DerivationPathEntity::derivation_path_entity_matching_derivation_path(self, self.context()) {
-                    //         Ok(derivationPathEntity) => {
-                    //             for (n, addr) in add_addresses {
-                    //                 match AddressEntity::create_with(
-                    //                     derivationPathEntity.id,
-                    //                     addr.as_str(),
-                    //                     n as i32,
-                    //                     internal,
-                    //                     false,
-                    //                     self.context()
-                    //                 ) {
-                    //                     Ok(created) => {},
-                    //                     Err(err) => { return Err(util::Error::Default(format!("Can't retrieve derivation path"))); }
-                    //                 }
-                    //             }
-                    //         },
-                    //         Err(err) => {
-                    //             return Err(util::Error::Default(format!("Can't retrieve derivation path")));
-                    //         }
-                    //     }
-                    // }
-                    Ok(HashSet::from_iter(arr.into_iter()))
-                })
-            })
+                    arr.push(addr.clone());
+                    add_addresses.insert(n, addr.clone());
+                    n += 1;
+                } else {
+                    println!("error generating keys");
+                    // return None;
+                    return Err(util::Error::DefaultWithCode(format!("Error generating public keys"), 500));
+                }
+            }
+            // TODO: store addresses
+            // if !wallet.is_transient() {
+            //     match DerivationPathEntity::derivation_path_entity_matching_derivation_path(self, self.context()) {
+            //         Ok(derivationPathEntity) => {
+            //             for (n, addr) in add_addresses {
+            //                 match AddressEntity::create_with(
+            //                     derivationPathEntity.id,
+            //                     addr.as_str(),
+            //                     n as i32,
+            //                     internal,
+            //                     false,
+            //                     self.context()
+            //                 ) {
+            //                     Ok(created) => {},
+            //                     Err(err) => { return Err(util::Error::Default(format!("Can't retrieve derivation path"))); }
+            //                 }
+            //             }
+            //         },
+            //         Err(err) => {
+            //             return Err(util::Error::Default(format!("Can't retrieve derivation path")));
+            //         }
+            //     }
+            // }
+            Ok(HashSet::from_iter(arr.into_iter()))
         } else {
             Err(util::Error::DefaultWithCode(format!("Error generating public keys (no wallet)"), 500))
         }
-
-
     }
 
     /// gets an address at an index path

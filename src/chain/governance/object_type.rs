@@ -1,6 +1,6 @@
 use std::io::{Error, Write};
 use byte::ctx::Endian;
-use byte::{BytesExt, TryRead};
+use byte::{BytesExt, TryRead, TryWrite};
 use crate::consensus::Encodable;
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
@@ -25,6 +25,17 @@ impl From<u32> for ObjectType {
     }
 }
 
+impl From<ObjectType> for u32 {
+    fn from(value: ObjectType) -> Self {
+        match value {
+            ObjectType::Unknown => 0,
+            ObjectType::Proposal => 1,
+            ObjectType::Trigger => 2,
+            ObjectType::Watchdog => 3,
+        }
+    }
+}
+
 impl From<&ObjectType> for u32 {
     fn from(value: &ObjectType) -> Self {
         match value {
@@ -43,6 +54,15 @@ impl<'a> TryRead<'a, Endian> for ObjectType {
         Ok((data, std::mem::size_of::<u32>()))
     }
 }
+
+impl TryWrite<Endian> for ObjectType {
+    fn try_write(self, bytes: &mut [u8], endian: Endian) -> Result<usize, byte::Error> {
+        let offset = &mut 0;
+        bytes.write_with::<u32>(offset, self.into(), endian)?;
+        Ok(*offset)
+    }
+}
+
 
 impl Encodable for ObjectType {
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, Error> {

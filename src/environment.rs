@@ -2,6 +2,9 @@
 // use ring::rand::SystemRandom;
 // use crate::resource::bundle::Bundle;
 
+use std::env;
+use std::path::PathBuf;
+
 #[derive(Debug, Default)]
 pub enum Language {
     #[default]
@@ -38,6 +41,18 @@ impl Default for Environment {
 // }
 
 impl Environment {
+    pub const DOMAIN: &'static str = "group.org.dashfoundation.dash-spv";
+    pub fn cargo_home_dir() -> String {
+        env::var("HOME").expect("No HOME defined")
+    }
+    pub fn cargo_manifest_dir() -> String {
+        env::var("CARGO_MANIFEST_DIR").expect("No CARGO_MANIFEST_DIR defined")
+    }
+    pub fn cargo_current_dir() -> PathBuf {
+        env::current_dir().expect("No current_dif")
+    }
+
+
     pub const fn new_const_default() -> Self {
         Self { language: Language::English }
     }

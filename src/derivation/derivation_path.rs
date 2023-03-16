@@ -1,6 +1,6 @@
 use std::collections::HashSet;
+use std::sync::Weak;
 use hashes::hex::ToHex;
-use crate::chain::{Chain, Wallet};
 use crate::chain::bip::bip32;
 use crate::chain::common::ChainType;
 use crate::UInt256;
@@ -15,7 +15,7 @@ use crate::derivation::{standalone_extended_public_key_location_string_for_uniqu
 use crate::keys::IKey;
 use crate::keys::key::{Key, KeyType};
 use crate::storage::keychain::Keychain;
-use crate::util::Shared;
+use crate::storage::manager::managed_context::ManagedContext;
 
 #[derive(Clone, Debug)]
 pub struct DerivationPathInfo {
@@ -27,10 +27,13 @@ pub struct DerivationPathInfo {
 #[derive(Clone, Debug, Default)]
 pub struct DerivationPath {
     pub base: UInt256IndexPath,
-    pub chain: Shared<Chain>,
+    // pub chain: Weak<Chain>,
+    pub context: Weak<ManagedContext>,
     pub chain_type: ChainType,
-    pub wallet: Option<Shared<Wallet>>,
+    // pub wallet: Option<Weak<Wallet>>,
     pub wallet_unique_id: Option<String>,
+    pub is_transient: bool,
+
     pub hardened_indexes: Vec<bool>,
     /// is this an open account
     pub r#type: DerivationPathType,
@@ -99,20 +102,21 @@ impl IIndexPath for DerivationPath {
 }
 
 impl IDerivationPath for DerivationPath {
-    fn chain(&self) -> &Shared<Chain> {
-        &self.chain
-    }
 
     fn chain_type(&self) -> ChainType {
         self.chain_type
     }
 
-    fn wallet(&self) -> &Option<Shared<Wallet>> {
-        &self.wallet
+    fn context(&self) -> Weak<ManagedContext> {
+        self.context.clone()
     }
 
-    fn set_wallet(&mut self, wallet: Shared<Wallet>) {
-        self.wallet = Some(wallet);
+    fn is_transient(&self) -> bool {
+        self.is_transient
+    }
+
+    fn set_is_transient(&mut self, is_transient: bool) {
+        self.is_transient = is_transient;
     }
 
     fn wallet_unique_id(&self) -> Option<String> {
@@ -122,19 +126,6 @@ impl IDerivationPath for DerivationPath {
     fn set_wallet_unique_id(&mut self, unique_id: String) {
         self.wallet_unique_id = Some(unique_id);
     }
-
-    // fn chain(&self) -> Weak<Chain> {
-    //     self.chain
-    // }
-
-    // fn wallet(&self) -> Weak<Wallet> {
-    //     self.wallet.upgrade()
-    //     self.wallet.or(self.account.map(|acc| acc.wallet))
-    // }
-
-    // fn context(&self) -> Weak<ManagedContext> {
-    //     self.chain.
-    // }
 
     fn signing_algorithm(&self) -> KeyType {
         self.signing_algorithm
@@ -205,7 +196,7 @@ impl IDerivationPath for DerivationPath {
 
     fn standalone_extended_public_key_unique_id(&mut self) -> Option<String> {
         self.standalone_extended_public_key_unique_id.clone().or({
-            if self.extended_public_key.is_none() && self.wallet.is_some() {
+            if self.extended_public_key.is_none() && self.wallet_unique_id.is_some() {
                 assert!(false, "we really should have a wallet");
                 None
             } else {
@@ -242,7 +233,7 @@ impl IDerivationPath for DerivationPath {
 }
 
 impl DerivationPath {
-    pub fn master_identity_contacts_derivation_path_for_account_number(account_number: u32, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn master_identity_contacts_derivation_path_for_account_number(account_number: u32, chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self::derivation_path_with_indexes(
             vec![
                 UInt256::from(DerivationPathFeaturePurpose::Default),
@@ -255,24 +246,23 @@ impl DerivationPath {
             KeyType::ECDSA,
             DerivationPathReference::ContactBasedFundsRoot,
             chain_type,
-            chain
+            context
         )
     }
 
-    pub fn derivation_path_with_indexes(indexes: Vec<UInt256>, hardened: Vec<bool>, r#type: DerivationPathType, signing_algorithm: KeyType, reference: DerivationPathReference, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn derivation_path_with_indexes(indexes: Vec<UInt256>, hardened: Vec<bool>, r#type: DerivationPathType, signing_algorithm: KeyType, reference: DerivationPathReference, chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self {
             base: UInt256IndexPath { indexes, hardened_indexes: hardened },
             r#type,
             signing_algorithm,
-            chain,
             reference,
             chain_type,
-            // context: chain.chain_context(),
+            context,
             ..Default::default()
         }
     }
 
-    pub fn derivation_path_with_bip32_key(key: bip32::Key, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn derivation_path_with_bip32_key(key: bip32::Key, chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         let key_type = KeyType::ECDSA;
         let mut path = Self::derivation_path_with_indexes(
             vec![key.child],
@@ -281,7 +271,7 @@ impl DerivationPath {
             key_type,
             DerivationPathReference::Unknown,
             chain_type,
-            chain
+            context,
         );
         path.extended_public_key = key_type.key_with_extended_public_key_data(&key.extended_key_data());
         path.depth = key.depth;
@@ -489,7 +479,7 @@ impl DerivationPath {
             .unwrap_or(String::new())
     }
 
-    pub fn init_with_extended_public_key_identifier(identifier: &str, chain_type: ChainType, chain: Shared<Chain>) -> Option<Self> {
+    pub fn init_with_extended_public_key_identifier(identifier: &str, chain_type: ChainType, context: Weak<ManagedContext>) -> Option<Self> {
         match Keychain::get_object::<DerivationPathInfo>(standalone_info_dictionary_location_string_for_unique_id(identifier)) {
             Ok(info) => {
                 let mut path = DerivationPath::derivation_path_with_indexes(
@@ -499,7 +489,7 @@ impl DerivationPath {
                     KeyType::ECDSA,
                     DerivationPathReference::Unknown,
                     chain_type,
-                    chain
+                    context
                 );
                 path.wallet_based_extended_public_key_location_string = Some(identifier.to_string());
                 match Keychain::get_data(standalone_extended_public_key_location_string_for_unique_id(identifier)) {

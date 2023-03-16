@@ -1,3 +1,4 @@
+use std::sync::{Arc, RwLock, Weak};
 use crate::chain::{Chain, Wallet};
 use crate::chain::common::chain_type::IHaveChainSettings;
 use crate::chain::common::ChainType;
@@ -6,15 +7,15 @@ use crate::derivation::authentication_keys_derivation_path::AuthenticationKeysDe
 use crate::derivation::credit_funding_derivation_path::CreditFundingDerivationPath;
 use crate::derivation::masternode_holdings_derivation_path::MasternodeHoldingsDerivationPath;
 use crate::derivation::protocol::IDerivationPath;
-use crate::util::Shared;
+use crate::storage::manager::managed_context::ManagedContext;
 
 pub trait Derivation {
-    fn register_derivation_paths_for_seed(&self, seed: &Seed, chain_type: ChainType);
-    fn identity_registration_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath;
-    fn identity_topup_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath;
-    fn identity_invitation_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath;
-    fn identity_bls_keys_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> AuthenticationKeysDerivationPath;
-    fn identity_ecdsa_keys_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> AuthenticationKeysDerivationPath;
+    fn register_derivation_paths_for_seed(&self, seed: &Seed, chain_type: ChainType, context: Weak<ManagedContext>);
+    fn identity_registration_funding_derivation_path_for_wallet(&self, wallet: Weak<Wallet>) -> CreditFundingDerivationPath;
+    fn identity_topup_funding_derivation_path_for_wallet(&self, wallet: Weak<Wallet>) -> CreditFundingDerivationPath;
+    fn identity_invitation_funding_derivation_path_for_wallet(&self, wallet: Weak<Wallet>) -> CreditFundingDerivationPath;
+    fn identity_bls_keys_derivation_path_for_wallet(&self, wallet: Weak<Wallet>) -> AuthenticationKeysDerivationPath;
+    fn identity_ecdsa_keys_derivation_path_for_wallet(&self, wallet: Weak<Wallet>) -> AuthenticationKeysDerivationPath;
 
     // fn identity_funding_private_key_for_wallet(&self, wallet: Shared<Wallet>, coin_type: u32, is_for_invitation: bool, index: u32, seed: &Seed) -> Option<Key>;
 
@@ -33,50 +34,50 @@ pub trait Derivation {
     // fn provider_funds_derivation_path_for_wallet(&self, coin_type: u32, wallet: &SharedWallet) -> MasternodeHoldingsDerivationPath;
 }
 
-impl Derivation for Shared<Chain> {
-    fn register_derivation_paths_for_seed(&self, seed: &Seed, chain_type: ChainType) {
-        AuthenticationKeysDerivationPath::provider_owner_keys_derivation_path_for_chain(chain_type, self.borrow())
+impl Derivation for Arc<RwLock<Chain>> {
+    fn register_derivation_paths_for_seed(&self, seed: &Seed, chain_type: ChainType, context: Weak<ManagedContext>) {
+        AuthenticationKeysDerivationPath::provider_owner_keys_derivation_path_for_chain(chain_type, context.clone())
             .generate_extended_public_key_from_seed(seed);
-        AuthenticationKeysDerivationPath::provider_operator_keys_derivation_path_for_chain(chain_type, self.borrow())
+        AuthenticationKeysDerivationPath::provider_operator_keys_derivation_path_for_chain(chain_type, context.clone())
             .generate_extended_public_key_from_seed(seed);
-        AuthenticationKeysDerivationPath::provider_voting_keys_derivation_path_for_chain(chain_type, self.borrow())
+        AuthenticationKeysDerivationPath::provider_voting_keys_derivation_path_for_chain(chain_type, context.clone())
             .generate_extended_public_key_from_seed(seed);
-        MasternodeHoldingsDerivationPath::provider_funds_derivation_path_for_chain(chain_type, self.borrow())
+        MasternodeHoldingsDerivationPath::provider_funds_derivation_path_for_chain(chain_type, context.clone())
             .generate_extended_public_key_from_seed(seed);
         if chain_type.is_evolution_enabled() {
-            AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_chain(chain_type, self.borrow())
+            AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_chain(chain_type, context.clone())
                 .generate_extended_public_key_from_seed(seed);
-            AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_chain(chain_type, self.borrow())
+            AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_chain(chain_type, context.clone())
                 .generate_extended_public_key_from_seed(seed);
-            CreditFundingDerivationPath::identity_registration_funding_derivation_path_for_chain(chain_type, self.borrow())
+            CreditFundingDerivationPath::identity_registration_funding_derivation_path_for_chain(chain_type, context.clone())
                 .generate_extended_public_key_from_seed(seed);
-            CreditFundingDerivationPath::identity_topup_funding_derivation_path_for_chain(chain_type, self.borrow())
+            CreditFundingDerivationPath::identity_topup_funding_derivation_path_for_chain(chain_type, context.clone())
                 .generate_extended_public_key_from_seed(seed);
-            CreditFundingDerivationPath::identity_invitation_funding_derivation_path_for_chain(chain_type, self.borrow())
+            CreditFundingDerivationPath::identity_invitation_funding_derivation_path_for_chain(chain_type, context.clone())
                 .generate_extended_public_key_from_seed(seed);
         }
     }
 
-    fn identity_registration_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath {
+    fn identity_registration_funding_derivation_path_for_wallet(&self, wallet: Weak<Wallet>) -> CreditFundingDerivationPath {
         todo!()
         // self.with(|chain|
         //     chain.derivation_factory.identity_registration_funding_derivation_path_for_wallet(
         //         chain.r#type(), ))
     }
 
-    fn identity_topup_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath {
+    fn identity_topup_funding_derivation_path_for_wallet(&self, wallet: Weak<Wallet>) -> CreditFundingDerivationPath {
         todo!()
     }
 
-    fn identity_invitation_funding_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> CreditFundingDerivationPath {
+    fn identity_invitation_funding_derivation_path_for_wallet(&self, wallet: Weak<Wallet>) -> CreditFundingDerivationPath {
         todo!()
     }
 
-    fn identity_bls_keys_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> AuthenticationKeysDerivationPath {
+    fn identity_bls_keys_derivation_path_for_wallet(&self, wallet: Weak<Wallet>) -> AuthenticationKeysDerivationPath {
         todo!()
     }
 
-    fn identity_ecdsa_keys_derivation_path_for_wallet(&self, wallet: Shared<Wallet>) -> AuthenticationKeysDerivationPath {
+    fn identity_ecdsa_keys_derivation_path_for_wallet(&self, wallet: Weak<Wallet>) -> AuthenticationKeysDerivationPath {
         todo!()
     }
 
@@ -113,49 +114,3 @@ impl Derivation for Shared<Chain> {
     // }
 
 }
-
-// pub struct DSChain {
-//     pub wallets: Vec<DSWallet>,
-// }
-// pub struct DSWallet {
-//     pub accounts: Vec<DSAccount>,
-//     pub chain: DSChain,
-// }
-//
-// pub struct DSAccount {
-//     pub master_contacts_derivation_path: DSDerivationPath,
-//     pub fund_derivation_paths: Vec<FundsDerivationPath>,
-//     pub wallet: DSWallet,
-// }
-//
-// impl Wallet {
-//     pub fn standard_wallet_with_seed_phrase(phrase: &str, created_at: u64, chain: DSChain) -> Option<DSWallet> {
-//         let account = DSAccount::account_with_number(0, chain.derivation_paths_for_account_number(0));
-//         if let Some(unique_id) = Self::set_seed_phrase(phrase, created_at, chain) {
-//             Self::registerDerivationPathsForSeedPhrase(phrase, unique_id, chain);
-//             let wallet = DSWallet::initWithUniqueID(unique_id, vec![account], chain);
-//             return Some(wallet);
-//         }
-//         None
-//     }
-// }
-//
-// impl DSAccount {
-//     pub fn account_with_number(number: u32, derivation_paths: Vec<FundsDerivationPath>) -> DSAccount {
-//         let account = Self {
-//             master_contacts_derivation_path: (),
-//             fund_derivation_paths: vec![],
-//             wallet: DSWallet {}
-//         }
-//     }
-// }
-
-// + (instancetype)initWithAccountNumber:(uint32_t)accountNumber withDerivationPaths:(NSArray<DSFundsDerivationPath *> *)derivationPaths inContext:(NSManagedObjectContext *)context {
-// if (!(self = [[super alloc] init])) return nil;
-// _accountNumber = accountNumber;
-// for (DSDerivationPath *derivationPath in derivationPaths) {
-// [self.mFundDerivationPaths addObject:(DSFundsDerivationPath *)derivationPath];
-// derivationPath.account = self;
-// }
-// return self;
-// }

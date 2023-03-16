@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Weak;
-use crate::chain::Wallet;
 use crate::chain::wallet::seed::Seed;
 use crate::derivation::derivation_path::DerivationPath;
 use crate::derivation::derivation_path_kind::DerivationPathKind;
@@ -21,7 +19,7 @@ pub struct Account {
     pub bip44_derivation_path: Option<FundsDerivationPath>,
     pub bip32_derivation_path: Option<FundsDerivationPath>,
     pub master_contacts_derivation_path: Option<DerivationPath>,
-    pub wallet: Shared<Wallet>,
+    // pub wallet: Weak<RwLock<Wallet>>,
     pub account_number: u32,
     /// current wallet balance excluding transactions known to be invalid
     // pub balance: u64,
@@ -80,7 +78,7 @@ impl Default for Account {
             bip44_derivation_path: None,
             bip32_derivation_path: None,
             master_contacts_derivation_path: None,
-            wallet: Shared::Borrowed(Weak::new()),
+            // wallet: Weak::new(),
             account_number: 0,
             contact_incoming_fund_derivation_paths_dictionary: Default::default(),
             contact_outgoing_fund_derivation_paths_dictionary: Default::default(),
@@ -185,29 +183,36 @@ impl Account {
     }
 
 
-    pub fn bind_to_wallet_with_unique_id(&mut self, unique_id: String, wallet: Shared<Wallet>) {
+    pub fn bind_to_wallet_with_unique_id(&mut self, unique_id: String, is_transient: bool/*, wallet: Weak<RwLock<Wallet>>*/) {
         if let Some(path) = self.bip32_derivation_path.as_mut() {
-            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
+            path.set_is_transient(is_transient);
+            path.set_wallet_unique_id(unique_id.clone());
         }
         if let Some(path) = self.bip44_derivation_path.as_mut() {
-            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
+            path.set_is_transient(is_transient);
+            path.set_wallet_unique_id(unique_id.clone());
         }
         if let Some(path) = self.master_contacts_derivation_path.as_mut() {
-            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
+            path.set_is_transient(is_transient);
+            path.set_wallet_unique_id(unique_id.clone());
         }
         if let Some(path) = self.default_derivation_path.as_mut() {
-            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
+            path.set_is_transient(is_transient);
+            path.set_wallet_unique_id(unique_id.clone());
         }
         self.fund_derivation_paths.iter_mut().for_each(|path| {
-            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
+            path.set_is_transient(is_transient);
+            path.set_wallet_unique_id(unique_id.clone());
         });
         self.contact_incoming_fund_derivation_paths_dictionary.values_mut().for_each(|path| {
-            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
+            path.set_is_transient(is_transient);
+            path.set_wallet_unique_id(unique_id.clone());
         });
         self.contact_outgoing_fund_derivation_paths_dictionary.values_mut().for_each(|path| {
-            path.set_wallet_with_unique_id(wallet.borrow(), unique_id.clone());
+            path.set_is_transient(is_transient);
+            path.set_wallet_unique_id(unique_id.clone());
         });
-        self.wallet = wallet;
+        // self.wallet = wallet;
     }
 
     pub fn generate_extended_public_keys_for_seed(&mut self, seed: &Seed, is_evolution_enabled: bool) {

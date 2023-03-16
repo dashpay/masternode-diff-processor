@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use crate::chain::{Chain, Wallet};
+use std::sync::Weak;
 use crate::chain::common::ChainType;
 use crate::chain::wallet::seed::Seed;
 use crate::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
@@ -13,7 +13,7 @@ use crate::derivation::masternode_holdings_derivation_path::MasternodeHoldingsDe
 use crate::derivation::protocol::IDerivationPath;
 use crate::derivation::simple_indexed_derivation_path::SimpleIndexedDerivationPath;
 use crate::keys::{Key, KeyType};
-use crate::util::Shared;
+use crate::storage::manager::managed_context::ManagedContext;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum DerivationPathKind {
@@ -88,20 +88,21 @@ impl DerivationPathKind {
 }
 
 impl IDerivationPath for DerivationPathKind {
-    fn chain(&self) -> &Shared<Chain> {
-        self.path().chain()
-    }
 
     fn chain_type(&self) -> ChainType {
         self.path().chain_type()
     }
 
-    fn wallet(&self) -> &Option<Shared<Wallet>> {
-        self.path().wallet()
+    fn context(&self) -> Weak<ManagedContext> {
+        self.path().context()
     }
 
-    fn set_wallet(&mut self, wallet: Shared<Wallet>) {
-        self.path_mut().set_wallet(wallet);
+    fn is_transient(&self) -> bool {
+        self.path().is_transient()
+    }
+
+    fn set_is_transient(&mut self, is_transient: bool) {
+        self.path_mut().set_is_transient(is_transient);
     }
 
     fn wallet_unique_id(&self) -> Option<String> {
@@ -111,17 +112,6 @@ impl IDerivationPath for DerivationPathKind {
     fn set_wallet_unique_id(&mut self, unique_id: String) {
         self.path_mut().set_wallet_unique_id(unique_id);
     }
-    // fn params(&self) -> &Params {
-    //     self.path().params()
-    // }
-    //
-    // fn wallet(&self) -> Weak<Wallet> {
-    //     self.path().wallet()
-    // }
-    //
-    // fn context(&self) -> Weak<ManagedContext> {
-    //     self.path().context()
-    // }
 
     fn signing_algorithm(&self) -> KeyType {
         self.path().signing_algorithm()

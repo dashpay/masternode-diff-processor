@@ -1,7 +1,8 @@
 use std::collections::HashSet;
 use std::ops::Range;
+use std::sync::Weak;
 use crate::{UInt256, util};
-use crate::chain::{Chain, ScriptMap, Wallet};
+use crate::chain::ScriptMap;
 use crate::chain::common::ChainType;
 use crate::chain::wallet::seed::Seed;
 use crate::crypto::UInt160;
@@ -11,7 +12,8 @@ use crate::derivation::derivation_path_type::DerivationPathType;
 use crate::derivation::index_path::{IIndexPath, IndexPath};
 use crate::derivation::protocol::IDerivationPath;
 use crate::keys::{Key, KeyType};
-use crate::util::{Address, Shared};
+use crate::storage::manager::managed_context::ManagedContext;
+use crate::util::Address;
 
 pub trait ISimpleIndexedDerivationPath: IDerivationPath {
     fn base(&self) -> &dyn IDerivationPath;
@@ -83,20 +85,21 @@ impl IIndexPath for SimpleIndexedDerivationPath {
 
 
 impl IDerivationPath for SimpleIndexedDerivationPath {
-    fn chain(&self) -> &Shared<Chain> {
-        self.base.chain()
-    }
 
     fn chain_type(&self) -> ChainType {
         self.base.chain_type()
     }
 
-    fn wallet(&self) -> &Option<Shared<Wallet>> {
-        self.base.wallet()
+    fn context(&self) -> Weak<ManagedContext> {
+        self.base.context()
     }
 
-    fn set_wallet(&mut self, wallet: Shared<Wallet>) {
-        self.base.set_wallet(wallet);
+    fn is_transient(&self) -> bool {
+        self.base.is_transient()
+    }
+
+    fn set_is_transient(&mut self, is_transient: bool) {
+        self.base.set_is_transient(is_transient);
     }
 
     fn wallet_unique_id(&self) -> Option<String> {
@@ -211,7 +214,6 @@ impl IDerivationPath for SimpleIndexedDerivationPath {
     }
 
     fn register_transaction_address(&mut self, address: &String) -> bool {
-        // todo: avoid clone & optioning address
         let contains = self.contains_address(address);
         if contains && !self.used_addresses().contains(address) {
             self.used_addresses().insert(address.clone());
@@ -225,67 +227,63 @@ impl IDerivationPath for SimpleIndexedDerivationPath {
     // following the last used address in the chain.
     fn register_addresses_with_gap_limit(&mut self, gap_limit: u32) -> Result<Vec<String>, util::Error> {
         assert_ne!(self.base.r#type, DerivationPathType::MultipleUserAuthentication, "This should not be called for multiple user authentication. Use 'register_addresses_with_gap_limit_and_identity_index()'' instead.");
-        if let Some(w) = self.wallet() {
-            let chain = self.chain().borrow();
-            let wallet = w.borrow();
-            chain.with(|chain| wallet.with(|wallet| {
-                let mut array = self.ordered_addresses.clone();
-                if !wallet.is_transient() {
-                    assert!(self.base.addresses_loaded, "addresses must be loaded before calling this function");
-                }
-                let mut i = array.len();
-                // keep only the trailing contiguous block of addresses that aren't used
-                while i > 0 && !self.used_addresses().contains(array.get(i - 1).unwrap()) {
-                    i -= 1;
-                }
-                if i > 0 {
-                    array.drain(0..i);
-                }
-                let limit = gap_limit as usize;
+        if self.wallet_unique_id().is_some() {
+            let mut array = self.ordered_addresses.clone();
+            if !self.is_transient() {
+                assert!(self.base.addresses_loaded, "addresses must be loaded before calling this function");
+            }
+            let mut i = array.len();
+            // keep only the trailing contiguous block of addresses that aren't used
+            while i > 0 && !self.used_addresses().contains(array.get(i - 1).unwrap()) {
+                i -= 1;
+            }
+            if i > 0 {
+                array.drain(0..i);
+            }
+            let limit = gap_limit as usize;
+            if array.len() >= limit {
+                return Ok(array.drain(0..limit).collect());
+            }
+            // It seems weird to repeat this, but it's correct because of the original call receive address and change address
+            array = self.ordered_addresses.clone();
+            i = array.len();
+            let mut n = i as u32;
+            // keep only the trailing contiguous block of addresses with no transactions
+            while i > 0 && !self.used_addresses().contains(array.get(i - 1).unwrap()) {
+                i -= 1;
+            }
+            if i > 0 {
+                array.drain(0..i);
                 if array.len() >= limit {
                     return Ok(array.drain(0..limit).collect());
                 }
-                // It seems weird to repeat this, but it's correct because of the original call receive address and change address
-                array = self.ordered_addresses.clone();
-                i = array.len();
-                let mut n = i as u32;
-                // keep only the trailing contiguous block of addresses with no transactions
-                while i > 0 && !self.used_addresses().contains(array.get(i - 1).unwrap()) {
-                    i -= 1;
-                }
-                if i > 0 {
-                    array.drain(0..i);
-                    if array.len() >= limit {
-                        return Ok(array.drain(0..limit).collect());
-                    }
-                }
-                while array.len() < limit {
-                    // generate new addresses up to gapLimit
-                    if let Some(pub_key) = self.public_key_data_at_index(n) {
-                        let addr = Address::with_public_key_data(&pub_key, &self.chain_type().script_map());
-                        // TODO: impl storage
-                        /*if !wallet.is_transient() {
-                            match DerivationPathEntity::derivation_path_entity_matching_derivation_path(self, self.base.context) {
-                                Ok(derivationPathEntity) => {
-                                    // store new address in core data
-                                    AddressEntity::create_with(derivationPathEntity.id, addr.as_str(), n as i32, false, false, self.base.context)
-                                        .expect("Can't store address entity");
-                                },
-                                Err(err) => {
-                                    return Err(util::Error::Default(format!("Can't retrieve derivation path entity for {:?}", self)));
-                                }
+            }
+            while array.len() < limit {
+                // generate new addresses up to gapLimit
+                if let Some(pub_key) = self.public_key_data_at_index(n) {
+                    let addr = Address::with_public_key_data(&pub_key, &self.chain_type().script_map());
+                    // TODO: impl storage
+                    /*if !self.is_transient() {
+                        match DerivationPathEntity::derivation_path_entity_matching_derivation_path(self, self.base.context) {
+                            Ok(derivationPathEntity) => {
+                                // store new address in core data
+                                AddressEntity::create_with(derivationPathEntity.id, addr.as_str(), n as i32, false, false, self.base.context)
+                                    .expect("Can't store address entity");
+                            },
+                            Err(err) => {
+                                return Err(util::Error::Default(format!("Can't retrieve derivation path entity for {:?}", self)));
                             }
-                        }*/
-                        self.base.all_addresses.push(addr.clone());
-                        array.push(addr.clone());
-                        self.ordered_addresses.push(addr.clone());
-                        n += 1;
-                    }
+                        }
+                    }*/
+                    self.base.all_addresses.push(addr.clone());
+                    array.push(addr.clone());
+                    self.ordered_addresses.push(addr.clone());
+                    n += 1;
                 }
-                Ok(array)
-            }))
+            }
+            Ok(array)
         } else {
-            return Err(util::Error::Default(format!("Error register_addresses_with_gap_limit")));
+            Err(util::Error::Default(format!("Error register_addresses_with_gap_limit")))
         }
     }
 }
@@ -323,9 +321,9 @@ impl ISimpleIndexedDerivationPath for SimpleIndexedDerivationPath {
 }
 
 impl SimpleIndexedDerivationPath {
-    pub fn simple_indexed_derivation_path(indexes: Vec<UInt256>, hardened: Vec<bool>, r#type: DerivationPathType, signing_algorithm: KeyType, reference: DerivationPathReference, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn simple_indexed_derivation_path(indexes: Vec<UInt256>, hardened: Vec<bool>, r#type: DerivationPathType, signing_algorithm: KeyType, reference: DerivationPathReference, chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self {
-            base: DerivationPath::derivation_path_with_indexes(indexes, hardened, r#type, signing_algorithm, reference, chain_type, chain),
+            base: DerivationPath::derivation_path_with_indexes(indexes, hardened, r#type, signing_algorithm, reference, chain_type, context),
             ..Default::default()
         }
     }

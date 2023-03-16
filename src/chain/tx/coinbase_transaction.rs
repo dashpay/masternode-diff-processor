@@ -54,7 +54,7 @@ impl<'a> TryRead<'a, ReadContext> for CoinbaseTransaction {
             merkle_root_llmq_list,
             locked_amount
         };
-        tx.base.tx_hash = UInt256::sha256d(&tx.to_data());
+        tx.base.tx_hash = UInt256::sha256d(tx.to_data());
         Ok((tx, offset))
     }
 }
@@ -63,7 +63,7 @@ impl CoinbaseTransaction {
 
     pub fn has_found_coinbase(&mut self, hashes: &[UInt256]) -> bool {
         if self.base.tx_hash.is_zero() {
-            self.base.tx_hash = UInt256::sha256d(&self.to_data());
+            self.base.tx_hash = UInt256::sha256d(self.to_data());
         }
         self.has_found_coinbase_internal(self.base.tx_hash, hashes)
     }
@@ -93,7 +93,7 @@ impl CoinbaseTransaction {
             merkle_root_llmq_list: None,
             locked_amount: u64::MAX
         };
-        tx.base.tx_hash = UInt256::sha256d(&tx.to_data());
+        tx.base.tx_hash = UInt256::sha256d(tx.to_data());
         tx
     }
 }

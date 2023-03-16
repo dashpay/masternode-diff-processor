@@ -1,6 +1,8 @@
 use std::cmp;
 use std::collections::HashMap;
 use std::hash::Hasher;
+use std::sync::Arc;
+use crate::UInt256;
 use crate::chain::block::{IBlock, Kind};
 use crate::chain::Chain;
 use crate::chain::chain_lock::ChainLock;
@@ -8,7 +10,6 @@ use crate::chain::checkpoint::Checkpoint;
 use crate::chain::common::ChainType;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, Zeroable};
-use crate::UInt256;
 use crate::util::Shared;
 
 pub const BLOCK_UNKNOWN_HEIGHT: i32 = i32::MAX;
@@ -35,8 +36,8 @@ pub struct Block {
     pub chain_locked: bool,
     pub has_unverified_chain_lock: bool,
 
-    pub chain_lock_awaiting_processing: Option<Shared<ChainLock>>,
-    pub chain_lock_awaiting_saving: Option<Shared<ChainLock>>,
+    pub chain_lock_awaiting_processing: Option<Arc<ChainLock>>,
+    pub chain_lock_awaiting_saving: Option<Arc<ChainLock>>,
 
     pub chain_type: ChainType,
     pub chain: Shared<Chain>,
@@ -57,7 +58,7 @@ impl std::hash::Hash for Block {
 
 impl IBlock for Block {
     fn chain(&self) -> Shared<Chain> {
-        self.chain.borrow()
+        self.chain.clone()
     }
 
     fn chain_type(&self) -> ChainType {
@@ -115,31 +116,16 @@ impl IBlock for Block {
         self.chain_work = chain_work;
     }
 
-    fn set_chain_locked_with_chain_lock(&mut self, chain_lock: Shared<ChainLock>) {
-        chain_lock.with(|lock| {
-            self.chain_locked = lock.signature_verified;
-            self.has_unverified_chain_lock = !lock.signature_verified;
-            self.chain_lock_awaiting_processing = self.has_unverified_chain_lock.then_some(chain_lock.borrow());
-            if !lock.saved {
-                lock.save_initial();
-                if !lock.saved {
-                    // it is still not saved
-                    self.chain_lock_awaiting_saving = Some(chain_lock.borrow());
-                }
-            }
-        });
-        // self.chain_locked = chain_lock.signature_verified;
-        // self.has_unverified_chain_lock = !chain_lock.signature_verified;
-        // if self.has_unverified_chain_lock {
-        //     self.chain_lock_awaiting_processing = Some(chain_lock);
-        // } else {
-        //     self.chain_lock_awaiting_processing = None;
-        // }
+    fn set_chain_locked_with_chain_lock(&mut self, chain_lock: Arc<ChainLock>) {
+        self.chain_locked = chain_lock.signature_verified;
+        self.has_unverified_chain_lock = !chain_lock.signature_verified;
+        self.chain_lock_awaiting_processing = self.has_unverified_chain_lock.then_some(chain_lock.clone());
         // if !chain_lock.saved {
-        //     chain_lock.save_initial();
+        //     chain_lock.borrow_mut().save_initial();
+        //     // chain_lock.save_initial();
         //     if !chain_lock.saved {
         //         // it is still not saved
-        //         self.chain_lock_awaiting_saving = Some(chain_lock);
+        //         self.chain_lock_awaiting_saving = Some(chain_lock.clone());
         //     }
         // }
     }
@@ -162,7 +148,7 @@ impl IBlock for Block {
         self.has_unverified_chain_lock
     }
 
-    fn chain_lock_awaiting_processing(&self) -> Option<Shared<ChainLock>> {
+    fn chain_lock_awaiting_processing(&self) -> Option<Arc<ChainLock>> {
         self.chain_lock_awaiting_processing.clone()
     }
 
@@ -358,20 +344,20 @@ impl Block {
         self.chain_lock_awaiting_saving.is_some()
     }
 
-    pub fn save_associated_chain_lock(&mut self) -> bool {
-        self.chain_lock_awaiting_saving.take()
-            .map_or(true, |lock| lock.with(|awaiting_lock|
-                if awaiting_lock.saved {
-                    true
-                } else {
-                    awaiting_lock.save_initial();
-                    if awaiting_lock.saved {
-                        self.chain_lock_awaiting_saving = None;
-                        true
-                    } else {
-                        false
-                    }
-                }
-            ))
-    }
+    // pub fn save_associated_chain_lock(&mut self) -> bool {
+    //     self.chain_lock_awaiting_saving.take()
+    //         .map_or(true, |mut awaiting_lock|
+    //             if awaiting_lock.saved {
+    //                 true
+    //             } else {
+    //                 awaiting_lock.save_initial();
+    //                 if awaiting_lock.saved {
+    //                     self.chain_lock_awaiting_saving = None;
+    //                     true
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //         )
+    // }
 }

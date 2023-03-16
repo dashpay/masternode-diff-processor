@@ -47,7 +47,7 @@ pub struct Transaction {
 
 impl ITransaction for Transaction {
     fn chain(&self) -> Shared<Chain> {
-        self.chain.borrow()
+        self.chain.clone()
     }
     fn chain_type(&self) -> ChainType {
         self.chain_type
@@ -586,7 +586,7 @@ impl Transaction {
         if !self.is_signed() {
             return false;
         }
-        self.tx_hash = UInt256::sha256d(&self.to_data());
+        self.tx_hash = UInt256::sha256d(self.to_data());
         true
     }
 
@@ -661,7 +661,7 @@ impl Transaction {
 impl Transaction {
     pub fn devnet_genesis_coinbase_with_identifier(identifier: String, version: u16, protocol_version: u32, amount: u64, script_map: &ScriptMap) -> UInt256 {
         let script = OP_RETURN.into_u8().to_le_bytes().to_vec();
-        UInt256::sha256d(&Self::data_with_subscript_index_static(
+        UInt256::sha256d(Self::data_with_subscript_index_static(
             None,
             TX_VERSION as u16,
             TransactionType::Classic,

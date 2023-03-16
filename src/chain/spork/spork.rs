@@ -1,8 +1,6 @@
 use byte::ctx::Bytes;
 use byte::{BytesExt, LE, TryRead};
-// use diesel::{ExpressionMethods, Insertable, Table};
 use hashes::hex::{FromHex, ToHex};
-use crate::chain::chain::Chain;
 use crate::chain::common::ChainType;
 use crate::chain::constants::DASH_MESSAGE_MAGIC;
 use crate::chain::spork::Identifier;
@@ -11,10 +9,7 @@ use crate::consensus::encode::VarInt;
 use crate::crypto::UInt256;
 use crate::keys::ecdsa_key::ECDSAKey;
 use crate::keys::IKey;
-// use crate::schema::sporks;
-// use crate::storage::models::chain::spork::{NewSporkEntity, SporkEntity};
-// use crate::storage::models::entity::EntityUpdates;
-use crate::util::{Address, Shared};
+use crate::util::Address;
 
 #[derive(Clone, Debug, Default)]
 pub struct Spork {
@@ -24,7 +19,6 @@ pub struct Spork {
     pub value: u64,
     pub signature: Vec<u8>,
     pub chain_type: ChainType,
-    pub chain: Shared<Chain>,
 }
 
 impl PartialEq for Spork {
@@ -38,7 +32,7 @@ impl PartialEq for Spork {
 }
 
 #[derive(Clone)]
-pub struct ReadContext(pub ChainType, pub Shared<Chain>);
+pub struct ReadContext(pub ChainType, pub bool);
 
 impl<'a> TryRead<'a, ReadContext> for Spork {
     fn try_read(bytes: &'a [u8], context: ReadContext) -> byte::Result<(Self, usize)> {
@@ -56,18 +50,19 @@ impl<'a> TryRead<'a, ReadContext> for Spork {
             value,
             signature,
             chain_type: context.0,
-            chain: context.1
+            // chain: context.1
         };
-        spork.check_validity();
+        spork.is_valid = spork.check_signature(&spork.signature, context.1);
+        // spork.check_validity();
         Ok((spork, *offset))
     }
 }
 
 impl Spork {
 
-    pub fn check_validity(&mut self) {
-        self.is_valid = self.check_signature(&self.signature);
-    }
+    // fn check_validity(&mut self) {
+    //     self.is_valid = self.check_signature(&self.signature);
+    // }
 
     pub fn is_equal_to_spork(&self, spork: &Spork) -> bool {
         self.chain_type == spork.chain_type &&
@@ -96,23 +91,21 @@ impl Spork {
         let mut writer: Vec<u8> = Vec::new();
         DASH_MESSAGE_MAGIC.to_string().enc(&mut writer);
         string_message.enc(&mut writer);
-        let message_digest = UInt256::sha256d(&writer);
+        let message_digest = UInt256::sha256d(writer);
         let message_public_key = ECDSAKey::init_with_compact_sig(signature, message_digest);
         let spork_public_key = ECDSAKey::init_with_public_key(Vec::from_hex(self.key().unwrap().as_str()).unwrap());
         spork_public_key.unwrap().public_key_data() == message_public_key.unwrap().public_key_data()
     }
 
 
-    pub fn check_signature(&self, signature: &Vec<u8>) -> bool {
+    fn check_signature(&self, signature: &Vec<u8>, is_updated_signatures: bool) -> bool {
         if self.chain_type.protocol_version() < 70209 {
             self.check_signature_70208_method(signature)
         } else {
             let message_digest = self.calculate_spork_hash();
             let msg_public_key = ECDSAKey::init_with_compact_sig(signature, message_digest).unwrap();
             let spork_address = Address::with_public_key_data(&msg_public_key.public_key_data(), &self.chain_type.script_map());
-            self.address() == spork_address.as_str() ||
-                (self.chain.with(|chain| chain.spork_manager.sporks_updated_signatures()) && self.check_signature_70208_method(signature))
-                // (!self.chain.spork_manager().sporks_updated_signatures() && self.check_signature_70208_method(signature))
+            self.address() == spork_address.as_str() || (is_updated_signatures && self.check_signature_70208_method(signature))
         }
     }
 
@@ -122,7 +115,7 @@ impl Spork {
         id.enc(&mut writer);
         self.value.enc(&mut writer);
         self.time_signed.enc(&mut writer);
-        UInt256::sha256d(&writer)
+        UInt256::sha256d(writer)
     }
 
 }

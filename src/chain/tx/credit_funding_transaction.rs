@@ -1,31 +1,15 @@
 use byte::TryRead;
-// use diesel::{Insertable, QuerySource, Table};
-// use diesel::insertable::CanInsertInSingleQuery;
-// use diesel::query_builder::QueryFragment;
-// use diesel::sqlite::Sqlite;
 use crate::chain::chain::Chain;
 use crate::chain::common::ChainType;
-use crate::chain::ext::Derivation;
 use crate::chain::tx::instant_send_lock::InstantSendLock;
 use crate::chain::tx::protocol::ReadContext;
 use crate::chain::tx::{ITransaction, Transaction};
 use crate::chain::tx::transaction_input::TransactionInput;
 use crate::chain::tx::transaction_output::TransactionOutput;
 use crate::chain::tx::TransactionType;
-// use crate::chain::wallet::extension::identities::WalletIdentities;
-// use crate::chain::wallet::extension::invitations::WalletInvitations;
-use crate::chain::wallet::wallet::Wallet;
 use crate::crypto::{UInt160, UInt256};
 use crate::crypto::byte_util::{AsBytes, clone_into_array, Reversable, Zeroable};
 use crate::crypto::UTXO;
-use crate::derivation::protocol::IDerivationPath;
-use crate::derivation::simple_indexed_derivation_path::ISimpleIndexedDerivationPath;
-// use crate::platform::identity::invitation::Invitation;
-// use crate::storage::manager::managed_context::ManagedContext;
-// use crate::storage::models::chain::chain::ChainEntity;
-// use crate::storage::models::entity::{Entity, EntityConvertible, EntityUpdates};
-// use crate::storage::models::tx::special::credit_funding_transaction::CreditFundingTransactionEntity;
-// use crate::storage::models::tx::transaction::NewTransactionEntity;
 use crate::util::{Address, Shared};
 
 #[derive(Clone, Debug, Default)]
@@ -76,69 +60,69 @@ impl CreditFundingTransaction {
         Some(Address::from_hash160_for_script_map(&self.credit_burn_public_key_hash(), &self.chain_type().script_map()))
     }
 
-    pub fn used_derivation_path_index_for_wallet(&self, wallet: Shared<Wallet>) -> u32 {
-        self.credit_burn_address()
-            .and_then(|address| self.chain()
-                .identity_registration_funding_derivation_path_for_wallet(wallet)
-                .index_of_known_address(&address))
-            .unwrap_or(u32::MAX)
-    }
-
-    pub fn check_derivation_path_index_for_wallet_is(&self, wallet: Shared<Wallet>, index: u32) -> bool {
-        // // todo: check None == None comparison
-        self.credit_burn_address()
-            .map(|address| self.chain()
-                .identity_registration_funding_derivation_path_for_wallet(wallet)
-                .address_at_index(index) == Some(address))
-            .unwrap_or(false)
-    }
-
-    pub fn check_invitation_derivation_path_index_for_wallet_is(&self, wallet: Shared<Wallet>, index: u32) -> bool {
-        // todo: check None == None comparison
-        self.credit_burn_address()
-            .map(|address| self.chain()
-                .identity_invitation_funding_derivation_path_for_wallet(wallet)
-                .address_at_index(index) == Some(address))
-            .unwrap_or(false)
-    }
-
-    pub fn mark_address_as_used_in_wallet(&self, wallet: Shared<Wallet>) {
-        if let Some(address) = self.credit_burn_address() {
-            let mut path = self.chain().identity_registration_funding_derivation_path_for_wallet(wallet);
-            path.register_transaction_address(&address);
-            path.register_addresses_with_gap_limit(10).expect("TODO: panic message");
-        }
-    }
-
-    pub fn mark_invitation_address_as_used_in_wallet(&mut self, wallet: Shared<Wallet>) {
-        if let Some(address) = self.credit_burn_address() {
-            let mut path = self.chain().identity_invitation_funding_derivation_path_for_wallet(wallet);
-            path.register_transaction_address(&address);
-            path.register_addresses_with_gap_limit(10).expect("TODO: panic message");
-        }
-    }
-
-    pub fn used_derivation_path_index(&self) -> u32 {
-        let accounts = self.accounts();
-        // let mut wallets = Vec::<Wallet>::new();
-        match accounts.len() {
-            0 => u32::MAX,
-            1 => self.used_derivation_path_index_for_wallet(self.first_account().unwrap().wallet.borrow()),
-            _ => {
-                todo!()
-                // accounts.iter().fold(Vec::<Shared<Wallet>>::new(), |mut wallets, account| {
-                //     // if let Some(wallet) = account.wallet {
-                //         if !wallets.contains(&account.wallet) {
-                //             wallets.push(account.wallet.clone());
-                //         }
-                //     // }
-                //     wallets
-                // }).iter().map(|wallet| self.used_derivation_path_index_for_wallet(wallet))
-                //     .find(|der| *der != u32::MAX)
-                //     .unwrap_or(u32::MAX)
-            }
-        }
-    }
+    // pub fn used_derivation_path_index_for_wallet(&self, wallet: Weak<Wallet>) -> u32 {
+    //     self.credit_burn_address()
+    //         .and_then(|address| self.chain()
+    //             .identity_registration_funding_derivation_path_for_wallet(wallet)
+    //             .index_of_known_address(&address))
+    //         .unwrap_or(u32::MAX)
+    // }
+    //
+    // pub fn check_derivation_path_index_for_wallet_is(&self, wallet: Weak<Wallet>, index: u32) -> bool {
+    //     // // todo: check None == None comparison
+    //     self.credit_burn_address()
+    //         .map(|address| self.chain()
+    //             .identity_registration_funding_derivation_path_for_wallet(wallet)
+    //             .address_at_index(index) == Some(address))
+    //         .unwrap_or(false)
+    // }
+    //
+    // pub fn check_invitation_derivation_path_index_for_wallet_is(&self, wallet: Weak<Wallet>, index: u32) -> bool {
+    //     // todo: check None == None comparison
+    //     self.credit_burn_address()
+    //         .map(|address| self.chain()
+    //             .identity_invitation_funding_derivation_path_for_wallet(wallet)
+    //             .address_at_index(index) == Some(address))
+    //         .unwrap_or(false)
+    // }
+    //
+    // pub fn mark_address_as_used_in_wallet(&self, wallet: Weak<Wallet>) {
+    //     if let Some(address) = self.credit_burn_address() {
+    //         let mut path = self.chain().identity_registration_funding_derivation_path_for_wallet(wallet);
+    //         path.register_transaction_address(&address);
+    //         path.register_addresses_with_gap_limit(10).expect("TODO: panic message");
+    //     }
+    // }
+    //
+    // pub fn mark_invitation_address_as_used_in_wallet(&mut self, wallet: Weak<Wallet>) {
+    //     if let Some(address) = self.credit_burn_address() {
+    //         let mut path = self.chain().identity_invitation_funding_derivation_path_for_wallet(wallet);
+    //         path.register_transaction_address(&address);
+    //         path.register_addresses_with_gap_limit(10).expect("TODO: panic message");
+    //     }
+    // }
+    //
+    // pub fn used_derivation_path_index(&self) -> u32 {
+    //     let accounts = self.accounts();
+    //     // let mut wallets = Vec::<Wallet>::new();
+    //     match accounts.len() {
+    //         0 => u32::MAX,
+    //         1 => self.used_derivation_path_index_for_wallet(self.first_account().unwrap().wallet.clone()),
+    //         _ => {
+    //             todo!()
+    //             // accounts.iter().fold(Vec::<Shared<Wallet>>::new(), |mut wallets, account| {
+    //             //     // if let Some(wallet) = account.wallet {
+    //             //         if !wallets.contains(&account.wallet) {
+    //             //             wallets.push(account.wallet.clone());
+    //             //         }
+    //             //     // }
+    //             //     wallets
+    //             // }).iter().map(|wallet| self.used_derivation_path_index_for_wallet(wallet))
+    //             //     .find(|der| *der != u32::MAX)
+    //             //     .unwrap_or(u32::MAX)
+    //         }
+    //     }
+    // }
 }
 
 // impl EntityConvertible for CreditFundingTransaction {

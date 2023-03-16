@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::{Arc, Weak};
 use crate::chain::{Chain, Wallet};
 use crate::chain::common::ChainType;
 use crate::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
@@ -7,6 +8,7 @@ use crate::derivation::derivation_path_kind::DerivationPathKind;
 use crate::derivation::index_path::IIndexPath;
 use crate::derivation::masternode_holdings_derivation_path::MasternodeHoldingsDerivationPath;
 use crate::derivation::protocol::IDerivationPath;
+use crate::storage::manager::managed_context::ManagedContext;
 use crate::util::Shared;
 
 #[derive(Clone, Debug, Default)]
@@ -44,77 +46,72 @@ impl Factory {
         Self::new_const_default()
     }
 
-    fn path<T, F>(unique_id: String, chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, creator: F, repo: &mut HashMap<String, T>) -> T
+    fn path<T, F>(is_transient: bool, unique_id: String, chain_type: ChainType, context: Weak<ManagedContext>, creator: F, repo: &mut HashMap<String, T>) -> T
     where T: IDerivationPath + Clone,
-          F: Fn(ChainType, Shared<Wallet>, Shared<Chain>, bool) -> T {
+          F: Fn(/*chain_type: */ChainType, /*is_transient: */bool, /*unique_id: */String, /*context: */Weak<ManagedContext>, /*load: */bool) -> T {
         repo.get(&unique_id).cloned().unwrap_or_else(|| {
-            let path = creator(chain_type, wallet, chain, true);
+            let path = creator(chain_type, is_transient, unique_id.clone(), context, true);
             repo.insert(unique_id, path.clone());
             path
         })
     }
 
-    pub fn provider_operator_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
-        Self::path(unique_id, chain_type, wallet, chain,
+    pub fn provider_operator_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, is_transient: bool, unique_id: String, context: Weak<ManagedContext>) -> AuthenticationKeysDerivationPath {
+        Self::path(is_transient, unique_id, chain_type, context,
             AuthenticationKeysDerivationPath::provider_operator_keys_derivation_path_for_wallet,
             self.operator_keys_derivation_path_by_wallet.get_or_insert(HashMap::new()))
-        // repo.get(&unique_id).cloned().unwrap_or_else(|| {
-        //     let path = AuthenticationKeysDerivationPath::provider_operator_keys_derivation_path_for_wallet(chain_type, wallet, chain, true);
-        //     repo.insert(unique_id, path.clone());
-        //     path
-        // })
     }
 
-    pub fn provider_owner_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
-        Self::path(unique_id, chain_type, wallet, chain,
+    pub fn provider_owner_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, is_transient: bool, unique_id: String, context: Weak<ManagedContext>) -> AuthenticationKeysDerivationPath {
+        Self::path(is_transient, unique_id, chain_type, context,
                    AuthenticationKeysDerivationPath::provider_owner_keys_derivation_path_for_wallet,
                    self.owner_keys_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
-    pub fn provider_voting_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
-        Self::path(unique_id, chain_type, wallet, chain,
+    pub fn provider_voting_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, is_transient: bool, unique_id: String, context: Weak<ManagedContext>) -> AuthenticationKeysDerivationPath {
+        Self::path(is_transient, unique_id, chain_type, context,
                    AuthenticationKeysDerivationPath::provider_voting_keys_derivation_path_for_wallet,
                    self.voting_keys_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
-    pub fn provider_funds_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> MasternodeHoldingsDerivationPath {
-        Self::path(unique_id, chain_type, wallet, chain,
+    pub fn provider_funds_derivation_path_for_wallet(&mut self, chain_type: ChainType, is_transient: bool, unique_id: String, context: Weak<ManagedContext>) -> MasternodeHoldingsDerivationPath {
+        Self::path(is_transient, unique_id, chain_type, context,
                    MasternodeHoldingsDerivationPath::provider_funds_derivation_path_for_wallet,
                    self.provider_funds_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
-    pub fn identity_registration_funding_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> CreditFundingDerivationPath {
-        Self::path(unique_id, chain_type, wallet, chain,
+    pub fn identity_registration_funding_derivation_path_for_wallet(&mut self, chain_type: ChainType, is_transient: bool, unique_id: String, context: Weak<ManagedContext>) -> CreditFundingDerivationPath {
+        Self::path(is_transient, unique_id, chain_type, context,
                    CreditFundingDerivationPath::identity_registration_funding_derivation_path_for_wallet,
                    self.identity_registration_funding_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
-    pub fn identity_topup_funding_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> CreditFundingDerivationPath {
-        Self::path(unique_id, chain_type, wallet, chain,
+    pub fn identity_topup_funding_derivation_path_for_wallet(&mut self, chain_type: ChainType, is_transient: bool, unique_id: String, context: Weak<ManagedContext>) -> CreditFundingDerivationPath {
+        Self::path(is_transient, unique_id, chain_type, context,
                    CreditFundingDerivationPath::identity_topup_funding_derivation_path_for_wallet,
                    self.identity_topup_funding_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
-    pub fn identity_invitation_funding_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> CreditFundingDerivationPath {
-        Self::path(unique_id, chain_type, wallet, chain,
+    pub fn identity_invitation_funding_derivation_path_for_wallet(&mut self, chain_type: ChainType, is_transient: bool, unique_id: String, context: Weak<ManagedContext>) -> CreditFundingDerivationPath {
+        Self::path(is_transient, unique_id, chain_type, context,
                    CreditFundingDerivationPath::identity_invitation_funding_derivation_path_for_wallet,
                    self.identity_invitation_funding_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
     /// Identity Authentication
-    pub fn identity_bls_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
-        Self::path(unique_id, chain_type, wallet, chain,
+    pub fn identity_bls_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, is_transient: bool, unique_id: String, context: Weak<ManagedContext>) -> AuthenticationKeysDerivationPath {
+        Self::path(is_transient, unique_id, chain_type, context,
                    AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_wallet,
                    self.identity_bls_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
-    pub fn identity_ecdsa_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, unique_id: String, wallet: Shared<Wallet>, chain: Shared<Chain>) -> AuthenticationKeysDerivationPath {
-        Self::path(unique_id, chain_type, wallet, chain,
+    pub fn identity_ecdsa_keys_derivation_path_for_wallet(&mut self, chain_type: ChainType, is_transient: bool, unique_id: String, context: Weak<ManagedContext>) -> AuthenticationKeysDerivationPath {
+        Self::path(is_transient, unique_id, chain_type, context,
                    AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_wallet,
                    self.identity_ecdsa_derivation_path_by_wallet.get_or_insert(HashMap::new()))
     }
 
-    pub fn loaded_specialized_derivation_paths_for_wallet(&mut self, chain_type: ChainType, wallet: Shared<Wallet>) -> Vec<DerivationPathKind> {
+    pub fn loaded_specialized_derivation_paths_for_wallet(&mut self, chain_type: ChainType, is_transient: bool, unique_id: String, context: Weak<ManagedContext>) -> Vec<DerivationPathKind> {
         todo!()
         // wallet.lock().ok()
         //     .and_then(|w| w.acquire_chain().map_or(vec![], |chain| ))
@@ -188,7 +185,7 @@ impl Factory {
         // arr
     }
 
-    pub fn unloaded_specialized_derivation_paths_for_wallet(&self, wallet: &Shared<Wallet>, chain: &Shared<Chain>) -> Vec<DerivationPathKind> {
+    pub fn unloaded_specialized_derivation_paths_for_wallet(&self, wallet: &Shared<Wallet>, chain: &Arc<Chain>) -> Vec<DerivationPathKind> {
         todo!()
         // let mut arr: Vec<DerivationPathKind> = vec![
         //     // Masternode

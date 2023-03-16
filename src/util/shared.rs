@@ -1,9 +1,12 @@
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, RwLock, Weak};
 
 #[derive(Clone, Debug, )]
 pub enum Shared<O: ?Sized> {
+    None,
     Owned(Arc<Mutex<O>>),
-    Borrowed(Weak<Mutex<O>>)
+    Borrowed(Weak<Mutex<O>>),
+    RwLock(Arc<RwLock<O>>),
+    BorrowedRwLock(Weak<RwLock<O>>),
 }
 
 #[macro_export]
@@ -35,6 +38,10 @@ impl<O: ?Sized> Shared<O> {
     // }
     pub fn with<F, T>(&self, f: F) -> T where F: FnOnce(&mut O) -> T {
         match *self {
+            Self::None => {
+                println!("It's a holder!");
+                unimplemented!()
+            },
             Self::Owned(ref mutex) => {
                 match mutex.lock() {
                     Ok(mut guard) => f(&mut *guard),
@@ -54,13 +61,63 @@ impl<O: ?Sized> Shared<O> {
                         unimplemented!()
                     }
                 }; x
+            },
+            Self::RwLock(ref rw_lock) => {
+                match rw_lock.try_write() {
+                    Ok(mut guard) => f(&mut *guard),
+                    Err(err) => {
+                        println!("The counter was poisoned: {:?}", err);
+                        unimplemented!()
+                    }
+                }
+            },
+            Self::BorrowedRwLock(ref weak) => {
+                let rw_lock = weak.upgrade()
+                    .expect("Shared::BorrowedRwLock no longer valid");
+                let x = match rw_lock.try_write() {
+                    Ok(mut guard) => f(&mut *guard),
+                    Err(err) => {
+                        println!("The counter was poisoned: {:?}", err);
+                        unimplemented!()
+                    }
+                }; x
             }
         }
     }
+
+    pub fn read<F, T>(&self, f: F) -> T where F: FnOnce(&O) -> T {
+        match *self {
+            Self::RwLock(ref rw_lock) => {
+                match rw_lock.try_read() {
+                    Ok(guard) => f(&*guard),
+                    Err(err) => {
+                        println!("The counter was poisoned: {:?}", err);
+                        unimplemented!()
+                    }
+                }
+            },
+            Self::BorrowedRwLock(ref weak) => {
+                let rw_lock = weak.upgrade()
+                    .expect("Shared::BorrowedRwLock no longer valid");
+                let x = match rw_lock.try_read() {
+                    Ok(guard) => f(&*guard),
+                    Err(err) => {
+                        println!("The counter was poisoned: {:?}", err);
+                        unimplemented!()
+                    }
+                }; x
+            },
+            _ => unimplemented!()
+        }
+    }
+
     pub fn borrow(&self) -> Shared<O> {
         match *self {
+            Self::None => Self::None,
             Self::Owned(ref arc) => Self::Borrowed(Arc::downgrade(arc)),
-            Self::Borrowed(ref weak) => Self::Borrowed(weak.clone())
+            Self::Borrowed(ref weak) => Self::Borrowed(weak.clone()),
+            Self::RwLock(ref arc) => Self::BorrowedRwLock(Arc::downgrade(arc)),
+            Self::BorrowedRwLock(ref weak) => Self::BorrowedRwLock(weak.clone())
         }
     }
 }

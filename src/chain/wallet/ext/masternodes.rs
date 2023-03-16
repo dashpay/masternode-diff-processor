@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use crate::chain::masternode::local_masternode::LocalMasternode;
+use crate::chain::tx::ProviderRegistrationTransaction;
 use crate::chain::wallet::wallet::Wallet;
 use crate::crypto::{UInt160, UInt384};
 use crate::keys::{BLSKey, ECDSAKey};
@@ -33,6 +34,12 @@ pub trait Masternodes {
     fn index_of_provider_owning_authentication_hash(&self, hash: &UInt160) -> Option<u32>;
     fn index_of_provider_operator_authentication_key(&self, key: &UInt384) -> Option<u32>;
     fn index_of_holding_address(&self, address: &String) -> Option<u32>;
+
+    fn can_authorize_provider_transaction(&self, transaction: &ProviderRegistrationTransaction) -> bool {
+        self.index_of_provider_owning_authentication_hash(&transaction.owner_key_hash).is_some() ||
+            self.index_of_provider_voting_authentication_hash(&transaction.voting_key_hash).is_some() ||
+            self.index_of_provider_operator_authentication_key(&transaction.operator_key).is_some()
+    }
 
     fn index_of_identity_authentication_hash(&self, hash: &UInt160) -> Option<u32>;
     fn index_of_identity_credit_funding_registration_hash(&self, hash: &UInt160) -> Option<u32>;

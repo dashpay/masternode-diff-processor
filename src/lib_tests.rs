@@ -6,9 +6,8 @@ pub mod tests {
     use byte::BytesExt;
     use hashes::hex::{FromHex, ToHex};
     use serde::{Deserialize, Serialize};
-    use std::io::Read;
     use std::ptr::null_mut;
-    use std::{env, fs, slice};
+    use std::slice;
     use crate::ffi::boxer::boxed;
     use crate::ffi::from::FromFFI;
     use crate::ffi::to::ToFFI;
@@ -281,20 +280,6 @@ pub mod tests {
         }
     }
 
-    pub fn get_file_as_byte_vec(filename: &str) -> Vec<u8> {
-        let mut f = fs::File::open(&filename).expect("no file found");
-        let metadata = fs::metadata(&filename).expect("unable to read metadata");
-        let mut buffer = vec![0; metadata.len() as usize];
-        f.read_exact(&mut buffer).expect("buffer overflow");
-        buffer
-    }
-
-    pub fn message_from_file(name: String) -> Vec<u8> {
-        let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-        let filepath = format!("{}/files/{}", crate_dir, name.as_str());
-        println!("{:?}", filepath);
-        get_file_as_byte_vec(&filepath)
-    }
     pub fn assert_diff_result(context: &mut FFIContext, result: types::MNListDiffResult) {
         let masternode_list = unsafe { (*result.masternode_list).decode() };
         print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.clone().reversed());

@@ -1,7 +1,7 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum SyncCountInfo {
     Unknown = 0,
     List = 2,

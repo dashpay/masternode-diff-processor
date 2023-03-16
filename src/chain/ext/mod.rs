@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod auth;
+pub mod chainlocks;
 pub mod derivation;
 pub mod governance;
 pub mod identities;

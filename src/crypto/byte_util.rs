@@ -1,7 +1,8 @@
-use byte::{BytesExt, LE, Result, TryRead};
+use byte::{BytesExt, LE, Result, TryRead, TryWrite};
 use byte::ctx::Endian;
 use std::{mem, slice};
-use std::net::IpAddr;
+use std::io::Write;
+use std::net::{IpAddr, Ipv4Addr};
 use ed25519_dalek::VerifyingKey;
 use hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, ripemd160, sha1, sha256, sha256d, sha512};
 use secp256k1::rand::{Rng, thread_rng};
@@ -166,10 +167,23 @@ macro_rules! define_try_read_to_big_uint {
 }
 
 #[macro_export]
+macro_rules! define_try_write_from_big_uint {
+    ($uint_type: ident) => {
+        impl TryWrite<Endian> for $uint_type {
+            fn try_write(self, mut bytes: &mut [u8], endian: Endian) -> byte::Result<usize> {
+                bytes.write_all(&self.0).unwrap();
+                Ok(self.0.len())
+            }
+        }
+    }
+}
+
+#[macro_export]
 macro_rules! define_bytes_to_big_uint {
     ($uint_type: ident, $byte_len: expr) => {
 
         define_try_read_to_big_uint!($uint_type, $byte_len);
+        define_try_write_from_big_uint!($uint_type);
         impl_decodable!($uint_type, $byte_len);
         define_try_from_bytes!($uint_type);
 
@@ -450,11 +464,11 @@ impl UInt160 {
 }
 
 impl UInt128 {
-    pub fn ip_address_from_i32(value: i32) -> Self {
+    pub fn ip_address_from_u32(value: u32) -> Self {
         //UInt128 address = {.u32 = {0, 0, CFSwapInt32HostToBig(0xffff), CFSwapInt32HostToBig(self.address)}};
         let mut writer = Vec::<u8>::new();
         0u64.enc(&mut writer);
-        0xffffi32.swap_bytes().enc(&mut writer);
+        0xffffu32.swap_bytes().enc(&mut writer);
         value.swap_bytes().enc(&mut writer);
         UInt128(clone_into_array(&writer))
     }
@@ -469,8 +483,25 @@ impl UInt128 {
     pub fn to_ip_addr(&self) -> IpAddr {
         IpAddr::from(self.0)
     }
+
+    pub fn to_ipv4_addr(&self) -> Ipv4Addr {
+        Ipv4Addr::from(self.ip_address_to_i32() as u32)
+    }
 }
 
+impl From<IpAddr> for UInt128 {
+    fn from(value: IpAddr) -> Self {
+        match value {
+            IpAddr::V4(ipv4) => {
+                let mut writer = [0u8; 16];
+                writer[8..12].copy_from_slice(&0xffffu32.to_be_bytes());
+                writer[12..].copy_from_slice(&ipv4.octets());
+                UInt128(writer)
+            },
+            IpAddr::V6(ipv6) => UInt128(ipv6.octets())
+        }
+    }
+}
 
 impl UInt256 {
     pub fn sha256(data: &[u8]) -> Self {
@@ -479,8 +510,8 @@ impl UInt256 {
     pub fn sha256_str(data: &str) -> Self {
         UInt256(sha256::Hash::hash(data.as_bytes()).into_inner())
     }
-    pub fn sha256d(data: &[u8]) -> Self {
-        UInt256(sha256d::Hash::hash(data).into_inner())
+    pub fn sha256d(data: impl AsRef<[u8]>) -> Self {
+        UInt256(sha256d::Hash::hash(data.as_ref()).into_inner())
     }
     pub fn sha256d_str(data: &str) -> Self {
         UInt256(sha256d::Hash::hash(data.as_bytes()).into_inner())

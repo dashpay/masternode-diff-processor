@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use crate::chain::block::block::Block;
 use crate::chain::block::full_block::FullBlock;
 use crate::chain::block::IBlock;
@@ -9,8 +10,7 @@ use crate::chain::common::ChainType;
 use crate::UInt256;
 use crate::util::Shared;
 
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Kind {
     Block(Block),
     MerkleBlock(MerkleBlock),
@@ -97,7 +97,7 @@ impl IBlock for Kind {
         self.block_mut().set_chain_work(chain_work);
     }
 
-    fn set_chain_locked_with_chain_lock(&mut self, chain_lock: Shared<ChainLock>) {
+    fn set_chain_locked_with_chain_lock(&mut self, chain_lock: Arc<ChainLock>) {
         self.block_mut().set_chain_locked_with_chain_lock(chain_lock);
     }
 
@@ -113,7 +113,7 @@ impl IBlock for Kind {
         self.block().has_unverified_chain_lock()
     }
 
-    fn chain_lock_awaiting_processing(&self) -> Option<Shared<ChainLock>> {
+    fn chain_lock_awaiting_processing(&self) -> Option<Arc<ChainLock>> {
         self.block().chain_lock_awaiting_processing()
     }
 

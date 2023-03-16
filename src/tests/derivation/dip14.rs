@@ -1,8 +1,7 @@
+use std::sync::Weak;
 use hashes::hex::FromHex;
-use crate::chain::common::chain_type::IHaveChainSettings;
 use crate::chain::common::ChainType;
-use crate::chain::ext::wallets::Wallets;
-use crate::chain::wallet::seed::Seed;
+use crate::chain::ext::wallets::WalletCreation;
 use crate::chains_manager::ChainsManager;
 use crate::derivation::derivation_path::DerivationPath;
 use crate::derivation::derivation_path_feature_purpose::DerivationPathFeaturePurpose;
@@ -18,10 +17,11 @@ const SEED_PHRASE: &str = "birth kingdom trash renew flavor utility donkey gasp 
 #[test]
 fn test_256_bit_path_ecdsa_derivation1() {
     let chain_type = ChainType::TestNet;
-    let seed = Seed::from_phrase::<bip0039::English>(SEED_PHRASE, chain_type.genesis_hash()).unwrap();
+    let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(SEED_PHRASE).unwrap();
     let manager = ChainsManager::new();
-    let chain = manager.testnet.borrow();
-    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
+    let wallet_arc = manager.testnet.transient_wallet_with_seed(seed.clone(), chain_type);
+    let wallet = wallet_arc.try_write().unwrap();
+
     // m/0x775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b/0xf537439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89a6'/0x4c4592ca670c983fc43397dfd21a6f427fac9b4ac53cb4dcdc6522ec51e81e79/0
 
     let mut path = DerivationPath::derivation_path_with_indexes(
@@ -35,7 +35,7 @@ fn test_256_bit_path_ecdsa_derivation1() {
         KeyType::ECDSA,
         DerivationPathReference::Unknown,
         chain_type,
-        chain.borrow());
+        Weak::new());
     match path.private_key_at_index_path_from_seed(&IndexPath::index_path_with_index(0), &seed) {
         Some(Key::ECDSA(key)) => {
             assert_eq!(key.secret_key_string(), "e8781fdef72862968cd9a4d2df34edaf9dcc5b17629ec505f0d2d1a8ed6f9f09", "keys should match");
@@ -52,10 +52,10 @@ fn test_256_bit_path_ecdsa_derivation1() {
 #[test]
 fn test_256_bit_path_ecdsa_derivation2() {
     let chain_type = ChainType::TestNet;
-    let seed = Seed::from_phrase::<bip0039::English>(SEED_PHRASE, chain_type.genesis_hash()).unwrap();
+    let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(SEED_PHRASE).unwrap();
     let manager = ChainsManager::new();
-    let chain = manager.testnet.borrow();
-    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
+    let wallet_arc = manager.testnet.transient_wallet_with_seed(seed.clone(), chain_type);
+    let wallet = wallet_arc.try_write().unwrap();
     // m/9'/5'/15'/0'/0x555d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3a'/0xa137439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89b5'/0
     let path = DerivationPath::derivation_path_with_indexes(
         vec![
@@ -71,7 +71,7 @@ fn test_256_bit_path_ecdsa_derivation2() {
         KeyType::ECDSA,
         DerivationPathReference::Unknown,
         chain_type,
-        chain.borrow());
+        Weak::new());
     match path.private_key_at_index_path_from_seed(&IndexPath::index_path_with_index(0), &seed) {
         Some(Key::ECDSA(key)) => {
             assert_eq!(key.secret_key_string(), "fac40790776d171ee1db90899b5eb2df2f7d2aaf35ad56f07ffb8ed2c57f8e60", "keys should match");
@@ -83,10 +83,10 @@ fn test_256_bit_path_ecdsa_derivation2() {
 #[test]
 fn test_256_bit_path_ecdsa_derivation3() {
     let chain_type = ChainType::TestNet;
-    let seed = Seed::from_phrase::<bip0039::English>(SEED_PHRASE, chain_type.genesis_hash()).unwrap();
+    let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(SEED_PHRASE).unwrap();
     let manager = ChainsManager::new();
-    let chain = manager.testnet.borrow();
-    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
+    let wallet_arc = manager.testnet.transient_wallet_with_seed(seed.clone(), chain_type);
+    let wallet = wallet_arc.try_write().unwrap();
     //m/0x775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b
     let mut path = DerivationPath::derivation_path_with_indexes(
         vec![
@@ -97,7 +97,7 @@ fn test_256_bit_path_ecdsa_derivation3() {
         KeyType::ECDSA,
         DerivationPathReference::Unknown,
         chain_type,
-        chain.borrow());
+        Weak::new());
     path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_ext_pubkey = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_ext_pubkey, "dptp1C5gGd8NzvAke5WNKyRfpDRyvV2UZ3jjrZVZU77qk9yZemMGSdZpkWp7y6wt3FzvFxAHSW8VMCaC1p6Ny5EqWuRm2sjvZLUUFMMwXhmW6eS69qjX958RYBH5R8bUCGZkCfUyQ8UVWcx9katkrRr", "serialized extended public keys should match");
@@ -108,10 +108,10 @@ fn test_256_bit_path_ecdsa_derivation3() {
 #[test]
 fn test_256_bit_path_ecdsa_derivation4() {
     let chain_type = ChainType::TestNet;
-    let seed = Seed::from_phrase::<bip0039::English>(SEED_PHRASE, chain_type.genesis_hash()).unwrap();
+    let seed = chain_type.seed_for_seed_phrase::<bip0039::English>(SEED_PHRASE).unwrap();
     let manager = ChainsManager::new();
-    let chain = manager.testnet.borrow();
-    let wallet = chain.borrow().transient_wallet_with_seed(seed.clone());
+    let wallet_arc = manager.testnet.transient_wallet_with_seed(seed.clone(), chain_type);
+    let wallet = wallet_arc.try_write().unwrap();
     //m/0x775d3854c910b7dee436869c4724bed2fe0784e198b8a39f02bbb49d8ebcfc3b/0xf537439f36d04a15474ff7423e4b904a14373fafb37a41db74c84f1dbb5c89a6'
     let mut path = DerivationPath::derivation_path_with_indexes(
         vec![
@@ -123,7 +123,7 @@ fn test_256_bit_path_ecdsa_derivation4() {
         KeyType::ECDSA,
         DerivationPathReference::Unknown,
         chain_type,
-        chain.borrow());
+        Weak::new());
     path.generate_extended_public_key_from_seed_no_store(&seed.data);
     let serialized_ext_pubkey = path.serialized_extended_public_key().unwrap();
     assert_eq!(serialized_ext_pubkey, "dptp1CLkexeadp6guoi8Fbiwq6CLZm3hT1DJLwHsxWvwYSeAhjenFhcQ9HumZSftfZEr4dyQjFD7gkM5bSn6Aj7F1Jve8KTn4JsMEaj9dFyJkYs4Ga5HSUqeajxGVmzaY1pEioDmvUtZL3J1NCDCmzQ", "serialized extended public keys should match");

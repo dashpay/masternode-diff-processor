@@ -1,6 +1,7 @@
 use std::collections::HashSet;
+use std::sync::Weak;
 use crate::UInt256;
-use crate::chain::{Chain, ScriptMap, Wallet};
+use crate::chain::ScriptMap;
 use crate::chain::common::ChainType;
 use crate::chain::wallet::seed::Seed;
 use crate::crypto::UInt160;
@@ -11,7 +12,7 @@ use crate::derivation::index_path::IndexPath;
 use crate::derivation::protocol::IDerivationPath;
 use crate::derivation::simple_indexed_derivation_path::{ISimpleIndexedDerivationPath, SimpleIndexedDerivationPath};
 use crate::keys::{Key, KeyType};
-use crate::util::Shared;
+use crate::storage::manager::managed_context::ManagedContext;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MasternodeHoldingsDerivationPath {
@@ -19,20 +20,21 @@ pub struct MasternodeHoldingsDerivationPath {
 }
 
 impl IDerivationPath for MasternodeHoldingsDerivationPath {
-    fn chain(&self) -> &Shared<Chain> {
-        self.base.chain()
-    }
 
     fn chain_type(&self) -> ChainType {
         self.base.chain_type()
     }
 
-    fn wallet(&self) -> &Option<Shared<Wallet>> {
-        self.base.wallet()
+    fn context(&self) -> Weak<ManagedContext> {
+        self.base.context()
     }
 
-    fn set_wallet(&mut self, wallet: Shared<Wallet>) {
-        self.base.set_wallet(wallet);
+    fn is_transient(&self) -> bool {
+        self.base.is_transient()
+    }
+
+    fn set_is_transient(&mut self, is_transient: bool) {
+        self.base.set_is_transient(is_transient);
     }
 
     fn wallet_unique_id(&self) -> Option<String> {
@@ -42,17 +44,6 @@ impl IDerivationPath for MasternodeHoldingsDerivationPath {
     fn set_wallet_unique_id(&mut self, unique_id: String) {
         self.base.set_wallet_unique_id(unique_id);
     }
-    // fn params(&self) -> &Params {
-    //     self.base.params()
-    // }
-    //
-    // fn wallet(&self) -> Weak<Wallet> {
-    //     self.base.wallet()
-    // }
-    //
-    // fn context(&self) -> Weak<ManagedContext> {
-    //     self.base.context()
-    // }
 
     fn signing_algorithm(&self) -> KeyType {
         self.base.signing_algorithm()
@@ -137,7 +128,7 @@ impl ISimpleIndexedDerivationPath for MasternodeHoldingsDerivationPath {
 }
 
 impl MasternodeHoldingsDerivationPath {
-    pub fn provider_funds_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn provider_funds_derivation_path_for_chain(chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self {
             base: SimpleIndexedDerivationPath::simple_indexed_derivation_path(
                 vec![
@@ -151,14 +142,15 @@ impl MasternodeHoldingsDerivationPath {
                 KeyType::ECDSA,
                 DerivationPathReference::ProviderFunds,
                 chain_type,
-                chain
+                context
             )
         }
     }
 
-    pub fn provider_funds_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
-        let mut path = Self::provider_funds_derivation_path_for_chain(chain_type, chain);
-        path.set_wallet(wallet);
+    pub fn provider_funds_derivation_path_for_wallet(chain_type: ChainType, is_transient: bool, wallet_unique_id: String, context: Weak<ManagedContext>, load: bool) -> Self {
+        let mut path = Self::provider_funds_derivation_path_for_chain(chain_type, context);
+        path.set_wallet_unique_id(wallet_unique_id);
+        path.set_is_transient(is_transient);
         if load && path.has_extended_public_key() {
             path.load_addresses();
         }

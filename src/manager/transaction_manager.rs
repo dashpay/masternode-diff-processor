@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 use crate::chain::{Chain, tx};
 use crate::chain::network::{BloomFilter, Peer};
 use crate::{UInt256, util};
@@ -14,12 +15,12 @@ pub struct TransactionManager {
     pub chain: Shared<Chain>,
     pub chain_type: ChainType,
     published_tx: HashMap<UInt256, tx::Kind>,
-    published_callback: HashMap<UInt256, std::sync::Arc<dyn PublishCallback>>,
+    published_callback: HashMap<UInt256, Arc<dyn PublishCallback>>,
 
 }
 impl Debug for TransactionManager {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MasternodeProcessorCache")
+        f.debug_struct("TransactionManager")
             .field("chain", &self.chain)
             .finish()
     }

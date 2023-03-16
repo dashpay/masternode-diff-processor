@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::net::IpAddr;
+use std::sync::Arc;
 use crate::chain::chain::Chain;
 use crate::chain::masternode::LocalMasternodeStatus;
 use crate::chain::tx::{ITransaction, ProviderRegistrationTransaction, ProviderUpdateRegistrarTransaction, ProviderUpdateRevocationTransaction, ProviderUpdateServiceTransaction};
@@ -167,7 +168,7 @@ impl LocalMasternode {
         // }
     }
 
-    pub fn chain(&self) -> Option<Shared<Chain>> {
+    pub fn chain(&self) -> Option<Arc<Chain>> {
         todo!()
         // if let Some(tx) = &self.provider_registration_transaction {
         //     Some(tx.chain().borrow())

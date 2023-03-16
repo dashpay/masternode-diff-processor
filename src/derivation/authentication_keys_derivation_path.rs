@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Weak;
 use crate::UInt256;
-use crate::chain::{Chain, ScriptMap, Wallet};
+use crate::chain::ScriptMap;
 use crate::chain::common::ChainType;
 use crate::chain::wallet::seed::Seed;
 use crate::crypto::UInt160;
@@ -13,8 +14,8 @@ use crate::derivation::protocol::IDerivationPath;
 use crate::derivation::simple_indexed_derivation_path::{ISimpleIndexedDerivationPath, SimpleIndexedDerivationPath};
 use crate::keys::{IKey, Key, KeyType};
 use crate::storage::keychain::Keychain;
+use crate::storage::manager::managed_context::ManagedContext;
 use crate::util::Address;
-use crate::util::shared::Shared;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct AuthenticationKeysDerivationPath {
@@ -41,20 +42,20 @@ impl IIndexPath for AuthenticationKeysDerivationPath {
 
 
 impl IDerivationPath for AuthenticationKeysDerivationPath {
-    fn chain(&self) -> &Shared<Chain> {
-        self.base.chain()
-    }
-
     fn chain_type(&self) -> ChainType {
         self.base.chain_type()
     }
 
-    fn wallet(&self) -> &Option<Shared<Wallet>> {
-        self.base.wallet()
+    fn context(&self) -> Weak<ManagedContext> {
+        self.base.context()
     }
 
-    fn set_wallet(&mut self, wallet: Shared<Wallet>) {
-        self.base.set_wallet(wallet);
+    fn is_transient(&self) -> bool {
+        self.base.is_transient()
+    }
+
+    fn set_is_transient(&mut self, is_transient: bool) {
+        self.base.set_is_transient(is_transient);
     }
 
     fn wallet_unique_id(&self) -> Option<String> {
@@ -64,16 +65,6 @@ impl IDerivationPath for AuthenticationKeysDerivationPath {
     fn set_wallet_unique_id(&mut self, unique_id: String) {
         self.base.set_wallet_unique_id(unique_id);
     }
-    // fn params(&self) -> &Params {
-    //     self.base.params()
-    // }
-    // fn wallet(&self) -> Weak<Wallet> {
-    //     self.base.wallet()
-    // }
-    //
-    // fn context(&self) -> Weak<ManagedContext> {
-    //     self.base.context()
-    // }
 
     fn signing_algorithm(&self) -> KeyType {
         self.base.signing_algorithm()
@@ -193,98 +184,104 @@ impl ISimpleIndexedDerivationPath for AuthenticationKeysDerivationPath {
 
 impl AuthenticationKeysDerivationPath {
 
-    pub fn provider_voting_keys_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn provider_voting_keys_derivation_path_for_chain(chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self::provider_keys_derivation_path_for_chain(
             DerivationPathReference::ProviderVotingKeys,
             KeyType::ECDSA,
             1,
             chain_type,
-            chain)
+            context)
     }
 
-    pub fn provider_owner_keys_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn provider_owner_keys_derivation_path_for_chain(chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self::provider_keys_derivation_path_for_chain(
             DerivationPathReference::ProviderOwnerKeys,
             KeyType::ECDSA,
             2,
             chain_type,
-            chain)
+            context)
     }
 
-    pub fn provider_operator_keys_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn provider_operator_keys_derivation_path_for_chain(chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self::provider_keys_derivation_path_for_chain(
             DerivationPathReference::ProviderOperatorKeys,
             KeyType::BLS,
             3,
             chain_type,
-            chain)
+            context)
     }
 
-    pub fn platform_node_keys_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    pub fn platform_node_keys_derivation_path_for_chain(chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self::provider_keys_derivation_path_for_chain(
             DerivationPathReference::PlatformNodeKeys,
             KeyType::ED25519,
             3,
             chain_type,
-            chain)
+            context)
     }
 
-    pub fn identity_ecdsa_keys_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
-        Self::identity_keys_derivation_path_for_chain(KeyType::ECDSA, 0, chain_type, chain)
+    pub fn identity_ecdsa_keys_derivation_path_for_chain(chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
+        Self::identity_keys_derivation_path_for_chain(KeyType::ECDSA, 0, chain_type, context)
     }
 
-    pub fn identity_bls_keys_derivation_path_for_chain(chain_type: ChainType, chain: Shared<Chain>) -> Self {
-        Self::identity_keys_derivation_path_for_chain(KeyType::BLS, 1, chain_type, chain)
+    pub fn identity_bls_keys_derivation_path_for_chain(chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
+        Self::identity_keys_derivation_path_for_chain(KeyType::BLS, 1, chain_type, context)
     }
 
-    pub fn provider_voting_keys_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
-        let mut path = AuthenticationKeysDerivationPath::provider_voting_keys_derivation_path_for_chain(chain_type, chain);
-        path.set_wallet(wallet);
+    pub fn provider_voting_keys_derivation_path_for_wallet(chain_type: ChainType, is_transient: bool, wallet_unique_id: String, context: Weak<ManagedContext>, load: bool) -> Self {
+        let mut path = AuthenticationKeysDerivationPath::provider_voting_keys_derivation_path_for_chain(chain_type, context);
+        path.set_wallet_unique_id(wallet_unique_id);
+        path.set_is_transient(is_transient);
         if load && path.has_extended_public_key() {
             path.load_addresses();
         }
         path
     }
 
-    pub fn provider_owner_keys_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
-        let mut path = AuthenticationKeysDerivationPath::provider_owner_keys_derivation_path_for_chain(chain_type, chain);
-        path.set_wallet(wallet);
+    pub fn provider_owner_keys_derivation_path_for_wallet(chain_type: ChainType, is_transient: bool, wallet_unique_id: String, context: Weak<ManagedContext>, load: bool) -> Self {
+        let mut path = AuthenticationKeysDerivationPath::provider_owner_keys_derivation_path_for_chain(chain_type, context);
+        path.set_wallet_unique_id(wallet_unique_id);
+        path.set_is_transient(is_transient);
         if load && path.has_extended_public_key() {
             path.load_addresses();
         }
         path
     }
 
-    pub fn provider_operator_keys_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
-        let mut path = AuthenticationKeysDerivationPath::provider_operator_keys_derivation_path_for_chain(chain_type, chain);
-        path.set_wallet(wallet);
+    pub fn provider_operator_keys_derivation_path_for_wallet(chain_type: ChainType, is_transient: bool, wallet_unique_id: String, context: Weak<ManagedContext>, load: bool) -> Self {
+        let mut path = AuthenticationKeysDerivationPath::provider_operator_keys_derivation_path_for_chain(chain_type, context);
+        path.set_wallet_unique_id(wallet_unique_id);
+        path.set_is_transient(is_transient);
         if load && path.has_extended_public_key() {
             path.load_addresses();
         }
         path
     }
 
-    pub fn platform_node_keys_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
-        let mut path = AuthenticationKeysDerivationPath::platform_node_keys_derivation_path_for_chain(chain_type, chain);
-        path.set_wallet(wallet);
+    pub fn platform_node_keys_derivation_path_for_wallet(chain_type: ChainType, is_transient: bool, wallet_unique_id: String, context: Weak<ManagedContext>, load: bool) -> Self {
+        let mut path = AuthenticationKeysDerivationPath::platform_node_keys_derivation_path_for_chain(chain_type, context);
+        path.set_wallet_unique_id(wallet_unique_id);
+        path.set_is_transient(is_transient);
         if load && path.has_extended_public_key() {
             path.load_addresses();
         }
         path
     }
 
-    pub fn identity_bls_keys_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
-        let mut path = AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_chain(chain_type, chain);
-        path.set_wallet(wallet);
+    pub fn identity_bls_keys_derivation_path_for_wallet(chain_type: ChainType, is_transient: bool, wallet_unique_id: String, context: Weak<ManagedContext>, load: bool) -> Self {
+        let mut path = AuthenticationKeysDerivationPath::identity_bls_keys_derivation_path_for_chain(chain_type, context);
+        path.set_wallet_unique_id(wallet_unique_id);
+        path.set_is_transient(is_transient);
         if load && (path.has_extended_public_key() || (path.has_extended_public_key() && !path.uses_hardened_keys)) {
             path.load_addresses();
         }
         path
     }
 
-    pub fn identity_ecdsa_keys_derivation_path_for_wallet(chain_type: ChainType, wallet: Shared<Wallet>, chain: Shared<Chain>, load: bool) -> Self {
-        let mut path = AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_chain(chain_type, chain);
-        path.set_wallet(wallet);
+    pub fn identity_ecdsa_keys_derivation_path_for_wallet(chain_type: ChainType, is_transient: bool, wallet_unique_id: String, context: Weak<ManagedContext>, load: bool) -> Self {
+        let mut path = AuthenticationKeysDerivationPath::identity_ecdsa_keys_derivation_path_for_chain(chain_type, context);
+        path.set_wallet_unique_id(wallet_unique_id);
+        path.set_is_transient(is_transient);
         if load && (path.has_extended_public_key() || (path.has_extended_public_key() && !path.uses_hardened_keys)) {
             path.load_addresses();
         }
@@ -328,9 +325,9 @@ impl AuthenticationKeysDerivationPath {
         should_store_extended_private_key: bool,
         uses_hardened_keys: bool,
         chain_type: ChainType,
-        chain: Shared<Chain>) -> Self {
+        context: Weak<ManagedContext>) -> Self {
         Self {
-            base: SimpleIndexedDerivationPath::simple_indexed_derivation_path(indexes, hardened, r#type, signing_algorithm, reference, chain_type, chain),
+            base: SimpleIndexedDerivationPath::simple_indexed_derivation_path(indexes, hardened, r#type, signing_algorithm, reference, chain_type, context),
             should_store_extended_private_key,
             uses_hardened_keys,
             ..Default::default()
@@ -342,7 +339,7 @@ impl AuthenticationKeysDerivationPath {
         signing_algorithm: KeyType,
         last_index: u32,
         chain_type: ChainType,
-        chain: Shared<Chain>) -> Self {
+        context: Weak<ManagedContext>) -> Self {
         Self::keys_derivation_path_for_chain(
             vec![
                 UInt256::from(DerivationPathFeaturePurpose::Default),
@@ -357,11 +354,11 @@ impl AuthenticationKeysDerivationPath {
             false,
             false,
             chain_type,
-            chain,
+            context,
         )
     }
 
-    fn identity_keys_derivation_path_for_chain(signing_algorithm: KeyType, last_index: u32, chain_type: ChainType, chain: Shared<Chain>) -> Self {
+    fn identity_keys_derivation_path_for_chain(signing_algorithm: KeyType, last_index: u32, chain_type: ChainType, context: Weak<ManagedContext>) -> Self {
         Self::keys_derivation_path_for_chain(
             vec![
                 UInt256::from(DerivationPathFeaturePurpose::Default),
@@ -377,7 +374,7 @@ impl AuthenticationKeysDerivationPath {
             true,
             true,
             chain_type,
-            chain,
+            context,
         )
     }
 

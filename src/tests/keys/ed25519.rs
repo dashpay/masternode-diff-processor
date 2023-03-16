@@ -1,6 +1,7 @@
+use std::sync::Weak;
 use hashes::hex::{FromHex, ToHex};
 use crate::chain::common::ChainType;
-use crate::chain::ext::wallets::Wallets;
+use crate::chain::ext::wallets::WalletCreation;
 use crate::chain::wallet::seed::Seed;
 use crate::chains_manager::ChainsManager;
 use crate::crypto::{ECPoint, UInt512};
@@ -32,10 +33,11 @@ pub fn test_key_with_private_key() {
 pub fn test_vector_1_derivation() {
     let manager = ChainsManager::new();
     let chain_type = ChainType::MainNet;
-    let chain = manager.mainnet.borrow();
+    // let mut chain = ;
     // Test Vector 1
     let seed_data = Vec::from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
-    let wallet = chain.borrow().transient_wallet_with_seed(Seed::with_data(seed_data.clone()));
+    let wallet_arc = manager.mainnet.transient_wallet_with_seed(Seed::with_data(seed_data.clone()), chain_type);
+    let wallet = wallet_arc.try_write().unwrap();
     //--------------------------------------------------------------------------------------------------//
     // Chain m
     // • fingerprint: 00000000
@@ -53,8 +55,9 @@ pub fn test_vector_1_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint(), 0, "fingerprint is wrong");
@@ -77,8 +80,9 @@ pub fn test_vector_1_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("75c6ebdd").unwrap().to_hex(), "fingerprint is wrong");
@@ -101,8 +105,9 @@ pub fn test_vector_1_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("43b1da13").unwrap().to_hex(), "fingerprint is wrong");
@@ -125,8 +130,9 @@ pub fn test_vector_1_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("29cbe4eb").unwrap().to_hex(), "fingerprint is wrong");
@@ -149,8 +155,9 @@ pub fn test_vector_1_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("c6c16e31").unwrap().to_hex(), "fingerprint is wrong");
@@ -173,8 +180,9 @@ pub fn test_vector_1_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("cd2c32d6").unwrap().to_hex(), "fingerprint is wrong");
@@ -189,10 +197,10 @@ pub fn test_vector_1_derivation() {
 pub fn test_vector_2_derivation() {
     let manager = ChainsManager::new();
     let chain_type = ChainType::MainNet;
-    let chain = manager.mainnet.borrow();
     // Test Vector 1
     let seed_data = Vec::from_hex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542").unwrap();
-    let wallet = chain.borrow().transient_wallet_with_seed(Seed::with_data(seed_data.clone()));
+    let wallet_arc = manager.mainnet.transient_wallet_with_seed(Seed::with_data(seed_data.clone()), chain_type);
+    let wallet = wallet_arc.try_write().unwrap();
     //--------------------------------------------------------------------------------------------------//
     // Chain m
     // • fingerprint: 00000000
@@ -210,8 +218,9 @@ pub fn test_vector_2_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint(), 0, "fingerprint is wrong");
@@ -234,8 +243,9 @@ pub fn test_vector_2_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("501b9831").unwrap().to_hex(), "fingerprint is wrong");
@@ -258,8 +268,9 @@ pub fn test_vector_2_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("b111941e").unwrap().to_hex(), "fingerprint is wrong");
@@ -282,8 +293,9 @@ pub fn test_vector_2_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("8cf3adfc").unwrap().to_hex(), "fingerprint is wrong");
@@ -306,8 +318,9 @@ pub fn test_vector_2_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("5309a7ac").unwrap().to_hex(), "fingerprint is wrong");
@@ -330,8 +343,9 @@ pub fn test_vector_2_derivation() {
         KeyType::ED25519,
         DerivationPathReference::Root,
         chain_type,
-        chain.borrow());
-    path.set_wallet(wallet.borrow());
+        Weak::new());
+    path.set_is_transient(true);
+    path.set_wallet_unique_id(wallet.unique_id_as_str().to_string());
     path.generate_extended_public_key_from_seed_no_store(&seed_data);
     let private_key = path.private_key_from_seed(&seed_data).unwrap();
     assert_eq!(private_key.fingerprint().to_hex(), Vec::from_hex("4b652c42").unwrap().to_hex(), "fingerprint is wrong");

@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::net::SocketAddr;
+use std::sync::Weak;
 use crate::chain::chain::Chain;
 use crate::chain::common::ChainType;
-use crate::crypto::{UInt128, UInt256};
+use crate::crypto::UInt256;
 // use crate::chain::masternode::{LLMQEntry, MasternodeList};
 // use crate::chain::tx::ITransaction;
 use crate::chain::masternode::local_masternode::LocalMasternode;
@@ -24,7 +26,7 @@ pub struct MasternodeManager {
     pub local_masternodes_dictionary_by_registration_transaction_hash: HashMap<UInt256, LocalMasternode>,
     pub chain: Shared<Chain>,
     pub chain_type: ChainType,
-    pub current_masternode_list: Option<MasternodeList>,
+    pub current_masternode_list: Option<Shared<MasternodeList>>,
 
 }
 // impl<'a> Default for &'a MasternodeManager {
@@ -67,11 +69,11 @@ impl MasternodeManager {
             ..Default::default()
         }
     }
-    pub(crate) fn quorum_entry_for_chain_lock_request_id(&self, request_id: Option<UInt256>, block_height_offset: u32) -> Option<Shared<LLMQEntry>> {
+    pub(crate) fn quorum_entry_for_chain_lock_request_id(&self, request_id: Option<UInt256>, block_height_offset: u32) -> Option<Weak<LLMQEntry>> {
         todo!()
     }
 
-    pub(crate) fn quorum_entry_for_instant_send_request_id(&self, request_id: &UInt256, block_height_offset: u32) -> Option<Shared<LLMQEntry>> {
+    pub(crate) fn quorum_entry_for_instant_send_request_id(&self, request_id: &UInt256, block_height_offset: u32) -> Option<Weak<LLMQEntry>> {
         todo!()
     }
 }
@@ -100,7 +102,7 @@ impl MasternodeManager {
 
     pub fn estimated_masternode_lists_to_sync(&mut self) -> u32 {
         todo!()
-        // if self.chain.options.sync_type.bits() & SyncType::MasternodeList.bits() != 0 {
+        // if self.chain_type.sync_type.bits() & SyncType::MasternodeList.bits() != 0 {
         //     0
         // } else if self.masternode_list_retrieval_queue_max_amount() == 0 || self.store.masternode_lists_by_block_hash.len() <= 1 {
         //     // 1 because there might be a default
@@ -131,7 +133,7 @@ impl MasternodeManager {
         // }
     }
 
-    pub fn local_masternode_from_provider_registration_transaction(&mut self, transaction: &ProviderRegistrationTransaction, save: bool) -> Option<&LocalMasternode> {
+    pub fn local_masternode_from_provider_registration_transaction(&self, transaction: &ProviderRegistrationTransaction, save: bool) -> Option<&LocalMasternode> {
         // First check to see if we have a local masternode for this provider registration hash
         todo!()
         /*let tx_hash = transaction.tx_hash();
@@ -155,7 +157,7 @@ impl MasternodeManager {
     }
 
 
-    pub fn has_masternode_at_location(&self, ip_address: UInt128, port: u16) -> bool {
+    pub fn has_masternode_at_location(&self, socket_addr: SocketAddr) -> bool {
         todo!()
     }
 }
