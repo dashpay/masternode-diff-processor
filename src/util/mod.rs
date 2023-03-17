@@ -1,5 +1,9 @@
+pub mod address;
 pub mod base58;
+pub mod data_append;
 pub mod ecdsa;
 pub mod endian;
 pub mod key;
 pub mod psbt;
+pub mod script;
+pub mod data_ops;

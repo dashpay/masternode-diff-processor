@@ -1,11 +1,15 @@
 use std::collections::HashSet;
 use byte::{BytesExt, LE};
 use hashes::hex::{FromHex, ToHex};
+use crate::chain::ScriptMap;
 use crate::common::merkle_tree::MerkleTree;
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{AsBytes, UInt256};
-use crate::crypto::data_ops::{Data, ScriptElement, ScriptMap, with_script_pub_key, with_script_sig};
+use crate::crypto::data_ops::Data;
+use crate::util::address::address::{with_script_pub_key, with_script_sig};
 use crate::util::base58;
+use crate::util::data_append::DataAppend;
+use crate::util::script::ScriptElement;
 
 #[test]
 fn test_multiple_merkle_hashes() {

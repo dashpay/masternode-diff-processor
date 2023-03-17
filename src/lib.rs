@@ -22,11 +22,13 @@ pub mod internal_macros;
 #[macro_use]
 pub mod macros;
 pub mod blockdata;
+pub mod chain;
 pub mod common;
 pub mod consensus;
 pub mod crypto;
 pub mod ffi;
 pub mod hash_types;
+pub mod keys;
 pub mod models;
 pub mod network;
 pub mod tx;

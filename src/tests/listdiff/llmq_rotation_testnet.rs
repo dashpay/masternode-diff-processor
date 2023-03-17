@@ -6,7 +6,7 @@ use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_block_
 use crate::{models, processor_create_cache, register_processor};
 use crate::tests::block_store::init_mainnet_store;
 use crate::tests::json_from_core_snapshot::{block_hash_to_block_hash, ListDiff, masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
-use crate::tests::llmq_rotation::{should_process_isd_quorum, validate_llmq_callback_throuh_rust_bls};
+use crate::tests::listdiff::llmq_rotation::{should_process_isd_quorum, validate_llmq_callback_throuh_rust_bls};
 
 #[test]
 fn testnet_quorum_quarters() {

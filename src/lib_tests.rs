@@ -13,7 +13,7 @@ pub mod tests {
     use crate::ffi::from::FromFFI;
     use crate::ffi::to::ToFFI;
     use crate::ffi::unboxer::unbox_any;
-    use crate::common::chain_type::{ChainType, IHaveChainSettings};
+    use crate::chain::common::chain_type::{ChainType, IHaveChainSettings};
     use crate::consensus::encode;
     use crate::crypto::byte_util::{
         BytesDecodable, Reversable, UInt256, UInt384, UInt768,

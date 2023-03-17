@@ -1,7 +1,7 @@
 use crate::common::ChainType;
 use crate::lib_tests::tests::FFIContext;
 use crate::tests::block_store::init_mainnet_store;
-use crate::tests::mainnet_reload::load_masternode_lists_for_files;
+use crate::tests::listdiff::mainnet_reload::load_masternode_lists_for_files;
 
 #[test]
 fn test_quorum_issue() {
