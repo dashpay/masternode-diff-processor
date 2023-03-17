@@ -1,12 +1,16 @@
-use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
 use std::collections::BTreeMap;
 use crate::common::{Block, SocketAddress};
+use crate::common::masternode_type::MasternodeType;
 use crate::consensus::Encodable;
 use crate::crypto::{UInt128, UInt160, UInt256, UInt384, byte_util::Zeroable};
 use crate::hashes::{sha256, sha256d, Hash};
 use crate::models::OperatorPublicKey;
 use crate::util::data_ops::short_hex_string_from;
+
+// (block_height, protocol_version, bls_version)
+#[derive(Clone, Copy)]
+pub struct MasternodeReadContext(pub u32, pub u32, pub u16);
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct MasternodeEntry {
@@ -22,6 +26,9 @@ pub struct MasternodeEntry {
     pub update_height: u32,
     pub key_id_voting: UInt160,
     pub is_valid: bool,
+    pub mn_type: MasternodeType,
+    pub platform_http_port: u16,
+    pub platform_node_id: UInt160,
     pub entry_hash: UInt256,
 }
 impl std::fmt::Debug for MasternodeEntry {
@@ -39,33 +46,55 @@ impl std::fmt::Debug for MasternodeEntry {
             .field("update_height", &self.update_height)
             .field("key_id_voting", &self.key_id_voting)
             .field("is_valid", &self.is_valid)
+            .field("mn_type", &self.mn_type)
+            .field("platform_http_port", &self.platform_http_port)
+            .field("platform_node_id", &self.platform_node_id)
             .field("entry_hash", &self.entry_hash)
             .finish()
     }
 }
-impl<'a> TryRead<'a, Endian> for MasternodeEntry {
-    fn try_read(bytes: &'a [u8], _ctx: Endian) -> byte::Result<(Self, usize)> {
+
+impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
+    fn try_read(bytes: &'a [u8], context: MasternodeReadContext) -> byte::Result<(Self, usize)> {
+        let MasternodeReadContext (block_height, protocol_version, diff_version) = context;
         let offset = &mut 0;
         let provider_registration_transaction_hash =
             bytes.read_with::<UInt256>(offset, byte::LE)?;
         let confirmed_hash = bytes.read_with::<UInt256>(offset, byte::LE)?;
         let ip_address = bytes.read_with::<UInt128>(offset, byte::LE)?;
-        let port = bytes.read_with::<u16>(offset, byte::LE)?.swap_bytes();
+        let port = bytes.read_with::<u16>(offset, byte::BE)?;
         let socket_address = SocketAddress { ip_address, port };
         let operator_public_key = bytes.read_with::<UInt384>(offset, byte::LE)?;
         let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
-        let is_valid = bytes.read_with::<u8>(offset, byte::LE).unwrap_or(0);
-        Ok((
-            Self::new(
-                provider_registration_transaction_hash,
-                confirmed_hash,
-                socket_address,
-                key_id_voting,
-                OperatorPublicKey { data: operator_public_key, version: 0 },
-                is_valid,
-            ),
-            *offset,
-        ))
+        let is_valid = bytes.read_with::<u8>(offset, byte::LE)
+            .unwrap_or(0);
+        let mn_type = if diff_version == 2 {
+            bytes.read_with::<MasternodeType>(offset, byte::LE)?
+        } else {
+            MasternodeType::Regular
+        };
+        let (platform_http_port, platform_node_id) = if mn_type == MasternodeType::HighPerformance {
+            (bytes.read_with::<u16>(offset, byte::LE)?.swap_bytes(),
+             bytes.read_with::<UInt160>(offset, byte::LE)?)
+        } else {
+            (0u16, UInt160::MIN)
+        };
+        let mut entry = Self::new(
+            provider_registration_transaction_hash,
+            confirmed_hash,
+            socket_address,
+            key_id_voting,
+            OperatorPublicKey { data: operator_public_key, version: diff_version },
+            is_valid,
+            mn_type,
+            platform_http_port,
+            platform_node_id,
+            block_height
+        );
+        if !entry.confirmed_hash.is_zero() && block_height != u32::MAX {
+            entry.known_confirmed_at_height = Some(block_height);
+        }
+        Ok((entry, *offset))
     }
 }
 
@@ -77,6 +106,10 @@ impl MasternodeEntry {
         key_id_voting: UInt160,
         operator_public_key: OperatorPublicKey,
         is_valid: u8,
+        mn_type: MasternodeType,
+        platform_http_port: u16,
+        platform_node_id: UInt160,
+        update_height: u32,
     ) -> Self {
         let entry_hash = MasternodeEntry::calculate_entry_hash(
             provider_registration_transaction_hash,
@@ -85,6 +118,9 @@ impl MasternodeEntry {
             operator_public_key,
             key_id_voting,
             is_valid,
+            mn_type,
+            platform_http_port,
+            platform_node_id
         );
         Self {
             provider_registration_transaction_hash,
@@ -98,9 +134,12 @@ impl MasternodeEntry {
             previous_entry_hashes: Default::default(),
             previous_validity: Default::default(),
             known_confirmed_at_height: None,
-            update_height: 0,
+            update_height,
             key_id_voting,
             is_valid: is_valid != 0,
+            mn_type,
+            platform_http_port,
+            platform_node_id,
             entry_hash,
         }
     }
@@ -112,40 +151,31 @@ impl MasternodeEntry {
         operator_public_key: OperatorPublicKey,
         key_id_voting: UInt160,
         is_valid: u8,
+        mn_type: MasternodeType,
+        platform_http_port: u16,
+        platform_node_id: UInt160,
     ) -> UInt256 {
-        let offset: &mut usize = &mut 0;
-        const HASH_IMPORTANT_DATA_LENGTH: usize = 32 + 32 + 16 + 2 + 48 + 20 + 1;
-        let mut buffer: Vec<u8> = Vec::with_capacity(HASH_IMPORTANT_DATA_LENGTH);
-        *offset += provider_registration_transaction_hash
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += confirmed_hash.consensus_encode(&mut buffer).unwrap();
-        *offset += socket_address
-            .ip_address
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += socket_address
-            .port
-            .swap_bytes()
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += operator_public_key.data.consensus_encode(&mut buffer).unwrap();
-        *offset += key_id_voting.consensus_encode(&mut buffer).unwrap();
-        *offset += is_valid.consensus_encode(&mut buffer).unwrap();
-        UInt256(sha256d::Hash::hash(&buffer).into_inner())
+        let mut writer = Vec::<u8>::new();
+        provider_registration_transaction_hash.enc(&mut writer);
+        confirmed_hash.enc(&mut writer);
+        socket_address.enc(&mut writer);
+        operator_public_key.data.enc(&mut writer);
+        key_id_voting.enc(&mut writer);
+        is_valid.enc(&mut writer);
+        if operator_public_key.version == 2 /*Basic BLS*/ {
+            let mn_type_u16: u16 = mn_type.into();
+            mn_type_u16.enc(&mut writer);
+            if mn_type == MasternodeType::HighPerformance {
+                platform_http_port.swap_bytes().enc(&mut writer);
+                platform_node_id.enc(&mut writer);
+            }
+        }
+        UInt256(sha256d::Hash::hash(&writer).into_inner())
     }
 
     pub fn confirmed_hash_at(&self, block_height: u32) -> Option<UInt256> {
-        match self.known_confirmed_at_height {
-            Some(h) => {
-                if h > block_height {
-                    None
-                } else {
-                    Some(self.confirmed_hash)
-                }
-            }
-            None => None,
-        }
+        self.known_confirmed_at_height.and_then(|h| (h <= block_height)
+            .then_some(self.confirmed_hash))
     }
 
     pub fn update_confirmed_hash(&mut self, hash: UInt256) {
@@ -192,16 +222,15 @@ impl MasternodeEntry {
             self.socket_address,
             self.operator_public_key,
             self.key_id_voting,
-            if self.is_valid { 1 } else { 0 },
+            u8::from(self.is_valid),
+            self.mn_type,
+            self.platform_http_port,
+            self.platform_node_id
         )
     }
 
     pub fn hash_confirmed_hash(confirmed_hash: UInt256, pro_reg_tx_hash: UInt256) -> UInt256 {
-        let mut buffer: Vec<u8> = Vec::with_capacity(64);
-        let offset: &mut usize = &mut 0;
-        *offset += pro_reg_tx_hash.consensus_encode(&mut buffer).unwrap();
-        *offset += confirmed_hash.consensus_encode(&mut buffer).unwrap();
-        UInt256(sha256::Hash::hash(&buffer).into_inner())
+        UInt256(sha256::Hash::hash(&[pro_reg_tx_hash.0, confirmed_hash.0].concat()).into_inner())
     }
 
     pub fn is_valid_at(&self, block_height: u32) -> bool {
@@ -295,16 +324,5 @@ impl MasternodeEntry {
         if entry.entry_hash_at(self.update_height) != self.entry_hash {
             self.previous_entry_hashes.insert(block, entry.entry_hash);
         }
-    }
-
-    pub fn update_with_block_height(&mut self, block_height: u32) {
-        self.update_height = block_height;
-        if !self.confirmed_hash.is_zero() && block_height != u32::MAX {
-            self.known_confirmed_at_height = Some(block_height);
-        }
-    }
-
-    pub fn update_with_bls_version(&mut self, version: u16) {
-        self.operator_public_key.version = version;
     }
 }

@@ -203,6 +203,9 @@ impl ToFFI for models::MasternodeEntry {
         let port = self.socket_address.port;
         let is_valid = self.is_valid;
         let update_height = self.update_height;
+        let mn_type: u16 = self.mn_type.into();
+        let platform_http_port = self.platform_http_port;
+        let platform_node_id = boxed(self.platform_node_id.0);
         Self::Item {
             confirmed_hash,
             confirmed_hash_hashed_with_provider_registration_transaction_hash,
@@ -221,6 +224,9 @@ impl ToFFI for models::MasternodeEntry {
             ip_address,
             port,
             update_height,
+            mn_type,
+            platform_http_port,
+            platform_node_id
         }
     }
 }

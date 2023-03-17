@@ -21,5 +21,4 @@ pub use self::operator_public_key::OperatorPublicKey;
 pub use self::rotation_info::LLMQRotationInfo;
 pub use self::snapshot::LLMQSnapshot;
 
-impl_bytes_decodable!(MasternodeEntry);
 impl_bytes_decodable!(LLMQEntry);

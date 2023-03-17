@@ -233,6 +233,9 @@ impl FromFFI for types::MasternodeEntry {
             update_height: self.update_height,
             key_id_voting: UInt160(*self.key_id_voting),
             is_valid: self.is_valid,
+            mn_type: self.mn_type.into(),
+            platform_http_port: self.platform_http_port,
+            platform_node_id: UInt160(*self.platform_node_id),
             entry_hash: UInt256(*self.entry_hash),
         }
     }

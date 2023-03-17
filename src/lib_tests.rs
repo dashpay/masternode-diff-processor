@@ -69,6 +69,15 @@ pub mod tests {
         pub merkleroot: UInt256,
     }
 
+    impl MerkleBlock {
+        pub fn new(height: u32, hash: &str, merkle_root: &str) -> MerkleBlock {
+            MerkleBlock {
+                height,
+                hash: UInt256::from_hex(hash).unwrap(),
+                merkleroot: if merkle_root.is_empty() { UInt256::MIN } else { UInt256::from_hex(merkle_root).unwrap() } }
+        }
+    }
+
     #[derive(Serialize, Deserialize)]
     struct Block {
         pub hash: String,
@@ -147,7 +156,6 @@ pub mod tests {
     ) -> MNListDiffResult {
         let processor = unsafe { &mut *processor };
         let cache = unsafe { &mut *cache };
-        let is_bls_basic = protocol_version >= 70225;
         println!(
             "process_mnlistdiff_from_message_internal.start: {:?}",
             std::time::Instant::now()
@@ -157,7 +165,7 @@ pub mod tests {
         processor.genesis_hash = genesis_hash;
         let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
         let list_diff =
-            unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash), is_bls_basic));
+            unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash), protocol_version));
         let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",
@@ -189,10 +197,9 @@ pub mod tests {
             "process_qrinfo_from_message --: {:?} {:?} {:?}",
             processor, processor.opaque_context, cache
         );
-        let is_bls_basic = protocol_version >= 70225;
         let offset = &mut 0;
         let read_list_diff =
-            |offset: &mut usize| processor.read_list_diff_from_message(message, offset, is_bls_basic);
+            |offset: &mut usize| processor.read_list_diff_from_message(message, offset, protocol_version);
         let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
             processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, cache)
         };
@@ -291,12 +298,8 @@ pub mod tests {
     }
 
     pub fn message_from_file(name: String) -> Vec<u8> {
-        let executable = env::current_exe().unwrap();
-        let path = match executable.parent() {
-            Some(name) => name,
-            _ => panic!(),
-        };
-        let filepath = format!("{}/../../../files/{}", path.display(), name.as_str());
+        let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+        let filepath = format!("{}/files/{}", crate_dir, name.as_str());
         println!("{:?}", filepath);
         get_file_as_byte_vec(&filepath)
     }

@@ -143,7 +143,9 @@ fn testnet_quorum_quarters() {
         &mut context.cache.llmq_indexed_members,
         &context.cache.mn_lists,
         &context.cache.llmq_snapshots,
-        &mut context.cache.needed_masternode_lists);
+        &mut context.cache.needed_masternode_lists,
+        false
+    );
     let node_hashes = nodes.into_iter().map(|m| m.provider_registration_transaction_hash).collect::<Vec<UInt256>>();
 
     println!("{}: {:?}", context.block_for_hash(last_quorum.llmq_hash).unwrap().height, last_quorum);
