@@ -51,6 +51,7 @@ pub enum DevnetType {
     Chacha,
     #[default]
     Mojito,
+    WhiteRussian
 }
 
 impl DevnetType {
@@ -60,6 +61,7 @@ impl DevnetType {
             DevnetType::Devnet333 => "333".to_string(),
             DevnetType::Chacha => "chacha".to_string(),
             DevnetType::Mojito => "mojito".to_string(),
+            DevnetType::WhiteRussian => "white-russian".to_string(),
         }
     }
 
@@ -203,7 +205,8 @@ impl IHaveChainSettings for DevnetType {
     fn genesis_hash(&self) -> UInt256 {
         UInt256::from_hex(match self {
             DevnetType::Mojito => "739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357",
-            _ => "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c"
+            DevnetType::WhiteRussian => "9163d6958065ca5e73c36f0f2474ce618846260c215f5cba633bd0003585cb35",
+            _ => "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c",
         }).unwrap().reversed()
     }
 
@@ -321,13 +324,15 @@ impl ChainType {
                     DevnetType::Chacha => Some("cPTms6Sd7QuhPWXWQSzMbvg2VbEPsWCsLBbR4PBgvfYRzAPazbt3".to_string()),
                     DevnetType::Devnet333 => Some("cQnP9JNQp6oaZrvBtqBWRMeQERMkDyuXyvQh1qaph4FdP6cT2cVa".to_string()),
                     DevnetType::JackDaniels => Some("cTeGz53m7kHgA9L75s4vqFGR89FjYz4D9o44eHfoKjJr2ArbEtwg".to_string()),
-                    DevnetType::Mojito => Some("".to_string())
+                    DevnetType::Mojito => Some("".to_string()),
+                    DevnetType::WhiteRussian => Some("".to_string())
                 },
                 address: match devnet {
                     DevnetType::Chacha => "ybiRzdGWFeijAgR7a8TJafeNi6Yk6h68ps".to_string(),
                     DevnetType::Devnet333 => "yM6zJAMWoouAZxPvqGDbuHb6BJaD6k4raQ".to_string(),
                     DevnetType::JackDaniels => "yYBanbwp2Pp2kYWqDkjvckY3MosuZzkKp7".to_string(),
                     DevnetType::Mojito => "".to_string(),
+                    DevnetType::WhiteRussian => "".to_string(),
                 }
             }
         }
