@@ -473,7 +473,7 @@ impl ECDSAKey {
         Self::derive_child_private_key(&mut seckey, &mut chaincode, &path, 1);
         // derive_child_private_key(&mut seckey, &mut chaincode, 1 | BIP32_HARD);
         // derive_child_private_key(&mut seckey, &mut chaincode, 0);
-        let mut writer = Vec::<u8>::new();
+        let mut writer = SecVec::new();
         script_map.privkey.enc(&mut writer);
         writer.extend_from_slice(&seckey.0);
         b'\x01'.enc(&mut writer); // specifies compressed pubkey format
