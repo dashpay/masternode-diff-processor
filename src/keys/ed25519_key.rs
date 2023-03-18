@@ -5,6 +5,7 @@ use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
 use crate::keys::{IKey, KeyType, dip14::{IChildKeyDerivation, IChildKeyDerivationData}};
 use crate::util::base58;
+use crate::util::sec_vec::SecVec;
 
 // TODO: check we need to use ECPoint here
 const EXT_PUBKEY_SIZE: usize = 4 + mem::size_of::<UInt256>() + mem::size_of::<ECPoint>();
@@ -74,12 +75,12 @@ impl IKey for ED25519Key
         ECPoint::from(signing_key.verifying_key()).0.to_vec()
     }
 
-    fn extended_private_key_data(&self) -> Option<Vec<u8>> {
+    fn extended_private_key_data(&self) -> Option<SecVec> {
         if !self.is_extended {
             None
         } else if let Some(private_key_data) = self.private_key_data() {
             // TODO: secure allocator
-            let mut writer = Vec::<u8>::new();
+            let mut writer = SecVec::new();
             self.fingerprint.enc(&mut writer);
             self.chaincode.enc(&mut writer);
             writer.extend(private_key_data);
@@ -193,7 +194,7 @@ impl IKey for ED25519Key
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
         //if (uint256_is_zero(_seckey)) return nil;
         //NSMutableData *d = [NSMutableData secureDataWithCapacity:sizeof(UInt256) + 2];
-        let mut writer = Vec::<u8>::new();
+        let mut writer = SecVec::with_capacity(33);
         script.privkey.enc(&mut writer);
         self.seckey.enc(&mut writer);
         // todo: should we add additional byte here ?

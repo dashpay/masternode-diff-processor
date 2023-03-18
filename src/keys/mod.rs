@@ -20,6 +20,7 @@ use crate::keys::dip14::{IChildKeyDerivation, SignKey};
 use crate::util::address::address::with_public_key_data;
 use crate::util::data_append::DataAppend;
 use crate::util::script::ScriptElement;
+use crate::util::sec_vec::SecVec;
 
 pub trait IKey: Send + Sync + Debug {
     fn r#type(&self) -> KeyType {
@@ -52,7 +53,7 @@ pub trait IKey: Send + Sync + Debug {
     fn public_key_data(&self) -> Vec<u8> {
         panic!("Should be overriden in implementation")
     }
-    fn extended_private_key_data(&self) -> Option<Vec<u8>> {
+    fn extended_private_key_data(&self) -> Option<SecVec> {
         panic!("Should be overriden in implementation")
     }
     fn extended_public_key_data(&self) -> Option<Vec<u8>> {

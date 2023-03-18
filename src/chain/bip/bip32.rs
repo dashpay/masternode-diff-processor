@@ -6,6 +6,7 @@ use crate::crypto::byte_util::clone_into_array;
 use crate::crypto::UInt256;
 use crate::chain::derivation::BIP32_HARD;
 use crate::util::{base58, endian};
+use crate::util::sec_vec::SecVec;
 
 #[allow(unused_assignments)]
 
@@ -144,7 +145,8 @@ impl Key {
             }
             child = child.swap_bytes();
             // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:14 + key.length + sizeof(chain)])
-            let mut writer = Vec::<u8>::with_capacity(14 + self.data.len() + std::mem::size_of::<UInt256>());
+            // let mut writer = Vec::<u8>::with_capacity(14 + self.data.len() + std::mem::size_of::<UInt256>());
+            let mut writer = SecVec::with_capacity(14 + self.data.len() + std::mem::size_of::<UInt256>());
             let is_priv = self.data.len() < 33;
             writer.extend_from_slice(&if is_priv { chain_type.bip32_script_map().xprv } else { chain_type.bip32_script_map().xpub }); // 4
             self.depth.enc(&mut writer);                // 5
@@ -158,7 +160,8 @@ impl Key {
             base58::check_encode_slice(&writer)
         } else {
             // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:47 + key.length + sizeof(chain)])
-            let mut writer = Vec::<u8>::with_capacity(47 + self.data.len() + std::mem::size_of::<UInt256>());
+            // let mut writer = Vec::<u8>::with_capacity(47 + self.data.len() + std::mem::size_of::<UInt256>());
+            let mut writer = SecVec::with_capacity(47 + self.data.len() + std::mem::size_of::<UInt256>());
             let is_priv = self.data.len() < 33;
             writer.extend_from_slice(&if is_priv { chain_type.dip14_script_map().dps } else { chain_type.dip14_script_map().dpp }); // 4
             self.depth.enc(&mut writer);                // 5

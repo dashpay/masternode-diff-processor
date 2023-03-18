@@ -7,13 +7,14 @@ use crate::consensus::Encodable;
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}};
 use crate::keys::{IKey, KeyType, dip14::{IChildKeyDerivation, SignKey}};
 use crate::util::{base58, data_ops::hex_with_data};
+use crate::util::sec_vec::SecVec;
 
 #[derive(Clone, Debug, Default)]
 pub struct BLSKey {
     pub seckey: UInt256,
     pub chaincode: UInt256,
     pub pubkey: UInt384,
-    pub extended_private_key_data: Vec<u8>,
+    pub extended_private_key_data: SecVec,
     pub extended_public_key_data: Vec<u8>,
     pub use_legacy: bool,
 }
@@ -54,8 +55,6 @@ impl BLSKey {
 }
 
 impl IKey for BLSKey {
-    // type SK = UInt256;
-
     fn r#type(&self) -> KeyType {
         KeyType::BLS // &KeyType::BLSBasic
     }
@@ -87,6 +86,10 @@ impl IKey for BLSKey {
         self.pubkey.0.to_vec()
     }
 
+    fn extended_private_key_data(&self) -> Option<SecVec> {
+        Some(self.extended_private_key_data.clone())
+    }
+
     fn extended_public_key_data(&self) -> Option<Vec<u8>> {
         Some(self.extended_public_key_data.clone())
     }
@@ -108,7 +111,7 @@ impl IKey for BLSKey {
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
         // if (uint256_is_zero(self.secretKey)) return nil;
         // NSMutableData *d = [NSMutableData secureDataWithCapacity:sizeof(UInt256) + 2];
-        let mut writer = Vec::<u8>::new();
+        let mut writer = SecVec::with_capacity(34);
         script.privkey.enc(&mut writer);
         self.seckey.enc(&mut writer);
         b'\x02'.enc(&mut writer);
@@ -208,7 +211,7 @@ impl BLSKey {
             bls_public_key.serialize()
         };
         Self {
-            extended_private_key_data: vec![],
+            extended_private_key_data: SecVec::new(),
             extended_public_key_data,
             chaincode: UInt256(*bls_extended_public_key.chain_code().serialize()),
             seckey: UInt256::MIN,
@@ -249,7 +252,7 @@ impl BLSKey {
         };
         if let Some(seckey) = UInt256::from_bytes(bls_private_key.serialize().as_slice(), &mut 0) {
             Some(Self {
-                extended_private_key_data: extended_private_key_data.to_vec(),
+                extended_private_key_data: SecVec::with_vec(extended_private_key_data.to_vec()),
                 extended_public_key_data: extended_public_key_data.to_vec(),
                 chaincode,
                 seckey,

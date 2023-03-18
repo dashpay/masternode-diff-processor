@@ -7,3 +7,4 @@ pub mod key;
 pub mod psbt;
 pub mod script;
 pub mod data_ops;
+pub mod sec_vec;

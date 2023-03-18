@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use crate::chain::{ScriptMap, derivation::{IIndexPath, IndexPath}};
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable}};
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey};
+use crate::util::sec_vec::SecVec;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum KeyType {
@@ -269,11 +270,11 @@ impl IKey for Key {
         }
     }
 
-    fn extended_private_key_data(&self) -> Option<Vec<u8>> {
+    fn extended_private_key_data(&self) -> Option<SecVec> {
         match self {
             Key::ECDSA(key) => key.extended_private_key_data(),
-            Key::BLS(key) => key.extended_public_key_data(),
-            Key::ED25519(key) => key.extended_public_key_data(),
+            Key::BLS(key) => key.extended_private_key_data(),
+            Key::ED25519(key) => key.extended_private_key_data(),
         }
     }
 

@@ -8,6 +8,7 @@ pub mod address {
     use crate::util::base58;
     use crate::util::data_append::DataAppend;
     use crate::util::script::ScriptElement;
+    use crate::util::sec_vec::SecVec;
 
     pub fn from_hash160_for_script_map(hash: &UInt160, map: &ScriptMap) -> String {
         let mut writer: Vec<u8> = Vec::new();
@@ -22,10 +23,11 @@ pub mod address {
         // TODO: SecAllocate SecureRandom
         // NSMutableData *d = [NSMutableData secureDataWithCapacity:160 / 8 + 1];
         // let d = SecureBox::new(160 / 8 + 1);
-        let mut d = Vec::<u8>::new();
-        map.pubkey.enc(&mut d);
-        UInt160::hash160(data).enc(&mut d);
-        base58::check_encode_slice(&d)
+        let mut writer = SecVec::with_capacity(21);
+        // let mut d = Vec::<u8>::new();
+        map.pubkey.enc(&mut writer);
+        UInt160::hash160(data).enc(&mut writer);
+        base58::check_encode_slice(&writer)
     }
 
 

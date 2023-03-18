@@ -13,6 +13,7 @@ use crate::crypto::{ECPoint, UInt160, UInt256, UInt512, byte_util::{AsBytes, Zer
 use crate::keys::{IKey, KeyType, dip14::{IChildKeyDerivation, SignKey}};
 use crate::util::address::address::is_valid_dash_private_key;
 use crate::util::base58;
+use crate::util::sec_vec::SecVec;
 
 const EXT_PUBKEY_SIZE: usize = 4 + mem::size_of::<UInt256>() + mem::size_of::<ECPoint>();
 
@@ -287,13 +288,13 @@ impl IKey for ECDSAKey {
         self.pubkey.clone()
     }
 
-    fn extended_private_key_data(&self) -> Option<Vec<u8>> {
+    fn extended_private_key_data(&self) -> Option<SecVec> {
         if !self.is_extended {
             None
         } else if let Some(private_key_data) = self.private_key_data() {
             // TODO: secure data
             //NSMutableData *data = [NSMutableData secureData];
-            let mut writer = Vec::<u8>::new();
+            let mut writer = SecVec::new();
             self.fingerprint.enc(&mut writer);
             self.chaincode.enc(&mut writer);
             writer.extend(private_key_data);
@@ -408,7 +409,7 @@ impl IKey for ECDSAKey {
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
         //if (uint256_is_zero(_seckey)) return nil;
         //NSMutableData *d = [NSMutableData secureDataWithCapacity:sizeof(UInt256) + 2];
-        let mut writer = Vec::<u8>::new();
+        let mut writer = SecVec::with_capacity(if self.compressed { 34 } else { 33 });
         script.privkey.enc(&mut writer);
         self.seckey.enc(&mut writer);
         if self.compressed {
