@@ -1,5 +1,5 @@
 use hashes::{Hash, sha256d};
-use crate::blockdata::opcodes::all::{OP_CHECKSIG, OP_DUP, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4, OP_RETURN, OP_SHAPESHIFT, OP_SHAPESHIFT_SCRIPT};
+use crate::blockdata::opcodes::all::{OP_CHECKSIG, OP_DUP, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4, OP_RETURN};
 use crate::chain::params::{BITCOIN_SCRIPT_ADDRESS, ScriptMap};
 use crate::consensus::Encodable;
 use crate::util::base58;
@@ -198,10 +198,12 @@ impl DataAppend for Vec<u8> /* io::Write */ {
             Ok(d) if d.len() == 21 => {
                 let mut script_push = Vec::<u8>::new();
                 if d[0] == BITCOIN_SCRIPT_ADDRESS {
-                    OP_SHAPESHIFT_SCRIPT.into_u8().enc(&mut script_push);
+                    // OP_SHAPESHIFT_SCRIPT
+                    0xb3.enc(&mut script_push);
                 } else {
                     // shapeshift is actually part of the message
-                    OP_SHAPESHIFT.into_u8().enc(&mut script_push);
+                    // OP_SHAPESHIFT
+                    0xb1.enc(&mut script_push);
                 }
                 script_push.extend(d.clone().drain(1..d.len()));
                 OP_RETURN.into_u8().enc(&mut writer);
