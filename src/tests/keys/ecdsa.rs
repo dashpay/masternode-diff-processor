@@ -22,8 +22,8 @@ fn test_sign_key(secret: &str, message: &str, compressed: bool, test_signature: 
     }
 }
 
-fn test_compact_signature_recovery(signature: &Vec<u8>, md: UInt256, test_data: Vec<u8>) {
-    match ECDSAKey::key_recovered_from_compact_sig(&signature, md) {
+fn test_compact_signature_recovery(signature: &[u8], md: UInt256, test_data: Vec<u8>) {
+    match ECDSAKey::key_with_compact_sig(signature, md) {
         Some(key) => assert_eq!(key.public_key_data(), test_data, "public key data doesn't match"),
         _ => panic!("Key can't recovered")
     }

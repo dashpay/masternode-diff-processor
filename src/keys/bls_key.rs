@@ -100,12 +100,12 @@ impl IKey for BLSKey {
         todo!()
     }
 
-    fn private_derive_to_path<PATH>(&self, index_path: &PATH) -> Option<Self>
+    fn private_derive_to_path<PATH>(&self, path: &PATH) -> Option<Self>
         where Self: Sized, PATH: IIndexPath<Item = u32> {
         ExtendedPrivateKey::from_bytes(self.extended_private_key_data.as_slice())
             .ok()
             .and_then(|bls_extended_private_key|
-                Self::init_with_bls_extended_private_key(&Self::derive(bls_extended_private_key, index_path, self.use_legacy), self.use_legacy))
+                Self::init_with_bls_extended_private_key(&Self::derive(bls_extended_private_key, path, self.use_legacy), self.use_legacy))
     }
 
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
@@ -480,5 +480,24 @@ impl BLSKey {
         } else {
             BasicSchemeMPL::new().aggregate_verify(keys, messages, &G2Element::from_bytes(bytes).unwrap())
         }
+    }
+}
+
+/// For FFI
+impl BLSKey {
+    pub fn key_with_extended_public_key_data(bytes: &[u8], use_legacy: bool) -> Option<Self> {
+        if use_legacy {
+            ExtendedPublicKey::from_bytes_legacy(bytes)
+        } else {
+            ExtendedPublicKey::from_bytes(bytes)
+        }.ok().map(|bls_extended_public_key| Self::init_with_bls_extended_public_key(&bls_extended_public_key, use_legacy))
+
+    }
+
+    pub fn key_with_extended_private_key_data(bytes: &[u8], use_legacy: bool) -> Option<Self> {
+        ExtendedPrivateKey::from_bytes(bytes)
+            .ok()
+            .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
+
     }
 }

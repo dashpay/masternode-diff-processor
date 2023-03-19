@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
-use crate::types;
+use crate::{BLSKeyWithUniqueId, ECDSAKeyWithUniqueId, ED25519KeyWithUniqueId, types};
 
 /// # Safety
 pub unsafe fn unbox_any<T: ?Sized>(any: *mut T) -> Box<T> {
@@ -334,4 +334,22 @@ pub unsafe fn unbox_qr_info_result(result: *mut types::QRInfoResult) {
             res.mn_list_diff_list_count,
         ));
     }
+}
+
+/// # Safety
+pub unsafe fn unbox_opaque_ecdsa_key(key: *mut ECDSAKeyWithUniqueId) {
+    let result = unbox_any(key);
+    unbox_any(result.ptr);
+}
+
+/// # Safety
+pub unsafe fn unbox_opaque_bls_key(key: *mut BLSKeyWithUniqueId) {
+    let result = unbox_any(key);
+    unbox_any(result.ptr);
+}
+
+/// # Safety
+pub unsafe fn unbox_opaque_ed25519_key(key: *mut ED25519KeyWithUniqueId) {
+    let result = unbox_any(key);
+    unbox_any(result.ptr);
 }

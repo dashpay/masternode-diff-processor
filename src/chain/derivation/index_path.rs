@@ -1,4 +1,7 @@
 use std::fmt::{Debug, Display};
+use std::os::raw::{c_int, c_ulong};
+use std::slice;
+use byte::{BytesExt, LE, TryRead};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::clone_into_array;
 use crate::crypto::UInt256;
@@ -85,6 +88,7 @@ pub trait IIndexPath: Sized {
     type Item: Copy + Clone + Display + Debug + Encodable + IndexHardSoft + PartialEq + Extremum;
 
     fn new(indexes: Vec<Self::Item>) -> Self;
+    fn new_hardened(indexes: Vec<Self::Item>, hardened: Vec<bool>) -> Self;
     fn index_path_with_index(index: Self::Item) -> Self {
         Self::new(vec![index])
     }
@@ -203,9 +207,13 @@ pub struct IndexPath<T> {
 
 impl<T> IIndexPath for IndexPath<T> where T: Copy + Debug + Display + Encodable + IndexHardSoft + PartialEq + Extremum {
     type Item = T;
-
+    // TODO: avoid hardened allocation for u32 index paths
     fn new(indexes: Vec<Self::Item>) -> Self {
-        Self { indexes, hardened: vec![] }
+        Self::new_hardened(indexes, vec![])
+    }
+
+    fn new_hardened(indexes: Vec<Self::Item>, hardened: Vec<bool>) -> Self {
+        Self { indexes, hardened }
     }
 
     fn indexes(&self) -> &Vec<Self::Item> {
@@ -217,3 +225,23 @@ impl<T> IIndexPath for IndexPath<T> where T: Copy + Debug + Display + Encodable 
     }
 }
 
+impl IndexPath<u32> {
+    pub fn from_ffi(indexes: *const c_ulong, length: c_int) -> Self {
+        let indexes_slice = unsafe { slice::from_raw_parts(indexes, length as usize) };
+        IndexPath::new(indexes_slice.iter().map(|&index| index as u32).collect())
+    }
+}
+
+impl<'a> TryRead<'a, usize> for IndexPath<UInt256> {
+    #[inline]
+    fn try_read(bytes: &'a [u8], size: usize) -> byte::Result<(Self, usize)> {
+        let offset = &mut 0;
+        let mut indexes = Vec::with_capacity(size);
+        let mut hardened = Vec::with_capacity(size);
+        for i in 0..size {
+            indexes.push(bytes.read_with::<UInt256>(offset, LE)?);
+            hardened.push(bytes.read_with::<bool>(offset, ())?);
+        }
+        Ok((Self::new_hardened(indexes, hardened), size))
+    }
+}

@@ -20,6 +20,7 @@ pub mod transaction_input;
 pub mod transaction_output;
 pub mod validity;
 pub mod var_int;
+pub mod opaque_key;
 
 pub use self::block::Block;
 pub use self::coinbase_transaction::CoinbaseTransaction;

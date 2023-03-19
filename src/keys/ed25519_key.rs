@@ -1,4 +1,6 @@
 use std::mem;
+use byte::BytesExt;
+use byte::ctx::Bytes;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
 use crate::crypto::{ECPoint, UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
@@ -70,9 +72,13 @@ impl IKey for ED25519Key
     }
 
     fn public_key_data(&self) -> Vec<u8> {
-        let signing_key = SigningKey::from_bytes(&self.seckey.0);
-        let public_key = VerifyingKey::from(&signing_key);
-        ECPoint::from(signing_key.verifying_key()).0.to_vec()
+        if !self.pubkey.is_empty() {
+            self.pubkey.to_vec()
+        } else {
+            let signing_key = SigningKey::from_bytes(&self.seckey.0);
+            let public_key = VerifyingKey::from(&signing_key);
+            ECPoint::from(signing_key.verifying_key()).0.to_vec()
+        }
     }
 
     fn extended_private_key_data(&self) -> Option<SecVec> {
@@ -275,4 +281,50 @@ impl ED25519Key {
             );
         Some(k.as_bytes().to_vec())
     }
+}
+
+/// For FFI
+impl ED25519Key {
+    pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Option<Self> {
+        let len = bytes.len();
+        if len == 68 || len == 69 {
+            let offset = &mut 0;
+            let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
+            let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
+            if len == 69 {
+                // skip 1st byte as pub key was padded with 0x00
+                *offset += 1;
+            }
+            let data: &[u8] = bytes.read_with(offset, Bytes::Len(32)).unwrap();
+            Self::public_key_from_bytes(data).ok().map(|pubkey| {
+                Self {
+                    fingerprint,
+                    chaincode,
+                    compressed: true,
+                    pubkey: ECPoint::from(pubkey).0.to_vec(),
+                    is_extended: true,
+                    ..Default::default() }
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn key_with_extended_private_key_data(bytes: &[u8]) -> Option<Self> {
+        (bytes.len() == 68).then_some({
+            let offset = &mut 0;
+            let fingerprint = bytes.read_with::<u32>(offset, byte::LE).unwrap();
+            let chaincode = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
+            let seckey = bytes.read_with::<UInt256>(offset, byte::LE).unwrap();
+            Self {
+                fingerprint,
+                chaincode,
+                seckey,
+                compressed: true,
+                is_extended: true,
+                ..Default::default()
+            }
+        })
+    }
+
 }

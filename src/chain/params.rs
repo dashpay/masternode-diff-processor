@@ -61,6 +61,12 @@ pub struct ScriptMap {
     pub script: u8,
 }
 
+impl From<i16> for ScriptMap {
+    fn from(value: i16) -> Self {
+        ChainType::from(value).script_map()
+    }
+}
+
 impl ScriptMap {
     pub const MAINNET: ScriptMap = ScriptMap {
         privkey: DASH_PRIVKEY,

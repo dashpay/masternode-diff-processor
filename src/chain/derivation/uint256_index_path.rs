@@ -16,6 +16,11 @@ impl IIndexPath for UInt256IndexPath {
     fn new(indexes: Vec<Self::Item>) -> Self {
         Self { indexes, ..Default::default() }
     }
+
+    fn new_hardened(indexes: Vec<Self::Item>, hardened: Vec<bool>) -> Self {
+        Self { indexes, hardened_indexes: hardened }
+    }
+
     fn indexes(&self) -> &Vec<Self::Item> {
         &self.indexes
     }

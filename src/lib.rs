@@ -12,8 +12,10 @@ mod lib_tests;
 mod tests;
 
 
+use std::ffi::{CStr, CString};
 #[cfg(feature = "std")]
 use std::io;
+use std::os::raw::{c_char, c_int, c_ulong};
 #[cfg(not(feature = "std"))]
 use core2::io;
 
@@ -52,10 +54,17 @@ use ffi::unboxer::{
 
 use std::ptr::null_mut;
 use std::slice;
+use crate::chain::bip::bip32;
+use crate::chain::derivation::IndexPath;
+use crate::chain::ScriptMap;
+use crate::common::ChainType;
 use crate::consensus::encode;
 use crate::crypto::byte_util::{BytesDecodable, ConstDecodable};
 use crate::crypto::UInt256;
 use crate::ffi::to::ToFFI;
+use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey};
+use crate::processing::keys_cache::KeysCache;
+use crate::types::opaque_key::{BLSKeyWithUniqueId, ECDSAKeyWithUniqueId, ED25519KeyWithUniqueId};
 
 /// Destroys anonymous internal holder for UInt256
 /// # Safety
@@ -420,3 +429,305 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
 //     }
 // }
 
+
+// Here we have temporary replacement for DSKey from the DashSync
+/// Destroys rust-allocated string
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_string(ptr: *mut c_char) {
+    if ptr.is_null() {
+        return;
+    }
+    let _ = CString::from_raw(ptr);
+}
+
+/// Destroys UInt160
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_uint160(ptr: *mut [u8; 20]) {
+    unbox_any(ptr);
+}
+
+/// Destroys compact signature for ECDSAKey
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_compact_sig(ptr: *mut [u8; 65]) {
+    unbox_any(ptr);
+}
+
+/// Initialize opaque cache to store keys information between FFI calls
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn keys_create_cache() -> *mut KeysCache {
+    let cache = KeysCache::default();
+    println!("keys_create_cache: {:?}", cache);
+    boxed(cache)
+}
+
+/// Clear opaque key cache
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn keys_clear_cache(cache: *mut KeysCache) {
+    println!("keys_clear_cache: {:p}", cache);
+    (*cache).clear();
+}
+
+/// Destroy opaque key cache
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn keys_destroy_cache(cache: *mut KeysCache) {
+    println!("keys_destroy_cache: {:?}", cache);
+    let cache = unbox_any(cache);
+}
+
+
+/// Destroys anonymous internal holder for ECDSAKeyWithUniqueId
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_ecdsa_key_wrapper(key: *mut ECDSAKeyWithUniqueId) {
+    unbox_any(key);
+}
+
+/// Destroys anonymous internal holder for BLSKeyWithUniqueId
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_bls_key_wrapper(key: *mut BLSKeyWithUniqueId) {
+    unbox_any(key);
+}
+
+/// Destroys anonymous internal holder for ED25519KeyWithUniqueId
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_ed25519_key_wrapper(key: *mut ED25519KeyWithUniqueId) {
+    unbox_any(key);
+}
+
+/// Destroys anonymous internal holder for ECDSAKey
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_ecdsa_key(key: *mut ECDSAKey) {
+    unbox_any(key);
+}
+
+/// Destroys anonymous internal holder for BLSKey
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_bls_key(key: *mut BLSKey) {
+    unbox_any(key);
+}
+
+/// Destroys anonymous internal holder for ED25519Key
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_ed25519_key(key: *mut ED25519Key) {
+    unbox_any(key);
+}
+
+/// Removes ECDSA key from cache
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn cache_remove_ecdsa_key(unique_id: u64, cache: *mut KeysCache) {
+    let cache = &mut *cache;
+    cache.ecdsa.remove(&unique_id);
+}
+
+/// Removes BLS key from cache
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn cache_key_remove_bls_key(unique_id: u64, cache: *mut KeysCache) {
+    let cache = &mut *cache;
+    cache.bls.remove(&unique_id);
+}
+
+/// Removes ED25519 key from cache
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn cache_key_remove_ed25519_key(unique_id: u64, cache: *mut KeysCache) {
+    let cache = &mut *cache;
+    cache.ed25519.remove(&unique_id);
+}
+
+/// Replacement for [DSKey keyWithExtendedPublicKeyData]
+/// Returns 'unique_id' (u64-equivalent for [DSDerivationPath createIdentifierForDerivationPath])
+/// Then key can be removed by this 'unique_id'
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_create_ecdsa_from_extened_public_key_data(ptr: *const u8, len: usize, cache: *mut KeysCache) -> *mut ECDSAKeyWithUniqueId {
+    let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+    ECDSAKey::key_with_extended_public_key_data(bytes)
+        .map_or(null_mut(), |key| {
+            let cache = &mut *cache;
+            let unique_id = UInt256::sha256(bytes).u64_le();
+            cache.ecdsa.insert(unique_id, key.clone());
+            boxed(ECDSAKeyWithUniqueId { unique_id, ptr: boxed(key) })
+        })
+}
+
+/// Replacement for [DSKey keyWithExtendedPublicKeyData]
+/// Returns 'unique_id' (u64-equivalent for [DSDerivationPath createIdentifierForDerivationPath])
+/// Then key can be removed by this 'unique_id'
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_create_bls_from_extened_public_key_data(ptr: *const u8, len: usize, use_legacy: bool, cache: *mut KeysCache) -> *mut BLSKeyWithUniqueId {
+    let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+    BLSKey::key_with_extended_public_key_data(bytes, use_legacy)
+        .map_or(null_mut(), |key| {
+            let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+            let cache = &mut *cache;
+            let unique_id = UInt256::sha256(bytes).u64_le();
+            cache.bls.insert(unique_id, key.clone());
+            boxed(BLSKeyWithUniqueId { unique_id, ptr: boxed(key) })
+        })
+}
+
+/// Replacement for [DSKey keyWithExtendedPublicKeyData]
+/// Returns 'unique_id' (u64-equivalent for [DSDerivationPath createIdentifierForDerivationPath])
+/// Then key can be removed by this 'unique_id'
+/// # Safety
+#[no_mangle]
+pub extern "C" fn key_create_ed25519_from_extened_public_key_data(ptr: *const u8, len: usize, cache: *mut KeysCache) -> *mut ED25519KeyWithUniqueId {
+    let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+    let cache = unsafe { &mut *cache };
+    ED25519Key::key_with_extended_public_key_data(bytes)
+        .map_or(null_mut(), |key| {
+            let unique_id = UInt256::sha256(bytes).u64_le();
+            cache.ed25519.insert(unique_id, key.clone());
+            boxed(ED25519KeyWithUniqueId { unique_id, ptr: boxed(key) })
+        })
+}
+
+#[no_mangle]
+pub extern "C" fn key_derive_ecdsa_from_extened_private_key_data_for_index_path(secret: *const u8, secret_len: usize, indexes: *const c_ulong, length: c_int) -> *mut ECDSAKey {
+    let bytes = unsafe { slice::from_raw_parts(secret, secret_len) };
+    let path = IndexPath::from_ffi(indexes, length);
+    ECDSAKey::key_with_extended_private_key_data(bytes)
+        .and_then(|key| key.private_derive_to_path(&path))
+        .map_or(null_mut(), boxed)
+}
+
+#[no_mangle]
+pub extern "C" fn key_derive_bls_from_extened_private_key_data_for_index_path(secret: *const u8, secret_len: usize, indexes: *const c_ulong, length: c_int, use_legacy: bool) -> *mut BLSKey {
+    let bytes = unsafe { slice::from_raw_parts(secret, secret_len) };
+    let path = IndexPath::from_ffi(indexes, length);
+    BLSKey::key_with_extended_private_key_data(bytes, use_legacy)
+        .and_then(|key| key.private_derive_to_path(&path))
+        .map_or(null_mut(), boxed)
+}
+
+#[no_mangle]
+pub extern "C" fn key_derive_ed25519_from_extened_private_key_data_for_index_path(secret: *const u8, secret_len: usize, indexes: *const c_ulong, length: c_int) -> *mut ED25519Key {
+    let bytes = unsafe { slice::from_raw_parts(secret, secret_len) };
+    let path = IndexPath::from_ffi(indexes, length);
+    ED25519Key::key_with_extended_private_key_data(bytes)
+        .and_then(|key| key.private_derive_to_path(&path))
+        .map_or(null_mut(), boxed)
+}
+
+
+#[no_mangle]
+pub extern "C" fn key_compact_sign_ecdsa(key: *mut ECDSAKey, digest: *const u8) -> *mut [u8; 65] {
+    let key = unsafe { &mut *key };
+    UInt256::from_const(digest)
+        .map(|message_digest| key.compact_sign(message_digest))
+        .map_or(null_mut(), boxed)
+}
+
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_create_ecdsa_from_secret(ptr: *const u8, len: usize, compressed: bool) -> *mut ECDSAKey {
+    let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+    ECDSAKey::key_with_secret_slice(bytes, compressed)
+        .map_or(null_mut(), boxed)
+}
+
+
+/// Deserializes extended private key from string and create opaque pointer to ECDSAKey
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_create_ecdsa_from_serialized_extended_private_key(key: *const c_char, chain_id: i16) -> *mut ECDSAKey {
+    // NSData *extendedPrivateKey = [self deserializedExtendedPrivateKey:serializedExtendedPrivateKey onChain:chain];
+    // [DSECDSAKey keyWithSecret:*(UInt256 *)extendedPrivateKey.bytes compressed:YES];
+    (unsafe { CStr::from_ptr(key) }.to_str().unwrap(), ChainType::from(chain_id))
+        .try_into()
+        .ok()
+        .and_then(|key: bip32::Key| ECDSAKey::key_with_secret_data(&key.extended_key_data(), true))
+        .map_or(null_mut(), boxed)
+}
+
+/// Deserializes extended private key from string and create opaque pointer to ECDSAKey
+/// To pass NSIndexPath need to be serialized as byte array with u264 with path_length = bytes.length / 33
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_serialized_extended_private_key_from_seed(
+    secret: *const u8,
+    secret_len: usize,
+    index_path: *const u8, // Vec<UInt256 + bool>
+    path_length: usize,
+    chain_id: i16) -> *mut c_char {
+    let secret_slice = unsafe { slice::from_raw_parts(secret, secret_len) };
+    let indexes_slice = unsafe { slice::from_raw_parts(index_path, 33 * path_length) };
+    let chain_type = ChainType::from(chain_id);
+    let index_path = indexes_slice.read_with::<IndexPath<UInt256>>(&mut 0, path_length).unwrap();
+    ECDSAKey::serialized_extended_private_key_from_seed(secret_slice, index_path, chain_type)
+        .map_or(null_mut(), |serialized| CString::new(serialized).unwrap().into_raw())
+}
+
+// #[no_mangle]
+// pub extern "C" fn key_ecdsa_create_signature_for_tx_input_script(key: *mut ECDSAKey, ptr: *const u8, len: usize, chain_id: i16) -> *mut ffi::Signature {
+//     let key = unsafe { &mut *key };
+//     let in_script = unsafe { slice::from_raw_parts(ptr, len) };
+//     let map = ChainType::from(chain_id).script_map();
+//
+//     // address::with_script_pub_key(&in_script.to_vec(), &map)
+//     // key.address_with_public_key_data(&script_map)
+// }
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn ecdsa_public_key_hash_from_secret(secret: *const c_char, chain_id: i16) -> *mut [u8; 20] {
+    let c_str = unsafe { CStr::from_ptr(secret) };
+    let private_key_string = c_str.to_str().unwrap();
+    let chain_type = ChainType::from(chain_id);
+    ECDSAKey::key_with_private_key(private_key_string, chain_type)
+        .map_or(null_mut(), |key| boxed(key.hash160().0))
+}
+/// # Safety
+#[no_mangle]
+pub extern "C" fn address_for_ecdsa_key(key: *mut ECDSAKey, chain_id: i16) -> *mut c_char {
+    let key = unsafe { &mut *key };
+    let script_map = ScriptMap::from(chain_id);
+    CString::new(key.address_with_public_key_data(&script_map))
+        .unwrap()
+        .into_raw()
+}
+/// # Safety
+#[no_mangle]
+pub extern "C" fn address_for_bls_key(key: *mut BLSKey, chain_id: i16) -> *mut c_char {
+    let key = unsafe { &mut *key };
+    let script_map = ScriptMap::from(chain_id);
+    CString::new(key.address_with_public_key_data(&script_map))
+        .unwrap()
+        .into_raw()
+}
+/// # Safety
+#[no_mangle]
+pub extern "C" fn address_for_ed25519_key(key: *mut ED25519Key, chain_id: i16) -> *mut c_char {
+    let key = unsafe { &mut *key };
+    let script_map = ScriptMap::from(chain_id);
+    CString::new(key.address_with_public_key_data(&script_map))
+        .unwrap()
+        .into_raw()
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn address_for_ecdsa_key_recovered_from_compact_sig(data: *const u8, len: usize, digest: *const u8, chain_id: i16) -> *mut c_char {
+    let compact_sig = unsafe { slice::from_raw_parts(data, len) };
+    let script_map = ScriptMap::from(chain_id);
+    UInt256::from_const(digest)
+        .and_then(|message_digest| ECDSAKey::key_with_compact_sig(compact_sig, message_digest))
+        .map_or(null_mut(), |mut key| CString::new(key.address_with_public_key_data(&script_map))
+            .unwrap()
+            .into_raw())
+}

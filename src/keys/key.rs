@@ -216,7 +216,7 @@ impl IKey for Key {
 
     fn sign(&self, data: &Vec<u8>) -> Vec<u8> {
         match self {
-            Key::ECDSA(key) => key.compact_sign(UInt256::from(data)),
+            Key::ECDSA(key) => key.compact_sign(UInt256::from(data)).to_vec(),
             Key::BLS(key) => key.sign_digest(UInt256::from(data)).as_bytes().to_vec(),
             Key::ED25519(key) => key.sign(data)
         }
