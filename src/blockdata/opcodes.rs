@@ -560,8 +560,8 @@ pub mod all {
 
     // Dash op codes
     // not a bitcoin op code, used to identify shapeshift when placed after OP_RETURN
-    pub const OP_SHAPESHIFT: All = OP_CLTV; // 0xb1
-    pub const OP_SHAPESHIFT_SCRIPT: All = OP_NOP4; // 0xb3
+    // pub const OP_SHAPESHIFT: All = OP_CLTV; // 0xb1
+    // pub const OP_SHAPESHIFT_SCRIPT: All = OP_NOP4; // 0xb3
 }
 
 impl fmt::Debug for All {
