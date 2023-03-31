@@ -265,14 +265,14 @@ impl BLSKey {
         }
     }
 
-    pub fn extended_private_key_with_seed_data(seed: &Vec<u8>, use_legacy: bool) -> Option<Self> {
+    pub fn extended_private_key_with_seed_data(seed: &[u8], use_legacy: bool) -> Option<Self> {
         ExtendedPrivateKey::from_seed(seed)
             .ok()
             .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
     }
 
 
-    pub fn public_key_from_extended_public_key_data<PATH>(data: &Vec<u8>, index_path: &PATH, use_legacy: bool) -> Option<Vec<u8>>
+    pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], index_path: &PATH, use_legacy: bool) -> Option<Vec<u8>>
         where PATH: IIndexPath<Item = u32> {
         if use_legacy {
             ExtendedPublicKey::from_bytes_legacy(data)
@@ -485,6 +485,12 @@ impl BLSKey {
 
 /// For FFI
 impl BLSKey {
+    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=u32> {
+        key.extended_public_key_data()
+            .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path, key.use_legacy))
+            .map(|pub_key_data| Self::key_with_public_key(UInt384::from(pub_key_data), key.use_legacy))
+    }
+
     pub fn key_with_extended_public_key_data(bytes: &[u8], use_legacy: bool) -> Option<Self> {
         if use_legacy {
             ExtendedPublicKey::from_bytes_legacy(bytes)

@@ -57,7 +57,7 @@ pub fn test_key_with_private_key() {
     // uncompressed private key
     assert!(is_valid_dash_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", &chain_type.script_map()), "invalid when valid");
     match ECDSAKey::key_with_private_key("7r17Ypj1scza76SPf56Jm9zraxSrv58ThzmxwuDXoauvV84ud62", chain_type) {
-        Some(mut key) => {
+        Some(key) => {
             let addr = key.address_with_public_key_data(&chain_type.script_map());
             assert_eq!("Xj74g7h8pZTzqudPSzVEL7dFxNZY95Emcy", addr.as_str(), "addresses don't match");
         },
@@ -66,7 +66,7 @@ pub fn test_key_with_private_key() {
 
     // compressed private key
     match ECDSAKey::key_with_private_key("XDHVuTeSrRs77u15134RPtiMrsj9KFDvsx1TwKUJxcgb4oiP6gA6", chain_type) {
-        Some(mut key) => {
+        Some(key) => {
             let addr = key.address_with_public_key_data(&chain_type.script_map());
             assert_eq!("XbKPGyV1BpzzxNAggx6Q9a6o7GaBWTLhJS", addr.as_str(), "addresses don't match");
             // compressed private key export

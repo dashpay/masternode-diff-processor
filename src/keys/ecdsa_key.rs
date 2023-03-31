@@ -71,7 +71,7 @@ impl ECDSAKey {
         Self::init_with_private_key(private_key_string, chain_type)
     }
 
-    pub fn key_with_public_key_data(data: &Vec<u8>) -> Option<Self> {
+    pub fn key_with_public_key_data(data: &[u8]) -> Option<Self> {
         assert!(!data.is_empty());
         match data.len() {
             33 | 65 => Self::public_key_from_bytes(data).map(|pubkey| Self::with_pubkey_compressed(pubkey, data.len() == 33)).ok(),
@@ -92,7 +92,7 @@ impl ECDSAKey {
             .ok()
     }
 
-    pub fn init_with_seed_data(seed: &Vec<u8>) -> Option<Self> {
+    pub fn init_with_seed_data(seed: &[u8]) -> Option<Self> {
         let i = UInt512::bip32_seed_key(seed);
         Self::secret_key_from_bytes(&i.0[..32])
             .ok()
@@ -413,7 +413,6 @@ impl IKey for ECDSAKey {
         }
     }
 
-
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
         //if (uint256_is_zero(_seckey)) return nil;
         //NSMutableData *d = [NSMutableData secureDataWithCapacity:sizeof(UInt256) + 2];
@@ -495,7 +494,7 @@ impl ECDSAKey {
             .serialize(chain_type)
     }
 
-    pub fn public_key_from_extended_public_key_data<PATH>(data: &Vec<u8>, path: &PATH) -> Option<Vec<u8>>
+    pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], path: &PATH) -> Option<Vec<u8>>
         where PATH: IIndexPath<Item = u32> {
         if data.len() < EXT_PUBKEY_SIZE {
             assert!(false, "Extended public key is wrong size");
@@ -539,6 +538,13 @@ impl ECDSAKey {
 
 /// For FFI
 impl ECDSAKey {
+
+    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=u32> {
+        key.extended_public_key_data()
+            .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path))
+            .and_then(|pub_key_data| Self::key_with_public_key_data(&pub_key_data))
+    }
+
     pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Option<Self> {
         let len = bytes.len();
         if len == 69 || len == 101 {

@@ -223,7 +223,7 @@ impl IKey for ED25519Key
 
 impl ED25519Key {
 
-    pub fn init_with_seed_data(seed: &Vec<u8>) -> Option<Self> {
+    pub fn init_with_seed_data(seed: &[u8]) -> Option<Self> {
         let i = UInt512::ed25519_seed_key(seed);
         Some(Self {
             seckey: UInt256::from(&i.0[..32]),
@@ -254,7 +254,7 @@ impl ED25519Key {
         SigningKey::try_from(data)
     }
 
-    pub fn key_with_public_key_data(data: &Vec<u8>) -> Option<Self> {
+    pub fn key_with_public_key_data(data: &[u8]) -> Option<Self> {
         assert!(!data.is_empty());
         // TODO: if we follow SLIP-0010 then we have 33-bytes, and need to cut off 1st byte (0x00)
         // TODO: if we follow IETF then we must ensure length == 32 bytes
@@ -265,7 +265,7 @@ impl ED25519Key {
         }.map(|pk| Self { pubkey: pk.to_bytes().to_vec(), compressed: true, ..Default::default() })
     }
 
-    pub fn public_key_from_extended_public_key_data<PATH>(data: &Vec<u8>, path: &PATH) -> Option<Vec<u8>>
+    pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], path: &PATH) -> Option<Vec<u8>>
         where PATH: IIndexPath<Item = u32> {
         if data.len() < EXT_PUBKEY_SIZE {
             assert!(false, "Extended public key is wrong size");
@@ -285,6 +285,13 @@ impl ED25519Key {
 
 /// For FFI
 impl ED25519Key {
+    pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=u32> {
+        key.extended_public_key_data()
+            .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path))
+            .and_then(|pub_key_data| Self::key_with_public_key_data(&pub_key_data))
+    }
+
+
     pub fn key_with_extended_public_key_data(bytes: &[u8]) -> Option<Self> {
         let len = bytes.len();
         if len == 68 || len == 69 {

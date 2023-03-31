@@ -5,4 +5,4 @@ pub mod from;
 pub mod to;
 pub mod unboxer;
 
-pub use self::common::Signature;
+pub use self::common::{ByteArray, IndexPathData, DerivationPathData};

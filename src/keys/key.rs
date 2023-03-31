@@ -1,9 +1,13 @@
 use std::fmt::Debug;
+use std::os::raw::c_void;
 use crate::chain::{ScriptMap, derivation::{IIndexPath, IndexPath}};
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable}};
+use crate::ffi::boxer::boxed;
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey};
+use crate::types::opaque_key::{AsOpaque, OpaqueKey};
 use crate::util::sec_vec::SecVec;
 
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum KeyType {
     ECDSA = 0,
@@ -112,7 +116,7 @@ impl KeyType {
         }.to_string()
     }
 
-    pub(crate) fn public_key_from_extended_public_key_data(&self, data: &Vec<u8>, index_path: &IndexPath<u32>) -> Option<Vec<u8>> {
+    pub(crate) fn public_key_from_extended_public_key_data(&self, data: &[u8], index_path: &IndexPath<u32>) -> Option<Vec<u8>> {
         match self {
             KeyType::ECDSA => ECDSAKey::public_key_from_extended_public_key_data(data, index_path),
             KeyType::ED25519 => ED25519Key::public_key_from_extended_public_key_data(data, index_path),
@@ -139,7 +143,7 @@ impl KeyType {
         }
     }
 
-    pub(crate) fn key_with_seed_data(&self, seed: &Vec<u8>) -> Option<Key> {
+    pub(crate) fn key_with_seed_data(&self, seed: &[u8]) -> Option<Key> {
         match self {
             KeyType::ECDSA => ECDSAKey::init_with_seed_data(seed).map(Key::ECDSA),
             KeyType::ED25519 => ED25519Key::init_with_seed_data(seed).map(Key::ED25519),
@@ -148,7 +152,7 @@ impl KeyType {
         }
     }
 
-    pub(crate) fn key_with_public_key_data(&self, data: &Vec<u8>) -> Option<Key> {
+    pub(crate) fn key_with_public_key_data(&self, data: &[u8]) -> Option<Key> {
         match self {
             KeyType::ECDSA => ECDSAKey::key_with_public_key_data(data).map(Key::ECDSA),
             KeyType::ED25519 => ED25519Key::key_with_public_key_data(data).map(Key::ED25519),
@@ -347,4 +351,15 @@ impl IKey for Key {
 
     }
 }
+
+impl AsOpaque for Key {
+    fn as_opaque(&self) -> *mut OpaqueKey {
+        boxed(OpaqueKey { key_type: self.r#type(), ptr: match self {
+            Key::ECDSA(key) => boxed(key) as *mut c_void,
+            Key::BLS(key) => boxed(key) as *mut c_void,
+            Key::ED25519(key) => boxed(key) as *mut c_void,
+        } })
+    }
+}
+
 

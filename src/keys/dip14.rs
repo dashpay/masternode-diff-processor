@@ -153,7 +153,7 @@ pub trait IChildKeyDerivation<T, SK, PK> where SK: SignKey + ?Sized {
     fn derive_child_public_key<PATH>(key: &mut PK, chaincode: &mut UInt256, path: &PATH, position: usize) where PATH: IIndexPath<Item = T>;
 }
 
-fn secp256k1_point_from_bytes(data: &[u8]) -> [u8; 33] {
+pub fn secp256k1_point_from_bytes(data: &[u8]) -> [u8; 33] {
     let sec = secp256k1::SecretKey::from_slice(data).unwrap();
     let s = secp256k1::Secp256k1::new();
     let pub_key = secp256k1::PublicKey::from_secret_key(&s, &sec);

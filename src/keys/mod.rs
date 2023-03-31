@@ -26,7 +26,7 @@ pub trait IKey: Send + Sync + Debug {
     fn r#type(&self) -> KeyType {
         panic!("Should be overriden in implementation")
     }
-    fn address_with_public_key_data(&mut self, script_map: &ScriptMap) -> String {
+    fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
         with_public_key_data(&self.public_key_data(), script_map)
     }
     fn sign(&self, data: &Vec<u8>) -> Vec<u8> {
@@ -80,6 +80,10 @@ pub trait IKey: Send + Sync + Debug {
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
         panic!("Should be overriden in implementation")
     }
+    // fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Option<Self>
+    //     where Self: Sized, PATH: IIndexPath<Item = u32> {
+    //     key.extended_public_key_data().and_then()
+    // }
 
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
         panic!("Should be overriden in implementation")
@@ -108,4 +112,6 @@ pub trait IKey: Send + Sync + Debug {
         }
         sig
     }
+
+
 }

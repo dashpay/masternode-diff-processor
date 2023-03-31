@@ -1,6 +1,7 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 use crate::{BLSKeyWithUniqueId, ECDSAKeyWithUniqueId, ED25519KeyWithUniqueId, types};
+use crate::types::opaque_key::{OpaqueKey, OpaqueKeys};
 
 /// # Safety
 pub unsafe fn unbox_any<T: ?Sized>(any: *mut T) -> Box<T> {
@@ -352,4 +353,19 @@ pub unsafe fn unbox_opaque_bls_key(key: *mut BLSKeyWithUniqueId) {
 pub unsafe fn unbox_opaque_ed25519_key(key: *mut ED25519KeyWithUniqueId) {
     let result = unbox_any(key);
     unbox_any(result.ptr);
+}
+
+/// # Safety
+pub unsafe fn unbox_opaque_key(data: *mut OpaqueKey) {
+    let key = unbox_any(data);
+    unbox_any(key.ptr);
+}
+
+/// # Safety
+pub unsafe fn unbox_opaque_keys(data: *mut OpaqueKeys) {
+    let res = unbox_any(data);
+    let keys = unbox_vec_ptr(res.keys, res.len);
+    for &x in keys.iter() {
+        unbox_opaque_key(x);
+    }
 }

@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Display};
-use std::os::raw::{c_int, c_ulong};
+use std::os::raw::c_ulong;
 use std::slice;
 use byte::{BytesExt, LE, TryRead};
 use crate::consensus::Encodable;
@@ -226,11 +226,18 @@ impl<T> IIndexPath for IndexPath<T> where T: Copy + Debug + Display + Encodable 
 }
 
 impl IndexPath<u32> {
-    pub fn from_ffi(indexes: *const c_ulong, length: c_int) -> Self {
-        let indexes_slice = unsafe { slice::from_raw_parts(indexes, length as usize) };
+    pub fn from_ffi(indexes: *const c_ulong, length: usize) -> Self {
+        let indexes_slice = unsafe { slice::from_raw_parts(indexes, length) };
         IndexPath::new(indexes_slice.iter().map(|&index| index as u32).collect())
     }
 }
+
+// impl IndexPath<UInt256> {
+//     pub fn from_ffi(indexes: *const [u8; 32], hardened_indexes: *const u8, length: usize) -> Self {
+//         let indexes_slice = unsafe { slice::from_raw_parts(indexes, length) };
+//         IndexPath::new(indexes_slice.iter().map(|&index| UInt256(index)).collect())
+//     }
+// }
 
 impl<'a> TryRead<'a, usize> for IndexPath<UInt256> {
     #[inline]
