@@ -15,7 +15,7 @@ use crate::crypto::{UInt256, UInt512};
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::{ByteArray, IndexPathData};
 use crate::ffi::common::DerivationPathData;
-use crate::ffi::unboxer::{unbox_any, unbox_opaque_keys};
+use crate::ffi::unboxer::{unbox_any, unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys};
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyType};
 use crate::keys::dip14::secp256k1_point_from_bytes;
 use crate::processing::keys_cache::KeysCache;
@@ -29,8 +29,17 @@ pub unsafe extern "C" fn processor_destroy_compact_sig(ptr: *mut [u8; 65]) {
     unbox_any(ptr);
 }
 #[no_mangle]
+pub unsafe extern "C" fn processor_destroy_opaque_key(data: *mut OpaqueKey) {
+    unbox_opaque_key(data);
+}
+#[no_mangle]
 pub unsafe extern "C" fn processor_destroy_opaque_keys(data: *mut OpaqueKeys) {
     unbox_opaque_keys(data);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn processor_destroy_serialized_opaque_keys(data: *mut OpaqueSerializedKeys) {
+    unbox_opaque_serialized_keys(data);
 }
 
 /// Initialize opaque cache to store keys information between FFI calls
@@ -387,11 +396,20 @@ pub unsafe extern "C" fn generate_extended_public_key_from_seed(seed: *const u8,
     let seed_bytes = slice::from_raw_parts(seed, seed_length);
     key_type.key_with_seed_data(seed_bytes)
         .and_then(|seed_key| seed_key.private_derive_to_256bit_derivation_path(&IndexPath::from(derivation_path)))
-        .map_or(null_mut(), |mut extended_public_key| {
-            extended_public_key.forget_private_key();
-            extended_public_key.as_opaque()
-        })
+        .map_or(null_mut(), |extended_public_key| extended_public_key.as_opaque())
 }
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn forget_private_key(key: *mut OpaqueKey) {
+    let key = &mut *key;
+    match key.key_type {
+        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).forget_private_key(),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).forget_private_key(),
+        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).forget_private_key()
+    }
+}
+
+
 // _extendedPublicKey = [parentDerivationPath.extendedPublicKey publicDeriveTo256BitDerivationPath:self derivationPathOffset:parentDerivationPath.length];
 /// # Safety
 #[no_mangle]
@@ -422,6 +440,17 @@ pub unsafe extern "C" fn key_extended_public_key_data(key: *mut OpaqueKey) -> By
         KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).extended_public_key_data(),
         KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).extended_public_key_data(),
         KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).extended_public_key_data()
+    })
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_extended_private_key_data(key: *mut OpaqueKey) -> ByteArray {
+    let key = &mut *key;
+    ByteArray::from(match key.key_type {
+        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).extended_private_key_data(),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).extended_private_key_data(),
+        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).extended_private_key_data()
     })
 }
 

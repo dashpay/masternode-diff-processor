@@ -1,7 +1,10 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
+
+use std::ffi::CString;
+use std::os::raw::c_char;
 use crate::{BLSKeyWithUniqueId, ECDSAKeyWithUniqueId, ED25519KeyWithUniqueId, types};
-use crate::types::opaque_key::{OpaqueKey, OpaqueKeys};
+use crate::types::opaque_key::{OpaqueKey, OpaqueKeys, OpaqueSerializedKeys};
 
 /// # Safety
 pub unsafe fn unbox_any<T: ?Sized>(any: *mut T) -> Box<T> {
@@ -338,6 +341,11 @@ pub unsafe fn unbox_qr_info_result(result: *mut types::QRInfoResult) {
 }
 
 /// # Safety
+pub unsafe fn unbox_string(data: *mut c_char) {
+    let _ = CString::from_raw(data);
+}
+
+/// # Safety
 pub unsafe fn unbox_opaque_ecdsa_key(key: *mut ECDSAKeyWithUniqueId) {
     let result = unbox_any(key);
     unbox_any(result.ptr);
@@ -367,5 +375,14 @@ pub unsafe fn unbox_opaque_keys(data: *mut OpaqueKeys) {
     let keys = unbox_vec_ptr(res.keys, res.len);
     for &x in keys.iter() {
         unbox_opaque_key(x);
+    }
+}
+
+/// # Safety
+pub unsafe fn unbox_opaque_serialized_keys(data: *mut OpaqueSerializedKeys) {
+    let res = unbox_any(data);
+    let keys = unbox_vec_ptr(res.keys, res.len);
+    for &x in keys.iter() {
+        unbox_string(x)
     }
 }

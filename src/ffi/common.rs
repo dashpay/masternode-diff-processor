@@ -1,6 +1,7 @@
 use std::{mem, ptr, slice, os::raw::c_ulong};
 use crate::chain::derivation::{IIndexPath, IndexPath};
 use crate::crypto::UInt256;
+use crate::util::sec_vec::SecVec;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -23,6 +24,19 @@ impl From<Option<Vec<u8>>> for ByteArray {
     }
 }
 
+impl From<Option<SecVec>> for ByteArray {
+    fn from(value: Option<SecVec>) -> Self {
+        match value {
+            Some(vec) => {
+                let ptr = vec.as_ptr();
+                let len = vec.len();
+                mem::forget(vec);
+                ByteArray { ptr, len }
+            }
+            None => ByteArray { ptr: ptr::null(), len: 0 },
+        }
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -38,6 +52,7 @@ pub struct DerivationPathData {
     pub hardened: *const u8,
     pub len: usize,
 }
+
 
 impl From<*const IndexPathData> for IndexPath<u32> {
     fn from(value: *const IndexPathData) -> Self {
@@ -57,4 +72,18 @@ impl From<*const DerivationPathData> for IndexPath<UInt256> {
     }
 }
 
+// #[repr(C)]
+// pub struct SecVecData {
+//     data: *const u8,
+//     len: usize,
+// }
+//
+// impl From<SecVec> for SecVecData {
+//     fn from(sec_vec: SecVec) -> Self {
+//         let data = sec_vec.as_ptr();
+//         let len = sec_vec.len();
+//         mem::forget(sec_vec);
+//         SecVecData { data, len }
+//     }
+// }
 
