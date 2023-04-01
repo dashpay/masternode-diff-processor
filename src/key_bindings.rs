@@ -192,6 +192,26 @@ pub extern "C" fn key_create_ed25519_from_extened_public_key_data(ptr: *const u8
 }
 
 #[no_mangle]
+pub extern "C" fn key_derive_key_from_extened_private_key_data_for_index_path(secret: *const u8, secret_len: usize, key_type: KeyType, indexes: *const c_ulong, length: usize) -> *mut OpaqueKey {
+    let bytes = unsafe { slice::from_raw_parts(secret, secret_len) };
+    let path = IndexPath::from_ffi(indexes, length);
+    match key_type {
+        KeyType::ECDSA => ECDSAKey::key_with_extended_private_key_data(bytes)
+            .and_then(|key| key.private_derive_to_path(&path))
+            .map_or(null_mut(), |key| key.as_opaque()),
+        KeyType::BLS => BLSKey::key_with_extended_private_key_data(bytes, true)
+            .and_then(|key| key.private_derive_to_path(&path))
+            .map_or(null_mut(), |key| key.as_opaque()),
+        KeyType::BLSBasic => BLSKey::key_with_extended_private_key_data(bytes, false)
+            .and_then(|key| key.private_derive_to_path(&path))
+            .map_or(null_mut(), |key| key.as_opaque()),
+        KeyType::ED25519 => ED25519Key::key_with_extended_private_key_data(bytes)
+            .and_then(|key| key.private_derive_to_path(&path))
+            .map_or(null_mut(), |key| key.as_opaque()),
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn key_derive_ecdsa_from_extened_private_key_data_for_index_path(secret: *const u8, secret_len: usize, indexes: *const c_ulong, length: usize) -> *mut ECDSAKey {
     let bytes = unsafe { slice::from_raw_parts(secret, secret_len) };
     let path = IndexPath::from_ffi(indexes, length);
