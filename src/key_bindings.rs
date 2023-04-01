@@ -323,6 +323,17 @@ pub extern "C" fn ecdsa_public_key_hash_from_secret(secret: *const c_char, chain
 }
 /// # Safety
 #[no_mangle]
+pub unsafe extern "C" fn key_address_for_key(key: *mut OpaqueKey, chain_id: i16) -> *mut c_char {
+    let key = unsafe { &mut *key };
+    let script_map = ScriptMap::from(chain_id);
+    CString::new(match key.key_type {
+        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).address_with_public_key_data(&script_map),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).address_with_public_key_data(&script_map),
+        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).address_with_public_key_data(&script_map)
+    }).unwrap().into_raw()
+}
+/// # Safety
+#[no_mangle]
 pub extern "C" fn address_for_ecdsa_key(key: *mut ECDSAKey, chain_id: i16) -> *mut c_char {
     let key = unsafe { &mut *key };
     let script_map = ScriptMap::from(chain_id);
@@ -430,6 +441,28 @@ pub unsafe extern "C" fn key_public_derive_to_256bit(key: *mut OpaqueKey, deriva
                 .public_derive_to_256bit_derivation_path_with_offset(&path, offset)
                 .map_or(null_mut(), |key| key.as_opaque())
     }
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_private_key_data(key: *mut OpaqueKey) -> ByteArray {
+    let key = &mut *key;
+    ByteArray::from(match key.key_type {
+        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).private_key_data(),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).private_key_data(),
+        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).private_key_data()
+    })
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_public_key_data(key: *mut OpaqueKey) -> ByteArray {
+    let key = &mut *key;
+    ByteArray::from(match key.key_type {
+        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).public_key_data(),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).public_key_data(),
+        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).public_key_data()
+    })
 }
 
 /// # Safety

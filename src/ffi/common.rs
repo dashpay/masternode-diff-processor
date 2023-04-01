@@ -10,6 +10,15 @@ pub struct ByteArray {
     pub len: usize,
 }
 
+impl From<Vec<u8>> for ByteArray {
+    fn from(value: Vec<u8>) -> Self {
+        let ptr = value.as_ptr();
+        let len = value.len();
+        mem::forget(value);
+        ByteArray { ptr, len }
+    }
+}
+
 impl From<Option<Vec<u8>>> for ByteArray {
     fn from(value: Option<Vec<u8>>) -> Self {
         match value {
