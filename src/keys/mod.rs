@@ -29,10 +29,10 @@ pub trait IKey: Send + Sync + Debug {
     fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
         with_public_key_data(&self.public_key_data(), script_map)
     }
-    fn sign(&self, data: &Vec<u8>) -> Vec<u8> {
+    fn sign(&self, data: &[u8]) -> Vec<u8> {
         panic!("Should be overriden in implementation")
     }
-    fn verify(&mut self, message_digest: &Vec<u8>, signature: &Vec<u8>) -> bool {
+    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
         panic!("Should be overriden in implementation")
     }
     fn secret_key(&self) -> UInt256 {

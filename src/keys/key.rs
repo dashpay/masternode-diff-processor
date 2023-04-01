@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::os::raw::c_void;
 use crate::chain::{ScriptMap, derivation::{IIndexPath, IndexPath}};
-use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable}};
+use crate::crypto::{UInt256, UInt384, UInt768, byte_util::BytesDecodable};
 use crate::ffi::boxer::boxed;
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey};
 use crate::types::opaque_key::{AsOpaque, OpaqueKey};
@@ -218,15 +218,15 @@ impl IKey for Key {
         }
     }
 
-    fn sign(&self, data: &Vec<u8>) -> Vec<u8> {
+    fn sign(&self, data: &[u8]) -> Vec<u8> {
         match self {
             Key::ECDSA(key) => key.compact_sign(UInt256::from(data)).to_vec(),
-            Key::BLS(key) => key.sign_digest(UInt256::from(data)).as_bytes().to_vec(),
+            Key::BLS(key) => key.sign(data),
             Key::ED25519(key) => key.sign(data)
         }
     }
 
-    fn verify(&mut self, message_digest: &Vec<u8>, signature: &Vec<u8>) -> bool {
+    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
         match self {
             Key::ECDSA(key) => key.verify(message_digest, signature),
             Key::BLS(key) => key.verify_uint768(UInt256::from(message_digest), UInt768::from(signature)),

@@ -30,7 +30,7 @@ impl IKey for ED25519Key
         KeyType::ED25519
     }
 
-    fn sign(&self, data: &Vec<u8>) -> Vec<u8> {
+    fn sign(&self, data: &[u8]) -> Vec<u8> {
         if self.seckey.is_zero() {
             println!("There is no seckey for sign");
             return vec![];
@@ -45,7 +45,7 @@ impl IKey for ED25519Key
         }
     }
 
-    fn verify(&mut self, message_digest: &Vec<u8>, signature: &Vec<u8>) -> bool {
+    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
         // todo: check if this needed & correct
         Signature::from_slice(signature)
             .map_or(false, |s| SigningKey::from_bytes(&self.seckey.0)

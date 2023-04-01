@@ -63,7 +63,7 @@ impl ECDSAKey {
             .and_then(|data| Self::key_with_secret_data(&data, compressed))
     }
 
-    pub fn key_recovered_from_compact_sig(compact_sig: &Vec<u8>, message_digest: UInt256) -> Option<Self> {
+    pub fn key_recovered_from_compact_sig(compact_sig: &[u8], message_digest: UInt256) -> Option<Self> {
         Self::init_with_compact_sig(compact_sig, message_digest)
     }
 
@@ -79,7 +79,7 @@ impl ECDSAKey {
         }
     }
 
-    pub fn init_with_compact_sig(compact_sig: &Vec<u8>, message_digest: UInt256) -> Option<ECDSAKey> {
+    pub fn init_with_compact_sig(compact_sig: &[u8], message_digest: UInt256) -> Option<ECDSAKey> {
         // assert!(compact_sig, "ECDSAKey::init_with_compact_sig {null}");
         if compact_sig.len() != 65 {
             return None;
@@ -253,7 +253,7 @@ impl IKey for ECDSAKey {
         KeyType::ECDSA
     }
 
-    fn sign(&self, data: &Vec<u8>) -> Vec<u8> {
+    fn sign(&self, data: &[u8]) -> Vec<u8> {
         if self.seckey.is_zero() {
             println!("There is no seckey for sign");
             return vec![];
@@ -265,7 +265,7 @@ impl IKey for ECDSAKey {
         }
     }
 
-    fn verify(&mut self, message_digest: &Vec<u8>, signature: &Vec<u8>) -> bool {
+    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
         if signature.len() > 65 {
             // not compact
             Self::public_key_from_bytes(&self.public_key_data())

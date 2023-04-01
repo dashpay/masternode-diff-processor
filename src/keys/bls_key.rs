@@ -58,10 +58,10 @@ impl IKey for BLSKey {
     fn r#type(&self) -> KeyType {
         KeyType::BLS // &KeyType::BLSBasic
     }
-    fn sign(&self, data: &Vec<u8>) -> Vec<u8> {
+    fn sign(&self, data: &[u8]) -> Vec<u8> {
         self.sign_digest(UInt256::from(data)).as_bytes().to_vec()
     }
-    fn verify(&mut self, message_digest: &Vec<u8>, signature: &Vec<u8>) -> bool {
+    fn verify(&mut self, message_digest: &[u8], signature: &[u8]) -> bool {
         self.verify_uint768(UInt256::from(message_digest), UInt768::from(signature))
     }
 
