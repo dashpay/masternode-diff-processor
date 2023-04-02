@@ -269,6 +269,15 @@ pub unsafe extern "C" fn key_verify_message_digest(key: *mut OpaqueKey, md: *con
 
 /// # Safety
 #[no_mangle]
+pub extern "C" fn key_bls_sign_data(key: *mut BLSKey, ptr: *const u8, len: usize) -> ByteArray {
+    let key = unsafe { &mut *key };
+    let data = unsafe { slice::from_raw_parts(ptr, len) };
+    ByteArray::from(key.sign_data(data))
+    // boxed(key.sign_data(data).0)
+}
+
+/// # Safety
+#[no_mangle]
 pub extern "C" fn key_compact_sign_ecdsa(key: *mut ECDSAKey, digest: *const u8) -> *mut [u8; 65] {
     let key = unsafe { &mut *key };
     UInt256::from_const(digest)
@@ -279,7 +288,7 @@ pub extern "C" fn key_compact_sign_ecdsa(key: *mut ECDSAKey, digest: *const u8) 
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_ecdsa_with_seed_data(ptr: *const u8, len: usize) -> *mut ECDSAKey {
-    let seed = unsafe { slice::from_raw_parts(ptr, len) };
+    let seed = slice::from_raw_parts(ptr, len);
     ECDSAKey::init_with_seed_data(seed)
         .map_or(null_mut(), boxed)
 }
@@ -292,6 +301,13 @@ pub unsafe extern "C" fn key_ecdsa_with_private_key(secret: *const c_char, chain
     let chain_type = ChainType::from(chain_id);
     ECDSAKey::key_with_private_key(private_key_string, chain_type)
         .map_or(null_mut(), |key| boxed(key))
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_ecdsa_has_private_key(key: *mut ECDSAKey) -> bool {
+    let key = &mut *key;
+    key.has_private_key()
 }
 
 // serializedPrivateKeyForChain
@@ -321,7 +337,7 @@ pub unsafe extern "C" fn key_create_ecdsa_from_secret(ptr: *const u8, len: usize
 pub unsafe extern "C" fn key_create_ecdsa_from_serialized_extended_private_key(key: *const c_char, chain_id: i16) -> *mut ECDSAKey {
     // NSData *extendedPrivateKey = [self deserializedExtendedPrivateKey:serializedExtendedPrivateKey onChain:chain];
     // [DSECDSAKey keyWithSecret:*(UInt256 *)extendedPrivateKey.bytes compressed:YES];
-    (unsafe { CStr::from_ptr(key) }.to_str().unwrap(), ChainType::from(chain_id))
+    (CStr::from_ptr(key).to_str().unwrap(), ChainType::from(chain_id))
         .try_into()
         .ok()
         .and_then(|key: bip32::Key| ECDSAKey::key_with_secret_data(&key.extended_key_data(), true))
@@ -331,7 +347,7 @@ pub unsafe extern "C" fn key_create_ecdsa_from_serialized_extended_private_key(k
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_create_ecdsa_from_extended_public_key_data(ptr: *const u8, len: usize) -> *mut OpaqueKey {
-    let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+    let bytes = slice::from_raw_parts(ptr, len);
     ECDSAKey::key_with_extended_public_key_data(bytes)
         .map_or(null_mut(), |key|
             boxed(OpaqueKey { key_type: KeyType::ECDSA, ptr: boxed(key) as *mut c_void }))
@@ -358,7 +374,7 @@ pub unsafe extern "C" fn key_create_with_public_key_data(ptr: *const u8, len: us
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_create_from_extended_public_key_data(ptr: *const u8, len: usize, key_type: KeyType) -> *mut OpaqueKey {
-    let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+    let bytes = slice::from_raw_parts(ptr, len);
     match key_type {
         KeyType::ECDSA => ECDSAKey::key_with_extended_public_key_data(bytes).map(|key| key.as_opaque()),
         KeyType::ED25519 => ED25519Key::key_with_extended_public_key_data(bytes).map(|key| key.as_opaque()),
@@ -789,7 +805,15 @@ pub unsafe extern "C" fn keys_public_key_data_is_equal(key1: *mut OpaqueKey, key
 //
 // }
 
-// /// # Safety
-// #[no_mangle]
-// pub unsafe extern "C" fn deserialized_extended_public_key(ptr: *const c_char, chain_id: i16) -> ByteArray {
-// }
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_secret_key_string(key: *mut OpaqueKey) -> *mut c_char {
+    let key = &mut *key;
+    CString::new(match key.key_type {
+        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).secret_key_string(),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).secret_key_string(),
+        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).secret_key_string()
+    }).unwrap().into_raw()
+
+}
+

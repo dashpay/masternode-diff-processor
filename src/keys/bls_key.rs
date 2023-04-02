@@ -373,7 +373,7 @@ impl BLSKey {
     }
 
     /// Signing
-    pub fn sign_data(&self, data: &Vec<u8>) -> UInt768 {
+    pub fn sign_data(&self, data: &[u8]) -> UInt768 {
         if self.seckey.is_zero() && self.extended_private_key_data.is_empty() {
             UInt768::MAX
         } else if let Ok(bls_private_key) = self.bls_private_key() {

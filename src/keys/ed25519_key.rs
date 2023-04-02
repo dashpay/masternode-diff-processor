@@ -2,6 +2,7 @@ use std::mem;
 use byte::BytesExt;
 use byte::ctx::Bytes;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
+use hashes::hex::ToHex;
 use crate::crypto::{ECPoint, UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
@@ -332,6 +333,10 @@ impl ED25519Key {
                 ..Default::default()
             }
         })
+    }
+
+    pub fn secret_key_string(&self) -> String {
+        self.seckey.0.to_hex()
     }
 
 }
