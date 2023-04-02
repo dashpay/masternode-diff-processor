@@ -4,7 +4,7 @@ use hashes::{Hash, sha256, sha256d};
 use hashes::hex::FromHex;
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
-use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}};
+use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}, UInt160};
 use crate::keys::{IKey, KeyType, dip14::{IChildKeyDerivation, SignKey}};
 use crate::util::{base58, data_ops::hex_with_data};
 use crate::util::sec_vec::SecVec;
@@ -510,4 +510,9 @@ impl BLSKey {
     pub fn has_private_key(&self) -> bool {
         !self.seckey.is_zero()
     }
+
+    pub fn hash160(&self) -> UInt160 {
+        UInt160::hash160(&self.public_key_data())
+    }
+
 }

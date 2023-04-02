@@ -10,7 +10,7 @@ use crate::chain::derivation::{BIP32_HARD, IndexPath};
 use crate::chain::ScriptMap;
 use crate::common::ChainType;
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::{clone_into_array, ConstDecodable};
+use crate::crypto::byte_util::{AsBytes, clone_into_array, ConstDecodable};
 use crate::crypto::{UInt256, UInt384, UInt512};
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::{ByteArray, IndexPathData};
@@ -502,6 +502,14 @@ pub extern "C" fn address_for_ed25519_key(key: *mut ED25519Key, chain_id: i16) -
 
 /// # Safety
 #[no_mangle]
+pub extern "C" fn key_ecdsa_recovered_from_compact_sig(data: *const u8, len: usize, digest: *const u8) -> *mut OpaqueKey {
+    let compact_sig = unsafe { slice::from_raw_parts(data, len) };
+    UInt256::from_const(digest)
+        .and_then(|message_digest| ECDSAKey::key_with_compact_sig(compact_sig, message_digest))
+        .map_or(null_mut(), |key| key.as_opaque())
+}
+/// # Safety
+#[no_mangle]
 pub extern "C" fn address_for_ecdsa_key_recovered_from_compact_sig(data: *const u8, len: usize, digest: *const u8, chain_id: i16) -> *mut c_char {
     let compact_sig = unsafe { slice::from_raw_parts(data, len) };
     let script_map = ScriptMap::from(chain_id);
@@ -789,6 +797,20 @@ pub unsafe extern "C" fn keys_public_key_data_is_equal(key1: *mut OpaqueKey, key
         _ => false
     }
 }
+
+//- (BOOL)checkPayloadSignature:(OpaqueKey *)providerOwnerPublicKey
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_check_payload_signature(key: *mut OpaqueKey, key_hash: *const u8) -> bool {
+    let key = &mut *key;
+    let key_hash = slice::from_raw_parts(key_hash, 20);
+    match key.key_type {
+        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).hash160().as_bytes().eq(key_hash),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).hash160().as_bytes().eq(key_hash),
+        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).hash160().as_bytes().eq(key_hash),
+    }
+}
+
 
 
 // - (NSString *)serializedExtendedPublicKey;

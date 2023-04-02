@@ -342,4 +342,9 @@ impl ED25519Key {
     pub fn has_private_key(&self) -> bool {
         !self.seckey.is_zero()
     }
+
+    pub fn hash160(&self) -> UInt160 {
+        UInt160::hash160(&self.public_key_data())
+    }
+
 }
