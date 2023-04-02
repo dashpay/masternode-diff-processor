@@ -583,6 +583,22 @@ pub extern "C" fn key_bls_public_key(key: *mut BLSKey) -> ByteArray {
     ByteArray::from(key.pubkey)
 }
 
+/// # Safety
+/// public_key: UInt384
+/// digest: UInt256
+/// signature: UInt768
+#[no_mangle]
+pub unsafe extern "C" fn key_bls_verify(public_key: *const u8, use_legacy: bool, digest: *const u8, signature: *const u8) -> bool {
+    // DSBLSKey *blsKey = [DSBLSKey keyWithPublicKey:publicKey useLegacy:quorumEntry.useLegacyBLSScheme];
+    // return [blsKey verify:signId signature:self.signature];
+    let public_key = slice::from_raw_parts(public_key, 48);
+    let pubkey = UInt384::from(public_key);
+    let message_digest = slice::from_raw_parts(digest, 32);
+    let signature = slice::from_raw_parts(signature, 96);
+    BLSKey::key_with_public_key(pubkey, use_legacy)
+        .verify(message_digest, signature)
+}
+
 // - (DSKey *)generateExtendedPublicKeyFromSeed:(NSData *)seed storeUnderWalletUniqueId:(NSString *)walletUniqueId storePrivateKey:(BOOL)storePrivateKey;
 /// # Safety
 #[no_mangle]
