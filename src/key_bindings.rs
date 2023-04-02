@@ -269,11 +269,10 @@ pub unsafe extern "C" fn key_verify_message_digest(key: *mut OpaqueKey, md: *con
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn key_bls_sign_data(key: *mut BLSKey, ptr: *const u8, len: usize) -> ByteArray {
-    let key = unsafe { &mut *key };
-    let data = unsafe { slice::from_raw_parts(ptr, len) };
+pub unsafe extern "C" fn key_bls_sign_data(key: *mut BLSKey, ptr: *const u8, len: usize) -> ByteArray {
+    let key = &mut *key;
+    let data = slice::from_raw_parts(ptr, len);
     ByteArray::from(key.sign_data(data))
-    // boxed(key.sign_data(data).0)
 }
 
 /// # Safety
@@ -597,6 +596,13 @@ pub unsafe extern "C" fn key_bls_verify(public_key: *const u8, use_legacy: bool,
     let signature = slice::from_raw_parts(signature, 96);
     BLSKey::key_with_public_key(pubkey, use_legacy)
         .verify(message_digest, signature)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn key_bls_check_payload_signature(key: *mut BLSKey, digest: *const u8, signature: *const u8) -> bool {
+    let message_digest = slice::from_raw_parts(digest, 32);
+    let signature = slice::from_raw_parts(signature, 96);
+    (&mut *key).verify(message_digest, signature)
 }
 
 // - (DSKey *)generateExtendedPublicKeyFromSeed:(NSData *)seed storeUnderWalletUniqueId:(NSString *)walletUniqueId storePrivateKey:(BOOL)storePrivateKey;
