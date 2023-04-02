@@ -1,7 +1,7 @@
 use bls_signatures::bip32::{ExtendedPrivateKey, ExtendedPublicKey};
 use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
 use hashes::{Hash, sha256, sha256d};
-use hashes::hex::FromHex;
+use hashes::hex::{FromHex, ToHex};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}, UInt160};
@@ -26,8 +26,13 @@ impl BLSKey {
             .ok()
             .map(|data| Self::key_with_seed_data(&data, use_legacy))
     }
+    pub fn key_with_private_key(string: &str, use_legacy: bool) -> Option<Self> {
+        Vec::from_hex(string.as_bytes().to_hex().as_str())
+            .ok()
+            .and_then(|data| Self::key_with_private_key_data(&data, use_legacy))
+    }
 
-    pub fn key_with_private_key(data: &Vec<u8>, use_legacy: bool) -> Option<Self> {
+    pub fn key_with_private_key_data(data: &Vec<u8>, use_legacy: bool) -> Option<Self> {
         UInt256::from_bytes(data, &mut 0)
             .and_then(|seckey| PrivateKey::from_bytes(data, false)
                 .ok()

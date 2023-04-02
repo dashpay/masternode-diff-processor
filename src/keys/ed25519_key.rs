@@ -2,7 +2,7 @@ use std::mem;
 use byte::BytesExt;
 use byte::ctx::Bytes;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
-use hashes::hex::ToHex;
+use hashes::hex::{FromHex, ToHex};
 use crate::crypto::{ECPoint, UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
@@ -286,6 +286,13 @@ impl ED25519Key {
 
 /// For FFI
 impl ED25519Key {
+
+    pub fn key_with_private_key(string: &str) -> Option<Self> {
+        Vec::from_hex(string.as_bytes().to_hex().as_str())
+            .ok()
+            .and_then(|data| Self::key_with_secret_data(&data, false))
+    }
+
     pub fn public_key_from_extended_public_key_data_at_index_path<PATH>(key: &Self, index_path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=u32> {
         key.extended_public_key_data()
             .and_then(|ext_pk_data| Self::public_key_from_extended_public_key_data(&ext_pk_data, index_path))

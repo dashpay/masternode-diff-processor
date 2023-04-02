@@ -138,8 +138,8 @@ impl KeyType {
         match self {
             KeyType::ECDSA => ECDSAKey::key_with_secret_data(data, true).map(Key::ECDSA),
             KeyType::ED25519 => ED25519Key::key_with_secret_data(data, true).map(Key::ED25519),
-            KeyType::BLS => BLSKey::key_with_private_key(data, true).map(Key::BLS),
-            KeyType::BLSBasic => BLSKey::key_with_private_key(data, false).map(Key::BLS),
+            KeyType::BLS => BLSKey::key_with_private_key_data(data, true).map(Key::BLS),
+            KeyType::BLSBasic => BLSKey::key_with_private_key_data(data, false).map(Key::BLS),
         }
     }
 

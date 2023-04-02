@@ -295,6 +295,25 @@ pub unsafe extern "C" fn key_ecdsa_with_seed_data(ptr: *const u8, len: usize) ->
 
 /// # Safety
 #[no_mangle]
+pub unsafe extern "C" fn key_with_private_key(secret: *const c_char, key_type: KeyType, chain_id: i16) -> *mut OpaqueKey {
+    let c_str = unsafe { CStr::from_ptr(secret) };
+    let private_key_string = c_str.to_str().unwrap();
+    let chain_type = ChainType::from(chain_id);
+    match key_type {
+        KeyType::ECDSA => ECDSAKey::key_with_private_key(private_key_string, chain_type)
+            .map_or(null_mut(), |key| key.as_opaque()),
+        KeyType::BLS => BLSKey::key_with_private_key(private_key_string, true)
+            .map_or(null_mut(), |key| key.as_opaque()),
+        KeyType::BLSBasic => BLSKey::key_with_private_key(private_key_string, false)
+            .map_or(null_mut(), |key| key.as_opaque()),
+        KeyType::ED25519 => ED25519Key::key_with_private_key(private_key_string)
+            .map_or(null_mut(), |key| key.as_opaque())
+    }
+
+}
+
+/// # Safety
+#[no_mangle]
 pub unsafe extern "C" fn key_ecdsa_with_private_key(secret: *const c_char, chain_id: i16) -> *mut ECDSAKey {
     let c_str = unsafe { CStr::from_ptr(secret) };
     let private_key_string = c_str.to_str().unwrap();
