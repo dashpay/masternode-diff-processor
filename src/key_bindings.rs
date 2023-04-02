@@ -305,6 +305,16 @@ pub unsafe extern "C" fn key_ecdsa_with_private_key(secret: *const c_char, chain
 
 /// # Safety
 #[no_mangle]
+pub unsafe extern "C" fn key_ecdsa_public_key_data_for_private_key(secret: *const c_char, chain_id: i16) -> ByteArray {
+    let c_str = unsafe { CStr::from_ptr(secret) };
+    let private_key_string = c_str.to_str().unwrap();
+    let chain_type = ChainType::from(chain_id);
+    ByteArray::from(ECDSAKey::key_with_private_key(private_key_string, chain_type)
+        .map(|key| key.public_key_data()))
+}
+
+/// # Safety
+#[no_mangle]
 pub unsafe extern "C" fn key_has_private_key(key: *mut OpaqueKey) -> bool {
     let key = &mut *key;
     match key.key_type {
