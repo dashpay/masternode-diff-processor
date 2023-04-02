@@ -506,4 +506,8 @@ impl BLSKey {
             .and_then(|pk| Self::init_with_bls_extended_private_key(&pk, use_legacy))
 
     }
+
+    pub fn has_private_key(&self) -> bool {
+        !self.seckey.is_zero()
+    }
 }

@@ -305,6 +305,17 @@ pub unsafe extern "C" fn key_ecdsa_with_private_key(secret: *const c_char, chain
 
 /// # Safety
 #[no_mangle]
+pub unsafe extern "C" fn key_has_private_key(key: *mut OpaqueKey) -> bool {
+    let key = &mut *key;
+    match key.key_type {
+        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).has_private_key(),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).has_private_key(),
+        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).has_private_key(),
+    }
+}
+
+/// # Safety
+#[no_mangle]
 pub unsafe extern "C" fn key_ecdsa_has_private_key(key: *mut ECDSAKey) -> bool {
     let key = &mut *key;
     key.has_private_key()

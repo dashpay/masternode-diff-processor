@@ -339,4 +339,7 @@ impl ED25519Key {
         self.seckey.0.to_hex()
     }
 
+    pub fn has_private_key(&self) -> bool {
+        !self.seckey.is_zero()
+    }
 }
