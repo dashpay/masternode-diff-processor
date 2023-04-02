@@ -576,6 +576,12 @@ pub extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len: usize
                 .into_raw())
 }
 
+/// # Safety
+#[no_mangle]
+pub extern "C" fn key_bls_public_key(key: *mut BLSKey) -> ByteArray {
+    let key = unsafe { &mut *key };
+    ByteArray::from(key.pubkey)
+}
 
 // - (DSKey *)generateExtendedPublicKeyFromSeed:(NSData *)seed storeUnderWalletUniqueId:(NSString *)walletUniqueId storePrivateKey:(BOOL)storePrivateKey;
 /// # Safety

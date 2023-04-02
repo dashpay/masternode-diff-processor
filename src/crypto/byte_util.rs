@@ -5,6 +5,7 @@ use hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, ripemd160, sha1, sha25
 use secp256k1::rand::{Rng, thread_rng};
 use crate::chain::params::{BIP32_SEED_KEY, ED25519_SEED_KEY};
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
+use crate::ffi;
 use crate::hashes::{hex::{FromHex, ToHex}, hex};
 use crate::util::base58;
 use crate::util::data_ops::short_hex_string_from;
@@ -46,6 +47,23 @@ pub struct UInt768(pub [u8; 96]);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ECPoint(pub [u8; 33]);
+
+
+#[macro_export]
+macro_rules! impl_ffi_bytearray {
+    ($var_type: ident) => {
+        impl From<$var_type> for ffi::ByteArray {
+            fn from(value: $var_type) -> Self {
+                let ptr = value.0.as_ptr();
+                let len = value.0.len();
+                mem::forget(value);
+                ffi::ByteArray { ptr, len }
+            }
+        }
+    }
+}
+
+
 
 #[macro_export]
 macro_rules! impl_bytes_decodable {
@@ -153,7 +171,8 @@ macro_rules! define_bytes_to_big_uint {
         define_try_write_from_big_uint!($uint_type);
         impl_decodable!($uint_type, $byte_len);
         define_try_from_bytes!($uint_type);
-
+        impl_ffi_bytearray!($uint_type);
+        
         impl std::default::Default for $uint_type {
             fn default() -> Self {
                 let data: [u8; $byte_len] = [0u8; $byte_len];

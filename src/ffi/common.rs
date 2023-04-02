@@ -10,15 +10,6 @@ pub struct ByteArray {
     pub len: usize,
 }
 
-impl From<UInt768> for ByteArray {
-    fn from(value: UInt768) -> Self {
-        let ptr = value.0.as_ptr();
-        let len = value.0.len();
-        mem::forget(value);
-        ByteArray { ptr, len }
-    }
-}
-
 impl From<[u8; 65]> for ByteArray {
     fn from(value: [u8; 65]) -> Self {
         let ptr = value.as_ptr();
