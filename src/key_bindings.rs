@@ -605,6 +605,13 @@ pub extern "C" fn key_bls_public_key(key: *mut BLSKey) -> ByteArray {
 }
 
 /// # Safety
+#[no_mangle]
+pub extern "C" fn key_bls_secret_key(key: *mut BLSKey) -> ByteArray {
+    let key = unsafe { &mut *key };
+    ByteArray::from(key.seckey)
+}
+
+/// # Safety
 /// public_key: UInt384
 /// digest: UInt256
 /// signature: UInt768
