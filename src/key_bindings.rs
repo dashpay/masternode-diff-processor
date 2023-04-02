@@ -577,6 +577,28 @@ pub extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len: usize
 
 /// # Safety
 #[no_mangle]
+pub extern "C" fn key_bls_with_seed_data(data: *const u8, len: usize, use_legacy: bool) -> *mut BLSKey {
+    let seed_data = unsafe { slice::from_raw_parts(data, len) };
+    boxed(BLSKey::key_with_seed_data(seed_data, use_legacy))
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_bls_fingerprint(key: *mut BLSKey) -> u32 {
+    (&mut *key).public_key_fingerprint()
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_bls_sign_data_single_sha256(key: *mut BLSKey, data: *const u8, len: usize) -> ByteArray {
+    let data_to_sign = slice::from_raw_parts(data, len);
+    ByteArray::from((&mut *key).sign_data_single_sha256(data_to_sign))
+}
+
+
+
+/// # Safety
+#[no_mangle]
 pub extern "C" fn key_bls_public_key(key: *mut BLSKey) -> ByteArray {
     let key = unsafe { &mut *key };
     ByteArray::from(key.pubkey)

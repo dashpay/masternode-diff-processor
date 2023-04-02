@@ -190,7 +190,7 @@ impl BLSKey {
         }
     }
 
-    pub fn key_with_seed_data(seed: &Vec<u8>, use_legacy: bool) -> Self {
+    pub fn key_with_seed_data(seed: &[u8], use_legacy: bool) -> Self {
         let bls_private_key = PrivateKey::from_bip32_seed(seed);
         let bls_public_key = bls_private_key.g1_element().unwrap();
         let seckey = UInt256::from(&*bls_private_key.serialize());
@@ -394,15 +394,15 @@ impl BLSKey {
         }
     }
 
-    pub fn sign_data_single_sha256(&self, data: &Vec<u8>) -> UInt768 {
+    pub fn sign_data_single_sha256(&self, data: &[u8]) -> UInt768 {
         if self.seckey.is_zero() && self.extended_private_key_data.is_empty() {
             UInt768::MAX
         } else if let Ok(bls_private_key) = self.bls_private_key() {
-            let hash = sha256::Hash::hash(data).into_inner();
+            let message = sha256::Hash::hash(data).into_inner();
             let signature = if self.use_legacy {
-                LegacySchemeMPL::new().sign(&bls_private_key, &hash).serialize_legacy()
+                LegacySchemeMPL::new().sign(&bls_private_key, &message).serialize_legacy()
             } else {
-                BasicSchemeMPL::new().sign(&bls_private_key, &hash).serialize()
+                BasicSchemeMPL::new().sign(&bls_private_key, &message).serialize()
             };
             UInt768(*signature)
         } else {

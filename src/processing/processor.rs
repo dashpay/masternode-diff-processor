@@ -28,11 +28,9 @@ pub struct MasternodeProcessor {
     destroy_masternode_list: MasternodeListDestroy,
     add_insight: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-    // validate_llmq: ValidateLLMQCallback,
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
-    // log_message: LogMessage,
 }
 impl std::fmt::Debug for MasternodeProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -55,11 +53,9 @@ impl MasternodeProcessor {
         destroy_masternode_list: MasternodeListDestroy,
         add_insight: AddInsightBlockingLookup,
         should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-        // validate_llmq: ValidateLLMQCallback,
         destroy_hash: HashDestroy,
         destroy_snapshot: LLMQSnapshotDestroy,
         should_process_diff_with_range: ShouldProcessDiffWithRange,
-        // log_message: LogMessage,
     ) -> Self {
         Self {
             get_merkle_root_by_hash,
@@ -72,11 +68,9 @@ impl MasternodeProcessor {
             destroy_masternode_list,
             add_insight,
             should_process_llmq_of_type,
-            // validate_llmq,
             destroy_hash,
             destroy_snapshot,
             should_process_diff_with_range,
-            // log_message,
             opaque_context: null(),
             genesis_hash: null(),
             use_insight_as_backup: false,
