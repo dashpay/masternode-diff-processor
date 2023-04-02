@@ -603,6 +603,12 @@ pub unsafe extern "C" fn key_public_derive_to_256bit(key: *mut OpaqueKey, deriva
 
 /// # Safety
 #[no_mangle]
+pub unsafe extern "C" fn key_ecdsa_public_key_data(key: *mut ECDSAKey) -> ByteArray {
+    ByteArray::from((&mut *key).public_key_data())
+}
+
+/// # Safety
+#[no_mangle]
 pub unsafe extern "C" fn key_private_key_data(key: *mut OpaqueKey) -> ByteArray {
     let key = &mut *key;
     ByteArray::from(match key.key_type {
