@@ -331,6 +331,15 @@ pub unsafe extern "C" fn key_ecdsa_serialized_private_key_for_chain(key: *mut EC
     CString::new(serialized).unwrap().into_raw()
 }
 
+// + (NSString *)serializedAuthPrivateKeyFromSeed:(NSData *)seed forChain:(DSChain *)chain
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_ecdsa_serialized_auth_private_key_for_chain(seed: *const u8, seed_len: usize, chain_id: i16) -> *mut c_char {
+    let seed = slice::from_raw_parts(seed, seed_len);
+    let script_map = ScriptMap::from(chain_id);
+    let serialized = ECDSAKey::serialized_auth_private_key_from_seed(seed, script_map);
+    CString::new(serialized).unwrap().into_raw()
+}
 
 /// # Safety
 #[no_mangle]

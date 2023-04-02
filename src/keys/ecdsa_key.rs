@@ -471,7 +471,7 @@ impl ECDSAKey {
         UInt160::hash160(&self.public_key_data())
     }
 
-    pub fn serialized_auth_private_key_from_seed(seed: &Vec<u8>, script_map: ScriptMap) -> String {
+    pub fn serialized_auth_private_key_from_seed(seed: &[u8], script_map: ScriptMap) -> String {
         let key = UInt512::bip32_seed_key(seed);
         let mut seckey = UInt256::from(&key.0[..32]);
         let mut chaincode = UInt256::from(&key.0[32..]);
