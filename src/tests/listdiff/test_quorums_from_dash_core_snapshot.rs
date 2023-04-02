@@ -3,10 +3,10 @@ use crate::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 use crate::{processor_create_cache, register_processor};
-use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
+use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, snapshot_destroy_default};
 use crate::tests::block_store::init_testnet_store;
 use crate::tests::json_from_core_snapshot::{masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
-use crate::tests::listdiff::llmq_rotation::{should_process_isd_quorum, validate_llmq_callback_throuh_rust_bls};
+use crate::tests::listdiff::llmq_rotation::should_process_isd_quorum;
 
 #[test]
 pub fn test_from_snapshot() {
@@ -39,11 +39,9 @@ pub fn test_from_snapshot() {
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_isd_quorum,
-            validate_llmq_callback_throuh_rust_bls,
             hash_destroy_default,
             snapshot_destroy_default,
-            should_process_diff_with_range_default,
-            log_default)
+            should_process_diff_with_range_default)
     };
     processor.opaque_context = context as *mut _ as *mut std::ffi::c_void;
     processor.use_insight_as_backup = true;

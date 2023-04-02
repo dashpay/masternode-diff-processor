@@ -13,9 +13,9 @@ pub type ShouldProcessDiffWithRange = unsafe extern "C" fn(
     block_hash: *mut [u8; 32],
     context: *const c_void,
 ) -> u8;
-pub type SendError = unsafe extern "C" fn(error: u8, context: *const c_void);
-pub type ValidateLLMQCallback =
-    unsafe extern "C" fn(data: *mut types::LLMQValidationData, context: *const c_void) -> bool;
+// pub type SendError = unsafe extern "C" fn(error: u8, context: *const c_void);
+// pub type ValidateLLMQCallback =
+//     unsafe extern "C" fn(data: *mut types::LLMQValidationData, context: *const c_void) -> bool;
 
 pub type GetBlockHeightByHash =
     unsafe extern "C" fn(block_hash: *mut [u8; 32], context: *const c_void) -> u32;
@@ -43,7 +43,7 @@ pub type SaveLLMQSnapshot = unsafe extern "C" fn(
     snapshot: *mut types::LLMQSnapshot,
     context: *const c_void,
 ) -> bool;
-pub type LogMessage = unsafe extern "C" fn(message: *const libc::c_char, context: *const c_void);
+// pub type LogMessage = unsafe extern "C" fn(message: *const libc::c_char, context: *const c_void);
 pub type HashDestroy = unsafe extern "C" fn(hash: *mut u8);
 pub type LLMQSnapshotDestroy = unsafe extern "C" fn(snapshot: *mut types::LLMQSnapshot);
 

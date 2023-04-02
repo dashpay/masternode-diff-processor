@@ -1,13 +1,10 @@
-use bls_signatures::{G1Element, G2Element, Scheme};
 use crate::ffi::boxer::boxed;
-use crate::ffi::unboxer::unbox_any;
-use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext};
+use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, FFIContext};
 use crate::chain::common::chain_type::{ChainType, DevnetType, IHaveChainSettings};
 use crate::common::LLMQType;
-use crate::crypto::byte_util::{AsBytes, Reversable, UInt256};
-use crate::crypto::{UInt384, UInt768};
+use crate::crypto::byte_util::{Reversable, UInt256};
 use crate::hashes::hex::{FromHex, ToHex};
-use crate::{process_qrinfo_from_message, processor_create_cache, register_processor, types};
+use crate::{process_qrinfo_from_message, processor_create_cache, register_processor};
 
 // #[test]
 // Deprecated
@@ -36,11 +33,9 @@ fn test_llmq_rotation() {
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_llmq_of_type,
-            validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
-            log_default,
         )
     };
     let result = unsafe { process_qrinfo_from_message(
@@ -99,11 +94,9 @@ fn test_llmq_rotation_2() {
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_llmq_of_type,
-            validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
-            log_default,
         )
     };
     let result = unsafe { process_qrinfo_from_message(
@@ -482,11 +475,9 @@ fn test_devnet_333() {
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_llmq_of_type,
-            validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
-            log_default,
         )
     };
     let result = unsafe { process_qrinfo_from_message(
@@ -517,11 +508,9 @@ fn test_processor_devnet_333() {
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_llmq_of_type,
-            validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
-            log_default,
         )
     };
     let cache = unsafe { &mut *processor_create_cache() };
@@ -561,12 +550,10 @@ fn test_processor_devnet_333() {
 //             masternode_list_destroy_default,
 //             add_insight_lookup_default,
 //             should_process_llmq_of_type,
-//             validate_llmq_callback,
 //             hash_destroy_default,
 //             snapshot_destroy_default,
 //             should_process_diff_with_range_default,
 //             send_error_default,
-//             log_default,
 //         )
 //     };
 //     let cache = unsafe { processor_create_cache() };
@@ -741,11 +728,9 @@ fn test_processor_devnet_333_2() {
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_llmq_of_type_333_2,
-            validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
-            log_default,
         )
     };
     let context = &mut (FFIContext {
@@ -1450,11 +1435,9 @@ fn test_jack_daniels() {
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_isd_quorum,
-            validate_llmq_callback_throuh_rust_bls,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
-            log_default,
         )
     };
     let cache = unsafe { &mut *processor_create_cache() };
@@ -1479,91 +1462,6 @@ fn test_jack_daniels() {
     );
 
     println!("Result: {:#?}", &result);
-}
-pub unsafe extern "C" fn validate_llmq_callback_throuh_rust_bls(
-    data: *mut types::LLMQValidationData,
-    _context: *const std::ffi::c_void,
-) -> bool {
-    let result = unbox_any(data);
-    let types::LLMQValidationData {
-        items,
-        count,
-        commitment_hash,
-        all_commitment_aggregated_signature,
-        threshold_signature,
-        public_key,
-        version
-    } = *result;
-    println!(
-        "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {:?}",
-        items,
-        count,
-        commitment_hash,
-        all_commitment_aggregated_signature,
-        threshold_signature,
-        public_key,
-        version
-    );
-    let all_commitment_aggregated_signature = UInt768(*all_commitment_aggregated_signature);
-    let threshold_signature = UInt768(*threshold_signature);
-    let public_key = UInt384(*public_key);
-    let commitment_hash = UInt256(*commitment_hash);
-    let use_legacy = version.use_bls_legacy();
-    let keys = (0..count)
-        .into_iter()
-        .map(|i| {
-            let item = *(*(items.add(i)));
-            let key = UInt384(item.data);
-            let version = item.version;
-            if version < 2 {
-                G1Element::from_bytes_legacy(key.as_bytes()).unwrap()
-            } else {
-                G1Element::from_bytes(key.as_bytes()).unwrap()
-            }
-        })
-        .collect::<Vec<G1Element>>();
-    let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys, use_legacy);
-    if !all_commitment_aggregated_signature_validated {
-        println!("••• Issue with all_commitment_aggregated_signature_validated: {}", all_commitment_aggregated_signature);
-        return false;
-    }
-    // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
-    // This is an aggregated BLS signature verification.
-    let quorum_signature_validated = verify_quorum_signature(commitment_hash, threshold_signature, public_key, use_legacy);
-    if !quorum_signature_validated {
-        println!("••• Issue with quorum_signature_validated");
-        return false;
-    }
-    println!("••• Quorum validated");
-    true
-}
-
-fn verify_secure_aggregated(message_digest: UInt256, signature: UInt768, public_keys: Vec<G1Element>, use_legacy: bool) -> bool {
-    let bls_signature = match if use_legacy {
-        G2Element::from_bytes_legacy(signature.as_bytes())
-    } else {
-        G2Element::from_bytes(signature.as_bytes())
-    } {
-        Ok(signature) => signature,
-        Err(err) => {
-            println!("verify_secure_aggregated (legacy = {}): error: {}", use_legacy, err);
-            return false;
-        }
-    };
-    let keys = public_keys.iter().collect::<Vec<&G1Element>>();
-    if use_legacy {
-        bls_signatures::LegacySchemeMPL::new().verify_secure(keys, message_digest.as_bytes(), &bls_signature)
-    } else {
-        bls_signatures::BasicSchemeMPL::new().verify_secure(keys, message_digest.as_bytes(), &bls_signature)
-    }
-}
-
-fn verify_quorum_signature(message_digest: UInt256, threshold_signature: UInt768, public_key: UInt384, use_legacy: bool) -> bool {
-    if use_legacy {
-        bls_signatures::LegacySchemeMPL::new().verify(&G1Element::from_bytes_legacy(public_key.as_bytes()).unwrap(), message_digest.as_bytes(), &G2Element::from_bytes_legacy(threshold_signature.as_bytes()).unwrap())
-    } else {
-        bls_signatures::BasicSchemeMPL::new().verify(&G1Element::from_bytes(public_key.as_bytes()).unwrap(), message_digest.as_bytes(), &G2Element::from_bytes(threshold_signature.as_bytes()).unwrap())
-    }
 }
 
 unsafe extern "C" fn block_height_lookup_jack_daniels(

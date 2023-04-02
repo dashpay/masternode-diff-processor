@@ -1,6 +1,6 @@
 use std::{mem, ptr, slice, os::raw::c_ulong};
 use crate::chain::derivation::{IIndexPath, IndexPath};
-use crate::crypto::{UInt256, UInt768};
+use crate::crypto::UInt256;
 use crate::util::sec_vec::SecVec;
 
 #[repr(C)]

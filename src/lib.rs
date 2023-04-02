@@ -43,10 +43,9 @@ use byte::BytesExt;
 use ffi::boxer::{boxed, boxed_vec};
 use ffi::callbacks::{
     AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash,
-    GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, LogMessage,
+    GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy,
     MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup,
     SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback,
-    ValidateLLMQCallback,
 };
 use ffi::unboxer::{
     unbox_any, unbox_block, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_masternode_list,
@@ -135,11 +134,9 @@ pub unsafe extern "C" fn register_processor(
     destroy_masternode_list: MasternodeListDestroy,
     add_insight: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-    validate_llmq: ValidateLLMQCallback,
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
-    log_message: LogMessage,
 ) -> *mut MasternodeProcessor {
     let processor = MasternodeProcessor::new(
         get_merkle_root_by_hash,
@@ -152,11 +149,11 @@ pub unsafe extern "C" fn register_processor(
         destroy_masternode_list,
         add_insight,
         should_process_llmq_of_type,
-        validate_llmq,
+        // validate_llmq,
         destroy_hash,
         destroy_snapshot,
         should_process_diff_with_range,
-        log_message,
+        // log_message,
     );
     println!("register_processor: {:?}", processor);
     boxed(processor)

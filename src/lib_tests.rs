@@ -16,7 +16,7 @@ pub mod tests {
     use crate::chain::common::chain_type::{ChainType, IHaveChainSettings};
     use crate::consensus::encode;
     use crate::crypto::byte_util::{
-        BytesDecodable, Reversable, UInt256, UInt384, UInt768,
+        BytesDecodable, Reversable, UInt256, UInt384,
     };
     use crate::{common, models};
     use crate::processing::processor_cache::MasternodeProcessorCache;
@@ -475,14 +475,6 @@ pub mod tests {
         true
     }
 
-    pub unsafe extern "C" fn log_default(
-        message: *const libc::c_char,
-        _context: *const std::ffi::c_void,
-    ) {
-        let c_str = std::ffi::CStr::from_ptr(message);
-        println!("{:?}", c_str.to_str().unwrap());
-    }
-
     pub unsafe extern "C" fn get_merkle_root_by_hash_default(
         block_hash: *mut [u8; 32],
         context: *const std::ffi::c_void,
@@ -532,50 +524,6 @@ pub mod tests {
                 chain.platform_type() == r#type ||
                 is_isd
         }
-    }
-
-    pub unsafe extern "C" fn validate_llmq_callback(
-        data: *mut types::LLMQValidationData,
-        _context: *const std::ffi::c_void,
-    ) -> bool {
-        let result = unbox_any(data);
-        let types::LLMQValidationData {
-            items,
-            count,
-            commitment_hash,
-            all_commitment_aggregated_signature,
-            threshold_signature,
-            public_key,
-            version
-        } = *result;
-        println!(
-            "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {:?}",
-            items,
-            count,
-            commitment_hash,
-            all_commitment_aggregated_signature,
-            threshold_signature,
-            public_key,
-            version
-        );
-
-        let all_commitment_aggregated_signature = UInt768(*all_commitment_aggregated_signature);
-        let threshold_signature = UInt768(*threshold_signature);
-        let public_key = UInt384(*public_key);
-        let commitment_hash = UInt256(*commitment_hash);
-
-        let infos = (0..count)
-            .into_iter()
-            .map(|i| {
-                let item = *(*items.add(i));
-                AggregationInfo {
-                    public_key: UInt384(item.data),
-                    version: item.version,
-                    digest: commitment_hash,
-                }
-            })
-            .collect::<Vec<AggregationInfo>>();
-        true
     }
 
     pub unsafe extern "C" fn get_block_hash_by_height_from_insight(block_height: u32, context: *const std::ffi::c_void) -> *mut u8 {
@@ -671,11 +619,9 @@ pub mod tests {
                 masternode_list_destroy_default,
                 add_insight_lookup_default,
                 should_process_llmq_of_type,
-                validate_llmq_callback,
                 hash_destroy_default,
                 snapshot_destroy_default,
                 should_process_diff_with_range_default,
-                log_default,
             )
         };
 

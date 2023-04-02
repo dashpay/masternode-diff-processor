@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, log_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, validate_llmq_callback, FFIContext, get_block_height_by_hash_from_context};
+use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_default, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, FFIContext, get_block_height_by_hash_from_context};
 use crate::{models, process_mnlistdiff_from_message, processor_create_cache, register_processor};
 use crate::ffi::from::FromFFI;
 use crate::ffi::to::ToFFI;
@@ -36,11 +36,9 @@ fn testnet_llmq_verification() {
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_llmq_of_type,
-            validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
-            log_default,
         )
     };
     let result = unsafe { process_mnlistdiff_from_message(
@@ -159,11 +157,9 @@ fn testnet_llmq_verification_using_processor_and_cache() {
             masternode_list_destroy_default,
             add_insight_lookup_default,
             should_process_llmq_of_type,
-            validate_llmq_callback,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
-            log_default,
         )
     };
 

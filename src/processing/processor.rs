@@ -3,7 +3,7 @@ use hashes::{sha256d, Hash};
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
-use crate::{AddInsightBlockingLookup, boxed, boxed_vec, common, ConstDecodable, encode, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, LogMessage, models, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback, types, UInt256, ValidateLLMQCallback};
+use crate::{AddInsightBlockingLookup, boxed, common, ConstDecodable, encode, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, models, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback, types, UInt256};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{Reversable, Zeroable};
 use crate::crypto::data_ops::{Data, inplace_intersection};
@@ -28,11 +28,11 @@ pub struct MasternodeProcessor {
     destroy_masternode_list: MasternodeListDestroy,
     add_insight: AddInsightBlockingLookup,
     should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-    validate_llmq: ValidateLLMQCallback,
+    // validate_llmq: ValidateLLMQCallback,
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
-    log_message: LogMessage,
+    // log_message: LogMessage,
 }
 impl std::fmt::Debug for MasternodeProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -55,11 +55,11 @@ impl MasternodeProcessor {
         destroy_masternode_list: MasternodeListDestroy,
         add_insight: AddInsightBlockingLookup,
         should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
-        validate_llmq: ValidateLLMQCallback,
+        // validate_llmq: ValidateLLMQCallback,
         destroy_hash: HashDestroy,
         destroy_snapshot: LLMQSnapshotDestroy,
         should_process_diff_with_range: ShouldProcessDiffWithRange,
-        log_message: LogMessage,
+        // log_message: LogMessage,
     ) -> Self {
         Self {
             get_merkle_root_by_hash,
@@ -72,11 +72,11 @@ impl MasternodeProcessor {
             destroy_masternode_list,
             add_insight,
             should_process_llmq_of_type,
-            validate_llmq,
+            // validate_llmq,
             destroy_hash,
             destroy_snapshot,
             should_process_diff_with_range,
-            log_message,
+            // log_message,
             opaque_context: null(),
             genesis_hash: null(),
             use_insight_as_backup: false,
@@ -933,34 +933,71 @@ impl MasternodeProcessor {
         if quorum.llmq_type == LLMQType::Llmqtype60_75 {
             has_valid_quorums &= true;
         } else {
-            let operator_pks: Vec<*mut types::OperatorPublicKey> = (0..valid_masternodes.len())
-                .into_iter()
-                .filter_map(|i| {
-                    match quorum
-                        .signers_bitset
-                        .as_slice()
-                        .bit_is_true_at_le_index(i as u32)
-                    {
-                        true => Some(boxed(valid_masternodes[i].operator_public_key_at(block_height).encode())),
-                        false => None,
-                    }
-                })
-                .collect();
-            let operator_public_keys_count = operator_pks.len();
-            let is_valid_signature = unsafe {
-                (self.validate_llmq)(
-                    boxed(types::LLMQValidationData {
-                        items: boxed_vec(operator_pks),
-                        count: operator_public_keys_count,
-                        commitment_hash: boxed(quorum.generate_commitment_hash().0),
-                        all_commitment_aggregated_signature: boxed(quorum.all_commitment_aggregated_signature.0),
-                        threshold_signature: boxed(quorum.threshold_signature.0),
-                        public_key: boxed(quorum.public_key.0),
-                        version: quorum.version
-                    }),
-                    self.opaque_context,
-                )
-            };
+            // let all_commitment_aggregated_signature = quorum.all_commitment_aggregated_signature;
+            // let threshold_signature = quorum.threshold_signature;
+            // let public_key = quorum.public_key;
+            // let commitment_hash = quorum.generate_commitment_hash();
+            // let version = quorum.version;
+            // let use_legacy = version.use_bls_legacy();
+            // let keys = (0..count)
+            //     .into_iter()
+            //     .map(|i| {
+            //         let item = *(*(items.add(i)));
+            //         let key = UInt384(item.data);
+            //         let version = item.version;
+            //         if version < 2 {
+            //             G1Element::from_bytes_legacy(key.as_bytes()).unwrap()
+            //         } else {
+            //             G1Element::from_bytes(key.as_bytes()).unwrap()
+            //         }
+            //     })
+            //     .collect::<Vec<G1Element>>();
+            // let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys, use_legacy);
+            // if !all_commitment_aggregated_signature_validated {
+            //     println!("••• Issue with all_commitment_aggregated_signature_validated: {}", all_commitment_aggregated_signature);
+            //     return false;
+            // }
+            // // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
+            // // This is an aggregated BLS signature verification.
+            // let quorum_signature_validated = verify_quorum_signature(commitment_hash, threshold_signature, public_key, use_legacy);
+            // if !quorum_signature_validated {
+            //     println!("••• Issue with quorum_signature_validated");
+            //     return false;
+            // }
+            // println!("••• Quorum validated");
+            // true
+            //
+            //
+            //
+            // let operator_pks: Vec<*mut types::OperatorPublicKey> = (0..valid_masternodes.len())
+            //     .into_iter()
+            //     .filter_map(|i| {
+            //         match quorum
+            //             .signers_bitset
+            //             .as_slice()
+            //             .bit_is_true_at_le_index(i as u32)
+            //         {
+            //             true => Some(boxed(valid_masternodes[i].operator_public_key_at(block_height).encode())),
+            //             false => None,
+            //         }
+            //     })
+            //     .collect();
+            // let operator_public_keys_count = operator_pks.len();
+            // let is_valid_signature = unsafe {
+            //     (self.validate_llmq)(
+            //         boxed(types::LLMQValidationData {
+            //             items: boxed_vec(operator_pks),
+            //             count: operator_public_keys_count,
+            //             commitment_hash: boxed(quorum.generate_commitment_hash().0),
+            //             all_commitment_aggregated_signature: boxed(quorum.all_commitment_aggregated_signature.0),
+            //             threshold_signature: boxed(quorum.threshold_signature.0),
+            //             public_key: boxed(quorum.public_key.0),
+            //             version: quorum.version
+            //         }),
+            //         self.opaque_context,
+            //     )
+            // };
+            let is_valid_signature = quorum.validate(valid_masternodes, block_height);
             let is_valid_payload = quorum.validate_payload();
             has_valid_quorums &= is_valid_payload && is_valid_signature;
         }
