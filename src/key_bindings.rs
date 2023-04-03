@@ -1091,3 +1091,61 @@ pub unsafe extern "C" fn key_decrypt_data_using_iv_size(data: *const u8, len: us
         _ => None
     })
 }
+
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_encrypt_data_with_dh_key(data: *const u8, len: usize, key: *mut OpaqueKey) -> ByteArray {
+    let data = slice::from_raw_parts(data, len);
+    let key = &mut *key;
+    ByteArray::from(match key.key_type {
+        KeyType::ECDSA =>
+            <Vec<u8> as CryptoData<ECDSAKey>>::encrypt_with_dh_key(&mut data.to_vec(), &mut *(key.ptr as *mut ECDSAKey)),
+        KeyType::BLS | KeyType::BLSBasic =>
+            <Vec<u8> as CryptoData<BLSKey>>::encrypt_with_dh_key(&mut data.to_vec(), &mut *(key.ptr as *mut BLSKey)),
+        _ => None
+    })
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_decrypt_data_with_dh_key(data: *const u8, len: usize, key: *mut OpaqueKey) -> ByteArray {
+    let data = slice::from_raw_parts(data, len);
+    let key = &mut *key;
+    ByteArray::from(match key.key_type {
+        KeyType::ECDSA =>
+            <Vec<u8> as CryptoData<ECDSAKey>>::decrypt_with_dh_key(&mut data.to_vec(), &mut *(key.ptr as *mut ECDSAKey)),
+        KeyType::BLS | KeyType::BLSBasic =>
+            <Vec<u8> as CryptoData<BLSKey>>::decrypt_with_dh_key(&mut data.to_vec(), &mut *(key.ptr as *mut BLSKey)),
+        _ => None
+    })
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_encrypt_data_with_dh_key_using_iv(data: *const u8, len: usize, key: *mut OpaqueKey, iv_data: *const u8, iv_len: usize) -> ByteArray {
+    let data = slice::from_raw_parts(data, len);
+    let iv = slice::from_raw_parts(iv_data, iv_len);
+    let key = &mut *key;
+    ByteArray::from(match key.key_type {
+        KeyType::ECDSA =>
+            <Vec<u8> as CryptoData<ECDSAKey>>::encrypt_with_dh_key_using_iv(&mut data.to_vec(), &mut *(key.ptr as *mut ECDSAKey), iv.to_vec()),
+        KeyType::BLS | KeyType::BLSBasic =>
+            <Vec<u8> as CryptoData<BLSKey>>::encrypt_with_dh_key_using_iv(&mut data.to_vec(), &mut *(key.ptr as *mut BLSKey), iv.to_vec()),
+        _ => None
+    })
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_decrypt_data_with_dh_key_using_iv_size(data: *const u8, len: usize, key: *mut OpaqueKey, iv_size: usize) -> ByteArray {
+    let data = slice::from_raw_parts(data, len);
+    let key = &mut *key;
+    ByteArray::from(match key.key_type {
+        KeyType::ECDSA =>
+            <Vec<u8> as CryptoData<ECDSAKey>>::decrypt_with_dh_key_using_iv_size(&mut data.to_vec(), &mut *(key.ptr as *mut ECDSAKey), iv_size),
+        KeyType::BLS | KeyType::BLSBasic =>
+            <Vec<u8> as CryptoData<BLSKey>>::decrypt_with_dh_key_using_iv_size(&mut data.to_vec(), &mut *(key.ptr as *mut BLSKey), iv_size),
+        _ => None
+    })
+}
