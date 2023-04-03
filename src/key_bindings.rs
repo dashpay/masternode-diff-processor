@@ -277,6 +277,14 @@ pub unsafe extern "C" fn key_bls_private_derive_to_path(key: *mut BLSKey, index_
 
 /// # Safety
 #[no_mangle]
+pub unsafe extern "C" fn key_bls_public_derive_to_path(key: *mut BLSKey, index_path: *const IndexPathData) -> *mut BLSKey {
+    let key = &mut *key;
+    key.public_derive_to_path(&IndexPath::from(index_path))
+        .map_or(null_mut(), boxed)
+}
+
+/// # Safety
+#[no_mangle]
 pub unsafe extern "C" fn key_bls_sign_data(key: *mut BLSKey, ptr: *const u8, len: usize) -> ByteArray {
     let key = &mut *key;
     let data = slice::from_raw_parts(ptr, len);
@@ -887,6 +895,22 @@ pub unsafe extern "C" fn deserialized_extended_private_key(ptr: *const c_char, c
         .try_into()
         .ok()
         .map(|key: bip32::Key| key.extended_key_data()))
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn keys_private_key_data_is_equal(key1: *mut OpaqueKey, key2: *mut OpaqueKey) -> bool {
+    let key1 = &mut *key1;
+    let key2 = &mut *key2;
+    match (key1.key_type, key2.key_type) {
+        (KeyType::ECDSA, KeyType::ECDSA) =>
+            (&mut *(key1.ptr as *mut ECDSAKey)).seckey == (&mut *(key2.ptr as *mut ECDSAKey)).seckey,
+        (KeyType::BLS | KeyType::BLSBasic, KeyType::BLS | KeyType::BLSBasic) =>
+            (&mut *(key1.ptr as *mut BLSKey)).seckey == (&mut *(key2.ptr as *mut BLSKey)).seckey,
+        (KeyType::ED25519, KeyType::ED25519) =>
+            (&mut *(key1.ptr as *mut ED25519Key)).seckey == (&mut *(key2.ptr as *mut ED25519Key)).seckey,
+        _ => false
+    }
 }
 
 /// # Safety
