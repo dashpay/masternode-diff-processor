@@ -269,6 +269,14 @@ pub unsafe extern "C" fn key_verify_message_digest(key: *mut OpaqueKey, md: *con
 
 /// # Safety
 #[no_mangle]
+pub unsafe extern "C" fn key_bls_private_derive_to_path(key: *mut BLSKey, index_path: *const IndexPathData) -> *mut BLSKey {
+    let key = &mut *key;
+    key.private_derive_to_path(&IndexPath::from(index_path))
+        .map_or(null_mut(), boxed)
+}
+
+/// # Safety
+#[no_mangle]
 pub unsafe extern "C" fn key_bls_sign_data(key: *mut BLSKey, ptr: *const u8, len: usize) -> ByteArray {
     let key = &mut *key;
     let data = slice::from_raw_parts(ptr, len);
@@ -602,6 +610,13 @@ pub unsafe extern "C" fn key_bls_sign_data_single_sha256(key: *mut BLSKey, data:
 pub extern "C" fn key_bls_public_key(key: *mut BLSKey) -> ByteArray {
     let key = unsafe { &mut *key };
     ByteArray::from(key.pubkey)
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn key_bls_chaincode(key: *mut BLSKey) -> ByteArray {
+    let key = unsafe { &mut *key };
+    ByteArray::from(key.chaincode)
 }
 
 /// # Safety
