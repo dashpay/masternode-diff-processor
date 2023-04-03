@@ -384,6 +384,19 @@ pub unsafe extern "C" fn key_ecdsa_has_private_key(key: *mut ECDSAKey) -> bool {
 // serializedPrivateKeyForChain
 /// # Safety
 #[no_mangle]
+pub unsafe extern "C" fn key_serialized_private_key_for_chain(key: *mut OpaqueKey, chain_id: i16) -> *mut c_char {
+    let key = &mut *key;
+    let script = ScriptMap::from(chain_id);
+    let serialized = match key.key_type {
+        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).serialized_private_key_for_script(&script),
+        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).serialized_private_key_for_script(&script),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).serialized_private_key_for_script(&script),
+    };
+    CString::new(serialized).unwrap().into_raw()
+}
+
+/// # Safety
+#[no_mangle]
 pub unsafe extern "C" fn key_ecdsa_serialized_private_key_for_chain(key: *mut ECDSAKey, chain_id: i16) -> *mut c_char {
     let key = &mut *key;
     let script = ScriptMap::from(chain_id);
