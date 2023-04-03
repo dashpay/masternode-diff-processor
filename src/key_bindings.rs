@@ -308,6 +308,21 @@ pub unsafe extern "C" fn key_ecdsa_with_seed_data(ptr: *const u8, len: usize) ->
         .map_or(null_mut(), boxed)
 }
 
+//+ (NSString *)serializedPrivateMasterFromSeedData:(NSData *)seedData forChain:(DSChain *)chain
+/// # Safety
+/// For test only
+#[no_mangle]
+pub unsafe extern "C" fn key_ecdsa_serialized_private_master_from_seed_data(ptr: *const u8, len: usize, chain_id: i16) -> *mut c_char {
+    let seed = slice::from_raw_parts(ptr, len);
+    if seed.is_empty() {
+        return null_mut();
+    }
+    let seed_key = UInt512::bip32_seed_key(seed);
+    let key = bip32::Key::new(0, 0, UInt256::MIN, UInt256::from(&seed_key.0[32..]), seed_key.0[..32].to_vec(), false)
+        .serialize(ChainType::from(chain_id));
+    CString::new(key).unwrap().into_raw()
+}
+
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_with_private_key(secret: *const c_char, key_type: KeyType, chain_id: i16) -> *mut OpaqueKey {
