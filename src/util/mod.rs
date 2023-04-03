@@ -8,3 +8,4 @@ pub mod psbt;
 pub mod script;
 pub mod data_ops;
 pub mod sec_vec;
+pub mod cc_crypt;

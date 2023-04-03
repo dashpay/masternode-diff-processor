@@ -3,6 +3,7 @@ pub mod key;
 pub mod ecdsa_key;
 pub mod ed25519_key;
 pub mod dip14;
+pub mod crypto_data;
 
 pub use self::key::Key;
 pub use self::key::KeyType;

@@ -6,6 +6,7 @@ use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}, UInt160};
 use crate::keys::{IKey, KeyType, dip14::{IChildKeyDerivation, SignKey}};
+use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::util::{base58, data_ops::hex_with_data};
 use crate::util::sec_vec::SecVec;
 
@@ -521,3 +522,62 @@ impl BLSKey {
     }
 
 }
+
+
+impl DHKey for BLSKey {
+    fn init_with_dh_key_exchange_with_public_key(public_key: &mut Self, private_key: &Self) -> Option<Self> where Self: Sized {
+        match (public_key.bls_public_key(), private_key.bls_private_key(), private_key.use_legacy) {
+            (Ok(bls_public_key), Ok(bls_private_key), use_legacy) if public_key.use_legacy == use_legacy =>
+                (bls_private_key * bls_public_key)
+                    .ok()
+                    .map(|key|
+                        BLSKey::key_with_public_key(UInt384(if use_legacy { *key.serialize_legacy() } else { *key.serialize() }), use_legacy)),
+            _ => None
+        }
+    }
+}
+
+impl CryptoData<BLSKey> for Vec<u8> {
+
+    fn encrypt_with_secret_key_using_iv(&mut self, secret_key: &BLSKey, public_key: &BLSKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+        secret_key.product(public_key)
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
+            .map(|key_data: [u8; 32]| {
+                let mut destination = initialization_vector.clone();
+                let iv: [u8; 16] = initialization_vector[..16].try_into().unwrap();
+                let encrypted_data = <Self as CryptoData<BLSKey>>::encrypt(self, key_data, iv).unwrap();
+                destination.extend(encrypted_data.clone());
+                destination
+            })
+    }
+
+    fn decrypt_with_secret_key_using_iv_size(&mut self, secret_key: &BLSKey, public_key: &BLSKey, iv_size: usize) -> Option<Vec<u8>> {
+        if self.len() < iv_size {
+            return None;
+        }
+        secret_key.product(public_key)
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
+            .and_then(|key_data: [u8; 32]|
+                <Self as CryptoData<BLSKey>>::decrypt(self[iv_size..self.len()].to_vec(), key_data, &self[..iv_size]))
+    }
+
+    fn encrypt_with_dh_key_using_iv(&self, key: &BLSKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+        key.bls_public_key_serialized()
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
+            .and_then(|key_data: [u8; 32]| initialization_vector[..16].try_into().ok()
+                .and_then(|iv_data: [u8; 16]|
+                    <Self as CryptoData<BLSKey>>::encrypt(self, key_data, iv_data)))
+    }
+
+    fn decrypt_with_dh_key_using_iv_size(&self, key: &BLSKey, iv_size: usize) -> Option<Vec<u8>> {
+        if self.len() < iv_size {
+            return None;
+        }
+        key.bls_public_key_serialized()
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
+            .and_then(|key_data: [u8; 32]| self[..iv_size].try_into().ok()
+                .and_then(|iv_data: [u8; 16]|
+                    <Self as CryptoData<BLSKey>>::decrypt(self[iv_size..self.len()].to_vec(), key_data, iv_data)))
+    }
+}
+

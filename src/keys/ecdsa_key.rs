@@ -12,6 +12,7 @@ use crate::chain::params::ScriptMap;
 use crate::consensus::Encodable;
 use crate::crypto::{ECPoint, UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}};
 use crate::keys::{IKey, KeyType, dip14::{IChildKeyDerivation, SignKey}};
+use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::util::address::address::is_valid_dash_private_key;
 use crate::util::base58;
 use crate::util::sec_vec::SecVec;
@@ -528,12 +529,12 @@ impl ECDSAKey {
     //
     // }
 
-    fn key_with_dh_key_exchange_with_public_key(public_key: &Self, private_key: &Self) -> Option<Self> {
-        private_key.secret_key()
-            .and_then(|seckey| ECDSAKey::public_key_from_bytes(&ECDSAKey::public_key_from_secret_key_serialized(&seckey, false))
-                .map(|pubkey| ECDSAKey::with_shared_secret(secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey), false)))
-            .ok()
-    }
+    // pub fn key_with_dh_key_exchange_with_public_key(public_key: &Self, private_key: &Self) -> Option<Self> {
+    //     private_key.secret_key()
+    //         .and_then(|seckey| ECDSAKey::public_key_from_bytes(&ECDSAKey::public_key_from_secret_key_serialized(&seckey, false))
+    //             .map(|pubkey| ECDSAKey::with_shared_secret(secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey), false)))
+    //         .ok()
+    // }
 }
 
 /// For FFI
@@ -599,3 +600,56 @@ impl ECDSAKey {
 
     }
 }
+
+impl DHKey for ECDSAKey {
+    fn init_with_dh_key_exchange_with_public_key(public_key: &mut Self, private_key: &Self) -> Option<Self> where Self: Sized {
+        match (Self::public_key_from_bytes(&public_key.public_key_data()),
+               Self::secret_key_from_bytes(private_key.seckey.as_bytes())) {
+            (Ok(pubkey), Ok(seckey)) => Some(Self::with_shared_secret(secp256k1::ecdh::SharedSecret::new(&pubkey, &seckey), false)),
+            _ => None
+        }
+    }
+}
+
+impl CryptoData<ECDSAKey> for Vec<u8> {
+    fn encrypt_with_secret_key_using_iv(&mut self, secret_key: &ECDSAKey, public_key: &ECDSAKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+        let mut destination = initialization_vector.clone();
+        ECDSAKey::secret_key_from_bytes(public_key.seckey.as_bytes())
+            .and_then(|seckey| ECDSAKey::public_key_from_bytes(&ECDSAKey::public_key_from_secret_key_serialized(&seckey, false)))
+            .map(|pubkey| secp256k1::ecdh::SharedSecret::new(&pubkey, &secret_key.secret_key().unwrap()))
+            .ok()
+            .and_then(|shared_secret| <Self as CryptoData<ECDSAKey>>::encrypt(self, shared_secret.secret_bytes(), initialization_vector))
+            .map(|encrypted_data| {
+                destination.extend(encrypted_data.clone());
+                destination
+            })
+    }
+
+    fn decrypt_with_secret_key_using_iv_size(&mut self, secret_key: &ECDSAKey, public_key: &ECDSAKey, iv_size: usize) -> Option<Vec<u8>> {
+        if self.len() < iv_size {
+            return None;
+        }
+        ECDSAKey::secret_key_from_bytes(public_key.seckey.as_bytes())
+            .and_then(|seckey| ECDSAKey::public_key_from_bytes(&ECDSAKey::public_key_from_secret_key_serialized(&seckey, false)))
+            .map(|pubkey| secp256k1::ecdh::SharedSecret::new(&pubkey, &secret_key.secret_key().unwrap()))
+            .ok()
+            .and_then(|shared_secret|
+                <Self as CryptoData<ECDSAKey>>::decrypt(self[iv_size..self.len()].to_vec(), shared_secret.secret_bytes(), &self[..iv_size]))
+    }
+
+    fn encrypt_with_dh_key_using_iv(&self, key: &ECDSAKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+        key.public_key_from_inner_secret_key_serialized()
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
+            .and_then(|key_data: [u8; 32]| initialization_vector.try_into().ok()
+                .and_then(|iv_data: [u8; 16]| <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data)))
+    }
+
+    fn decrypt_with_dh_key_using_iv_size(&self, key: &ECDSAKey, iv_size: usize) -> Option<Vec<u8>> {
+        key.public_key_from_inner_secret_key_serialized()
+            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
+            .and_then(|key_data: [u8; 32]| self[..iv_size].try_into().ok()
+                .and_then(|iv_data: [u8; 16]|
+                    <Self as CryptoData<ECDSAKey>>::decrypt(self[iv_size..self.len()].to_vec(), key_data, iv_data)))
+    }
+}
+
