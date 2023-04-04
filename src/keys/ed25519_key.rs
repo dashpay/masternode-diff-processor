@@ -3,6 +3,7 @@ use byte::BytesExt;
 use byte::ctx::Bytes;
 use ed25519_dalek::{Signature, SignatureError, Signer, SigningKey, Verifier, VerifyingKey};
 use hashes::hex::{FromHex, ToHex};
+use hashes::sha256;
 use crate::crypto::{ECPoint, UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
@@ -211,6 +212,9 @@ impl IKey for ED25519Key
         base58::check_encode_slice(&writer)
     }
 
+    fn hmac_256_data(&self, data: &[u8]) -> UInt256 {
+        UInt256::hmac::<sha256::Hash>(self.seckey.as_bytes(), data)
+    }
 
     fn forget_private_key(&mut self) {
         if self.pubkey.is_empty() && !self.seckey.is_zero() {

@@ -124,9 +124,8 @@ impl IKey for BLSKey {
         base58::check_encode_slice(&writer)
     }
 
-    fn hmac_256_data(&self, data: &Vec<u8>) -> UInt256 {
+    fn hmac_256_data(&self, data: &[u8]) -> UInt256 {
         UInt256::hmac::<sha256::Hash>(self.seckey.as_bytes(), data)
-
     }
 
     fn forget_private_key(&mut self) {

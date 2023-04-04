@@ -334,7 +334,7 @@ impl IKey for Key {
         }
     }
 
-    fn hmac_256_data(&self, data: &Vec<u8>) -> UInt256 {
+    fn hmac_256_data(&self, data: &[u8]) -> UInt256 {
         match self {
             Key::ECDSA(key) => key.hmac_256_data(data),
             Key::BLS(key) => key.hmac_256_data(data),

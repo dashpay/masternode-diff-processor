@@ -345,26 +345,6 @@ impl IKey for ECDSAKey {
         todo!()
     }
 
-    // fn private_derive_to_path2<PATH, INDEX>(&self, path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=INDEX> {
-    //     todo!()
-        // let mut seckey = self.seckey.clone();
-        // let mut chaincode = self.chaincode.clone();
-        // let mut fingerprint = 0u32;
-        // let length = path.length();
-        // (0..length)
-        //     .into_iter()
-        //     .for_each(|position| {
-        //         if position + 1 == length {
-        //             fingerprint = secp256k1::SecretKey::from_slice(&seckey.0)
-        //                 .map(|sk| secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &sk))
-        //                 .map(|pk| UInt160::hash160(&pk.serialize()).u32_le())
-        //                 .unwrap_or(0);
-        //         }
-        //         Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position)
-        //     });
-        // Some(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
-    // }
-
     fn private_derive_to_path<PATH>(&self, path: &PATH) -> Option<Self>
         where Self: Sized, PATH: IIndexPath<Item = u32> {
         let mut seckey = self.seckey.clone();
@@ -384,6 +364,26 @@ impl IKey for ECDSAKey {
             });
         Some(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
     }
+
+    // fn private_derive_to_path2<PATH, INDEX>(&self, path: &PATH) -> Option<Self> where Self: Sized, PATH: IIndexPath<Item=INDEX> {
+    //     todo!()
+        // let mut seckey = self.seckey.clone();
+        // let mut chaincode = self.chaincode.clone();
+        // let mut fingerprint = 0u32;
+        // let length = path.length();
+        // (0..length)
+        //     .into_iter()
+        //     .for_each(|position| {
+        //         if position + 1 == length {
+        //             fingerprint = secp256k1::SecretKey::from_slice(&seckey.0)
+        //                 .map(|sk| secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &sk))
+        //                 .map(|pk| UInt160::hash160(&pk.serialize()).u32_le())
+        //                 .unwrap_or(0);
+        //         }
+        //         Self::derive_child_private_key(&mut seckey, &mut chaincode, path, position)
+        //     });
+        // Some(Self { seckey, chaincode, fingerprint, is_extended: true, compressed: true, ..Default::default() })
+    // }
 
     fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Option<Self>
         where Self: Sized, PATH: IIndexPath<Item = UInt256> {
@@ -424,6 +424,10 @@ impl IKey for ECDSAKey {
             b'\x01'.enc(&mut writer);
         }
         base58::check_encode_slice(&writer)
+    }
+
+    fn hmac_256_data(&self, data: &[u8]) -> UInt256 {
+        UInt256::hmac::<sha256::Hash>(self.seckey.as_bytes(), data)
     }
 
     fn forget_private_key(&mut self) {

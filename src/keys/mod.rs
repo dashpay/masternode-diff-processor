@@ -89,7 +89,7 @@ pub trait IKey: Send + Sync + Debug {
     fn serialized_private_key_for_script(&self, script: &ScriptMap) -> String {
         panic!("Should be overriden in implementation")
     }
-    fn hmac_256_data(&self, data: &Vec<u8>) -> UInt256 {
+    fn hmac_256_data(&self, data: &[u8]) -> UInt256 {
         panic!("Should be overriden in implementation")
     }
     fn forget_private_key(&mut self) {

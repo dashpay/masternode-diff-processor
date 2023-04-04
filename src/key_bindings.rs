@@ -10,7 +10,7 @@ use crate::chain::derivation::{BIP32_HARD, IndexPath};
 use crate::chain::ScriptMap;
 use crate::common::ChainType;
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::{AsBytes, clone_into_array, ConstDecodable};
+use crate::crypto::byte_util::{AsBytes, clone_into_array, ConstDecodable, Reversable};
 use crate::crypto::{UInt256, UInt384, UInt512};
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::{ByteArray, IndexPathData};
@@ -1169,4 +1169,28 @@ pub unsafe extern "C" fn key_decrypt_data_with_dh_key_using_iv_size(data: *const
             <Vec<u8> as CryptoData<BLSKey>>::decrypt_with_dh_key_using_iv_size(&mut data.to_vec(), &mut *(key.ptr as *mut BLSKey), iv_size),
         _ => None
     })
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_create_account_reference(source_key: *mut OpaqueKey, extended_public_key: *mut OpaqueKey, account_number: usize) -> u32 {
+    let source_key = &mut *source_key;
+    let extended_public_key = &mut *extended_public_key;
+    let extended_public_key_data = match extended_public_key.key_type {
+        KeyType::ECDSA => (&mut *(source_key.ptr as *mut ECDSAKey)).extended_public_key_data(),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(source_key.ptr as *mut BLSKey)).extended_public_key_data(),
+        KeyType::ED25519 => (&mut *(source_key.ptr as *mut ED25519Key)).extended_public_key_data(),
+    }.unwrap_or(vec![]);
+
+    let account_secret_key = match source_key.key_type  {
+        KeyType::ECDSA => (&mut *(source_key.ptr as *mut ECDSAKey)).hmac_256_data(&extended_public_key_data),
+        KeyType::BLS | KeyType::BLSBasic => (&mut *(source_key.ptr as *mut BLSKey)).hmac_256_data(&extended_public_key_data),
+        KeyType::ED25519 => (&mut *(source_key.ptr as *mut ED25519Key)).hmac_256_data(&extended_public_key_data)
+    }.reversed();
+    let account_secret_key28 = account_secret_key.u32_le() >> 4;
+    let shortened_account_bits = (account_number as u32) & 0x0FFFFFFF;
+    let version = 0; // currently set to 0
+    let version_bits = version << 28;
+    // this is the account ref
+    return version_bits | (account_secret_key28 ^ shortened_account_bits)
 }
