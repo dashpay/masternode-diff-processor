@@ -242,6 +242,14 @@ pub extern "C" fn key_derive_ed25519_from_extened_private_key_data_for_index_pat
 
 
 /// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_ecdsa_sign(key: *mut ECDSAKey, data: *const u8, len: usize) -> ByteArray {
+    let key = unsafe { &mut *key };
+    let data = slice::from_raw_parts(data, len);
+    ByteArray::from(key.sign(data))
+}
+
+/// # Safety
 /// digest is UInt256
 #[no_mangle]
 pub unsafe extern "C" fn key_sign_message_digest(key: *mut OpaqueKey, digest: *const u8) -> ByteArray {
