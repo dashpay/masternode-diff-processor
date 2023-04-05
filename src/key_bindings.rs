@@ -5,6 +5,7 @@ use std::slice;
 use byte::BytesExt;
 use secp256k1::Scalar;
 use crate::chain::bip::bip32;
+use crate::chain::bip::bip38::BIP38;
 use crate::chain::common::chain_type::IHaveChainSettings;
 use crate::chain::derivation::{BIP32_HARD, IndexPath};
 use crate::chain::ScriptMap;
@@ -1193,4 +1194,17 @@ pub unsafe extern "C" fn key_create_account_reference(source_key: *mut OpaqueKey
     let version_bits = version << 28;
     // this is the account ref
     return version_bits | (account_secret_key28 ^ shortened_account_bits)
+}
+
+/// # Safety
+/// decrypts & serializes a BIP38 key using the given passphrase or returns NULL if passphrase is incorrect
+#[no_mangle]
+pub unsafe extern "C" fn key_ecdsa_with_bip38_key(private_key: *const c_char, passphrase: *const c_char, chain_id: i16) -> *mut c_char {
+    let private_key = CStr::from_ptr(private_key).to_str().unwrap();
+    let passphrase = CStr::from_ptr(passphrase).to_str().unwrap();
+    let script = ScriptMap::from(chain_id);
+    ECDSAKey::key_with_bip38_key(private_key, passphrase, &script)
+        .map_or(null_mut(), |key| CString::new(key.serialized_private_key_for_script(&script))
+            .unwrap()
+            .into_raw())
 }

@@ -1,11 +1,7 @@
 use bip38::{Decrypt, Encrypt};
-// use unicode_normalization::UnicodeNormalization;
 use crate::chain::ScriptMap;
-use crate::common::ChainType;
 use crate::crypto::UInt256;
-use crate::keys::{ECDSAKey, IKey};
-use crate::util::address::address;
-use crate::util::base58;
+use crate::keys::ECDSAKey;
 
 pub trait BIP38 {
     // decrypts a BIP38 key using the given passphrase or retuns nil if passphrase is incorrect
