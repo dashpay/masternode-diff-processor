@@ -1,7 +1,16 @@
 use bip38::{Decrypt, Encrypt};
+use byte::BytesExt;
 use crate::chain::ScriptMap;
 use crate::crypto::UInt256;
 use crate::keys::ECDSAKey;
+use crate::util::base58;
+
+const BIP38_NOEC_PREFIX: u16 = 0x0142;
+const BIP38_EC_PREFIX: u16 = 0x0143;
+const BIP38_NOEC_FLAG: u8 = 0x80 | 0x40;
+const BIP38_COMPRESSED_FLAG: u8 = 0x20;
+const BIP38_LOTSEQUENCE_FLAG: u8 = 0x04;
+const BIP38_INVALID_FLAG: u8 = 0x10 | 0x08 | 0x02 | 0x01;
 
 pub trait BIP38 {
     // decrypts a BIP38 key using the given passphrase or retuns nil if passphrase is incorrect
@@ -15,6 +24,8 @@ pub trait BIP38 {
     // fn bip38_key_with_intermediate_code(code: &str, seedb: Vec<u8>, chain_type: ChainType) -> Option<String>;
     // encrypts receiver with passphrase and returns BIP38 key
     fn bip38_key_with_passphrase(&self, passphrase: &str, script: &ScriptMap) -> Option<String>;
+
+    fn is_valid_bip38_key(key: &str) -> bool;
 }
 
 impl BIP38 for ECDSAKey {
@@ -27,5 +38,25 @@ impl BIP38 for ECDSAKey {
 
     fn bip38_key_with_passphrase(&self, passphrase: &str, script: &ScriptMap) -> Option<String> {
         self.seckey.0.encrypt(passphrase, false, script.pubkey).ok()
+    }
+
+    fn is_valid_bip38_key(key: &str) -> bool {
+        match base58::from_check(key) {
+            Ok(d) if d.len() == 39 => {
+                if let Ok(prefix) = d.read_with::<u16>(&mut 0, byte::BE) {
+                    let flag = d[2];
+                    if prefix == BIP38_NOEC_PREFIX { // non EC multiplied key
+                        flag & BIP38_NOEC_FLAG == BIP38_NOEC_FLAG && flag & BIP38_LOTSEQUENCE_FLAG == 0 && flag & BIP38_INVALID_FLAG == 0
+                    } else if prefix == BIP38_EC_PREFIX { // EC multiplied key
+                        flag & BIP38_NOEC_FLAG == 0 && flag & BIP38_INVALID_FLAG == 0
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
+            _ => false
+        }
     }
 }

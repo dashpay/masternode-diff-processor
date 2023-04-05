@@ -1208,3 +1208,10 @@ pub unsafe extern "C" fn key_ecdsa_with_bip38_key(private_key: *const c_char, pa
             .unwrap()
             .into_raw())
 }
+/// # Safety
+/// decrypts & serializes a BIP38 key using the given passphrase or returns NULL if passphrase is incorrect
+#[no_mangle]
+pub unsafe extern "C" fn key_is_valid_bip38_key(key: *const c_char) -> bool {
+    let key = CStr::from_ptr(key).to_str().unwrap();
+    ECDSAKey::is_valid_bip38_key(key)
+}
