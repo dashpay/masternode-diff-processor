@@ -11,7 +11,7 @@ use crate::chain::derivation::{BIP32_HARD, IndexPath};
 use crate::chain::ScriptMap;
 use crate::common::ChainType;
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::{AsBytes, clone_into_array, ConstDecodable, Reversable};
+use crate::crypto::byte_util::{AsBytes, clone_into_array, ConstDecodable, Reversable, Zeroable};
 use crate::crypto::{UInt256, UInt384, UInt512};
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::{ByteArray, IndexPathData};
@@ -1259,5 +1259,11 @@ pub unsafe extern "C" fn validate_masternode_list(list: *const types::Masternode
     }
     let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(quorum.llmq_type, list.masternodes, quorum.llmq_quorum_hash(), block_height);
     return quorum.validate(valid_masternodes, block_height);
+}
 
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_ecdsa_secret_key_is_empty(key: *const c_char, chain_type: i16) -> bool {
+    ECDSAKey::key_with_private_key(CStr::from_ptr(key).to_str().unwrap(), ChainType::from(chain_type))
+        .map_or(true, |key| key.seckey.is_zero())
 }
