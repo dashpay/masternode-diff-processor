@@ -1,4 +1,5 @@
 use std::os::raw::{c_char, c_void};
+use std::ptr::null_mut;
 use crate::{BLSKey, ECDSAKey, ED25519Key};
 use crate::ffi::boxer::boxed;
 use crate::keys::KeyType;
@@ -57,7 +58,35 @@ impl AsOpaque for ED25519Key {
     }
 }
 
+impl AsOpaque for Option<ECDSAKey> {
+    fn as_opaque(&self) -> *mut OpaqueKey {
+        if let Some(key) = self {
+            key.as_opaque()
+        } else {
+            null_mut()
+        }
+    }
+}
 
+impl AsOpaque for Option<BLSKey> {
+    fn as_opaque(&self) -> *mut OpaqueKey {
+        if let Some(key) = self {
+            key.as_opaque()
+        } else {
+            null_mut()
+        }
+    }
+}
+
+impl AsOpaque for Option<ED25519Key> {
+    fn as_opaque(&self) -> *mut OpaqueKey {
+        if let Some(key) = self {
+            key.as_opaque()
+        } else {
+            null_mut()
+        }
+    }
+}
 
 
 

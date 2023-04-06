@@ -450,9 +450,7 @@ pub unsafe extern "C" fn key_create_ecdsa_from_serialized_extended_private_key(k
 #[no_mangle]
 pub unsafe extern "C" fn key_create_ecdsa_from_extended_public_key_data(ptr: *const u8, len: usize) -> *mut OpaqueKey {
     let bytes = slice::from_raw_parts(ptr, len);
-    ECDSAKey::key_with_extended_public_key_data(bytes)
-        .map_or(null_mut(), |key|
-            boxed(OpaqueKey { key_type: KeyType::ECDSA, ptr: boxed(key) as *mut c_void }))
+    ECDSAKey::key_with_extended_public_key_data(bytes).as_opaque()
 }
 
 /// # Safety
@@ -460,18 +458,10 @@ pub unsafe extern "C" fn key_create_ecdsa_from_extended_public_key_data(ptr: *co
 pub unsafe extern "C" fn key_create_with_private_key_data(ptr: *const u8, len: usize, key_type: KeyType) -> *mut OpaqueKey {
     let bytes = slice::from_raw_parts(ptr, len);
     match key_type {
-        KeyType::ECDSA => ECDSAKey::key_with_secret_data(bytes, true)
-            .map(|key| key.as_opaque())
-            .unwrap_or(null_mut()),
-        KeyType::ED25519 => ED25519Key::key_with_secret_data(bytes, true)
-            .map(|key| key.as_opaque())
-            .unwrap_or(null_mut()),
-        KeyType::BLS => BLSKey::key_with_private_key_data(bytes, true)
-            .map(|key| key.as_opaque())
-            .unwrap_or(null_mut()),
-        KeyType::BLSBasic => BLSKey::key_with_private_key_data(bytes, false)
-            .map(|key| key.as_opaque())
-            .unwrap_or(null_mut()),
+        KeyType::ECDSA => ECDSAKey::key_with_secret_data(bytes, true).as_opaque(),
+        KeyType::ED25519 => ED25519Key::key_with_secret_data(bytes, true).as_opaque(),
+        KeyType::BLS => BLSKey::key_with_private_key_data(bytes, true).as_opaque(),
+        KeyType::BLSBasic => BLSKey::key_with_private_key_data(bytes, false).as_opaque()
     }
 }
 
@@ -647,6 +637,18 @@ pub extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len: usize
             CString::new(key.address_with_public_key_data(&ScriptMap::from(chain_id)))
                 .unwrap()
                 .into_raw())
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn key_with_seed_data(data: *const u8, len: usize, key_type: KeyType) -> *mut OpaqueKey {
+    let seed_data = unsafe { slice::from_raw_parts(data, len) };
+    match key_type {
+        KeyType::ECDSA => ECDSAKey::init_with_seed_data(seed_data).as_opaque(),
+        KeyType::BLS => BLSKey::key_with_seed_data(seed_data, true).as_opaque(),
+        KeyType::BLSBasic => BLSKey::key_with_seed_data(seed_data, false).as_opaque(),
+        KeyType::ED25519 => ED25519Key::init_with_seed_data(seed_data).as_opaque()
+    }
 }
 
 /// # Safety
