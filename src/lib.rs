@@ -60,7 +60,6 @@ use crate::crypto::UInt256;
 use crate::ffi::to::ToFFI;
 use crate::ffi::unboxer::unbox_vec_ptr;
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key};
-use crate::types::opaque_key::{BLSKeyWithUniqueId, ECDSAKeyWithUniqueId, ED25519KeyWithUniqueId};
 
 /// Destroys anonymous internal holder for UInt256
 /// # Safety

@@ -1237,3 +1237,10 @@ pub unsafe extern "C" fn key_is_valid_bip38_key(key: *const c_char) -> bool {
     let key = CStr::from_ptr(key).to_str().unwrap();
     ECDSAKey::is_valid_bip38_key(key)
 }
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn x11(data: *const u8, len: usize) -> ByteArray {
+    let data = slice::from_raw_parts(data, len);
+    rs_x11_hash::get_x11_hash(data).into()
+}

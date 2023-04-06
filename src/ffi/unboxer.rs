@@ -3,7 +3,7 @@
 
 use std::ffi::CString;
 use std::os::raw::c_char;
-use crate::{BLSKeyWithUniqueId, ECDSAKeyWithUniqueId, ED25519KeyWithUniqueId, types};
+use crate::types;
 use crate::types::opaque_key::{OpaqueKey, OpaqueKeys, OpaqueSerializedKeys};
 
 /// # Safety
@@ -345,12 +345,12 @@ pub unsafe fn unbox_string(data: *mut c_char) {
     let _ = CString::from_raw(data);
 }
 
-/// # Safety
-pub unsafe fn unbox_opaque_ecdsa_key(key: *mut ECDSAKeyWithUniqueId) {
-    let result = unbox_any(key);
-    unbox_any(result.ptr);
-}
-
+// /// # Safety
+// pub unsafe fn unbox_opaque_ecdsa_key(key: *mut ECDSAKeyWithUniqueId) {
+//     let result = unbox_any(key);
+//     unbox_any(result.ptr);
+// }
+//
 // /// # Safety
 // pub unsafe fn unbox_opaque_bls_key(key: *mut BLSKeyWithUniqueId) {
 //     let result = unbox_any(key);
@@ -363,11 +363,11 @@ pub unsafe fn unbox_opaque_ecdsa_key(key: *mut ECDSAKeyWithUniqueId) {
 //     unbox_any(result.ptr);
 // }
 //
-// /// # Safety
-// pub unsafe fn unbox_opaque_key(data: *mut OpaqueKey) {
-//     let key = unbox_any(data);
-//     unbox_any(key.ptr);
-// }
+/// # Safety
+pub unsafe fn unbox_opaque_key(data: *mut OpaqueKey) {
+    let key = unbox_any(data);
+    unbox_any(key.ptr);
+}
 
 /// # Safety
 pub unsafe fn unbox_opaque_keys(data: *mut OpaqueKeys) {
