@@ -8,7 +8,6 @@ use crate::types::opaque_key::{AsOpaque, OpaqueKey};
 use crate::util::sec_vec::SecVec;
 
 #[repr(u8)]
-#[cfg_attr(cbindgen, lang = "objc")]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum KeyType {
     ECDSA = 0,
