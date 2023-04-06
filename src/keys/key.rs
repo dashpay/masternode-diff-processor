@@ -7,7 +7,7 @@ use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey};
 use crate::types::opaque_key::{AsOpaque, OpaqueKey};
 use crate::util::sec_vec::SecVec;
 
-#[repr(u8)]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum KeyType {
     ECDSA = 0,

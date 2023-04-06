@@ -4,7 +4,7 @@ use crate::BytesDecodable;
 use crate::consensus::Encodable;
 
 #[warn(non_camel_case_types)]
-#[repr(u16)]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 pub enum LLMQVersion {
     Default = 1,

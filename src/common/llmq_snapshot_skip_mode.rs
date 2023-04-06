@@ -1,7 +1,7 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 
-#[repr(u32)]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash)]
 pub enum LLMQSnapshotSkipMode {
     // No skipping. The skip list is empty.
