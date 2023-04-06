@@ -134,7 +134,7 @@ impl KeyType {
         }
     }
 
-    pub(crate) fn key_with_private_key_data(&self, data: &Vec<u8>) -> Option<Key> {
+    pub(crate) fn key_with_private_key_data(&self, data: &[u8]) -> Option<Key> {
         match self {
             KeyType::ECDSA => ECDSAKey::key_with_secret_data(data, true).map(Key::ECDSA),
             KeyType::ED25519 => ED25519Key::key_with_secret_data(data, true).map(Key::ED25519),

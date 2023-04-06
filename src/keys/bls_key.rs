@@ -33,7 +33,7 @@ impl BLSKey {
             .and_then(|data| Self::key_with_private_key_data(&data, use_legacy))
     }
 
-    pub fn key_with_private_key_data(data: &Vec<u8>, use_legacy: bool) -> Option<Self> {
+    pub fn key_with_private_key_data(data: &[u8], use_legacy: bool) -> Option<Self> {
         UInt256::from_bytes(data, &mut 0)
             .and_then(|seckey| PrivateKey::from_bytes(data, false)
                 .ok()

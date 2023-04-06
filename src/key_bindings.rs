@@ -427,7 +427,7 @@ pub unsafe extern "C" fn key_ecdsa_serialized_auth_private_key_for_chain(seed: *
 #[no_mangle]
 pub unsafe extern "C" fn key_create_ecdsa_from_secret(ptr: *const u8, len: usize, compressed: bool) -> *mut OpaqueKey {
     let bytes = unsafe { slice::from_raw_parts(ptr, len) };
-    ECDSAKey::key_with_secret_slice(bytes, compressed)
+    ECDSAKey::key_with_secret_data(bytes, compressed)
         .map_or(null_mut(), |key|
             boxed(OpaqueKey { key_type: KeyType::ECDSA, ptr: boxed(key) as *mut c_void }))
 }
@@ -453,6 +453,26 @@ pub unsafe extern "C" fn key_create_ecdsa_from_extended_public_key_data(ptr: *co
     ECDSAKey::key_with_extended_public_key_data(bytes)
         .map_or(null_mut(), |key|
             boxed(OpaqueKey { key_type: KeyType::ECDSA, ptr: boxed(key) as *mut c_void }))
+}
+
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn key_create_with_private_key_data(ptr: *const u8, len: usize, key_type: KeyType) -> *mut OpaqueKey {
+    let bytes = slice::from_raw_parts(ptr, len);
+    match key_type {
+        KeyType::ECDSA => ECDSAKey::key_with_secret_data(bytes, true)
+            .map(|key| key.as_opaque())
+            .unwrap_or(null_mut()),
+        KeyType::ED25519 => ED25519Key::key_with_secret_data(bytes, true)
+            .map(|key| key.as_opaque())
+            .unwrap_or(null_mut()),
+        KeyType::BLS => BLSKey::key_with_private_key_data(bytes, true)
+            .map(|key| key.as_opaque())
+            .unwrap_or(null_mut()),
+        KeyType::BLSBasic => BLSKey::key_with_private_key_data(bytes, false)
+            .map(|key| key.as_opaque())
+            .unwrap_or(null_mut()),
+    }
 }
 
 /// # Safety
@@ -892,7 +912,7 @@ pub unsafe extern "C" fn deprecated_incorrect_extended_public_key_from_seed(seed
     let secret = &i.0[..32];
     let mut writer = SecVec::new();
     let mut chaincode = UInt256::from(&i.0[32..]);
-    ECDSAKey::key_with_secret_slice(secret, true)
+    ECDSAKey::key_with_secret_data(secret, true)
         .and_then(|key| {
             key.hash160().u32_le().enc(&mut writer);
             let mut key = UInt256::from(secret);

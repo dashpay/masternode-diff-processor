@@ -245,7 +245,7 @@ impl ED25519Key {
         todo!()
     }
 
-    pub fn key_with_secret_data(data: &Vec<u8>, compressed: bool) -> Option<Self> {
+    pub fn key_with_secret_data(data: &[u8], compressed: bool) -> Option<Self> {
         Self::secret_key_from_bytes(data)
             .ok()
             .map(|seckey| Self { seckey: UInt256(seckey.to_bytes()), compressed, ..Default::default() })

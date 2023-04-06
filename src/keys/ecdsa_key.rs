@@ -48,12 +48,7 @@ impl ECDSAKey {
             .ok()
             .map(|seckey| Self::with_seckey_and_chaincode(seckey, UInt256::from(&data.0[32..]), compressed))
     }
-    pub fn key_with_secret_slice(data: &[u8], compressed: bool) -> Option<Self> {
-        Self::secret_key_from_bytes(data)
-            .ok()
-            .map(|seckey| Self::with_seckey(seckey, compressed))
-    }
-    pub fn key_with_secret_data(data: &Vec<u8>, compressed: bool) -> Option<Self> {
+    pub fn key_with_secret_data(data: &[u8], compressed: bool) -> Option<Self> {
         Self::secret_key_from_bytes(data)
             .ok()
             .map(|seckey| Self::with_seckey(seckey, compressed))
