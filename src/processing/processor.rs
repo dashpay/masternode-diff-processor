@@ -1,6 +1,5 @@
 use common::{LLMQParams, LLMQType};
 use hashes::{sha256d, Hash};
-use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
 use crate::{AddInsightBlockingLookup, boxed, common, ConstDecodable, encode, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, models, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback, types, UInt256};
@@ -393,7 +392,7 @@ impl MasternodeProcessor {
                 skip_removed_masternodes,
             )
         } else {
-            Self::get_masternodes_for_quorum(
+            models::MasternodeList::get_masternodes_for_quorum(
                 quorum.llmq_type,
                 masternodes,
                 quorum.llmq_quorum_hash(),
@@ -402,39 +401,7 @@ impl MasternodeProcessor {
         self.validate_signature(valid_masternodes, quorum, block_height, has_valid_quorums);
     }
 
-    pub fn get_masternodes_for_quorum(llmq_type: LLMQType, masternodes: BTreeMap<UInt256, models::MasternodeEntry>, quorum_modifier: UInt256, block_height: u32) -> Vec<models::MasternodeEntry> {
-        let quorum_count = llmq_type.size();
-        let masternodes_in_list_count = masternodes.len();
-        let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
-        let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
-        scores.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
-        let mut valid_masternodes: Vec<models::MasternodeEntry> = Vec::new();
-        let count = min(masternodes_in_list_count, scores.len());
-        for score in scores.iter().take(count) {
-            if let Some(masternode) = score_dictionary.get_mut(score) {
-                if (*masternode).is_valid_at(block_height) {
-                    valid_masternodes.push((*masternode).clone());
-                }
-            }
-            if valid_masternodes.len() == quorum_count as usize {
-                break;
-            }
-        }
-        valid_masternodes
-    }
 
-    pub fn score_masternodes_map(
-        masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
-        quorum_modifier: UInt256,
-        block_height: u32,
-    ) -> BTreeMap<UInt256, models::MasternodeEntry> {
-        masternodes
-            .into_iter()
-            .filter_map(|(_, entry)| {
-                models::MasternodeList::masternode_score(&entry, quorum_modifier, block_height).map(|score| (score, entry))
-            })
-            .collect()
-    }
 
     fn sort_scored_masternodes(scored_masternodes: BTreeMap<UInt256, models::MasternodeEntry>) -> Vec<models::MasternodeEntry> {
         let mut v = Vec::from_iter(scored_masternodes);
@@ -465,7 +432,7 @@ impl MasternodeProcessor {
         quorum_count: u32,
         block_height: u32,
     ) -> Vec<models::MasternodeEntry> {
-        let scored_masternodes = Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
+        let scored_masternodes = models::MasternodeList::score_masternodes_map(masternodes, quorum_modifier, block_height);
         Self::sort_scored_masternodes(scored_masternodes)
     }
 
@@ -507,7 +474,7 @@ impl MasternodeProcessor {
                         // TODO: partition with enumeration doesn't work here, so need to change
                         // nodes.into_iter().enumerate().partition(|&(i, _)| snapshot.member_list.bit_is_true_at_le_index(i as u32))
                         let quorum_modifier = Self::build_llmq_modifier(llmq_type, work_block_hash);
-                        let scored_masternodes = Self::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height);
+                        let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height);
                         let scored_sorted_masternodes = Self::sort_scored_masternodes(scored_masternodes);
                         let (used_at_h, unused_at_h) = scored_sorted_masternodes
                         .into_iter()

@@ -1,3 +1,4 @@
+use std::cmp::min;
 use hashes::{sha256, Hash};
 use std::collections::BTreeMap;
 use crate::common::LLMQType;
@@ -211,4 +212,38 @@ impl MasternodeList {
         hashes
     }
 
+}
+
+impl MasternodeList {
+    pub fn score_masternodes_map(
+        masternodes: BTreeMap<UInt256, MasternodeEntry>,
+        quorum_modifier: UInt256,
+        block_height: u32,
+    ) -> BTreeMap<UInt256, MasternodeEntry> {
+        masternodes
+            .into_iter()
+            .filter_map(|(_, entry)| Self::masternode_score(&entry, quorum_modifier, block_height).map(|score| (score, entry)))
+            .collect()
+    }
+
+    pub fn get_masternodes_for_quorum(llmq_type: LLMQType, masternodes: BTreeMap<UInt256, MasternodeEntry>, quorum_modifier: UInt256, block_height: u32) -> Vec<MasternodeEntry> {
+        let quorum_count = llmq_type.size();
+        let masternodes_in_list_count = masternodes.len();
+        let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
+        let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
+        scores.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
+        let mut valid_masternodes: Vec<MasternodeEntry> = Vec::new();
+        let count = min(masternodes_in_list_count, scores.len());
+        for score in scores.iter().take(count) {
+            if let Some(masternode) = score_dictionary.get_mut(score) {
+                if (*masternode).is_valid_at(block_height) {
+                    valid_masternodes.push((*masternode).clone());
+                }
+            }
+            if valid_masternodes.len() == quorum_count as usize {
+                break;
+            }
+        }
+        valid_masternodes
+    }
 }

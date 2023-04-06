@@ -388,7 +388,6 @@ impl LLMQEntry {
             println!("••• Issue with quorum_signature_validated");
             return false;
         }
-        println!("••• Quorum validated");
         true
     }
 }

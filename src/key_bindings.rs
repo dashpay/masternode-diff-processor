@@ -16,11 +16,13 @@ use crate::crypto::{UInt256, UInt384, UInt512};
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::{ByteArray, IndexPathData};
 use crate::ffi::common::DerivationPathData;
+use crate::ffi::from::FromFFI;
 use crate::ffi::unboxer::{unbox_any, unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys};
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyType};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::keys::dip14::secp256k1_point_from_bytes;
 use crate::processing::keys_cache::KeysCache;
+use crate::{models, types};
 use crate::types::opaque_key::{AsOpaque, KeyWithUniqueId, OpaqueKey, OpaqueKeys, OpaqueSerializedKeys};
 use crate::util::address::address;
 use crate::util::sec_vec::SecVec;
@@ -1243,4 +1245,19 @@ pub unsafe extern "C" fn key_is_valid_bip38_key(key: *const c_char) -> bool {
 pub unsafe extern "C" fn x11(data: *const u8, len: usize) -> ByteArray {
     let data = slice::from_raw_parts(data, len);
     rs_x11_hash::get_x11_hash(data).into()
+}
+
+// - (BOOL)validateWithMasternodeList:(DSMasternodeList *)masternodeList blockHeightLookup:(BlockHeightFinder)blockHeightLookup;
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn validate_masternode_list(list: *const types::MasternodeList, quorum: *const types::LLMQEntry, block_height: u32) -> bool {
+    let list = (*list).decode();
+    let mut quorum = (*quorum).decode();
+    let is_valid_payload = quorum.validate_payload();
+    if !is_valid_payload {
+        return false;
+    }
+    let valid_masternodes = models::MasternodeList::get_masternodes_for_quorum(quorum.llmq_type, list.masternodes, quorum.llmq_quorum_hash(), block_height);
+    return quorum.validate(valid_masternodes, block_height);
+
 }
