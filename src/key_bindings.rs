@@ -18,7 +18,7 @@ use crate::ffi::{ByteArray, IndexPathData};
 use crate::ffi::common::DerivationPathData;
 use crate::ffi::from::FromFFI;
 use crate::ffi::unboxer::{unbox_any, unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys};
-use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyType};
+use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyKind};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::keys::dip14::secp256k1_point_from_bytes;
 use crate::processing::keys_cache::KeysCache;
@@ -159,7 +159,7 @@ pub unsafe extern "C" fn key_create_ecdsa_from_extened_public_key_data(ptr: *con
             let cache = &mut *cache;
             let unique_id = UInt256::sha256(bytes).u64_le();
             cache.ecdsa.insert(unique_id, key.clone());
-            boxed(KeyWithUniqueId { key_type: KeyType::ECDSA, unique_id, ptr: boxed(key) as *mut c_void })
+            boxed(KeyWithUniqueId { key_type: KeyKind::ECDSA, unique_id, ptr: boxed(key) as *mut c_void })
         })
 }
 
@@ -176,7 +176,7 @@ pub unsafe extern "C" fn key_create_bls_from_extened_public_key_data(ptr: *const
             let cache = &mut *cache;
             let unique_id = UInt256::sha256(bytes).u64_le();
             cache.bls.insert(unique_id, key.clone());
-            boxed(KeyWithUniqueId { key_type: if use_legacy { KeyType::BLS } else { KeyType::BLSBasic }, unique_id, ptr: boxed(key) as *mut c_void })
+            boxed(KeyWithUniqueId { key_type: if use_legacy { KeyKind::BLS } else { KeyKind::BLSBasic }, unique_id, ptr: boxed(key) as *mut c_void })
         })
 }
 
@@ -192,25 +192,25 @@ pub extern "C" fn key_create_ed25519_from_extened_public_key_data(ptr: *const u8
         .map_or(null_mut(), |key| {
             let unique_id = UInt256::sha256(bytes).u64_le();
             cache.ed25519.insert(unique_id, key.clone());
-            boxed(KeyWithUniqueId { key_type: KeyType::ED25519, unique_id, ptr: boxed(key) as *mut c_void })
+            boxed(KeyWithUniqueId { key_type: KeyKind::ED25519, unique_id, ptr: boxed(key) as *mut c_void })
         })
 }
 
 #[no_mangle]
-pub extern "C" fn key_derive_key_from_extened_private_key_data_for_index_path(secret: *const u8, secret_len: usize, key_type: KeyType, indexes: *const c_ulong, length: usize) -> *mut OpaqueKey {
+pub extern "C" fn key_derive_key_from_extened_private_key_data_for_index_path(secret: *const u8, secret_len: usize, key_type: KeyKind, indexes: *const c_ulong, length: usize) -> *mut OpaqueKey {
     let bytes = unsafe { slice::from_raw_parts(secret, secret_len) };
     let path = IndexPath::from_ffi(indexes, length);
     match key_type {
-        KeyType::ECDSA => ECDSAKey::key_with_extended_private_key_data(bytes)
+        KeyKind::ECDSA => ECDSAKey::key_with_extended_private_key_data(bytes)
             .and_then(|key| key.private_derive_to_path(&path))
             .map_or(null_mut(), |key| key.as_opaque()),
-        KeyType::BLS => BLSKey::key_with_extended_private_key_data(bytes, true)
+        KeyKind::BLS => BLSKey::key_with_extended_private_key_data(bytes, true)
             .and_then(|key| key.private_derive_to_path(&path))
             .map_or(null_mut(), |key| key.as_opaque()),
-        KeyType::BLSBasic => BLSKey::key_with_extended_private_key_data(bytes, false)
+        KeyKind::BLSBasic => BLSKey::key_with_extended_private_key_data(bytes, false)
             .and_then(|key| key.private_derive_to_path(&path))
             .map_or(null_mut(), |key| key.as_opaque()),
-        KeyType::ED25519 => ED25519Key::key_with_extended_private_key_data(bytes)
+        KeyKind::ED25519 => ED25519Key::key_with_extended_private_key_data(bytes)
             .and_then(|key| key.private_derive_to_path(&path))
             .map_or(null_mut(), |key| key.as_opaque()),
     }
@@ -259,9 +259,9 @@ pub unsafe extern "C" fn key_sign_message_digest(key: *mut OpaqueKey, digest: *c
     let key = unsafe { &mut *key };
     let message_digest = UInt256::from_const(digest).unwrap();
     match key.key_type {
-        KeyType::ECDSA => ByteArray::from((&*(key.ptr as *mut ECDSAKey)).compact_sign(message_digest)),
-        KeyType::BLS | KeyType::BLSBasic => ByteArray::from((&*(key.ptr as *mut BLSKey)).sign_digest(message_digest)),
-        KeyType::ED25519 => ByteArray::from((&*(key.ptr as *mut ED25519Key)).sign(&message_digest.0))
+        KeyKind::ECDSA => ByteArray::from((&*(key.ptr as *mut ECDSAKey)).compact_sign(message_digest)),
+        KeyKind::BLS | KeyKind::BLSBasic => ByteArray::from((&*(key.ptr as *mut BLSKey)).sign_digest(message_digest)),
+        KeyKind::ED25519 => ByteArray::from((&*(key.ptr as *mut ED25519Key)).sign(&message_digest.0))
     }
 }
 
@@ -273,9 +273,9 @@ pub unsafe extern "C" fn key_verify_message_digest(key: *mut OpaqueKey, md: *con
     let digest = slice::from_raw_parts(md, 32);
     let signature = slice::from_raw_parts(sig, sig_len);
     match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).verify(digest, signature),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).verify(digest, signature),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).verify(digest, signature)
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).verify(digest, signature),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).verify(digest, signature),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).verify(digest, signature)
     }
 }
 
@@ -337,18 +337,18 @@ pub unsafe extern "C" fn key_ecdsa_serialized_private_master_from_seed_data(ptr:
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_with_private_key(secret: *const c_char, key_type: KeyType, chain_id: i16) -> *mut OpaqueKey {
+pub unsafe extern "C" fn key_with_private_key(secret: *const c_char, key_type: KeyKind, chain_id: i16) -> *mut OpaqueKey {
     let c_str = unsafe { CStr::from_ptr(secret) };
     let private_key_string = c_str.to_str().unwrap();
     let chain_type = ChainType::from(chain_id);
     match key_type {
-        KeyType::ECDSA => ECDSAKey::key_with_private_key(private_key_string, chain_type)
+        KeyKind::ECDSA => ECDSAKey::key_with_private_key(private_key_string, chain_type)
             .map_or(null_mut(), |key| key.as_opaque()),
-        KeyType::BLS => BLSKey::key_with_private_key(private_key_string, true)
+        KeyKind::BLS => BLSKey::key_with_private_key(private_key_string, true)
             .map_or(null_mut(), |key| key.as_opaque()),
-        KeyType::BLSBasic => BLSKey::key_with_private_key(private_key_string, false)
+        KeyKind::BLSBasic => BLSKey::key_with_private_key(private_key_string, false)
             .map_or(null_mut(), |key| key.as_opaque()),
-        KeyType::ED25519 => ED25519Key::key_with_private_key(private_key_string)
+        KeyKind::ED25519 => ED25519Key::key_with_private_key(private_key_string)
             .map_or(null_mut(), |key| key.as_opaque())
     }
 
@@ -379,9 +379,9 @@ pub unsafe extern "C" fn key_ecdsa_public_key_data_for_private_key(secret: *cons
 pub unsafe extern "C" fn key_has_private_key(key: *mut OpaqueKey) -> bool {
     let key = &mut *key;
     match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).has_private_key(),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).has_private_key(),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).has_private_key(),
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).has_private_key(),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).has_private_key(),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).has_private_key(),
     }
 }
 
@@ -399,9 +399,9 @@ pub unsafe extern "C" fn key_serialized_private_key_for_chain(key: *mut OpaqueKe
     let key = &mut *key;
     let script = ScriptMap::from(chain_id);
     let serialized = match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).serialized_private_key_for_script(&script),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).serialized_private_key_for_script(&script),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).serialized_private_key_for_script(&script),
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).serialized_private_key_for_script(&script),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).serialized_private_key_for_script(&script),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).serialized_private_key_for_script(&script),
     };
     CString::new(serialized).unwrap().into_raw()
 }
@@ -431,7 +431,7 @@ pub unsafe extern "C" fn key_create_ecdsa_from_secret(ptr: *const u8, len: usize
     let bytes = unsafe { slice::from_raw_parts(ptr, len) };
     ECDSAKey::key_with_secret_data(bytes, compressed)
         .map_or(null_mut(), |key|
-            boxed(OpaqueKey { key_type: KeyType::ECDSA, ptr: boxed(key) as *mut c_void }))
+            boxed(OpaqueKey { key_type: KeyKind::ECDSA, ptr: boxed(key) as *mut c_void }))
 }
 
 
@@ -457,55 +457,55 @@ pub unsafe extern "C" fn key_create_ecdsa_from_extended_public_key_data(ptr: *co
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_create_with_private_key_data(ptr: *const u8, len: usize, key_type: KeyType) -> *mut OpaqueKey {
+pub unsafe extern "C" fn key_create_with_private_key_data(ptr: *const u8, len: usize, key_type: KeyKind) -> *mut OpaqueKey {
     let bytes = slice::from_raw_parts(ptr, len);
     match key_type {
-        KeyType::ECDSA => ECDSAKey::key_with_secret_data(bytes, true).as_opaque(),
-        KeyType::ED25519 => ED25519Key::key_with_secret_data(bytes, true).as_opaque(),
-        KeyType::BLS => BLSKey::key_with_private_key_data(bytes, true).as_opaque(),
-        KeyType::BLSBasic => BLSKey::key_with_private_key_data(bytes, false).as_opaque()
+        KeyKind::ECDSA => ECDSAKey::key_with_secret_data(bytes, true).as_opaque(),
+        KeyKind::ED25519 => ED25519Key::key_with_secret_data(bytes, true).as_opaque(),
+        KeyKind::BLS => BLSKey::key_with_private_key_data(bytes, true).as_opaque(),
+        KeyKind::BLSBasic => BLSKey::key_with_private_key_data(bytes, false).as_opaque()
     }
 }
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_create_with_public_key_data(ptr: *const u8, len: usize, key_type: KeyType) -> *mut OpaqueKey {
+pub unsafe extern "C" fn key_create_with_public_key_data(ptr: *const u8, len: usize, key_type: KeyKind) -> *mut OpaqueKey {
     let bytes = slice::from_raw_parts(ptr, len);
     match key_type {
-        KeyType::ECDSA => ECDSAKey::key_with_public_key_data(bytes)
+        KeyKind::ECDSA => ECDSAKey::key_with_public_key_data(bytes)
             .map(|key| key.as_opaque())
             .unwrap_or(null_mut()),
-        KeyType::ED25519 => ED25519Key::key_with_public_key_data(bytes)
+        KeyKind::ED25519 => ED25519Key::key_with_public_key_data(bytes)
             .map(|key| key.as_opaque())
             .unwrap_or(null_mut()),
-        KeyType::BLS => BLSKey::key_with_public_key(UInt384::from(bytes), true)
+        KeyKind::BLS => BLSKey::key_with_public_key(UInt384::from(bytes), true)
             .as_opaque(),
-        KeyType::BLSBasic => BLSKey::key_with_public_key(UInt384::from(bytes), false)
+        KeyKind::BLSBasic => BLSKey::key_with_public_key(UInt384::from(bytes), false)
             .as_opaque(),
     }
 }
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_create_from_extended_public_key_data(ptr: *const u8, len: usize, key_type: KeyType) -> *mut OpaqueKey {
+pub unsafe extern "C" fn key_create_from_extended_public_key_data(ptr: *const u8, len: usize, key_type: KeyKind) -> *mut OpaqueKey {
     let bytes = slice::from_raw_parts(ptr, len);
     match key_type {
-        KeyType::ECDSA => ECDSAKey::key_with_extended_public_key_data(bytes).map(|key| key.as_opaque()),
-        KeyType::ED25519 => ED25519Key::key_with_extended_public_key_data(bytes).map(|key| key.as_opaque()),
-        KeyType::BLS => BLSKey::key_with_extended_public_key_data(bytes, true).map(|key| key.as_opaque()),
-        KeyType::BLSBasic => BLSKey::key_with_extended_public_key_data(bytes, false).map(|key| key.as_opaque()),
+        KeyKind::ECDSA => ECDSAKey::key_with_extended_public_key_data(bytes).map(|key| key.as_opaque()),
+        KeyKind::ED25519 => ED25519Key::key_with_extended_public_key_data(bytes).map(|key| key.as_opaque()),
+        KeyKind::BLS => BLSKey::key_with_extended_public_key_data(bytes, true).map(|key| key.as_opaque()),
+        KeyKind::BLSBasic => BLSKey::key_with_extended_public_key_data(bytes, false).map(|key| key.as_opaque()),
     }.unwrap_or(null_mut())
 }
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_create_from_extended_private_key_data(ptr: *const u8, len: usize, key_type: KeyType) -> *mut OpaqueKey {
+pub unsafe extern "C" fn key_create_from_extended_private_key_data(ptr: *const u8, len: usize, key_type: KeyKind) -> *mut OpaqueKey {
     let bytes = unsafe { slice::from_raw_parts(ptr, len) };
     match key_type {
-        KeyType::ECDSA => ECDSAKey::key_with_extended_private_key_data(bytes).map(|key| key.as_opaque()),
-        KeyType::ED25519 => ED25519Key::key_with_extended_private_key_data(bytes).map(|key| key.as_opaque()),
-        KeyType::BLS => BLSKey::key_with_extended_private_key_data(bytes, true).map(|key| key.as_opaque()),
-        KeyType::BLSBasic => BLSKey::key_with_extended_private_key_data(bytes, false).map(|key| key.as_opaque()),
+        KeyKind::ECDSA => ECDSAKey::key_with_extended_private_key_data(bytes).map(|key| key.as_opaque()),
+        KeyKind::ED25519 => ED25519Key::key_with_extended_private_key_data(bytes).map(|key| key.as_opaque()),
+        KeyKind::BLS => BLSKey::key_with_extended_private_key_data(bytes, true).map(|key| key.as_opaque()),
+        KeyKind::BLSBasic => BLSKey::key_with_extended_private_key_data(bytes, false).map(|key| key.as_opaque()),
     }.unwrap_or(null_mut())
 }
 
@@ -554,9 +554,9 @@ pub unsafe extern "C" fn key_address_for_key(key: *mut OpaqueKey, chain_id: i16)
     let key = unsafe { &mut *key };
     let script_map = ScriptMap::from(chain_id);
     CString::new(match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).address_with_public_key_data(&script_map),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).address_with_public_key_data(&script_map),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).address_with_public_key_data(&script_map)
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).address_with_public_key_data(&script_map),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).address_with_public_key_data(&script_map),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).address_with_public_key_data(&script_map)
     }).unwrap().into_raw()
 }
 /// # Safety
@@ -643,13 +643,13 @@ pub extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len: usize
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn key_with_seed_data(data: *const u8, len: usize, key_type: KeyType) -> *mut OpaqueKey {
+pub extern "C" fn key_with_seed_data(data: *const u8, len: usize, key_type: KeyKind) -> *mut OpaqueKey {
     let seed_data = unsafe { slice::from_raw_parts(data, len) };
     match key_type {
-        KeyType::ECDSA => ECDSAKey::init_with_seed_data(seed_data).as_opaque(),
-        KeyType::BLS => BLSKey::key_with_seed_data(seed_data, true).as_opaque(),
-        KeyType::BLSBasic => BLSKey::key_with_seed_data(seed_data, false).as_opaque(),
-        KeyType::ED25519 => ED25519Key::init_with_seed_data(seed_data).as_opaque()
+        KeyKind::ECDSA => ECDSAKey::init_with_seed_data(seed_data).as_opaque(),
+        KeyKind::BLS => BLSKey::key_with_seed_data(seed_data, true).as_opaque(),
+        KeyKind::BLSBasic => BLSKey::key_with_seed_data(seed_data, false).as_opaque(),
+        KeyKind::ED25519 => ED25519Key::init_with_seed_data(seed_data).as_opaque()
     }
 }
 
@@ -722,7 +722,7 @@ pub unsafe extern "C" fn key_bls_check_payload_signature(key: *mut BLSKey, diges
 // - (DSKey *)generateExtendedPublicKeyFromSeed:(NSData *)seed storeUnderWalletUniqueId:(NSString *)walletUniqueId storePrivateKey:(BOOL)storePrivateKey;
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn generate_extended_public_key_from_seed(seed: *const u8, seed_length: usize, key_type: KeyType, derivation_path: *const DerivationPathData) -> *mut OpaqueKey {
+pub unsafe extern "C" fn generate_extended_public_key_from_seed(seed: *const u8, seed_length: usize, key_type: KeyKind, derivation_path: *const DerivationPathData) -> *mut OpaqueKey {
     let seed_bytes = slice::from_raw_parts(seed, seed_length);
     key_type.key_with_seed_data(seed_bytes)
         .and_then(|seed_key| seed_key.private_derive_to_256bit_derivation_path(&IndexPath::from(derivation_path)))
@@ -733,9 +733,9 @@ pub unsafe extern "C" fn generate_extended_public_key_from_seed(seed: *const u8,
 pub unsafe extern "C" fn forget_private_key(key: *mut OpaqueKey) {
     let key = &mut *key;
     match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).forget_private_key(),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).forget_private_key(),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).forget_private_key()
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).forget_private_key(),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).forget_private_key(),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).forget_private_key()
     }
 }
 
@@ -747,15 +747,15 @@ pub unsafe extern "C" fn key_public_derive_to_256bit(key: *mut OpaqueKey, deriva
     let key = &mut *key;
     let path = IndexPath::from(derivation_path);
     match key.key_type {
-        KeyType::ECDSA =>
+        KeyKind::ECDSA =>
             (&mut *(key.ptr as *mut ECDSAKey))
                 .public_derive_to_256bit_derivation_path_with_offset(&path, offset)
                 .map_or(null_mut(), |key| key.as_opaque()),
-        KeyType::BLS | KeyType::BLSBasic =>
+        KeyKind::BLS | KeyKind::BLSBasic =>
             (&mut *(key.ptr as *mut BLSKey))
                 .public_derive_to_256bit_derivation_path_with_offset(&path, offset)
                 .map_or(null_mut(), |key| key.as_opaque()),
-        KeyType::ED25519 =>
+        KeyKind::ED25519 =>
             (&mut *(key.ptr as *mut ED25519Key))
                 .public_derive_to_256bit_derivation_path_with_offset(&path, offset)
                 .map_or(null_mut(), |key| key.as_opaque())
@@ -773,9 +773,9 @@ pub unsafe extern "C" fn key_ecdsa_public_key_data(key: *mut ECDSAKey) -> ByteAr
 pub unsafe extern "C" fn key_private_key_data(key: *mut OpaqueKey) -> ByteArray {
     let key = &mut *key;
     ByteArray::from(match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).private_key_data(),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).private_key_data(),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).private_key_data()
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).private_key_data(),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).private_key_data(),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).private_key_data()
     })
 }
 
@@ -784,9 +784,9 @@ pub unsafe extern "C" fn key_private_key_data(key: *mut OpaqueKey) -> ByteArray 
 pub unsafe extern "C" fn key_public_key_data(key: *mut OpaqueKey) -> ByteArray {
     let key = &mut *key;
     ByteArray::from(match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).public_key_data(),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).public_key_data(),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).public_key_data()
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).public_key_data(),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).public_key_data(),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).public_key_data()
     })
 }
 
@@ -795,9 +795,9 @@ pub unsafe extern "C" fn key_public_key_data(key: *mut OpaqueKey) -> ByteArray {
 pub unsafe extern "C" fn key_extended_public_key_data(key: *mut OpaqueKey) -> ByteArray {
     let key = &mut *key;
     ByteArray::from(match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).extended_public_key_data(),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).extended_public_key_data(),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).extended_public_key_data()
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).extended_public_key_data(),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).extended_public_key_data(),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).extended_public_key_data()
     })
 }
 
@@ -806,16 +806,16 @@ pub unsafe extern "C" fn key_extended_public_key_data(key: *mut OpaqueKey) -> By
 pub unsafe extern "C" fn key_extended_private_key_data(key: *mut OpaqueKey) -> ByteArray {
     let key = &mut *key;
     ByteArray::from(match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).extended_private_key_data(),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).extended_private_key_data(),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).extended_private_key_data()
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).extended_private_key_data(),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).extended_private_key_data(),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).extended_private_key_data()
     })
 }
 
 // - (DSKey *)privateKeyAtIndexPath:(NSIndexPath *)indexPath fromSeed:(NSData *)seed;
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_private_key_at_index_path(seed: *const u8, seed_length: usize, key_type: KeyType, index_path: *const IndexPathData, derivation_path: *const DerivationPathData) -> *mut OpaqueKey {
+pub unsafe extern "C" fn key_private_key_at_index_path(seed: *const u8, seed_length: usize, key_type: KeyKind, index_path: *const IndexPathData, derivation_path: *const DerivationPathData) -> *mut OpaqueKey {
     let seed_bytes = slice::from_raw_parts(seed, seed_length);
     key_type.key_with_seed_data(seed_bytes)
         .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&IndexPath::from(derivation_path)))
@@ -830,13 +830,13 @@ pub unsafe extern "C" fn key_public_key_at_index_path(key: *mut OpaqueKey, index
     let key = &mut *key;
     let index_path = IndexPath::from(index_path);
     match key.key_type {
-        KeyType::ECDSA =>
+        KeyKind::ECDSA =>
             ECDSAKey::public_key_from_extended_public_key_data_at_index_path(&mut *(key.ptr as *mut ECDSAKey), &index_path)
                 .map_or(null_mut(), |key| key.as_opaque()),
-        KeyType::BLS | KeyType::BLSBasic =>
+        KeyKind::BLS | KeyKind::BLSBasic =>
             BLSKey::public_key_from_extended_public_key_data_at_index_path(&mut *(key.ptr as *mut BLSKey), &index_path)
                 .map_or(null_mut(), |key| key.as_opaque()),
-        KeyType::ED25519 =>
+        KeyKind::ED25519 =>
             ED25519Key::public_key_from_extended_public_key_data_at_index_path(&mut *(key.ptr as *mut ED25519Key), &index_path)
                 .map_or(null_mut(), |key| key.as_opaque()),
     }
@@ -849,10 +849,10 @@ pub unsafe extern "C" fn key_public_key_data_at_index_path(key: *mut OpaqueKey, 
     let key = &mut *key;
     let path = IndexPath::from(index_path);
     ByteArray::from(match key.key_type {
-        KeyType::ECDSA => ECDSAKey::public_key_from_extended_public_key_data(&(&mut *(key.ptr as *mut ECDSAKey)).extended_public_key_data().unwrap_or(vec![]), &path),
-        KeyType::BLS => BLSKey::public_key_from_extended_public_key_data(&(&mut *(key.ptr as *mut BLSKey)).extended_public_key_data().unwrap_or(vec![]), &path, true),
-        KeyType::BLSBasic => BLSKey::public_key_from_extended_public_key_data(&(&mut *(key.ptr as *mut BLSKey)).extended_public_key_data().unwrap_or(vec![]), &path, false),
-        KeyType::ED25519 => ED25519Key::public_key_from_extended_public_key_data(&(&mut *(key.ptr as *mut ED25519Key)).extended_public_key_data().unwrap_or(vec![]), &path)
+        KeyKind::ECDSA => ECDSAKey::public_key_from_extended_public_key_data(&(&mut *(key.ptr as *mut ECDSAKey)).extended_public_key_data().unwrap_or(vec![]), &path),
+        KeyKind::BLS => BLSKey::public_key_from_extended_public_key_data(&(&mut *(key.ptr as *mut BLSKey)).extended_public_key_data().unwrap_or(vec![]), &path, true),
+        KeyKind::BLSBasic => BLSKey::public_key_from_extended_public_key_data(&(&mut *(key.ptr as *mut BLSKey)).extended_public_key_data().unwrap_or(vec![]), &path, false),
+        KeyKind::ED25519 => ED25519Key::public_key_from_extended_public_key_data(&(&mut *(key.ptr as *mut ED25519Key)).extended_public_key_data().unwrap_or(vec![]), &path)
     })
 }
 
@@ -860,7 +860,7 @@ pub unsafe extern "C" fn key_public_key_data_at_index_path(key: *mut OpaqueKey, 
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_private_keys_at_index_paths(
-    seed: *const u8, seed_len: usize, key_type: KeyType,
+    seed: *const u8, seed_len: usize, key_type: KeyKind,
     index_paths: *const IndexPathData,
     index_paths_len: usize,
     derivation_path: *const DerivationPathData) -> *mut OpaqueKeys {
@@ -883,7 +883,7 @@ pub unsafe extern "C" fn key_private_keys_at_index_paths(
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn serialized_key_private_keys_at_index_paths(
-    seed: *const u8, seed_len: usize, key_type: KeyType,
+    seed: *const u8, seed_len: usize, key_type: KeyKind,
     index_paths: *const IndexPathData,
     index_paths_len: usize,
     derivation_path: *const DerivationPathData,
@@ -965,11 +965,11 @@ pub unsafe extern "C" fn keys_private_key_data_is_equal(key1: *mut OpaqueKey, ke
     let key1 = &mut *key1;
     let key2 = &mut *key2;
     match (key1.key_type, key2.key_type) {
-        (KeyType::ECDSA, KeyType::ECDSA) =>
+        (KeyKind::ECDSA, KeyKind::ECDSA) =>
             (&mut *(key1.ptr as *mut ECDSAKey)).seckey == (&mut *(key2.ptr as *mut ECDSAKey)).seckey,
-        (KeyType::BLS | KeyType::BLSBasic, KeyType::BLS | KeyType::BLSBasic) =>
+        (KeyKind::BLS | KeyKind::BLSBasic, KeyKind::BLS | KeyKind::BLSBasic) =>
             (&mut *(key1.ptr as *mut BLSKey)).seckey == (&mut *(key2.ptr as *mut BLSKey)).seckey,
-        (KeyType::ED25519, KeyType::ED25519) =>
+        (KeyKind::ED25519, KeyKind::ED25519) =>
             (&mut *(key1.ptr as *mut ED25519Key)).seckey == (&mut *(key2.ptr as *mut ED25519Key)).seckey,
         _ => false
     }
@@ -981,11 +981,11 @@ pub unsafe extern "C" fn keys_public_key_data_is_equal(key1: *mut OpaqueKey, key
     let key1 = &mut *key1;
     let key2 = &mut *key2;
     match (key1.key_type, key2.key_type) {
-        (KeyType::ECDSA, KeyType::ECDSA) =>
+        (KeyKind::ECDSA, KeyKind::ECDSA) =>
             (&mut *(key1.ptr as *mut ECDSAKey)).public_key_data() == (&mut *(key2.ptr as *mut ECDSAKey)).public_key_data(),
-        (KeyType::BLS | KeyType::BLSBasic, KeyType::BLS | KeyType::BLSBasic) =>
+        (KeyKind::BLS | KeyKind::BLSBasic, KeyKind::BLS | KeyKind::BLSBasic) =>
             (&mut *(key1.ptr as *mut BLSKey)).public_key_data() == (&mut *(key2.ptr as *mut BLSKey)).public_key_data(),
-        (KeyType::ED25519, KeyType::ED25519) =>
+        (KeyKind::ED25519, KeyKind::ED25519) =>
             (&mut *(key1.ptr as *mut ED25519Key)).public_key_data() == (&mut *(key2.ptr as *mut ED25519Key)).public_key_data(),
         _ => false
     }
@@ -998,9 +998,9 @@ pub unsafe extern "C" fn key_check_payload_signature(key: *mut OpaqueKey, key_ha
     let key = &mut *key;
     let key_hash = slice::from_raw_parts(key_hash, 20);
     match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).hash160().as_bytes().eq(key_hash),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).hash160().as_bytes().eq(key_hash),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).hash160().as_bytes().eq(key_hash),
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).hash160().as_bytes().eq(key_hash),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).hash160().as_bytes().eq(key_hash),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).hash160().as_bytes().eq(key_hash),
     }
 }
 
@@ -1045,9 +1045,9 @@ pub unsafe extern "C" fn key_check_payload_signature(key: *mut OpaqueKey, key_ha
 pub unsafe extern "C" fn key_secret_key_string(key: *mut OpaqueKey) -> *mut c_char {
     let key = &mut *key;
     CString::new(match key.key_type {
-        KeyType::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).secret_key_string(),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).secret_key_string(),
-        KeyType::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).secret_key_string()
+        KeyKind::ECDSA => (&mut *(key.ptr as *mut ECDSAKey)).secret_key_string(),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key.ptr as *mut BLSKey)).secret_key_string(),
+        KeyKind::ED25519 => (&mut *(key.ptr as *mut ED25519Key)).secret_key_string()
     }).unwrap().into_raw()
 
 }
@@ -1060,12 +1060,12 @@ pub unsafe extern "C" fn key_encrypt_data(data: *const u8, len: usize, private_k
     let private_key = &mut *private_key;
     let public_key = &mut *public_key;
     ByteArray::from(match (private_key.key_type, public_key.key_type) {
-        (KeyType::ECDSA, KeyType::ECDSA) =>
+        (KeyKind::ECDSA, KeyKind::ECDSA) =>
             ECDSAKey::init_with_dh_key_exchange_with_public_key(
                 &mut *(public_key.ptr as *mut ECDSAKey),
                 &mut *(private_key.ptr as *mut ECDSAKey)
             ).and_then(|key| <Vec<u8> as CryptoData<ECDSAKey>>::encrypt_with_dh_key(&mut data.to_vec(), &key)),
-        (KeyType::BLS, KeyType::BLS) | (KeyType::BLSBasic, KeyType::BLSBasic) =>
+        (KeyKind::BLS, KeyKind::BLS) | (KeyKind::BLSBasic, KeyKind::BLSBasic) =>
             BLSKey::init_with_dh_key_exchange_with_public_key(
                 &mut *(public_key.ptr as *mut BLSKey),
                 &mut *(private_key.ptr as *mut BLSKey)
@@ -1082,12 +1082,12 @@ pub unsafe extern "C" fn key_encrypt_data_using_iv(data: *const u8, len: usize, 
     let private_key = &mut *private_key;
     let public_key = &mut *public_key;
     ByteArray::from(match (private_key.key_type, public_key.key_type) {
-        (KeyType::ECDSA, KeyType::ECDSA) =>
+        (KeyKind::ECDSA, KeyKind::ECDSA) =>
             ECDSAKey::init_with_dh_key_exchange_with_public_key(
                 &mut *(public_key.ptr as *mut ECDSAKey),
                 &mut *(private_key.ptr as *mut ECDSAKey)
             ).and_then(|key| <Vec<u8> as CryptoData<ECDSAKey>>::encrypt_with_dh_key_using_iv(&mut data.to_vec(), &key, iv.to_vec())),
-        (KeyType::BLS, KeyType::BLS) | (KeyType::BLSBasic, KeyType::BLSBasic) =>
+        (KeyKind::BLS, KeyKind::BLS) | (KeyKind::BLSBasic, KeyKind::BLSBasic) =>
             BLSKey::init_with_dh_key_exchange_with_public_key(
                 &mut *(public_key.ptr as *mut BLSKey),
                 &mut *(private_key.ptr as *mut BLSKey)
@@ -1103,12 +1103,12 @@ pub unsafe extern "C" fn key_decrypt_data(data: *const u8, len: usize, private_k
     let private_key = &mut *private_key;
     let public_key = &mut *public_key;
     ByteArray::from(match (private_key.key_type, public_key.key_type) {
-        (KeyType::ECDSA, KeyType::ECDSA) =>
+        (KeyKind::ECDSA, KeyKind::ECDSA) =>
             ECDSAKey::init_with_dh_key_exchange_with_public_key(
                 &mut *(public_key.ptr as *mut ECDSAKey),
                 &mut *(private_key.ptr as *mut ECDSAKey)
             ).and_then(|key| <Vec<u8> as CryptoData<ECDSAKey>>::decrypt_with_dh_key(&mut data.to_vec(), &key)),
-        (KeyType::BLS, KeyType::BLS) | (KeyType::BLSBasic, KeyType::BLSBasic) =>
+        (KeyKind::BLS, KeyKind::BLS) | (KeyKind::BLSBasic, KeyKind::BLSBasic) =>
             BLSKey::init_with_dh_key_exchange_with_public_key(
                 &mut *(public_key.ptr as *mut BLSKey),
                 &mut *(private_key.ptr as *mut BLSKey)
@@ -1124,12 +1124,12 @@ pub unsafe extern "C" fn key_decrypt_data_using_iv_size(data: *const u8, len: us
     let private_key = &mut *private_key;
     let public_key = &mut *public_key;
     ByteArray::from(match (private_key.key_type, public_key.key_type) {
-        (KeyType::ECDSA, KeyType::ECDSA) =>
+        (KeyKind::ECDSA, KeyKind::ECDSA) =>
             ECDSAKey::init_with_dh_key_exchange_with_public_key(
                 &mut *(public_key.ptr as *mut ECDSAKey),
                 &mut *(private_key.ptr as *mut ECDSAKey)
             ).and_then(|key| <Vec<u8> as CryptoData<ECDSAKey>>::decrypt_with_dh_key_using_iv_size(&mut data.to_vec(), &key, iv_size)),
-        (KeyType::BLS, KeyType::BLS) | (KeyType::BLSBasic, KeyType::BLSBasic) =>
+        (KeyKind::BLS, KeyKind::BLS) | (KeyKind::BLSBasic, KeyKind::BLSBasic) =>
             BLSKey::init_with_dh_key_exchange_with_public_key(
                 &mut *(public_key.ptr as *mut BLSKey),
                 &mut *(private_key.ptr as *mut BLSKey)
@@ -1145,9 +1145,9 @@ pub unsafe extern "C" fn key_encrypt_data_with_dh_key(data: *const u8, len: usiz
     let data = slice::from_raw_parts(data, len);
     let key = &mut *key;
     ByteArray::from(match key.key_type {
-        KeyType::ECDSA =>
+        KeyKind::ECDSA =>
             <Vec<u8> as CryptoData<ECDSAKey>>::encrypt_with_dh_key(&mut data.to_vec(), &mut *(key.ptr as *mut ECDSAKey)),
-        KeyType::BLS | KeyType::BLSBasic =>
+        KeyKind::BLS | KeyKind::BLSBasic =>
             <Vec<u8> as CryptoData<BLSKey>>::encrypt_with_dh_key(&mut data.to_vec(), &mut *(key.ptr as *mut BLSKey)),
         _ => None
     })
@@ -1159,9 +1159,9 @@ pub unsafe extern "C" fn key_decrypt_data_with_dh_key(data: *const u8, len: usiz
     let data = slice::from_raw_parts(data, len);
     let key = &mut *key;
     ByteArray::from(match key.key_type {
-        KeyType::ECDSA =>
+        KeyKind::ECDSA =>
             <Vec<u8> as CryptoData<ECDSAKey>>::decrypt_with_dh_key(&mut data.to_vec(), &mut *(key.ptr as *mut ECDSAKey)),
-        KeyType::BLS | KeyType::BLSBasic =>
+        KeyKind::BLS | KeyKind::BLSBasic =>
             <Vec<u8> as CryptoData<BLSKey>>::decrypt_with_dh_key(&mut data.to_vec(), &mut *(key.ptr as *mut BLSKey)),
         _ => None
     })
@@ -1174,9 +1174,9 @@ pub unsafe extern "C" fn key_encrypt_data_with_dh_key_using_iv(data: *const u8, 
     let iv = slice::from_raw_parts(iv_data, iv_len);
     let key = &mut *key;
     ByteArray::from(match key.key_type {
-        KeyType::ECDSA =>
+        KeyKind::ECDSA =>
             <Vec<u8> as CryptoData<ECDSAKey>>::encrypt_with_dh_key_using_iv(&mut data.to_vec(), &mut *(key.ptr as *mut ECDSAKey), iv.to_vec()),
-        KeyType::BLS | KeyType::BLSBasic =>
+        KeyKind::BLS | KeyKind::BLSBasic =>
             <Vec<u8> as CryptoData<BLSKey>>::encrypt_with_dh_key_using_iv(&mut data.to_vec(), &mut *(key.ptr as *mut BLSKey), iv.to_vec()),
         _ => None
     })
@@ -1188,9 +1188,9 @@ pub unsafe extern "C" fn key_decrypt_data_with_dh_key_using_iv_size(data: *const
     let data = slice::from_raw_parts(data, len);
     let key = &mut *key;
     ByteArray::from(match key.key_type {
-        KeyType::ECDSA =>
+        KeyKind::ECDSA =>
             <Vec<u8> as CryptoData<ECDSAKey>>::decrypt_with_dh_key_using_iv_size(&mut data.to_vec(), &mut *(key.ptr as *mut ECDSAKey), iv_size),
-        KeyType::BLS | KeyType::BLSBasic =>
+        KeyKind::BLS | KeyKind::BLSBasic =>
             <Vec<u8> as CryptoData<BLSKey>>::decrypt_with_dh_key_using_iv_size(&mut data.to_vec(), &mut *(key.ptr as *mut BLSKey), iv_size),
         _ => None
     })
@@ -1202,15 +1202,15 @@ pub unsafe extern "C" fn key_create_account_reference(source_key: *mut OpaqueKey
     let source_key = &mut *source_key;
     let extended_public_key = &mut *extended_public_key;
     let extended_public_key_data = match extended_public_key.key_type {
-        KeyType::ECDSA => (&mut *(source_key.ptr as *mut ECDSAKey)).extended_public_key_data(),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(source_key.ptr as *mut BLSKey)).extended_public_key_data(),
-        KeyType::ED25519 => (&mut *(source_key.ptr as *mut ED25519Key)).extended_public_key_data(),
+        KeyKind::ECDSA => (&mut *(source_key.ptr as *mut ECDSAKey)).extended_public_key_data(),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(source_key.ptr as *mut BLSKey)).extended_public_key_data(),
+        KeyKind::ED25519 => (&mut *(source_key.ptr as *mut ED25519Key)).extended_public_key_data(),
     }.unwrap_or(vec![]);
 
     let account_secret_key = match source_key.key_type  {
-        KeyType::ECDSA => (&mut *(source_key.ptr as *mut ECDSAKey)).hmac_256_data(&extended_public_key_data),
-        KeyType::BLS | KeyType::BLSBasic => (&mut *(source_key.ptr as *mut BLSKey)).hmac_256_data(&extended_public_key_data),
-        KeyType::ED25519 => (&mut *(source_key.ptr as *mut ED25519Key)).hmac_256_data(&extended_public_key_data)
+        KeyKind::ECDSA => (&mut *(source_key.ptr as *mut ECDSAKey)).hmac_256_data(&extended_public_key_data),
+        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(source_key.ptr as *mut BLSKey)).hmac_256_data(&extended_public_key_data),
+        KeyKind::ED25519 => (&mut *(source_key.ptr as *mut ED25519Key)).hmac_256_data(&extended_public_key_data)
     }.reversed();
     let account_secret_key28 = account_secret_key.u32_le() >> 4;
     let shortened_account_bits = (account_number as u32) & 0x0FFFFFFF;

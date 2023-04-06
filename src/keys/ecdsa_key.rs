@@ -11,7 +11,7 @@ use crate::chain::derivation::{BIP32_HARD, IIndexPath, IndexPath};
 use crate::chain::params::ScriptMap;
 use crate::consensus::Encodable;
 use crate::crypto::{ECPoint, UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}};
-use crate::keys::{IKey, KeyType, dip14::{IChildKeyDerivation, SignKey}};
+use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}};
 use crate::keys::crypto_data::{CryptoData, DHKey};
 use crate::util::address::address::is_valid_dash_private_key;
 use crate::util::base58;
@@ -245,8 +245,8 @@ impl ECDSAKey {
 impl IKey for ECDSAKey {
     // type SK = UInt256;
 
-    fn r#type(&self) -> KeyType {
-        KeyType::ECDSA
+    fn r#type(&self) -> KeyKind {
+        KeyKind::ECDSA
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {

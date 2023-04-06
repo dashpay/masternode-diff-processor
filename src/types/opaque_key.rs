@@ -2,7 +2,7 @@ use std::os::raw::{c_char, c_void};
 use std::ptr::null_mut;
 use crate::{BLSKey, ECDSAKey, ED25519Key};
 use crate::ffi::boxer::boxed;
-use crate::keys::KeyType;
+use crate::keys::KeyKind;
 
 pub trait AsOpaque {
     fn as_opaque(&self) -> *mut OpaqueKey;
@@ -11,7 +11,7 @@ pub trait AsOpaque {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct OpaqueKey {
-    pub key_type: KeyType,
+    pub key_type: KeyKind,
     // ECDSAKey, ED25519Key or BLSKey
     pub ptr: *mut c_void,
 }
@@ -33,7 +33,7 @@ pub struct OpaqueSerializedKeys {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct KeyWithUniqueId {
-    pub key_type: KeyType,
+    pub key_type: KeyKind,
     pub unique_id: u64,
     // ECDSAKey, ED25519Key or BLSKey
     pub ptr: *mut c_void,
@@ -42,19 +42,19 @@ pub struct KeyWithUniqueId {
 
 impl AsOpaque for ECDSAKey {
     fn as_opaque(&self) -> *mut OpaqueKey {
-        boxed(OpaqueKey { key_type: KeyType::ECDSA, ptr: boxed(self) as *mut c_void })
+        boxed(OpaqueKey { key_type: KeyKind::ECDSA, ptr: boxed(self) as *mut c_void })
     }
 }
 
 impl AsOpaque for BLSKey {
     fn as_opaque(&self) -> *mut OpaqueKey {
-        boxed(OpaqueKey { key_type: if self.use_legacy { KeyType::BLS } else { KeyType::BLSBasic }, ptr: boxed(self) as *mut c_void })
+        boxed(OpaqueKey { key_type: if self.use_legacy { KeyKind::BLS } else { KeyKind::BLSBasic }, ptr: boxed(self) as *mut c_void })
     }
 }
 
 impl AsOpaque for ED25519Key {
     fn as_opaque(&self) -> *mut OpaqueKey {
-        boxed(OpaqueKey { key_type: KeyType::ED25519, ptr: boxed(self) as *mut c_void })
+        boxed(OpaqueKey { key_type: KeyKind::ED25519, ptr: boxed(self) as *mut c_void })
     }
 }
 

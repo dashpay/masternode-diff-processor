@@ -7,7 +7,7 @@ use hashes::sha256;
 use crate::crypto::{ECPoint, UInt160, UInt256, UInt512, byte_util::{AsBytes, Zeroable}};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
-use crate::keys::{IKey, KeyType, dip14::{IChildKeyDerivation, IChildKeyDerivationData}};
+use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, IChildKeyDerivationData}};
 use crate::util::base58;
 use crate::util::sec_vec::SecVec;
 
@@ -28,8 +28,8 @@ pub struct ED25519Key {
 impl IKey for ED25519Key
     where Self: IChildKeyDerivationData<u32, SigningKey, ECPoint> + IChildKeyDerivationData<UInt256, SigningKey, ECPoint> {
 
-    fn r#type(&self) -> KeyType {
-        KeyType::ED25519
+    fn r#type(&self) -> KeyKind {
+        KeyKind::ED25519
     }
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {

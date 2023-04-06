@@ -6,7 +6,7 @@ pub mod dip14;
 pub mod crypto_data;
 
 pub use self::key::Key;
-pub use self::key::KeyType;
+pub use self::key::KeyKind;
 pub use self::bls_key::BLSKey;
 pub use self::ecdsa_key::ECDSAKey;
 pub use self::ed25519_key::ED25519Key;
@@ -24,7 +24,7 @@ use crate::util::script::ScriptElement;
 use crate::util::sec_vec::SecVec;
 
 pub trait IKey: Send + Sync + Debug {
-    fn r#type(&self) -> KeyType {
+    fn r#type(&self) -> KeyKind {
         panic!("Should be overriden in implementation")
     }
     fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
