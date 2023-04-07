@@ -7,7 +7,7 @@ pub const CC_BLOCK_SIZE_AES128: usize = 16;
 pub trait DHKey: Send + Sync + Debug {
     fn init_with_dh_key_exchange_with_public_key(public_key: &mut Self, private_key: &Self) -> Option<Self> where Self: Sized;
 }
-
+// TODO: CryptoData where AsRef<[u8]>: CryptoData<K>
 pub trait CryptoData<K: IKey + Clone>: Send + Sync + Debug where Vec<u8>: CryptoData<K> {
 
     #[inline]
@@ -53,6 +53,7 @@ pub trait CryptoData<K: IKey + Clone>: Send + Sync + Debug where Vec<u8>: Crypto
 
 
 
+    // Chained sequence
 
     fn encapsulated_dh_decryption_with_keys(&mut self, keys: Vec<K>) -> Option<Vec<u8>> where K: DHKey {
         assert!(keys.len() > 0, "There should be at least one key");
@@ -100,3 +101,4 @@ pub trait CryptoData<K: IKey + Clone>: Send + Sync + Debug where Vec<u8>: Crypto
         }
     }
 }
+

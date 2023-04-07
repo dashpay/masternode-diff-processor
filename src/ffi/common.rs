@@ -10,6 +10,22 @@ pub struct ByteArray {
     pub len: usize,
 }
 
+impl Default for ByteArray {
+    fn default() -> Self {
+        ByteArray { ptr: ptr::null(), len: 0 }
+    }
+}
+
+impl From<blake3::Hash> for ByteArray {
+    fn from(value: blake3::Hash) -> Self {
+        let bytes: [u8; 32] = value.into();
+        let ptr = bytes.as_ptr();
+        let len = bytes.len();
+        mem::forget(bytes);
+        ByteArray { ptr, len }
+    }
+}
+
 impl From<[u8; 65]> for ByteArray {
     fn from(value: [u8; 65]) -> Self {
         let ptr = value.as_ptr();
@@ -37,7 +53,7 @@ impl From<Option<Vec<u8>>> for ByteArray {
                 mem::forget(vec);
                 ByteArray { ptr, len }
             }
-            None => ByteArray { ptr: ptr::null(), len: 0 },
+            None => ByteArray::default(),
         }
     }
 }
@@ -51,7 +67,7 @@ impl From<Option<SecVec>> for ByteArray {
                 mem::forget(vec);
                 ByteArray { ptr, len }
             }
-            None => ByteArray { ptr: ptr::null(), len: 0 },
+            None => ByteArray::default(),
         }
     }
 }

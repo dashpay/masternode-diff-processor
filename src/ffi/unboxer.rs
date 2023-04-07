@@ -345,28 +345,13 @@ pub unsafe fn unbox_string(data: *mut c_char) {
     let _ = CString::from_raw(data);
 }
 
-// /// # Safety
-// pub unsafe fn unbox_opaque_ecdsa_key(key: *mut ECDSAKeyWithUniqueId) {
-//     let result = unbox_any(key);
-//     unbox_any(result.ptr);
-// }
-//
-// /// # Safety
-// pub unsafe fn unbox_opaque_bls_key(key: *mut BLSKeyWithUniqueId) {
-//     let result = unbox_any(key);
-//     unbox_any(result.ptr);
-// }
-//
-// /// # Safety
-// pub unsafe fn unbox_opaque_ed25519_key(key: *mut ED25519KeyWithUniqueId) {
-//     let result = unbox_any(key);
-//     unbox_any(result.ptr);
-// }
-//
-/// # Safety
 pub unsafe fn unbox_opaque_key(data: *mut OpaqueKey) {
-    let key = unbox_any(data);
-    unbox_any(key.ptr);
+    let k = unbox_any(data);
+    match *k {
+        OpaqueKey::ECDSA(key) => { let _ = unbox_any(key); },
+        OpaqueKey::BLS(key) => { let _ = unbox_any(key); },
+        OpaqueKey::ED25519(key) => { let _ = unbox_any(key); },
+    };
 }
 
 /// # Safety

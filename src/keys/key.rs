@@ -1,10 +1,9 @@
 use std::fmt::Debug;
-use std::os::raw::c_void;
+use std::ptr::null_mut;
 use crate::chain::{ScriptMap, derivation::{IIndexPath, IndexPath}};
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::BytesDecodable};
-use crate::ffi::boxer::boxed;
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey};
-use crate::types::opaque_key::{AsOpaque, OpaqueKey};
+use crate::types::opaque_key::{AsOpaqueKey, OpaqueKey};
 use crate::util::sec_vec::SecVec;
 
 #[repr(C)]
@@ -352,14 +351,24 @@ impl IKey for Key {
     }
 }
 
-impl AsOpaque for Key {
-    fn as_opaque(&self) -> *mut OpaqueKey {
-        boxed(OpaqueKey { key_type: self.r#type(), ptr: match self {
-            Key::ECDSA(key) => boxed(key) as *mut c_void,
-            Key::BLS(key) => boxed(key) as *mut c_void,
-            Key::ED25519(key) => boxed(key) as *mut c_void,
-        } })
+impl AsOpaqueKey for Key {
+    fn to_opaque_ptr(self) -> *mut OpaqueKey {
+        match self {
+            Key::ECDSA(key) => key.to_opaque_ptr(),
+            Key::BLS(key) => key.to_opaque_ptr(),
+            Key::ED25519(key) => key.to_opaque_ptr(),
+        }
     }
 }
 
+impl AsOpaqueKey for Option<Key> {
+    fn to_opaque_ptr(self) -> *mut OpaqueKey {
+        match self {
+            Some(Key::ECDSA(key)) => key.to_opaque_ptr(),
+            Some(Key::BLS(key)) => key.to_opaque_ptr(),
+            Some(Key::ED25519(key)) => key.to_opaque_ptr(),
+            _ => null_mut()
+        }
+    }
+}
 
