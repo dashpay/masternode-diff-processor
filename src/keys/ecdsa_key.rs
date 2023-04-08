@@ -294,7 +294,6 @@ impl IKey for ECDSAKey {
     }
 
     fn public_key_data(&self) -> Vec<u8> {
-        println!("public_key_data: {}", self.pubkey.to_hex());
         if self.pubkey.is_empty() && self.has_private_key() {
             let seckey = self.secret_key().unwrap();
             let pubkey = secp256k1::PublicKey::from_secret_key(&Secp256k1::new(), &seckey);
