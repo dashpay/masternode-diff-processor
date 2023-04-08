@@ -9,23 +9,18 @@ pub mod tests {
     use std::io::Read;
     use std::ptr::null_mut;
     use std::{env, fs, slice};
+    use crate::bindings::common::{processor_create_cache, register_processor};
+    use crate::bindings::masternode::process_mnlistdiff_from_message;
     use crate::ffi::boxer::boxed;
     use crate::ffi::from::FromFFI;
     use crate::ffi::to::ToFFI;
     use crate::ffi::unboxer::unbox_any;
     use crate::chain::common::chain_type::{ChainType, IHaveChainSettings};
     use crate::consensus::encode;
-    use crate::crypto::byte_util::{
-        BytesDecodable, Reversable, UInt256, UInt384,
-    };
+    use crate::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384};
     use crate::{common, models};
-    use crate::processing::processor_cache::MasternodeProcessorCache;
-    use crate::processing::{MNListDiffResult, QRInfoResult};
-    use crate::{
-        process_mnlistdiff_from_message, processor_create_cache, register_processor,
-        unwrap_or_diff_processing_failure, unwrap_or_qr_processing_failure, unwrap_or_return,
-        MasternodeProcessor, ProcessingError, types
-    };
+    use crate::processing::{MasternodeProcessorCache, MasternodeProcessor, MNListDiffResult, ProcessingError, QRInfoResult};
+    use crate::{unwrap_or_diff_processing_failure, unwrap_or_qr_processing_failure, unwrap_or_return, types};
     use crate::tests::block_store::init_testnet_store;
 
     // This regex can be used to omit timestamp etc. while replacing after paste from xcode console log

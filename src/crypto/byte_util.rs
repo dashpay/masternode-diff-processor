@@ -60,6 +60,15 @@ macro_rules! impl_ffi_bytearray {
                 ffi::ByteArray { ptr, len }
             }
         }
+        impl From<Option<$var_type>> for ffi::ByteArray {
+            fn from(value: Option<$var_type>) -> Self {
+                if let Some(v) = value {
+                    v.into()
+                } else {
+                    ffi::ByteArray::default()
+                }
+            }
+        }
     }
 }
 
@@ -172,7 +181,7 @@ macro_rules! define_bytes_to_big_uint {
         impl_decodable!($uint_type, $byte_len);
         define_try_from_bytes!($uint_type);
         impl_ffi_bytearray!($uint_type);
-        
+
         impl std::default::Default for $uint_type {
             fn default() -> Self {
                 let data: [u8; $byte_len] = [0u8; $byte_len];
@@ -241,6 +250,7 @@ macro_rules! define_bytes_to_big_uint {
         impl $uint_type {
             pub const MIN: Self = $uint_type([0; $byte_len]);
             pub const MAX: Self = $uint_type([!0; $byte_len]);
+            pub const SIZE: usize = $byte_len;
         }
 
         impl AsBytes for $uint_type {

@@ -1,5 +1,5 @@
 use hashes::hex::{FromHex, ToHex};
-use crate::key_bindings::{key_create_from_extended_public_key_data, key_extended_public_key_data};
+use crate::bindings::keys::{key_create_from_extended_public_key_data, key_extended_public_key_data};
 use crate::keys::KeyKind;
 
 #[test]

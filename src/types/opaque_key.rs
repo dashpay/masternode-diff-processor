@@ -1,9 +1,8 @@
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 use std::ptr::null_mut;
-use crate::{BLSKey, ECDSAKey, ED25519Key};
 use crate::ffi::boxer::boxed;
-use crate::keys::KeyKind;
+use crate::keys::{BLSKey, ECDSAKey, ED25519Key, KeyKind};
 
 pub trait AsOpaqueKey {
     fn to_opaque_ptr(self) -> *mut OpaqueKey;

@@ -1,8 +1,8 @@
 extern crate libc;
 use std::ffi::c_void;
+use crate::{models, types};
+use crate::crypto::{byte_util::MutDecodable, UInt256};
 use crate::ffi::from::FromFFI;
-use crate::{models, types, UInt256};
-use crate::crypto::byte_util::MutDecodable;
 
 pub type AddInsightBlockingLookup =
     unsafe extern "C" fn(block_hash: *mut [u8; 32], context: *const c_void);

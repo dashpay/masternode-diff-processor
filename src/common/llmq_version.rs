@@ -1,7 +1,7 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, TryWrite};
-use crate::BytesDecodable;
 use crate::consensus::Encodable;
+use crate::crypto::byte_util::BytesDecodable;
 
 #[warn(non_camel_case_types)]
 #[repr(C)]

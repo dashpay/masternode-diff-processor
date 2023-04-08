@@ -2,9 +2,8 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use hashes::hex::FromHex;
 use crate::chain::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap, SporkParams};
 use crate::chain::params::DUFFS;
-use crate::crypto::byte_util::Reversable;
-use crate::UInt256;
 use crate::common::LLMQType;
+use crate::crypto::{byte_util::Reversable, UInt256};
 
 pub trait IHaveChainSettings {
     fn genesis_hash(&self) -> UInt256;

@@ -4,7 +4,8 @@ use crate::chain::common::chain_type::{ChainType, DevnetType, IHaveChainSettings
 use crate::common::LLMQType;
 use crate::crypto::byte_util::{Reversable, UInt256};
 use crate::hashes::hex::{FromHex, ToHex};
-use crate::{process_qrinfo_from_message, processor_create_cache, register_processor};
+use crate::bindings::common::{processor_create_cache, register_processor};
+use crate::bindings::masternode::process_qrinfo_from_message;
 
 // #[test]
 // Deprecated

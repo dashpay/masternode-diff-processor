@@ -1,4 +1,4 @@
-use crate::UInt256;
+use crate::crypto::UInt256;
 
 #[test]
 pub fn test_superior_and_equal_uint256() {

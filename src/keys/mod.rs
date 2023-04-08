@@ -12,11 +12,11 @@ pub use self::ecdsa_key::ECDSAKey;
 pub use self::ed25519_key::ED25519Key;
 
 use std::fmt::Debug;
-use crate::UInt256;
 use crate::chain::ScriptMap;
 use crate::chain::derivation::index_path::IIndexPath;
 use crate::chain::tx::protocol::SIGHASH_ALL;
 use crate::consensus::Encodable;
+use crate::crypto::UInt256;
 use crate::keys::dip14::{IChildKeyDerivation, SignKey};
 use crate::util::address::address::with_public_key_data;
 use crate::util::data_append::DataAppend;

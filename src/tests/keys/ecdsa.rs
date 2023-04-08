@@ -1,8 +1,8 @@
 use hashes::hex::FromHex;
 use hashes::{sha256, Hash};
 
-use crate::UInt256;
 use crate::chain::common::ChainType;
+use crate::crypto::UInt256;
 use crate::keys::{ECDSAKey, IKey};
 use crate::util::address::address::is_valid_dash_private_key;
 use crate::util::base58;

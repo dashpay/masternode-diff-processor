@@ -3,7 +3,7 @@ use byte::BytesExt;
 use hashes::hex::{FromHex, ToHex};
 use hashes::{Hash, sha256d};
 use crate::keys::{BLSKey, IKey};
-use crate::UInt256;
+use crate::crypto::UInt256;
 
 #[test]
 pub fn test_bls_sign() {

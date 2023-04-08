@@ -35,6 +35,16 @@ impl From<[u8; 65]> for ByteArray {
     }
 }
 
+impl From<Option<[u8; 65]>> for ByteArray {
+    fn from(value: Option<[u8; 65]>) -> Self {
+        if let Some(v) = value {
+            v.into()
+        } else {
+            ByteArray::default()
+        }
+    }
+}
+
 impl From<Vec<u8>> for ByteArray {
     fn from(value: Vec<u8>) -> Self {
         let ptr = value.as_ptr();

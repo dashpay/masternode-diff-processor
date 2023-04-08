@@ -1,7 +1,7 @@
 use hashes::Hash;
 use std::fmt::Write;
 use crate::consensus::Encodable;
-use crate::UInt256;
+use crate::crypto::UInt256;
 
 pub const DASH_MESSAGE_MAGIC: &str = "DarkCoin Signed Message:\n";
 

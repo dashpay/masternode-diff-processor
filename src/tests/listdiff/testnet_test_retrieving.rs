@@ -1,5 +1,6 @@
 use hashes::hex::FromHex;
-use crate::{process_mnlistdiff_from_message, register_processor};
+use crate::bindings::common::register_processor;
+use crate::bindings::masternode::process_mnlistdiff_from_message;
 use crate::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;

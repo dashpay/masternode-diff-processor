@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
-use crate::{boxed, boxed_vec, common, models, ToFFI, types, UInt256};
-use crate::ffi::to::{encode_masternodes_map, encode_quorums_map};
+use crate::{common, models, types};
+use crate::crypto::UInt256;
+use crate::ffi::boxer::{boxed, boxed_vec};
+use crate::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
 use crate::processing::ProcessingError;
 
 pub struct MNListDiffResult {

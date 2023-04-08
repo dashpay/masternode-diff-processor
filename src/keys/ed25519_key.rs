@@ -282,7 +282,6 @@ impl ED25519Key {
             .into_iter()
             .for_each(|position|
                 Self::derive_child_public_key(&mut k, &mut c, path, position)
-                // derive_child_public_key_ed25519(&mut k, &mut c, path.index_at_position(position))
             );
         Some(k.as_bytes().to_vec())
     }

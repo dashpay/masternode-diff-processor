@@ -1,6 +1,6 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
-use crate::BytesDecodable;
+use crate::crypto::byte_util::BytesDecodable;
 
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]

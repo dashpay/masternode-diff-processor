@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::slice;
-use crate::{common, encode, models, tx, types};
-use crate::crypto::{UInt128, UInt160, UInt256, UInt384, UInt768};
-use crate::crypto::byte_util::Reversable;
+use crate::{common, models, tx, types};
+use crate::consensus::encode;
+use crate::crypto::{byte_util::Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::ffi::to::ToFFI;
 use crate::tx::transaction;
 

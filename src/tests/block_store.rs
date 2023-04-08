@@ -1,7 +1,7 @@
 use hashes::hex::FromHex;
 use crate::crypto::byte_util::Reversable;
+use crate::crypto::UInt256;
 use crate::lib_tests::tests::MerkleBlock;
-use crate::UInt256;
 
 // pub const BLOCK_STORE_JSON: &str = r#"{
 //     "MainNet": [
