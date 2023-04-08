@@ -49,7 +49,7 @@ cbindgen = "0.24.3"
 name = "dash_spv_masternode_processor"
 #crate-type = ["staticlib", "cdylib"]
 
-[profile.release]
-lto = "thin"
-opt-level = 3
+#[profile.release]
+#lto = "thin"
+#opt-level = 3
 #debug = true
