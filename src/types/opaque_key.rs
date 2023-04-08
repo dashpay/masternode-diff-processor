@@ -33,7 +33,8 @@ impl AsCStringPtr for Option<String> {
 #[derive(Clone, Debug)]
 pub enum OpaqueKey {
     ECDSA(*mut ECDSAKey),
-    BLS(*mut BLSKey),
+    BLSLegacy(*mut BLSKey),
+    BLSBasic(*mut BLSKey),
     ED25519(*mut ED25519Key),
 }
 
@@ -52,7 +53,11 @@ impl AsOpaqueKey for ECDSAKey {
 
 impl AsOpaqueKey for BLSKey {
     fn to_opaque_ptr(self) -> *mut OpaqueKey {
-        boxed(OpaqueKey::BLS(boxed(self)))
+        boxed(if self.use_legacy {
+            OpaqueKey::BLSLegacy(boxed(self))
+        } else {
+            OpaqueKey::BLSBasic(boxed(self))
+        })
     }
 }
 
@@ -101,7 +106,11 @@ impl From<ECDSAKey> for *mut OpaqueKey {
 
 impl From<BLSKey> for *mut OpaqueKey {
     fn from(value: BLSKey) -> Self {
-        boxed(OpaqueKey::BLS(boxed(value)))
+        boxed(if value.use_legacy {
+            OpaqueKey::BLSLegacy(boxed(value))
+        } else {
+            OpaqueKey::BLSBasic(boxed(value))
+        })
     }
 }
 

@@ -349,7 +349,8 @@ pub unsafe fn unbox_opaque_key(data: *mut OpaqueKey) {
     let k = unbox_any(data);
     match *k {
         OpaqueKey::ECDSA(key) => { let _ = unbox_any(key); },
-        OpaqueKey::BLS(key) => { let _ = unbox_any(key); },
+        OpaqueKey::BLSLegacy(key) |
+        OpaqueKey::BLSBasic(key) => { let _ = unbox_any(key); },
         OpaqueKey::ED25519(key) => { let _ = unbox_any(key); },
     };
 }
