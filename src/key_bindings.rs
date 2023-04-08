@@ -237,27 +237,26 @@ pub unsafe extern "C" fn key_ecdsa_sign(key: *mut ECDSAKey, data: *const u8, len
 /// # Safety
 /// digest is UInt256
 #[no_mangle]
-pub unsafe extern "C" fn key_sign_message_digest(key: *mut c_void, key_type: KeyKind, digest: *const u8) -> ByteArray {
+pub unsafe extern "C" fn key_sign_message_digest(key: *mut OpaqueKey, digest: *const u8) -> ByteArray {
     // let key = unsafe { &mut *key };
     let message_digest = UInt256::from_const(digest).unwrap();
-    match key_type {
-        KeyKind::ECDSA => ByteArray::from((&*(key as *mut ECDSAKey)).compact_sign(message_digest)),
-        KeyKind::BLS | KeyKind::BLSBasic => ByteArray::from((&*(key as *mut BLSKey)).sign_digest(message_digest)),
-        KeyKind::ED25519 => ByteArray::from((&*(key as *mut ED25519Key)).sign(&message_digest.0))
+    match *key {
+        OpaqueKey::ECDSA(ptr) => ByteArray::from((&*ptr).compact_sign(message_digest)),
+        OpaqueKey::BLS(ptr) => ByteArray::from((&*ptr).sign_digest(message_digest)),
+        OpaqueKey::ED25519(ptr) => ByteArray::from((&*ptr).sign(&message_digest.0))
     }
 }
 
 /// # Safety
 /// digest is UInt256
 #[no_mangle]
-pub unsafe extern "C" fn key_verify_message_digest(key: *mut c_void, key_type: KeyKind, md: *const u8, sig: *const u8, sig_len: usize) -> bool {
-    // let key = unsafe { &mut *key };
+pub unsafe extern "C" fn key_verify_message_digest(key: *mut OpaqueKey, md: *const u8, sig: *const u8, sig_len: usize) -> bool {
     let digest = slice::from_raw_parts(md, 32);
     let signature = slice::from_raw_parts(sig, sig_len);
-    match key_type {
-        KeyKind::ECDSA => (&mut *(key as *mut ECDSAKey)).verify(digest, signature),
-        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key as *mut BLSKey)).verify(digest, signature),
-        KeyKind::ED25519 => (&mut *(key as *mut ED25519Key)).verify(digest, signature)
+    match *key {
+        OpaqueKey::ECDSA(ptr) => (&mut *ptr).verify(digest, signature),
+        OpaqueKey::BLS(ptr) => (&mut *ptr).verify(digest, signature),
+        OpaqueKey::ED25519(ptr) => (&mut *ptr).verify(digest, signature)
     }
 }
 
@@ -354,11 +353,11 @@ pub unsafe extern "C" fn key_ecdsa_public_key_data_for_private_key(secret: *cons
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_has_private_key(key: *mut c_void, key_type: KeyKind) -> bool {
-    match key_type {
-        KeyKind::ECDSA => (&*(key as *mut ECDSAKey)).has_private_key(),
-        KeyKind::BLS | KeyKind::BLSBasic => (&*(key as *mut BLSKey)).has_private_key(),
-        KeyKind::ED25519 => (&*(key as *mut ED25519Key)).has_private_key(),
+pub unsafe extern "C" fn key_has_private_key(key: *mut OpaqueKey) -> bool {
+    match *key {
+        OpaqueKey::ECDSA(ptr) => (&*ptr).has_private_key(),
+        OpaqueKey::BLS(ptr) => (&*ptr).has_private_key(),
+        OpaqueKey::ED25519(ptr) => (&*ptr).has_private_key(),
     }
 }
 
@@ -372,12 +371,12 @@ pub unsafe extern "C" fn key_ecdsa_has_private_key(key: *mut ECDSAKey) -> bool {
 // serializedPrivateKeyForChain
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_serialized_private_key_for_chain(key: *mut c_void, key_type: KeyKind, chain_id: i16) -> *mut c_char {
+pub unsafe extern "C" fn key_serialized_private_key_for_chain(key: *mut OpaqueKey, chain_id: i16) -> *mut c_char {
     let script = ScriptMap::from(chain_id);
-    let serialized = match key_type {
-        KeyKind::ECDSA => (&*(key as *mut ECDSAKey)).serialized_private_key_for_script(&script),
-        KeyKind::ED25519 => (&*(key as *mut ED25519Key)).serialized_private_key_for_script(&script),
-        KeyKind::BLS | KeyKind::BLSBasic => (&*(key as *mut BLSKey)).serialized_private_key_for_script(&script),
+    let serialized = match *key {
+        OpaqueKey::ECDSA(ptr) => (&*ptr).serialized_private_key_for_script(&script),
+        OpaqueKey::BLS(ptr) => (&*ptr).serialized_private_key_for_script(&script),
+        OpaqueKey::ED25519(ptr) => (&*ptr).serialized_private_key_for_script(&script),
     };
     CString::new(serialized).unwrap().into_raw()
 }
@@ -522,12 +521,12 @@ pub extern "C" fn ecdsa_public_key_hash_from_secret(secret: *const c_char, chain
 }
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_address_for_key(key: *mut c_void, key_type: KeyKind, chain_id: i16) -> *mut c_char {
+pub unsafe extern "C" fn key_address_for_key(key: *mut OpaqueKey, chain_id: i16) -> *mut c_char {
     let script_map = ScriptMap::from(chain_id);
-    CString::new(match key_type {
-        KeyKind::ECDSA => (&*(key as *mut ECDSAKey)).address_with_public_key_data(&script_map),
-        KeyKind::BLS | KeyKind::BLSBasic => (&*(key as *mut BLSKey)).address_with_public_key_data(&script_map),
-        KeyKind::ED25519 => (&*(key as *mut ED25519Key)).address_with_public_key_data(&script_map)
+    CString::new(match *key {
+        OpaqueKey::ECDSA(ptr) => (&*ptr).address_with_public_key_data(&script_map),
+        OpaqueKey::BLS(ptr) => (&*ptr).address_with_public_key_data(&script_map),
+        OpaqueKey::ED25519(ptr) => (&*ptr).address_with_public_key_data(&script_map)
     }).unwrap().into_raw()
 }
 /// # Safety
@@ -698,11 +697,11 @@ pub unsafe extern "C" fn generate_extended_public_key_from_seed(seed: *const u8,
 }
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn forget_private_key(key: *mut c_void, key_type: KeyKind) {
-    match key_type {
-        KeyKind::ECDSA => (&mut *(key as *mut ECDSAKey)).forget_private_key(),
-        KeyKind::BLS | KeyKind::BLSBasic => (&mut *(key as *mut BLSKey)).forget_private_key(),
-        KeyKind::ED25519 => (&mut *(key as *mut ED25519Key)).forget_private_key()
+pub unsafe extern "C" fn forget_private_key(key: *mut OpaqueKey) {
+    match *key {
+        OpaqueKey::ECDSA(ptr) => (&mut *ptr).forget_private_key(),
+        OpaqueKey::BLS(ptr) => (&mut *ptr).forget_private_key(),
+        OpaqueKey::ED25519(ptr) => (&mut *ptr).forget_private_key()
     }
 }
 
@@ -727,21 +726,21 @@ pub unsafe extern "C" fn key_ecdsa_public_key_data(key: *mut ECDSAKey) -> ByteAr
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_private_key_data(key: *mut c_void, key_type: KeyKind) -> ByteArray {
-    ByteArray::from(match key_type {
-        KeyKind::ECDSA => (&*(key as *mut ECDSAKey)).private_key_data(),
-        KeyKind::BLS | KeyKind::BLSBasic => (&*(key as *mut BLSKey)).private_key_data(),
-        KeyKind::ED25519 => (&*(key as *mut ED25519Key)).private_key_data()
+pub unsafe extern "C" fn key_private_key_data(key: *mut OpaqueKey) -> ByteArray {
+    ByteArray::from(match *key {
+        OpaqueKey::ECDSA(ptr) => (&*ptr).private_key_data(),
+        OpaqueKey::BLS(ptr) => (&*ptr).private_key_data(),
+        OpaqueKey::ED25519(ptr) => (&*ptr).private_key_data()
     })
 }
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_public_key_data(key: *mut c_void, key_type: KeyKind) -> ByteArray {
-    ByteArray::from(match key_type {
-        KeyKind::ECDSA => (&*(key as *mut ECDSAKey)).public_key_data(),
-        KeyKind::BLS | KeyKind::BLSBasic => (&*(key as *mut BLSKey)).public_key_data(),
-        KeyKind::ED25519 => (&*(key as *mut ED25519Key)).public_key_data()
+pub unsafe extern "C" fn key_public_key_data(key: *mut OpaqueKey) -> ByteArray {
+    ByteArray::from(match *key {
+        OpaqueKey::ECDSA(ptr) => (&*ptr).public_key_data(),
+        OpaqueKey::BLS(ptr) => (&*ptr).public_key_data(),
+        OpaqueKey::ED25519(ptr) => (&*ptr).public_key_data()
     })
 }
 /// # Safety
