@@ -261,6 +261,7 @@ impl ED25519Key {
 
     pub fn key_with_public_key_data(data: &[u8]) -> Option<Self> {
         assert!(!data.is_empty());
+        println!("ED25519Key.key_with_public_key_data: {}", data.to_hex());
         // TODO: if we follow SLIP-0010 then we have 33-bytes, and need to cut off 1st byte (0x00)
         // TODO: if we follow IETF then we must ensure length == 32 bytes
         match data.len() {
@@ -272,6 +273,7 @@ impl ED25519Key {
 
     pub fn public_key_from_extended_public_key_data<PATH>(data: &[u8], path: &PATH) -> Option<Vec<u8>>
         where PATH: IIndexPath<Item = u32> {
+        println!("ED25519Key.public_key_from_extended_public_key_data: {}, {:?}, {:?}", data.to_hex(), path.indexes(), path.hardened_indexes());
         if data.len() < EXT_PUBKEY_SIZE {
             assert!(false, "Extended public key is wrong size");
             return None;
