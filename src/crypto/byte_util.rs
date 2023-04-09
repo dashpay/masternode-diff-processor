@@ -801,6 +801,14 @@ impl secp256k1::ThirtyTwoByteHash for UInt256 {
     }
 }
 
+impl From<VerifyingKey> for UInt256 {
+    fn from(value: VerifyingKey) -> Self {
+        UInt256(value.to_bytes())
+        // let mut data = [0u8; 33];
+        // data[1..33].copy_from_slice(value.as_bytes());
+        // Self(data)
+    }
+}
 impl From<VerifyingKey> for ECPoint {
     fn from(value: VerifyingKey) -> Self {
         let mut data = [0u8; 33];

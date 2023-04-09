@@ -75,32 +75,33 @@ impl IChildKeyDerivationData<UInt256, UInt256, ECPoint> for ECDSAKey {
     }
 }
 
-impl IChildKeyDerivationData<u32, SigningKey, ECPoint> for ED25519Key {
+impl IChildKeyDerivationData<u32, SigningKey, UInt256> for ED25519Key {
     fn private_key_data_input<PATH>(key: &SigningKey, path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=u32> {
         let index = path.index_at_position(position);
-        let writer = &mut [0u8; 37];
+        // let writer = &mut [0u8; 37];
+        let writer = &mut [0u8; 36];
         if index & BIP32_HARD != 0 {
-            writer[1..33].copy_from_slice(&key.to_bytes());
+            writer[..32].copy_from_slice(&key.to_bytes());
         } else {
-            writer[1..33].copy_from_slice(key.verifying_key().as_bytes());
+            writer[..32].copy_from_slice(key.verifying_key().as_bytes());
         }
-        writer[33..37].copy_from_slice(&index.to_be_bytes());
+        writer[32..36].copy_from_slice(&index.to_be_bytes());
         writer.to_vec()
     }
 
-    fn public_key_data_input<PATH>(key: &ECPoint, path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=u32> {
+    fn public_key_data_input<PATH>(key: &UInt256, path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=u32> {
         let index = path.index_at_position(position);
         if index & BIP32_HARD != 0 {
             panic!("can't derive private child key from public parent key");
         }
-        let writer = &mut [0u8; 37];
-        writer[..33].copy_from_slice(&key.0);
-        writer[33..].copy_from_slice(&index.to_be_bytes());
+        let writer = &mut [0u8; 36];
+        writer[..32].copy_from_slice(&key.0);
+        writer[32..].copy_from_slice(&index.to_be_bytes());
         writer.to_vec()
     }
 }
 
-impl IChildKeyDerivationData<UInt256, SigningKey, ECPoint> for ED25519Key {
+impl IChildKeyDerivationData<UInt256, SigningKey, UInt256> for ED25519Key {
     fn private_key_data_input<PATH>(key: &SigningKey, path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=UInt256> {
         let index = path.index_at_position(position);
         let is_hardened = path.hardened_at_position(position);
@@ -108,7 +109,7 @@ impl IChildKeyDerivationData<UInt256, SigningKey, ECPoint> for ED25519Key {
         let i_is_31_bits = index.is_31_bits();
         let mut writer = Vec::<u8>::new();
         if is_hardened {
-            0u8.enc(&mut writer);
+            // 0u8.enc(&mut writer);
             writer.extend_from_slice(&key.to_bytes());
         } else {
             panic!("For ED25519 only hardened derivation is supported");
@@ -125,7 +126,7 @@ impl IChildKeyDerivationData<UInt256, SigningKey, ECPoint> for ED25519Key {
         writer
     }
 
-    fn public_key_data_input<PATH>(key: &ECPoint, path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=UInt256> {
+    fn public_key_data_input<PATH>(key: &UInt256, path: &PATH, position: usize) -> Vec<u8> where PATH: IIndexPath<Item=UInt256> {
         let index = path.index_at_position(position);
         let is_hardened = path.hardened_at_position(position);
         if is_hardened {
@@ -184,7 +185,7 @@ impl<T> IChildKeyDerivation<T, UInt256, ECPoint> for ECDSAKey where Self: IChild
     }
 }
 
-impl<T> IChildKeyDerivation<T, SigningKey, ECPoint> for ED25519Key where Self: IChildKeyDerivationData<T, SigningKey, ECPoint> {
+impl<T> IChildKeyDerivation<T, SigningKey, UInt256> for ED25519Key where Self: IChildKeyDerivationData<T, SigningKey, UInt256> {
     fn derive_child_private_key<PATH>(key: &mut SigningKey, chaincode: &mut UInt256, path: &PATH, position: usize)
         where PATH: IIndexPath<Item=T> {
         let i = UInt512::hmac(chaincode.as_ref(), Self::private_key_data_input(key, path, position).as_ref());
@@ -193,7 +194,7 @@ impl<T> IChildKeyDerivation<T, SigningKey, ECPoint> for ED25519Key where Self: I
         chaincode.0.copy_from_slice(&i.0[32..]);
     }
 
-    fn derive_child_public_key<PATH>(key: &mut ECPoint, chaincode: &mut UInt256, path: &PATH, position: usize)
+    fn derive_child_public_key<PATH>(key: &mut UInt256, chaincode: &mut UInt256, path: &PATH, position: usize)
         where PATH: IIndexPath<Item=T> {
         println!("ED25519Key.derive_child_public_key: {} {} {}", key, chaincode, position);
         let i = UInt512::hmac(chaincode.as_ref(), Self::public_key_data_input(key, path, position).as_ref());
