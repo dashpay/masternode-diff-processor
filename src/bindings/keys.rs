@@ -238,7 +238,7 @@ pub unsafe extern "C" fn key_sign_message_digest(key: *mut OpaqueKey, digest: *c
 /// digest is UInt256
 #[no_mangle]
 pub unsafe extern "C" fn key_verify_message_digest(key: *mut OpaqueKey, md: *const u8, sig: *const u8, sig_len: usize) -> bool {
-    let digest = slice::from_raw_parts(md, 32);
+    let digest = slice::from_raw_parts(md, UInt256::SIZE);
     let signature = slice::from_raw_parts(sig, sig_len);
     match *key {
         OpaqueKey::ECDSA(ptr) => (&mut *ptr).verify(digest, signature),
@@ -247,6 +247,7 @@ pub unsafe extern "C" fn key_verify_message_digest(key: *mut OpaqueKey, md: *con
         OpaqueKey::ED25519(ptr) => (&mut *ptr).verify(digest, signature)
     }
 }
+
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_has_private_key(key: *mut OpaqueKey) -> bool {
@@ -535,13 +536,13 @@ pub unsafe extern "C" fn key_bls_verify(public_key: *const u8, use_legacy: bool,
         .verify(message_digest, signature)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn key_bls_check_payload_signature(key: *mut BLSKey, digest: *const u8, signature: *const u8) -> bool {
-    let message_digest = slice::from_raw_parts(digest, UInt256::SIZE);
-    let signature = slice::from_raw_parts(signature, UInt768::SIZE);
-    (&mut *key).verify(message_digest, signature)
-}
-
+// #[no_mangle]
+// pub unsafe extern "C" fn key_bls_check_payload_signature(key: *mut BLSKey, digest: *const u8, signature: *const u8) -> bool {
+//     let message_digest = slice::from_raw_parts(digest, UInt256::SIZE);
+//     let signature = slice::from_raw_parts(signature, UInt768::SIZE);
+//     (&mut *key).verify(message_digest, signature)
+// }
+//
 /// # Safety
 #[no_mangle]
 pub unsafe extern "C" fn key_ecdsa_public_key_data(key: *mut ECDSAKey) -> ByteArray {
@@ -659,8 +660,21 @@ pub extern "C" fn key_ecdsa_recovered_from_compact_sig(data: *const u8, len: usi
 
 /// # Safety
 #[no_mangle]
+pub unsafe extern "C" fn key_ecdsa_verify_compact_sig(signature: *const u8, signature_len: usize, payload: *const u8, payload_len: usize, owner_key_hash: *const u8) -> bool {
+    let compact_sig = slice::from_raw_parts(signature, signature_len);
+    let payload = slice::from_raw_parts(payload, payload_len);
+    let message_digest = UInt256::sha256d(payload);
+    let owner_key_hash = UInt160::from_const(owner_key_hash)
+        .expect("Owner key hash has wrong length");
+    ECDSAKey::key_with_compact_sig(compact_sig, message_digest)
+        .map_or(false, |key| key.hash160().eq(&owner_key_hash))
+
+}
+
+/// # Safety
+#[no_mangle]
 pub unsafe extern "C" fn key_create_ecdsa_from_secret(ptr: *const u8, len: usize, compressed: bool) -> *mut OpaqueKey {
-    let bytes = unsafe { slice::from_raw_parts(ptr, len) };
+    let bytes = slice::from_raw_parts(ptr, len);
     ECDSAKey::key_with_secret_data(bytes, compressed)
         .to_opaque_ptr()
 }
