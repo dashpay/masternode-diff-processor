@@ -200,9 +200,14 @@ impl<T> IChildKeyDerivation<T, SigningKey, UInt256> for ED25519Key where Self: I
         let i = UInt512::hmac(chaincode.as_ref(), Self::public_key_data_input(key, path, position).as_ref());
         let scalar: [u8; 32] = i.0[..32].try_into().unwrap();
         println!("ED25519Key.derive_child_public_key.i: {}", i);
-        let pub_key = VerifyingKey::from_bytes(&scalar).unwrap();
-        key.0.copy_from_slice(pub_key.as_bytes());
-        chaincode.0.copy_from_slice(&i.0[32..]);
+
+        match VerifyingKey::from_bytes(&scalar) {
+            Ok(pub_key) => {
+                key.0.copy_from_slice(pub_key.as_bytes());
+                chaincode.0.copy_from_slice(&i.0[32..]);
+            },
+            Err(err) => panic!("{}", err)
+        }
     }
 }
 

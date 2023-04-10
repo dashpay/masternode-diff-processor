@@ -116,6 +116,21 @@ impl From<*const DerivationPathData> for IndexPath<UInt256> {
     }
 }
 
+impl From<(*const u8, *const bool, usize)> for IndexPath<UInt256> {
+    fn from(value: (*const u8, *const bool, usize)) -> Self {
+        let len = value.2;
+        let hashes_len = len * 32;
+        let hashes = unsafe { slice::from_raw_parts(value.0, hashes_len) };
+        let hardened = unsafe { slice::from_raw_parts(value.1, len) };
+        let indexes = (0..hashes_len)
+            .into_iter()
+            .step_by(32)
+            .map(|pos| UInt256::from(&hashes[pos..pos+32]))
+            .collect::<Vec<_>>();
+        IndexPath::new_hardened(indexes, hardened.to_vec())
+    }
+}
+
 // #[repr(C)]
 // pub struct SecVecData {
 //     data: *const u8,

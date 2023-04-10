@@ -16,7 +16,6 @@ use crate::crypto::byte_util::{AsBytes, clone_into_array, ConstDecodable, Revers
 use crate::crypto::{UInt160, UInt256, UInt384, UInt512, UInt768};
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::{ByteArray, IndexPathData};
-use crate::ffi::common::DerivationPathData;
 use crate::ffi::unboxer::{unbox_any, unbox_opaque_key, unbox_opaque_keys, unbox_opaque_serialized_keys};
 use crate::keys::{BLSKey, ECDSAKey, ED25519Key, IKey, KeyKind};
 use crate::keys::crypto_data::{CryptoData, DHKey};
@@ -313,8 +312,9 @@ pub unsafe extern "C" fn forget_private_key(key: *mut OpaqueKey) {
 // _extendedPublicKey = [parentDerivationPath.extendedPublicKey publicDeriveTo256BitDerivationPath:self derivationPathOffset:parentDerivationPath.length];
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_public_derive_to_256bit(key: *mut OpaqueKey, derivation_path: *const DerivationPathData, offset: usize) -> *mut OpaqueKey {
-    let path = IndexPath::from(derivation_path);
+// pub unsafe extern "C" fn key_public_derive_to_256bit(key: *mut OpaqueKey, derivation_path: *const DerivationPathData, offset: usize) -> *mut OpaqueKey {
+pub unsafe extern "C" fn key_public_derive_to_256bit(key: *mut OpaqueKey, derivation_indexes: *const u8, derivation_hardened: *const bool, derivation_len: usize, offset: usize) -> *mut OpaqueKey {
+    let path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
     match *key {
         OpaqueKey::ECDSA(ptr) => (&mut *ptr).public_derive_to_256bit_derivation_path_with_offset(&path, offset).to_opaque_ptr(),
         OpaqueKey::BLSLegacy(ptr) |
@@ -369,10 +369,11 @@ pub unsafe extern "C" fn key_extended_private_key_data(key: *mut OpaqueKey) -> B
 // - (DSKey *)privateKeyAtIndexPath:(NSIndexPath *)indexPath fromSeed:(NSData *)seed;
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_private_key_at_index_path(seed: *const u8, seed_length: usize, key_type: KeyKind, index_path: *const IndexPathData, derivation_path: *const DerivationPathData) -> *mut OpaqueKey {
+pub unsafe extern "C" fn key_private_key_at_index_path(seed: *const u8, seed_length: usize, key_type: KeyKind, index_path: *const IndexPathData, derivation_indexes: *const u8, derivation_hardened: *const bool, derivation_len: usize) -> *mut OpaqueKey {
     let seed_bytes = slice::from_raw_parts(seed, seed_length);
+    let path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
     key_type.key_with_seed_data(seed_bytes)
-        .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&IndexPath::from(derivation_path)))
+        .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&path))
         .and_then(|path_extended_key| path_extended_key.private_derive_to_path(&IndexPath::from(index_path)))
         .to_opaque_ptr()
 }
@@ -414,11 +415,14 @@ pub unsafe extern "C" fn key_private_keys_at_index_paths(
     seed: *const u8, seed_len: usize, key_type: KeyKind,
     index_paths: *const IndexPathData,
     index_paths_len: usize,
-    derivation_path: *const DerivationPathData) -> *mut OpaqueKeys {
+    derivation_indexes: *const u8,
+    derivation_hardened: *const bool,
+    derivation_len: usize) -> *mut OpaqueKeys {
     let seed_bytes = slice::from_raw_parts(seed, seed_len);
     let index_paths = slice::from_raw_parts(index_paths, index_paths_len);
+    let derivation_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
     key_type.key_with_seed_data(seed_bytes)
-        .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&IndexPath::from(derivation_path)))
+        .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&derivation_path))
         .map_or(null_mut(), |derivation_path_extended_key| {
             let keys = index_paths.iter()
                 .map(|p| derivation_path_extended_key.private_derive_to_path(&IndexPath::from(p as *const IndexPathData))
@@ -437,13 +441,16 @@ pub unsafe extern "C" fn serialized_key_private_keys_at_index_paths(
     seed: *const u8, seed_len: usize, key_type: KeyKind,
     index_paths: *const IndexPathData,
     index_paths_len: usize,
-    derivation_path: *const DerivationPathData,
+    derivation_indexes: *const u8,
+    derivation_hardened: *const bool,
+    derivation_len: usize,
     chain_id: i16,
 ) -> *mut OpaqueSerializedKeys {
     let seed_bytes = slice::from_raw_parts(seed, seed_len);
     let index_paths = slice::from_raw_parts(index_paths, index_paths_len);
+    let derivation_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
     key_type.key_with_seed_data(seed_bytes)
-        .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&IndexPath::from(derivation_path)))
+        .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&derivation_path))
         .map_or(null_mut(), |derivation_path_extended_key| {
             let script = ScriptMap::from(chain_id);
             let keys = index_paths.iter()
@@ -866,10 +873,11 @@ pub extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len: usize
 // - (DSKey *)generateExtendedPublicKeyFromSeed:(NSData *)seed storeUnderWalletUniqueId:(NSString *)walletUniqueId storePrivateKey:(BOOL)storePrivateKey;
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn generate_extended_public_key_from_seed(seed: *const u8, seed_length: usize, key_type: KeyKind, derivation_path: *const DerivationPathData) -> *mut OpaqueKey {
+pub unsafe extern "C" fn generate_extended_public_key_from_seed(seed: *const u8, seed_length: usize, key_type: KeyKind, derivation_indexes: *const u8, derivation_hardened: *const bool, derivation_len: usize) -> *mut OpaqueKey {
     let seed_bytes = slice::from_raw_parts(seed, seed_length);
+    let derivation_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
     key_type.key_with_seed_data(seed_bytes)
-        .and_then(|seed_key| seed_key.private_derive_to_256bit_derivation_path(&IndexPath::from(derivation_path)))
+        .and_then(|seed_key| seed_key.private_derive_to_256bit_derivation_path(&derivation_path))
         .to_opaque_ptr()
 }
 
@@ -879,19 +887,23 @@ pub unsafe extern "C" fn generate_extended_public_key_from_seed(seed: *const u8,
 // - (DSKey *)deprecatedIncorrectExtendedPublicKeyFromSeed:(NSData *)seed;
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn deprecated_incorrect_extended_public_key_from_seed(seed: *const u8, seed_len: usize, derivation_path: *const DerivationPathData) -> *mut OpaqueKey {
+pub unsafe extern "C" fn deprecated_incorrect_extended_public_key_from_seed(seed: *const u8, seed_len: usize, derivation_indexes: *const u8, derivation_hardened: *const bool, derivation_len: usize) -> *mut OpaqueKey {
     let i = UInt512::bip32_seed_key(slice::from_raw_parts(seed, seed_len));
     let secret = &i.0[..32];
     let mut writer = SecVec::new();
     let mut chaincode = UInt256::from(&i.0[32..]);
+    let derivation_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
     ECDSAKey::key_with_secret_data(secret, true)
         .and_then(|key| {
             key.hash160().u32_le().enc(&mut writer);
             let mut key = UInt256::from(secret);
-            (0..(*derivation_path).len).into_iter().for_each(|position| {
-                let index = (*derivation_path).indexes.offset(position as isize);
-                let slice = slice::from_raw_parts(index as *const u8, 8);
-                let soft_index = slice.read_with::<u64>(&mut 0, byte::BE).unwrap() as u32;
+            let hashes = unsafe { slice::from_raw_parts(derivation_indexes, derivation_len * 32) };
+            (0..derivation_len).into_iter().for_each(|position| {
+                // let index = (*derivation_path).indexes.offset(position as isize);
+                // let index = derivation_indexes.add(position);
+                // let slice = slice::from_raw_parts(index as *const u8, 8);
+                let soft_index = hashes.read_with::<u64>(&mut position.clone(), byte::LE).unwrap() as u32;
+                // let soft_index = slice.read_with::<u64>(&mut 0, byte::BE).unwrap() as u32;
                 let buf = &mut [0u8; 37];
                 if soft_index & BIP32_HARD != 0 {
                     buf[1..33].copy_from_slice(&key.0);
