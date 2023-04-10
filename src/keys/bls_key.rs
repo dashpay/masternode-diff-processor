@@ -153,6 +153,7 @@ impl BLSKey {
     /// A little recursive magic since extended private keys can't be re-assigned in the library
     pub fn derive<PATH>(extended_private_key: ExtendedPrivateKey, path: &PATH, use_legacy: bool) -> ExtendedPrivateKey
         where PATH: IIndexPath<Item = u32> {
+        println!("bls_key.derive: {}: {:?} {}", extended_private_key.serialize().as_slice().to_hex(), path.indexes(), use_legacy);
         if path.is_empty() {
             extended_private_key
         } else {
@@ -227,6 +228,7 @@ impl BLSKey {
     }
 
     pub fn init_with_bls_extended_private_key(bls_extended_private_key: &ExtendedPrivateKey, use_legacy: bool) -> Option<Self> {
+        println!("init_with_bls_extended_private_key bls_extended_private_key: {} {}", bls_extended_private_key.serialize().as_slice().to_hex(), use_legacy);
         let extended_private_key_data = bls_extended_private_key.serialize();
         let extended_public_key_opt = if use_legacy {
             bls_extended_private_key.extended_public_key_legacy()
