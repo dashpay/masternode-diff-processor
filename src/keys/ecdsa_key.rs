@@ -640,15 +640,31 @@ impl CryptoData<ECDSAKey> for Vec<u8> {
     fn encrypt_with_dh_key_using_iv(&self, key: &ECDSAKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
         println!("ecdsa_key.encrypt_with_dh_key_using_iv {:?}: {}", key.public_key_from_inner_secret_key_serialized(), initialization_vector.to_hex());
         let mut destination = initialization_vector.clone();
-        key.public_key_from_inner_secret_key_serialized()
-            .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
-            .and_then(|key_data: [u8; 32]| initialization_vector.try_into().ok()
-                .and_then(|iv_data: [u8; 16]| <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data))
-                .map(|encrypted_data| {
-                    destination.extend(encrypted_data);
-                    destination
-                })
-            )
+        let pubkey_data = key.public_key_from_inner_secret_key_serialized().unwrap_or(key.public_key_data());
+        if pubkey_data.is_empty() {
+            None
+        } else {
+            pubkey_data[..32].try_into().ok()
+                .and_then(|key_data: [u8; 32]| initialization_vector.try_into().ok()
+                    .and_then(|iv_data: [u8; 16]| <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data))
+                    .map(|encrypted_data| {
+                        destination.extend(encrypted_data);
+                        destination
+                    }))
+        }
+
+
+        // key.public_key()
+        //     .ok()
+        //     .map(|pubk| if key.compressed { pubk.serialize().to_vec() } else { pubk.serialize_uncompressed().to_vec() })
+        //     // .or(key.public_key_from_inner_secret_key_serialized())
+        //     .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
+        //     .and_then(|key_data: [u8; 32]| initialization_vector.try_into().ok()
+        //         .and_then(|iv_data: [u8; 16]| <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data))
+        //         .map(|encrypted_data| {
+        //             destination.extend(encrypted_data);
+        //             destination
+        //         }))
     }
 
     fn decrypt_with_dh_key_using_iv_size(&self, key: &ECDSAKey, iv_size: usize) -> Option<Vec<u8>> {
