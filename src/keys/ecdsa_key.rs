@@ -151,7 +151,7 @@ impl ECDSAKey {
     }
 
     fn with_shared_secret(secret: secp256k1::ecdh::SharedSecret, compressed: bool) -> Self {
-        Self { seckey: UInt256(secret.secret_bytes()), compressed, ..Default::default() }
+        Self { pubkey: secret.secret_bytes().to_vec(), compressed, ..Default::default() }
     }
 
     fn with_pubkey_compressed(pubkey: secp256k1::PublicKey, compressed: bool) -> Self {
