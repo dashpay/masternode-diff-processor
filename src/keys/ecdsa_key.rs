@@ -151,6 +151,7 @@ impl ECDSAKey {
     }
 
     fn with_shared_secret(secret: secp256k1::ecdh::SharedSecret, compressed: bool) -> Self {
+        println!("ecdsa_key.with_shared_secret: {} {}", secret.secret_bytes().to_hex(), compressed);
         Self { pubkey: secret.secret_bytes().to_vec(), compressed, ..Default::default() }
     }
 
@@ -637,6 +638,7 @@ impl CryptoData<ECDSAKey> for Vec<u8> {
     }
 
     fn encrypt_with_dh_key_using_iv(&self, key: &ECDSAKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+        println!("ecdsa_key.encrypt_with_dh_key_using_iv {:?}: {}", key.public_key_from_inner_secret_key_serialized(), initialization_vector.to_hex());
         let mut destination = initialization_vector.clone();
         key.public_key_from_inner_secret_key_serialized()
             .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
