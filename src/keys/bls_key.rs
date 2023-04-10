@@ -228,8 +228,8 @@ impl BLSKey {
     }
 
     pub fn init_with_bls_extended_private_key(bls_extended_private_key: &ExtendedPrivateKey, use_legacy: bool) -> Option<Self> {
-        println!("init_with_bls_extended_private_key bls_extended_private_key: {} {}", bls_extended_private_key.serialize().as_slice().to_hex(), use_legacy);
         let extended_private_key_data = bls_extended_private_key.serialize();
+        println!("init_with_bls_extended_private_key bls_extended_private_key: {} {}", extended_private_key_data.as_slice().to_hex(), use_legacy);
         let extended_public_key_opt = if use_legacy {
             bls_extended_private_key.extended_public_key_legacy()
         } else {
