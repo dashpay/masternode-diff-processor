@@ -80,5 +80,16 @@ fn test_bls_from_bip32_long_seed() {
         private_key.serialize().as_slice(),
         private_key_test_data.as_slice(),
         "----");
+}
 
+#[test]
+fn test_bls_fingerprint_from_bip32_seed() {
+    let seed = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    let key_pair = BLSKey::key_with_seed_data(&seed, true);
+    let key_pair_fingerprint = key_pair.fingerprint();
+    assert_eq!(key_pair_fingerprint, 0xddad59bb, "Testing BLS private child public key fingerprint");
+    let seed2 = [1, 50, 6, 244, 24, 199, 1, 25];
+    let key_pair2 = BLSKey::extended_private_key_with_seed_data(&seed2, true).unwrap();
+    let key_pair2_fingerprint = key_pair2.fingerprint();
+    assert_eq!(key_pair2_fingerprint, 0xa4700b27, "Testing BLS extended private child public key fingerprint");
 }

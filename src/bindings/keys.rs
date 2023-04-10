@@ -498,6 +498,14 @@ pub unsafe extern "C" fn key_bls_with_seed_data(data: *const u8, len: usize, use
 
 /// # Safety
 #[no_mangle]
+pub unsafe extern "C" fn key_bls_with_bip32_seed_data(data: *const u8, len: usize, use_legacy: bool) -> *mut BLSKey {
+    let seed_data = slice::from_raw_parts(data, len);
+    BLSKey::extended_private_key_with_seed_data(seed_data, use_legacy)
+        .map_or(null_mut(), boxed)
+}
+
+/// # Safety
+#[no_mangle]
 pub unsafe extern "C" fn key_bls_fingerprint(key: *mut BLSKey) -> u32 {
     (&*key).public_key_fingerprint()
 }
