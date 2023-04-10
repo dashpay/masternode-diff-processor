@@ -151,7 +151,7 @@ impl ECDSAKey {
     }
 
     fn with_shared_secret(secret: secp256k1::ecdh::SharedSecret, compressed: bool) -> Self {
-        Self { pubkey: secret.secret_bytes().to_vec(), compressed, ..Default::default() }
+        Self { seckey: UInt256(secret.secret_bytes()), compressed, ..Default::default() }
     }
 
     fn with_pubkey_compressed(pubkey: secp256k1::PublicKey, compressed: bool) -> Self {
@@ -637,10 +637,16 @@ impl CryptoData<ECDSAKey> for Vec<u8> {
     }
 
     fn encrypt_with_dh_key_using_iv(&self, key: &ECDSAKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+        let mut destination = initialization_vector.clone();
         key.public_key_from_inner_secret_key_serialized()
             .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
             .and_then(|key_data: [u8; 32]| initialization_vector.try_into().ok()
-                .and_then(|iv_data: [u8; 16]| <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data)))
+                .and_then(|iv_data: [u8; 16]| <Self as CryptoData<ECDSAKey>>::encrypt(self, key_data, iv_data))
+                .map(|encrypted_data| {
+                    destination.extend(encrypted_data);
+                    destination
+                })
+            )
     }
 
     fn decrypt_with_dh_key_using_iv_size(&self, key: &ECDSAKey, iv_size: usize) -> Option<Vec<u8>> {
