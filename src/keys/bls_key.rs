@@ -108,6 +108,7 @@ impl IKey for BLSKey {
 
     fn private_derive_to_path<PATH>(&self, path: &PATH) -> Option<Self>
         where Self: Sized, PATH: IIndexPath<Item = u32> {
+        println!("private_derive_to_path: {}", self.extended_private_key_data.to_hex());
         ExtendedPrivateKey::from_bytes(self.extended_private_key_data.as_slice())
             .ok()
             .and_then(|bls_extended_private_key|
@@ -255,6 +256,11 @@ impl BLSKey {
         } else {
             bls_public_key.serialize()
         };
+        println!("init_with_bls_extended_private_key.bls_private_key (seckey): {}", bls_private_key.serialize().as_slice().to_hex());
+        println!("init_with_bls_extended_private_key.extended_private_key_data: {}", extended_private_key_data.to_hex());
+        println!("init_with_bls_extended_private_key.extended_public_key_data: {}", extended_public_key_data.to_hex());
+        println!("init_with_bls_extended_private_key.chaincode: {}", chaincode);
+        println!("init_with_bls_extended_private_key.pubkey: {}", UInt384(*bls_public_key_bytes));
         if let Some(seckey) = UInt256::from_bytes(bls_private_key.serialize().as_slice(), &mut 0) {
             Some(Self {
                 extended_private_key_data: SecVec::with_vec(extended_private_key_data.to_vec()),

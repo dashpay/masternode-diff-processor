@@ -74,3 +74,20 @@ fn test_bls_encryption_and_decryption() {
     let decrypted_str = String::from_utf8(decrypted).unwrap();
     assert_eq!(secret, decrypted_str.as_str(), "they should be the same string");
 }
+
+#[test]
+pub fn test_base64_extended_public_key_size() {
+    let base64_engine = GeneralPurpose::new(&alphabet::STANDARD, GeneralPurposeConfig::default());
+    let alice_seed = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    let extended_private_key_data = Vec::from_hex("0000000106f68e209200000000ba3b3032119e384bc0f89ef795bfeebaa738be14c04733a6bace32b4a9370928064b824c2c47493a3a123356688033fc12d2464dca59ebe9978c801d14a84b7c").unwrap();
+    let extended_public_key_data = Vec::from_hex("0000000106f68e209200000000ba3b3032119e384bc0f89ef795bfeebaa738be14c04733a6bace32b4a937092892a8b8dc09228e56932aafed768fb5ec8579f284917be9f489c222950e62497ddaeafa87a15219df72627796a3588b08").unwrap();
+    // let alice_key_pair = BLSKey::key_with_extended_private_key_data(&extended_private_key_data, true).unwrap();
+    let alice_key_pair = BLSKey::key_with_secret_hex("064b824c2c47493a3a123356688033fc12d2464dca59ebe9978c801d14a84b7c", true).unwrap();
+
+    let bob_seed = [10, 9, 8, 7, 6, 6, 7, 8, 9, 10];
+    let bob_key_pair = BLSKey::key_with_seed_data(&bob_seed, true);
+    let mut ext_pk_data = Vec::from_hex("351973adaa8073a0ac848c08ba1c6df9a14d3c52033febe9bf4c5b365546a163bac5c8180240b908657221ebdc8fde7cd3017531159a7c58b955db380964c929dc6a85ac86").unwrap();
+    let encrypted = <Vec<u8> as CryptoData<BLSKey>>::encrypt_with_secret_key(&mut ext_pk_data, &alice_key_pair, &bob_key_pair).unwrap();
+    let base64_data = base64_engine.encode(encrypted);
+    assert_eq!(base64_data.len(), 128, "BLS privateKeyData is incorrect");
+}
