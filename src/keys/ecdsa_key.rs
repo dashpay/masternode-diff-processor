@@ -619,7 +619,7 @@ impl CryptoData<ECDSAKey> for Vec<u8> {
             .ok()
             .and_then(|shared_secret| <Self as CryptoData<ECDSAKey>>::encrypt(self, shared_secret.secret_bytes(), initialization_vector))
             .map(|encrypted_data| {
-                destination.extend(encrypted_data.clone());
+                destination.extend(encrypted_data);
                 destination
             })
     }

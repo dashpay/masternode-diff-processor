@@ -569,11 +569,15 @@ impl CryptoData<BLSKey> for Vec<u8> {
     }
 
     fn encrypt_with_dh_key_using_iv(&self, key: &BLSKey, initialization_vector: Vec<u8>) -> Option<Vec<u8>> {
+        let mut destination = initialization_vector.clone();
         key.bls_public_key_serialized()
             .and_then(|sym_key_data| sym_key_data[..32].try_into().ok())
             .and_then(|key_data: [u8; 32]| initialization_vector[..16].try_into().ok()
-                .and_then(|iv_data: [u8; 16]|
-                    <Self as CryptoData<BLSKey>>::encrypt(self, key_data, iv_data)))
+                .and_then(|iv_data: [u8; 16]| <Self as CryptoData<BLSKey>>::encrypt(self, key_data, iv_data))
+                .map(|encrypted_data| {
+                    destination.extend(encrypted_data);
+                    destination
+                }))
     }
 
     fn decrypt_with_dh_key_using_iv_size(&self, key: &BLSKey, iv_size: usize) -> Option<Vec<u8>> {
