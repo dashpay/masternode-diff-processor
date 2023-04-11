@@ -116,6 +116,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
     fn append_proposal_info(proposal_info: &Vec<u8>, mut writer: Self) -> Self {
         let hash = sha256d::Hash::hash(proposal_info).into_inner();
         OP_RETURN.into_u8().enc(&mut writer);
+        // TODO check we need to write varint
         hash.to_vec().enc(&mut writer);
         // writer.append_script_push_data(hash.to_vec());
         // hash.to_vec().append_script_push_data(&mut writer);
@@ -189,7 +190,9 @@ impl DataAppend for Vec<u8> /* io::Write */ {
                 (len as u32).enc(&mut writer);
             },
         }
-        self.enc(&mut writer);
+        writer.write(self)
+            .expect("can't write script push data");
+        // self.enc(&mut writer);
         // writer
     }
 

@@ -1,4 +1,4 @@
-use hashes::hex::FromHex;
+use hashes::hex::{FromHex, ToHex};
 use hashes::{sha256, Hash};
 
 use crate::chain::common::ChainType;
@@ -6,6 +6,7 @@ use crate::crypto::UInt256;
 use crate::keys::{ECDSAKey, IKey};
 use crate::util::address::address::is_valid_dash_private_key;
 use crate::util::base58;
+use crate::util::data_append::DataAppend;
 
 // TODO: impl bip38 and their tests
 
@@ -171,3 +172,46 @@ fn test_ecdsa_encryption_and_decryption() {
         None => panic!("No data encrypted"),
     }
 }*/
+
+#[test]
+fn private_key_with_non_base_string() {
+    let chain_type = ChainType::TestNet;
+    let script_map = chain_type.script_map();
+    let ipk1 = "cNeRqjZpEEowdxMjiBa7S5uBgqweng19F1EZRFWcqE2XTpDy1Vzt";
+    let ipk2 = "35a56b070a8ec80f6c0cba21886aba9b308c4e40ed7b4f290749333522125f7c";
+    let ipk3 = "eee3e42d35d1c75ea4cf3dbc902de9619faf0cd6ba1ab178a873d80c3f7dc90c";
+    let ipk4 = "19d6aba7a9fcdb627ad39a2176689c2dcca13db68415411d88b1c37c2103794a";
+    let ipk5 = "b4788261554d2f74647e547ef34018c228b7869191c0dc0086d91901c515c370";
+    let pk1 = ECDSAKey::key_with_private_key(ipk1, chain_type);
+    let pk2 = ECDSAKey::key_with_private_key(ipk2, chain_type);
+    let pk3 = ECDSAKey::key_with_private_key(ipk3, chain_type);
+    let pk4 = ECDSAKey::key_with_private_key(ipk4, chain_type);
+    let pk5 = ECDSAKey::key_with_private_key(ipk5, chain_type);
+    assert!(pk1.is_some(), "pk1 is none");
+    assert!(pk2.is_some(), "pk2 is none");
+    assert!(pk3.is_some(), "pk3 is none");
+    assert!(pk4.is_some(), "pk4 is none");
+    assert!(pk5.is_some(), "pk5 is none");
+    let ia1 = pk1.unwrap().address_with_public_key_data(&script_map);
+    let ia2 = pk2.unwrap().address_with_public_key_data(&script_map);
+    let ia3 = pk3.unwrap().address_with_public_key_data(&script_map);
+    let ia4 = pk4.unwrap().address_with_public_key_data(&script_map);
+    let ia5 = pk5.unwrap().address_with_public_key_data(&script_map);
+    assert_eq!(ia1, "yaMmAV9Fmx4St7xPH9eHCLcYJZdGYd8vD8");
+    assert_eq!(ia2, "yhf7gKjEimNd1uYatJBk3Xw88oKgE4Texj");
+    assert_eq!(ia3, "yVLAtNKRZsX3nh8v4e9cVnk79xows2nYXX");
+    assert_eq!(ia4, "yeqepWHkXT2fuJG15XmLratBNSyhMBJLfg");
+    assert_eq!(ia5, "yUmE18TDgByXSeJiE4QPwuyBS151Ls2rZu");
+
+    let script1 = Vec::<u8>::script_pub_key_for_address(&ia1, &script_map);
+    let script2 = Vec::<u8>::script_pub_key_for_address(&ia2, &script_map);
+    let script3 = Vec::<u8>::script_pub_key_for_address(&ia3, &script_map);
+    let script4 = Vec::<u8>::script_pub_key_for_address(&ia4, &script_map);
+    let script5 = Vec::<u8>::script_pub_key_for_address(&ia5, &script_map);
+
+    assert_eq!(script1.to_hex(), "76a9149a01e1b57808ed4f14553fc4624de20c13c9e97e88ac");
+    assert_eq!(script2.to_hex(), "76a914ea12f5467a2351e842fcf6124435273039fe185e88ac");
+    assert_eq!(script3.to_hex(), "76a91462dc3919f49e95fe2e81af07d96149d0fd77353588ac");
+    assert_eq!(script4.to_hex(), "76a914cb28bc5238bf5fcb97ddc7763ccc8c8a34fb38cd88ac");
+    assert_eq!(script5.to_hex(), "76a9145ca1190f85fb51c702f6ee97e8871c7a6b14bc7788ac");
+}

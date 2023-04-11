@@ -120,13 +120,17 @@ impl ECDSAKey {
                 is_valid_dash_private_key(&private_key.to_string(), &chain_type.script_map())
                     .then_some(Self::with_seckey(secp256k1::SecretKey::from_hashed_data::<sha256::Hash>(private_key.as_bytes()), false)),
             _ => {
-                let mut data = match base58::from_check(private_key) {
-                    Ok(data) if data.len() != 28 => data,
-                    _ => base58::from(private_key).unwrap_or(vec![])
-                };
-                if !(32..=34).contains(&data.len()) {
-                    data = Vec::from_hex(private_key.as_bytes().to_hex().as_str()).unwrap_or(vec![]);
+                let mut d = base58::from_check(private_key).ok();
+                if d.is_none() || d.as_ref().unwrap().len() == 28 {
+                    d = base58::from(private_key).ok();
                 }
+                if d.as_ref().is_none() || !(32..=34).contains(&d.as_ref().unwrap().len()) {
+                    d = Vec::from_hex(private_key).ok();
+                }
+                if d.as_ref().is_none() {
+                    return None;
+                }
+                let data = d.unwrap();
                 match data.len() {
                     33 | 34 if data[0] == chain_type.script_map().privkey =>
                         Self::secret_key_from_bytes(&data[1..33]).ok().map(|seckey| Self::with_seckey(seckey, data.len() == 34)),
