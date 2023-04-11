@@ -503,8 +503,7 @@ impl UInt256 {
     }
     pub fn x11_hash(data: &[u8]) -> Self {
         let hash = rs_x11_hash::get_x11_hash(&data);
-        UInt256::from_bytes(&hash, &mut 0)
-            .expect("Error x11 hashing")
+        UInt256(hash)
     }
 
     pub fn block_hash_for_dev_net_genesis_block_with_version(version: u32, prev_hash: UInt256, merkle_root: UInt256, timestamp: u32, target: u32, nonce: u32) -> Self {

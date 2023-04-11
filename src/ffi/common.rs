@@ -24,6 +24,13 @@ impl From<blake3::Hash> for ByteArray {
     }
 }
 
+impl From<[u8; 32]> for ByteArray {
+    fn from(value: [u8; 32]) -> Self {
+        let vec = value.to_vec();
+        vec.into()
+    }
+}
+
 impl From<[u8; 65]> for ByteArray {
     fn from(value: [u8; 65]) -> Self {
         let vec = value.to_vec();
