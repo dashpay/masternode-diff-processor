@@ -1,5 +1,9 @@
 use hashes::hex::{FromHex, ToHex};
-use crate::bindings::keys::{key_create_from_extended_public_key_data, key_extended_public_key_data};
+use crate::bindings::keys::{key_bls_chaincode, key_bls_with_bip32_seed_data, key_create_from_extended_public_key_data, key_extended_public_key_data, key_private_key_at_index_path};
+use crate::chain::derivation::{IIndexPath, IndexPath};
+use crate::crypto::byte_util::ConstDecodable;
+use crate::crypto::UInt256;
+use crate::ffi::IndexPathData;
 use crate::keys::KeyKind;
 
 #[test]
@@ -15,4 +19,40 @@ fn test_keys() {
     let seed_bytes = unsafe { std::slice::from_raw_parts(extended_public_key_data.ptr, extended_public_key_data.len) };
     println!("extended_public_key_data: {:?}", seed_bytes.to_hex());
     assert_eq!(seed_bytes.to_hex(), extended_public_key_data_string);
+}
+
+#[test]
+fn derive_bls() {
+    let seed = Vec::from_hex("467c2dd58bbd29427fb3c5467eee339021a87b21309eeabfe9459d31eeb6eba9b2a1213c12a173118c84fd49e8b4bf9282272d67bf7b7b394b088eab53b438bc").unwrap();
+    let index_path = IndexPath::index_path_with_index(0u32);
+    let indexes = vec![
+        UInt256::from_hex("0900000000000000000000000000000000000000000000000000000000000000").unwrap(),
+        UInt256::from_hex("0500000000000000000000000000000000000000000000000000000000000000").unwrap(),
+        UInt256::from_hex("0500000000000000000000000000000000000000000000000000000000000000").unwrap(),
+        UInt256::from_hex("0000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+        UInt256::from_hex("0100000000000000000000000000000000000000000000000000000000000000").unwrap(),
+    ];
+    let hardened = vec![true, true, true, true, true];
+    let indexes = vec![0];
+    let index_path_data = IndexPathData  {
+        indexes: indexes.as_ptr(),
+        len: 1,
+    };
+    let indexes = b"09000000000000000000000000000000000000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000050000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000";
+
+    unsafe {
+        let key = key_private_key_at_index_path(seed.as_ptr(), seed.len(), KeyKind::BLS, &index_path_data as *const IndexPathData, indexes.as_ptr(), hardened.as_ptr(), 5);
+        let ext_pub = key_extended_public_key_data(key);
+        println!("{:?}", ext_pub);
+    }
+}
+
+#[test]
+fn bls_chaincode() {
+    let seed = [1, 50, 6, 244, 24, 199, 1, 25];
+    let key_pair = unsafe { key_bls_with_bip32_seed_data(seed.as_ptr(), seed.len(), true) };
+    let chain_code = unsafe { key_bls_chaincode(key_pair) };
+    let chaincode = UInt256::from_const(chain_code.ptr).unwrap();
+    assert_eq!(chaincode.0.to_hex(), "d8b12555b4cc5578951e4a7c80031e22019cc0dce168b3ed88115311b8feb1e3", "Testing BLS derivation chain code");
+
 }

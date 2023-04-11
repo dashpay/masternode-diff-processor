@@ -54,10 +54,8 @@ macro_rules! impl_ffi_bytearray {
     ($var_type: ident) => {
         impl From<$var_type> for ffi::ByteArray {
             fn from(value: $var_type) -> Self {
-                let ptr = value.0.as_ptr();
-                let len = value.0.len();
-                mem::forget(value);
-                ffi::ByteArray { ptr, len }
+                let vec = value.0.to_vec();
+                vec.into()
             }
         }
         impl From<Option<$var_type>> for ffi::ByteArray {

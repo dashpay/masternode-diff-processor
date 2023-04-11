@@ -19,19 +19,15 @@ impl Default for ByteArray {
 impl From<blake3::Hash> for ByteArray {
     fn from(value: blake3::Hash) -> Self {
         let bytes: [u8; 32] = value.into();
-        let ptr = bytes.as_ptr();
-        let len = bytes.len();
-        mem::forget(bytes);
-        ByteArray { ptr, len }
+        let vec = bytes.to_vec();
+        vec.into()
     }
 }
 
 impl From<[u8; 65]> for ByteArray {
     fn from(value: [u8; 65]) -> Self {
-        let ptr = value.as_ptr();
-        let len = value.len();
-        mem::forget(value);
-        ByteArray { ptr, len }
+        let vec = value.to_vec();
+        vec.into()
     }
 }
 
@@ -58,10 +54,7 @@ impl From<Option<Vec<u8>>> for ByteArray {
     fn from(value: Option<Vec<u8>>) -> Self {
         match value {
             Some(vec) => {
-                let ptr = vec.as_ptr();
-                let len = vec.len();
-                mem::forget(vec);
-                ByteArray { ptr, len }
+                vec.into()
             }
             None => ByteArray::default(),
         }
