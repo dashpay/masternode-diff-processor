@@ -772,13 +772,13 @@ pub unsafe extern "C" fn key_create_from_extended_private_key_data(ptr: *const u
 pub unsafe extern "C" fn key_serialized_extended_private_key_from_seed(
     secret: *const u8,
     secret_len: usize,
-    index_path: *const u8, // Vec<UInt256 + bool>
-    path_length: usize,
+    derivation_indexes: *const u8,
+    derivation_hardened: *const bool,
+    derivation_len: usize,
     chain_id: i16) -> *mut c_char {
     let secret_slice = unsafe { slice::from_raw_parts(secret, secret_len) };
-    let indexes_slice = unsafe { slice::from_raw_parts(index_path, 33 * path_length) };
+    let index_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
     let chain_type = ChainType::from(chain_id);
-    let index_path = indexes_slice.read_with::<IndexPath<UInt256>>(&mut 0, path_length).unwrap();
     ECDSAKey::serialized_extended_private_key_from_seed(secret_slice, index_path, chain_type)
         .to_c_string_ptr()
 }
