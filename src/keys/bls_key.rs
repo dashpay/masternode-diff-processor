@@ -34,17 +34,19 @@ impl BLSKey {
     }
 
     pub fn key_with_private_key_data(data: &[u8], use_legacy: bool) -> Option<Self> {
+        println!("bls key_with_private_key_data: {}: {}", data.to_hex(), use_legacy);
         UInt256::from_bytes(data, &mut 0)
-            .and_then(|seckey| PrivateKey::from_bytes(data, false)
+            .and_then(|seckey| PrivateKey::from_bytes(data, use_legacy)
                 .ok()
-                .and_then(|bls_private_key| bls_private_key.g1_element()
+                .and_then(|bls_private_key| bls_private_key
+                    .g1_element()
                     .ok()
-                    .map(|bls_public_key|
-                        Self {
-                            seckey,
-                            pubkey: UInt384(*if use_legacy { bls_public_key.serialize() } else { bls_public_key.serialize_legacy() }),
-                            use_legacy,
-                            ..Default::default() })))
+                    .map(|bls_public_key| Self {
+                        seckey,
+                        pubkey: UInt384(*if use_legacy { bls_public_key.serialize_legacy() } else { bls_public_key.serialize() }),
+                        use_legacy,
+                        ..Default::default()
+                    })))
     }
 
     pub fn key_with_public_key(pubkey: UInt384, use_legacy: bool) -> Self {

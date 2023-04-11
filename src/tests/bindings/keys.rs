@@ -1,10 +1,13 @@
+use std::ffi::CString;
 use hashes::hex::{FromHex, ToHex};
-use crate::bindings::keys::{key_bls_chaincode, key_bls_with_bip32_seed_data, key_create_from_extended_public_key_data, key_extended_public_key_data, key_private_key_at_index_path};
+use crate::bindings::keys::{key_bls_chaincode, key_bls_public_key, key_bls_with_bip32_seed_data, key_create_from_extended_public_key_data, key_extended_public_key_data, key_private_key_at_index_path, key_with_private_key};
 use crate::chain::derivation::{IIndexPath, IndexPath};
+use crate::common::ChainType;
 use crate::crypto::byte_util::ConstDecodable;
-use crate::crypto::UInt256;
+use crate::crypto::{UInt256, UInt384};
 use crate::ffi::IndexPathData;
 use crate::keys::KeyKind;
+use crate::types::opaque_key::OpaqueKey;
 
 #[test]
 fn test_keys() {
@@ -55,4 +58,24 @@ fn bls_chaincode() {
     let chaincode = UInt256::from_const(chain_code.ptr).unwrap();
     assert_eq!(chaincode.0.to_hex(), "d8b12555b4cc5578951e4a7c80031e22019cc0dce168b3ed88115311b8feb1e3", "Testing BLS derivation chain code");
 
+}
+
+#[test]
+fn bls_operator_key() {
+    //return key_with_private_key([key UTF8String], keyType, chainType);
+    let operator_key_hex_string = "0fc63f4e6d7572a6c33465525b5c3323f57036873dd37c98c393267c58b50533";
+    let str = CString::new(operator_key_hex_string).unwrap();
+    let key = unsafe { key_with_private_key(str.as_ptr(), KeyKind::BLS, ChainType::TestNet.into()) };
+
+    unsafe {
+        match key.as_ref() {
+            Some(OpaqueKey::BLSLegacy(bls_key)) => {
+                let pubkey = key_bls_public_key(*bls_key);
+                let k = UInt384::from_const(pubkey.ptr).unwrap();
+                let tst = UInt384::from_hex("139b654f0b1c031e1cf2b934c2d895178875cfe7c6a4f6758f02bc66eea7fc292d0040701acbe31f5e14a911cb061a2f").unwrap();
+                assert_eq!(tst, k);
+            },
+            _ => {}
+        }
+    }
 }
