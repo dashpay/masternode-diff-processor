@@ -28,7 +28,7 @@ impl BLSKey {
             .map(|data| Self::key_with_seed_data(&data, use_legacy))
     }
     pub fn key_with_private_key(string: &str, use_legacy: bool) -> Option<Self> {
-        Vec::from_hex(string.as_bytes().to_hex().as_str())
+        Vec::from_hex(string)
             .ok()
             .and_then(|data| Self::key_with_private_key_data(&data, use_legacy))
     }
