@@ -872,7 +872,7 @@ impl MasternodeProcessor {
         &self,
         base_block_hash: UInt256,
         block_hash: UInt256,
-    ) -> u8 {
+    ) -> ProcessingError {
         unsafe {
             (self.should_process_diff_with_range)(
                 boxed(base_block_hash.0),

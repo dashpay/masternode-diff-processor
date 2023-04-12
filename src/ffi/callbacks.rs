@@ -3,6 +3,7 @@ use std::ffi::c_void;
 use crate::{models, types};
 use crate::crypto::{byte_util::MutDecodable, UInt256};
 use crate::ffi::from::FromFFI;
+use crate::processing::ProcessingError;
 
 pub type AddInsightBlockingLookup =
     unsafe extern "C" fn(block_hash: *mut [u8; 32], context: *const c_void);
@@ -12,10 +13,7 @@ pub type ShouldProcessDiffWithRange = unsafe extern "C" fn(
     base_block_hash: *mut [u8; 32],
     block_hash: *mut [u8; 32],
     context: *const c_void,
-) -> u8;
-// pub type SendError = unsafe extern "C" fn(error: u8, context: *const c_void);
-// pub type ValidateLLMQCallback =
-//     unsafe extern "C" fn(data: *mut types::LLMQValidationData, context: *const c_void) -> bool;
+) -> ProcessingError;
 
 pub type GetBlockHeightByHash =
     unsafe extern "C" fn(block_hash: *mut [u8; 32], context: *const c_void) -> u32;
@@ -43,7 +41,6 @@ pub type SaveLLMQSnapshot = unsafe extern "C" fn(
     snapshot: *mut types::LLMQSnapshot,
     context: *const c_void,
 ) -> bool;
-// pub type LogMessage = unsafe extern "C" fn(message: *const libc::c_char, context: *const c_void);
 pub type HashDestroy = unsafe extern "C" fn(hash: *mut u8);
 pub type LLMQSnapshotDestroy = unsafe extern "C" fn(snapshot: *mut types::LLMQSnapshot);
 

@@ -38,8 +38,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     if !is_from_snapshot {
         let error = processor
             .should_process_diff_with_range(list_diff.base_block_hash, list_diff.block_hash);
-        let none_error: u8 = ProcessingError::None.into();
-        if error != none_error {
+        if error != ProcessingError::None {
             println!("process_mnlistdiff_from_message <- {:?} ms [{:?}]", instant.elapsed().as_millis(), error);
             return boxed(types::MNListDiffResult::default_with_error(error));
         }
@@ -91,8 +90,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     if !is_from_snapshot {
         let error =
             processor.should_process_diff_with_range(diff_tip.base_block_hash, diff_tip.block_hash);
-        let none_error: u8 = ProcessingError::None.into();
-        if error != none_error {
+        if error != ProcessingError::None {
             println!("process_qrinfo_from_message <- {:?} ms [{:#?}]", instant.elapsed().as_millis(), error);
             return boxed(types::QRInfoResult::default_with_error(error));
         }
@@ -163,7 +161,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
         processor.save_snapshot(block_hash, snapshot.clone());
     }
     let result = types::QRInfoResult {
-        error_status: ProcessingError::None.into(),
+        error_status: ProcessingError::None,
         result_at_tip,
         result_at_h,
         result_at_h_c,

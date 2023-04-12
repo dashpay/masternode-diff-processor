@@ -443,8 +443,8 @@ pub mod tests {
         base_block_hash: *mut [u8; 32],
         block_hash: *mut [u8; 32],
         context: *const std::ffi::c_void,
-    ) -> u8 {
-        ProcessingError::None.into()
+    ) -> ProcessingError {
+        ProcessingError::None
     }
     pub unsafe extern "C" fn snapshot_destroy_default(_snapshot: *mut types::LLMQSnapshot) {}
     pub unsafe extern "C" fn add_insight_lookup_default(
