@@ -68,17 +68,17 @@ pub mod address {
 
     }
 
-    pub fn is_valid_dash_address_for_script_map(address: &String, map: &ScriptMap) -> bool {
+    pub fn is_valid_dash_address_for_script_map(address: &str, map: &ScriptMap) -> bool {
         if address.len() > 35 {
             return false;
         }
-        match base58::from_check(address.as_str()) {
+        match base58::from_check(address) {
             Ok(d) if d.len() == 21 => d[0] == map.pubkey || d[0] == map.script,
             _ => false
         }
     }
 
-    pub fn is_valid_dash_devnet_address(address: &String) -> bool {
+    pub fn is_valid_dash_devnet_address(address: &str) -> bool {
         is_valid_dash_address_for_script_map(address, &ScriptMap::TESTNET)
     }
 

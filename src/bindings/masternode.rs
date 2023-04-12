@@ -1,16 +1,12 @@
-use std::os::raw::c_char;
 use std::ptr::null_mut;
 use std::slice;
 use byte::BytesExt;
 use crate::{models, types};
-use crate::chain::ScriptMap;
 use crate::common::LLMQType;
 use crate::consensus::encode;
-use crate::crypto::{UInt256, byte_util::{BytesDecodable, ConstDecodable}, UInt160};
+use crate::crypto::{UInt256, byte_util::{BytesDecodable, ConstDecodable}};
 use crate::ffi::{boxer::{boxed, boxed_vec}, ByteArray, from::FromFFI, to::ToFFI};
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache, ProcessingError};
-use crate::types::opaque_key::AsCStringPtr;
-use crate::util::address::address;
 
 /// Read and process message received as a response for 'GETMNLISTDIFF' call
 /// Here we calculate quorums according to Core v0.17
@@ -232,13 +228,4 @@ pub extern "C" fn masternode_hash_confirmed_hash(confirmed_hash: *const u8, pro_
     let confirmed_hash = UInt256::from_const(confirmed_hash).unwrap_or(UInt256::MIN);
     let pro_reg_tx_hash = UInt256::from_const(pro_reg_tx_hash).unwrap_or(UInt256::MIN);
     models::MasternodeEntry::hash_confirmed_hash(confirmed_hash, pro_reg_tx_hash).into()
-}
-
-/// # Safety
-#[no_mangle]
-pub extern "C" fn address_from_hash160(hash: *const u8, chain_id: i16) -> *mut c_char {
-    let hash = UInt160::from_const(hash).unwrap_or(UInt160::MIN);
-    let script_map = ScriptMap::from(chain_id);
-    address::from_hash160_for_script_map(&hash, &script_map)
-        .to_c_string_ptr()
 }

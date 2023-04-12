@@ -8,7 +8,7 @@ use crate::util::script::{op_len, ScriptElement};
 pub trait DataAppend: std::io::Write {
     fn from_coinbase_message(message: &String, height: u32) -> Self;
     fn devnet_genesis_coinbase_message(identifier: &String, version: u16, protocol_version: u32) -> Self;
-    fn script_pub_key_for_address(address: &String, script_map: &ScriptMap) -> Self;
+    fn script_pub_key_for_address(address: &str, script_map: &ScriptMap) -> Self;
     fn credit_burn_script_pub_key_for_address(address: &String, script_map: &ScriptMap) -> Self;
     fn proposal_info(proposal_info: Vec<u8>) -> Self;
     fn shapeshift_memo_for_address(address: String) -> Self;
@@ -17,7 +17,7 @@ pub trait DataAppend: std::io::Write {
     fn append_devnet_genesis_coinbase_message(identifier: &String, version: u16, protocol_version: u32, writer: Self) -> Self;
     fn append_credit_burn_script_pub_key_for_address(address: &String, script_map: &ScriptMap, writer: Self) -> Self;
     fn append_proposal_info(proposal_info: &Vec<u8>, writer: Self) -> Self;
-    fn append_script_pub_key_for_address(address: &String, script_map: &ScriptMap, writer: Self) -> Self;
+    fn append_script_pub_key_for_address(address: &str, script_map: &ScriptMap, writer: Self) -> Self;
     fn append_script_push_data<W: std::io::Write>(&self, writer: W);
     // fn append_script_push_data(&mut self, data: Vec<u8>);
     fn append_shapeshift_memo_for_address(address: String, writer: Self) -> Self;
@@ -41,7 +41,7 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         Self::append_devnet_genesis_coinbase_message(identifier, version, protocol_version, Vec::<u8>::new())
     }
 
-    fn script_pub_key_for_address(address: &String, script_map: &ScriptMap) -> Self {
+    fn script_pub_key_for_address(address: &str, script_map: &ScriptMap) -> Self {
         Self::append_script_pub_key_for_address(address, script_map, Vec::<u8>::new())
     }
 
@@ -123,8 +123,8 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         writer
     }
 
-    fn append_script_pub_key_for_address(address: &String, script_map: &ScriptMap, mut writer: Self) -> Self {
-        match base58::from_check(address.as_str()) {
+    fn append_script_pub_key_for_address(address: &str, script_map: &ScriptMap, mut writer: Self) -> Self {
+        match base58::from_check(address) {
             Ok(data) => match &data[..] {
                 [v, data @ ..] if *v == script_map.pubkey => {
                     OP_DUP.into_u8().enc(&mut writer);
