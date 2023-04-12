@@ -86,6 +86,14 @@ pub const DKG_60_75: DKGParams = DKGParams {
     bad_votes_threshold: 48,
 };
 
+pub const DKG_25_67: DKGParams = DKGParams {
+    interval: 24,
+    phase_blocks: 2,
+    mining_window_start: 10,
+    mining_window_end: 18,
+    bad_votes_threshold: 22,
+};
+
 pub const DKG_PLATFORM_TESTNET: DKGParams = DKGParams {
     interval: 24 * 12,
     phase_blocks: 2,
@@ -225,6 +233,18 @@ pub const LLMQ_60_75: LLMQParams = LLMQParams {
     recovery_members: 25,
 };
 
+pub const LLMQ_25_67: LLMQParams = LLMQParams {
+    r#type: LLMQType::Llmqtype25_67,
+    name: "llmq_25_67",
+    size: 25,
+    min_size: 22,
+    threshold: 17,
+    dkg_params: DKG_25_67,
+    signing_active_quorum_count: 24,
+    keep_old_connections: 25,
+    recovery_members: 12,
+};
+
 pub const LLMQ_TEST_PLATFORM: LLMQParams = LLMQParams {
     r#type: LLMQType::LlmqtypeTestnetPlatform,
     name: "llmq_test_platform",
@@ -253,23 +273,22 @@ pub const LLMQ_DEV_PLATFORM: LLMQParams = LLMQParams {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 pub enum LLMQType {
-    LlmqtypeUnknown = 0, //other kind of
-    Llmqtype50_60 = 1,   // 50 members, 30 (60%) threshold, one per hour
-    Llmqtype400_60 = 2,  // 400 members, 240 (60%) threshold, one every 12 hours
-    Llmqtype400_85 = 3,  // 400 members, 340 (85%) threshold, one every 24 hours
-    Llmqtype100_67 = 4,  // 100 members, 67 (67%) threshold, one per hour
-    Llmqtype60_75 = 5,   // 60 members, 45 (75%) threshold, one every 12 hours
+    LlmqtypeUnknown = 0,    // other kind of
+    Llmqtype50_60 = 1,      // 50 members,  30  (60%) threshold, 24 / day
+    Llmqtype400_60 = 2,     // 400 members, 240 (60%) threshold, 2  / day
+    Llmqtype400_85 = 3,     // 400 members, 340 (85%) threshold, 1  / day
+    Llmqtype100_67 = 4,     // 100 members, 67  (67%) threshold, 24 / day
+    Llmqtype60_75 = 5,      // 60 members,  45  (75%) threshold, 2  / day
+    Llmqtype25_67 = 6,      // 25 members,  67  (67%) threshold, 24 / day
 
-    LlmqtypeTest = 100,             // 3 members, 2 (66%) threshold, one per hour
     // dev-only
+    LlmqtypeTest = 100,             // 3 members, 2 (66%) threshold, one per hour
     LlmqtypeDevnet = 101,           // 10 members, 6 (60%) threshold, one per hour
     LlmqtypeTestV17 = 102, // 3 members, 2 (66%) threshold, one per hour. Params might differ when -llmqtestparams is used
     LlmqtypeTestDIP0024 = 103, // 4 members, 2 (66%) threshold, one per hour. Params might differ when -llmqtestparams is used
     LlmqtypeDevnetDIP0024 = 105, // 8 members, 4 (50%) threshold, one per hour. Params might differ when -llmqdevnetparams is used
     LlmqtypeTestnetPlatform = 106, // 8 members, 4 (50%) threshold, one per hour. Params might differ when -llmqdevnetparams is used
     LlmqtypeDevnetPlatform = 107, // 8 members, 4 (50%) threshold, one per hour. Params might differ when -llmqdevnetparams is used
-    // LLMQ_TEST_PLATFORM = 106,    // 4 members, 2 (66%) threshold, one per hour.
-    LlmqtypeChachaBLSv19 = 205,
 }
 
 
@@ -281,6 +300,7 @@ impl LLMQType {
             LLMQType::Llmqtype400_85 => LLMQ_400_85,
             LLMQType::Llmqtype100_67 => LLMQ_100_67,
             LLMQType::Llmqtype60_75 => LLMQ_60_75,
+            LLMQType::Llmqtype25_67 => LLMQ_25_67,
             LLMQType::LlmqtypeTest => LLMQ_TEST,
             LLMQType::LlmqtypeDevnet => LLMQ_DEVNET,
             LLMQType::LlmqtypeTestV17 => LLMQ_V017,
@@ -288,7 +308,6 @@ impl LLMQType {
             LLMQType::LlmqtypeDevnetDIP0024 => LLMQ_0024,
             LLMQType::LlmqtypeTestnetPlatform => LLMQ_TEST_PLATFORM,
             LLMQType::LlmqtypeDevnetPlatform => LLMQ_DEV_PLATFORM,
-            LLMQType::LlmqtypeChachaBLSv19 => LLMQ_DEVNET,
             LLMQType::LlmqtypeUnknown => LLMQ_DEVNET,
         }
     }
@@ -313,13 +332,13 @@ impl From<u8> for LLMQType {
             3 => LLMQType::Llmqtype400_85,
             4 => LLMQType::Llmqtype100_67,
             5 => LLMQType::Llmqtype60_75,
+            6 => LLMQType::Llmqtype25_67,
             100 => LLMQType::LlmqtypeTest,
             101 => LLMQType::LlmqtypeDevnet,
             102 => LLMQType::LlmqtypeTestV17,
             103 => LLMQType::LlmqtypeTestDIP0024,
             105 => LLMQType::LlmqtypeDevnetDIP0024,
             106 => LLMQType::LlmqtypeTestnetPlatform,
-            205 => LLMQType::LlmqtypeChachaBLSv19,
             _ => LLMQType::LlmqtypeUnknown,
         }
     }
@@ -334,6 +353,7 @@ impl From<LLMQType> for u8 {
             LLMQType::Llmqtype400_85 => 3,
             LLMQType::Llmqtype100_67 => 4,
             LLMQType::Llmqtype60_75 => 5,
+            LLMQType::Llmqtype25_67 => 6,
             LLMQType::LlmqtypeTest => 100,
             LLMQType::LlmqtypeDevnet => 101,
             LLMQType::LlmqtypeTestV17 => 102,
@@ -341,7 +361,6 @@ impl From<LLMQType> for u8 {
             LLMQType::LlmqtypeDevnetDIP0024 => 105,
             LLMQType::LlmqtypeTestnetPlatform => 106,
             LLMQType::LlmqtypeDevnetPlatform => 107,
-            LLMQType::LlmqtypeChachaBLSv19 => 205,
         }
     }
 }
