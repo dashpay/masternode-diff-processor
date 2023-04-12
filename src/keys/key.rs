@@ -300,7 +300,6 @@ impl IKey for Key {
 
     fn private_derive_to_256bit_derivation_path<PATH>(&self, path: &PATH) -> Option<Self>
         where Self: Sized, PATH: IIndexPath<Item=UInt256> {
-        println!("Key.private_derive_to_256bit_derivation_path: {:?} {:?}", path.indexes(), path.hardened_indexes());
         match self {
             Key::ECDSA(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),
             Key::BLS(key) => key.private_derive_to_256bit_derivation_path(path).map(Into::into),

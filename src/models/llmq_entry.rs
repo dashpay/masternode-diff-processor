@@ -208,14 +208,15 @@ impl LLMQEntry {
         )
     }
 
+    pub fn build_llmq_quorum_hash(llmq_type: LLMQType, llmq_hash: UInt256) -> UInt256 {
+        let mut writer: Vec<u8> = Vec::with_capacity(33);
+        VarInt(llmq_type as u64).enc(&mut writer);
+        llmq_hash.enc(&mut writer);
+        UInt256(sha256d::Hash::hash(&writer).into_inner())
+    }
+
     pub fn llmq_quorum_hash(&self) -> UInt256 {
-        let mut buffer: Vec<u8> = Vec::with_capacity(33);
-        let offset: &mut usize = &mut 0;
-        *offset += VarInt(self.llmq_type as u64)
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += self.llmq_hash.consensus_encode(&mut buffer).unwrap();
-        UInt256(sha256d::Hash::hash(&buffer).into_inner())
+        Self::build_llmq_quorum_hash(self.llmq_type, self.llmq_hash)
     }
 
     pub fn commitment_data(&self) -> Vec<u8> {

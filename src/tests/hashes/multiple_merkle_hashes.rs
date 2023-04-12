@@ -6,7 +6,7 @@ use crate::common::merkle_tree::MerkleTree;
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{AsBytes, UInt256};
 use crate::crypto::data_ops::Data;
-use crate::util::address::address::{with_script_pub_key, with_script_sig};
+use crate::util::address::address;
 use crate::util::base58;
 use crate::util::data_append::DataAppend;
 use crate::util::script::ScriptElement;
@@ -291,13 +291,13 @@ fn check_script_elements(data: &[u8], exp_script_elements: Vec<ScriptElement>) {
 
 fn check_address_with_script_pubkey(data: &[u8], script_map: &ScriptMap, address: Option<String>) {
     let elem = data.to_vec().script_elements();
-    let addr = with_script_pub_key(&data.to_vec(), script_map);
+    let addr = address::with_script_pub_key(&data.to_vec(), script_map);
     assert_eq!(addr, address, "Address with script pubkey don't match")
 }
 
 fn check_address_with_script_signature(data: &[u8], script_map: &ScriptMap, address: Option<String>) {
     let elem = data.to_vec().script_elements();
-    let addr = with_script_sig(&data.to_vec(), script_map);
+    let addr = address::with_script_sig(&data.to_vec(), script_map);
     println!("check_address_with_script_signature: {:?} => {:?}", data.to_hex(), address);
     assert_eq!(addr, address, "Address with script signature don't match")
 }

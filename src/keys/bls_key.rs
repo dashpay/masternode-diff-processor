@@ -1,14 +1,12 @@
 use bls_signatures::bip32::{ExtendedPrivateKey, ExtendedPublicKey};
 use bls_signatures::{BasicSchemeMPL, BlsError, G1Element, G2Element, LegacySchemeMPL, PrivateKey, Scheme};
-use hashes::{Hash, sha256, sha256d};
-use hashes::hex::{FromHex, ToHex};
+use hashes::{Hash, hex::FromHex, sha256, sha256d};
 use crate::chain::{derivation::IIndexPath, ScriptMap};
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}, UInt160};
 use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}};
 use crate::keys::crypto_data::{CryptoData, DHKey};
-use crate::util::{base58, data_ops::hex_with_data};
-use crate::util::sec_vec::SecVec;
+use crate::util::{base58, data_ops::hex_with_data, sec_vec::SecVec};
 
 #[derive(Clone, Debug, Default)]
 pub struct BLSKey {
@@ -34,7 +32,6 @@ impl BLSKey {
     }
 
     pub fn key_with_private_key_data(data: &[u8], use_legacy: bool) -> Option<Self> {
-        println!("bls key_with_private_key_data: {}: {}", data.to_hex(), use_legacy);
         UInt256::from_bytes(data, &mut 0)
             .and_then(|seckey| PrivateKey::from_bytes(data, use_legacy)
                 .ok()
@@ -110,7 +107,6 @@ impl IKey for BLSKey {
 
     fn private_derive_to_path<PATH>(&self, path: &PATH) -> Option<Self>
         where Self: Sized, PATH: IIndexPath<Item = u32> {
-        println!("private_derive_to_path: {}", self.extended_private_key_data.to_hex());
         ExtendedPrivateKey::from_bytes(self.extended_private_key_data.as_slice())
             .ok()
             .and_then(|bls_extended_private_key|
@@ -155,7 +151,6 @@ impl BLSKey {
     /// A little recursive magic since extended private keys can't be re-assigned in the library
     pub fn derive<PATH>(extended_private_key: ExtendedPrivateKey, path: &PATH, use_legacy: bool) -> ExtendedPrivateKey
         where PATH: IIndexPath<Item = u32> {
-        println!("bls_key.derive: {}: {:?} {}", extended_private_key.serialize().as_slice().to_hex(), path.indexes(), use_legacy);
         if path.is_empty() {
             extended_private_key
         } else {
@@ -231,7 +226,6 @@ impl BLSKey {
 
     pub fn init_with_bls_extended_private_key(bls_extended_private_key: &ExtendedPrivateKey, use_legacy: bool) -> Option<Self> {
         let extended_private_key_data = bls_extended_private_key.serialize();
-        println!("init_with_bls_extended_private_key bls_extended_private_key: {} {}", extended_private_key_data.as_slice().to_hex(), use_legacy);
         let extended_public_key_opt = if use_legacy {
             bls_extended_private_key.extended_public_key_legacy()
         } else {
@@ -260,11 +254,6 @@ impl BLSKey {
         } else {
             bls_public_key.serialize()
         };
-        println!("init_with_bls_extended_private_key.bls_private_key (seckey): {}", bls_private_key.serialize().as_slice().to_hex());
-        println!("init_with_bls_extended_private_key.extended_private_key_data: {}", extended_private_key_data.to_hex());
-        println!("init_with_bls_extended_private_key.extended_public_key_data: {}", extended_public_key_data.to_hex());
-        println!("init_with_bls_extended_private_key.chaincode: {}", chaincode);
-        println!("init_with_bls_extended_private_key.pubkey: {}", UInt384(*bls_public_key_bytes));
         if let Some(seckey) = UInt256::from_bytes(bls_private_key.serialize().as_slice(), &mut 0) {
             Some(Self {
                 extended_private_key_data: SecVec::with_vec(extended_private_key_data.to_vec()),

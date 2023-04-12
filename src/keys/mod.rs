@@ -18,7 +18,7 @@ use crate::chain::tx::protocol::SIGHASH_ALL;
 use crate::consensus::Encodable;
 use crate::crypto::UInt256;
 use crate::keys::dip14::{IChildKeyDerivation, SignKey};
-use crate::util::address::address::with_public_key_data;
+use crate::util::address::address;
 use crate::util::data_append::DataAppend;
 use crate::util::script::ScriptElement;
 use crate::util::sec_vec::SecVec;
@@ -28,7 +28,7 @@ pub trait IKey: Send + Sync + Debug {
         panic!("Should be overriden in implementation")
     }
     fn address_with_public_key_data(&self, script_map: &ScriptMap) -> String {
-        with_public_key_data(&self.public_key_data(), script_map)
+        address::with_public_key_data(&self.public_key_data(), script_map)
     }
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         panic!("Should be overriden in implementation")

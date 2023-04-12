@@ -5,7 +5,7 @@ use crate::crypto::byte_util::{AsBytes, Reversable};
 use crate::crypto::{UInt160, UInt256};
 use crate::ffi::ByteArray;
 use crate::keys::ECDSAKey;
-use crate::util::address::address::{from_hash160_for_script_map, with_script_pub_key};
+use crate::util::address::address;
 use crate::util::data_ops::DASH_MESSAGE_MAGIC;
 
 
@@ -33,11 +33,11 @@ pub unsafe extern "C" fn pro_reg_tx_payload_collateral_digest(
     let script_map = ScriptMap::from(chain_type);
     let mut writer = Vec::<u8>::new();
     DASH_MESSAGE_MAGIC.to_string().enc(&mut writer);
-    let payout_address = with_script_pub_key(&script_payout.to_vec(), &script_map)
+    let payout_address = address::with_script_pub_key(&script_payout.to_vec(), &script_map)
         .expect("Can't extract payout address");
     let payload_hash = UInt256::sha256d(payload).reversed();
-    let owner_address = from_hash160_for_script_map(&owner_key_hash, &script_map);
-    let voter_address = from_hash160_for_script_map(&voter_key_hash, &script_map);
+    let owner_address = address::from_hash160_for_script_map(&owner_key_hash, &script_map);
+    let voter_address = address::from_hash160_for_script_map(&voter_key_hash, &script_map);
     let payload_collateral_string = format!("{}|{}|{}|{}|{}", payout_address, operator_reward, owner_address, voter_address, payload_hash);
     payload_collateral_string.enc(&mut writer);
     ByteArray::from(UInt256::sha256d(&writer))
