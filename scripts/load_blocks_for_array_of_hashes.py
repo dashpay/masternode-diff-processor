@@ -12,9 +12,9 @@ hashes = args.hashes.split(',')
 
 
 def get_api_base(c):
-    return 'insight.dashevo.org' if c == 'mainnet' else 'testnet-insight.dashevo.org'
+    return 'insight.dashevo.org' if c == 'mainnet' else 'insight.testnet.networks.dash.org:3002'
 
-
+# https://insight.testnet.networks.dash.org:3002/insight/block/00000020ae1548f572b068859c7983880fbb6d259680b4821fedd365ec80b09e
 filename = args.file
 chain = args.chain
 blocks = []
@@ -25,8 +25,9 @@ for i in hashes:
     block_hash = block["hash"]
     block_height = block["height"]
     merkle_root = block["merkleroot"]
-    print('MerkleBlock {{ hash: UInt256::from_hex("{}").unwrap().reversed(), height: {}, merkleroot: UInt256::from_hex("{}").unwrap() }},'.format(
-            block_hash, block_height, merkle_root))
+    # print('MerkleBlock {{ hash: UInt256::from_hex("{}").unwrap().reversed(), height: {}, merkleroot: UInt256::from_hex("{}").unwrap() }},'.format(
+    #         block_hash, block_height, merkle_root))
+    print('MerkleBlock::reversed({}, "{}", "{}"), '.format(block_height, block_hash, merkle_root))
     blocks.append(block)
 
 # print('{}'.format(blocks))

@@ -162,9 +162,8 @@ impl MasternodeEntry {
         operator_public_key.data.enc(&mut writer);
         key_id_voting.enc(&mut writer);
         is_valid.enc(&mut writer);
-        if operator_public_key.version == 2 /*Basic BLS*/ {
-            let mn_type_u16: u16 = mn_type.into();
-            mn_type_u16.enc(&mut writer);
+        if operator_public_key.is_basic() {
+            u16::from(mn_type).enc(&mut writer);
             if mn_type == MasternodeType::HighPerformance {
                 platform_http_port.swap_bytes().enc(&mut writer);
                 platform_node_id.enc(&mut writer);
