@@ -71,6 +71,14 @@ pub mod tests {
                 hash: UInt256::from_hex(hash).unwrap(),
                 merkleroot: if merkle_root.is_empty() { UInt256::MIN } else { UInt256::from_hex(merkle_root).unwrap() } }
         }
+
+        pub fn reversed(height: u32, hash: &str, merkle_root: &str) -> MerkleBlock {
+            MerkleBlock {
+                height,
+                hash: UInt256::from_hex(hash).unwrap().reversed(),
+                merkleroot: UInt256::from_hex(merkle_root).unwrap_or(UInt256::MIN)
+            }
+        }
     }
 
     #[derive(Serialize, Deserialize)]
@@ -335,7 +343,7 @@ pub mod tests {
         let block_hash_reversed = block_hash.clone().reversed();
         let block = data.block_for_hash(block_hash).unwrap_or(&MerkleBlock { hash: UInt256::MIN, height: u32::MAX, merkleroot: UInt256::MIN });
         let height = block.height;
-        println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
+        // println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
         height
     }
 
@@ -353,7 +361,7 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         if let Some(block) = data.block_for_height(block_height) {
             let block_hash = block.hash;
-            println!("get_block_hash_by_height_from_context: {}: {:?}", block_height, block_hash.clone().reversed());
+            // println!("get_block_hash_by_height_from_context: {}: {:?}", block_height, block_hash.clone().reversed());
             boxed(block_hash.0) as *mut _
         } else {
             null_mut()
@@ -401,7 +409,7 @@ pub mod tests {
     ) -> *mut types::MasternodeList {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        println!("get_masternode_list_by_block_hash_from_cache: {}", h);
+        //println!("get_masternode_list_by_block_hash_from_cache: {}", h);
         if let Some(list) = data.cache.mn_lists.get(&h) {
             println!("get_masternode_list_by_block_hash_from_cache: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
             let encoded = list.encode();
