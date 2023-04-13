@@ -364,7 +364,7 @@ impl LLMQEntry {
             match self.signers_bitset.as_slice().bit_is_true_at_le_index(i as u32) {
                 true => {
                     let key = valid_masternodes[i].operator_public_key_at(block_height);
-                    if key.version < 2 {
+                    if key.is_legacy() {
                         G1Element::from_bytes_legacy(key.data.as_bytes())
                     } else {
                         G1Element::from_bytes(key.data.as_bytes())
