@@ -39,15 +39,23 @@ pub extern "C" fn address_with_script_sig(script: *const u8, script_len: usize, 
 /// # Safety
 #[no_mangle]
 pub extern "C" fn script_pubkey_for_address(address: *const c_char, chain_id: i16) -> ByteArray {
-    let c_str = unsafe { CStr::from_ptr(address) };
-    let script_map = ScriptMap::from(chain_id);
-    Vec::<u8>::script_pub_key_for_address(c_str.to_str().unwrap(), &script_map).into()
+    if address.is_null() {
+        ByteArray::default()
+    } else {
+        let c_str = unsafe { CStr::from_ptr(address) };
+        let script_map = ScriptMap::from(chain_id);
+        Vec::<u8>::script_pub_key_for_address(c_str.to_str().unwrap(), &script_map).into()
+    }
 }
 
 /// # Safety
 #[no_mangle]
 pub extern "C" fn is_valid_dash_address_for_chain(address: *const c_char, chain_id: i16) -> bool {
-    let c_str = unsafe { CStr::from_ptr(address) };
-    let script_map = ScriptMap::from(chain_id);
-    address::is_valid_dash_address_for_script_map(c_str.to_str().unwrap(), &script_map)
+    if address.is_null() {
+        false
+    } else {
+        let c_str = unsafe { CStr::from_ptr(address) };
+        let script_map = ScriptMap::from(chain_id);
+        address::is_valid_dash_address_for_script_map(c_str.to_str().unwrap(), &script_map)
+    }
 }
