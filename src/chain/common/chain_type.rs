@@ -180,7 +180,7 @@ impl IHaveChainSettings for ChainType {
     fn platform_type(&self) -> LLMQType {
         match self {
             ChainType::MainNet => LLMQType::Llmqtype100_67,
-            ChainType::TestNet => LLMQType::Llmqtype100_67,
+            ChainType::TestNet => LLMQType::Llmqtype25_67,
             ChainType::DevNet(devnet_type) => devnet_type.platform_type(),
         }
 
@@ -226,7 +226,7 @@ impl IHaveChainSettings for DevnetType {
     }
 
     fn platform_type(&self) -> LLMQType {
-        LLMQType::LlmqtypeDevnet
+        LLMQType::LlmqtypeTestnetPlatform
     }
 
     fn should_process_llmq_of_type(&self, llmq_type: LLMQType) -> bool {
@@ -277,8 +277,8 @@ impl ChainType {
     pub fn protocol_version(&self) -> u32 {
         match self {
             ChainType::MainNet => 70219,
-            ChainType::TestNet => 70220,
-            ChainType::DevNet(_) => 70225
+            ChainType::TestNet => 70227,
+            ChainType::DevNet(_) => 70227
         }
     }
 
@@ -338,7 +338,7 @@ impl ChainType {
     }
 
     pub fn use_legacy_bls(&self) -> bool {
-        !self.is_devnet_any()
+        !self.is_mainnet()
     }
 
     pub fn peer_misbehaving_threshold(&self) -> usize {

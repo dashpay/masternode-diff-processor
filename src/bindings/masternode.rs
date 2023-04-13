@@ -2,7 +2,8 @@ use std::ptr::null_mut;
 use std::slice;
 use byte::BytesExt;
 use crate::{models, types};
-use crate::common::LLMQType;
+use crate::chain::common::chain_type::IHaveChainSettings;
+use crate::common::{ChainType, LLMQType};
 use crate::consensus::encode;
 use crate::crypto::{UInt256, byte_util::{BytesDecodable, ConstDecodable}};
 use crate::ffi::{boxer::{boxed, boxed_vec}, ByteArray, from::FromFFI, to::ToFFI};
@@ -228,4 +229,28 @@ pub extern "C" fn masternode_hash_confirmed_hash(confirmed_hash: *const u8, pro_
     let confirmed_hash = UInt256::from_const(confirmed_hash).unwrap_or(UInt256::MIN);
     let pro_reg_tx_hash = UInt256::from_const(pro_reg_tx_hash).unwrap_or(UInt256::MIN);
     models::MasternodeEntry::hash_confirmed_hash(confirmed_hash, pro_reg_tx_hash).into()
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn quorum_type_for_is_locks(chain_id: i16) -> LLMQType {
+    ChainType::from(chain_id).is_llmq_type()
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn quorum_type_for_isd_locks(chain_id: i16) -> LLMQType {
+    ChainType::from(chain_id).isd_llmq_type()
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn quorum_type_for_chain_locks(chain_id: i16) -> LLMQType {
+    ChainType::from(chain_id).chain_locks_type()
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn quorum_type_for_platform(chain_id: i16) -> LLMQType {
+    ChainType::from(chain_id).platform_type()
 }
