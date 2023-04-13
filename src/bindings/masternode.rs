@@ -254,3 +254,10 @@ pub extern "C" fn quorum_type_for_chain_locks(chain_id: i16) -> LLMQType {
 pub extern "C" fn quorum_type_for_platform(chain_id: i16) -> LLMQType {
     ChainType::from(chain_id).platform_type()
 }
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn quorum_should_process_type_for_chain(llmq_type: LLMQType, chain_id: i16) -> bool {
+    let chain_type = ChainType::from(chain_id);
+    chain_type.should_process_llmq_of_type(llmq_type)
+}
