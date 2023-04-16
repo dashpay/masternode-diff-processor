@@ -93,3 +93,15 @@ pub extern "C" fn chain_devnet_from_identifier(identifier: *const c_char) -> Dev
     let c_str = unsafe { CStr::from_ptr(identifier) };
     DevnetType::from(c_str.to_str().unwrap())
 }
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn chain_type_for_devnet_type(devnet_type: DevnetType) -> ChainType {
+    ChainType::from(devnet_type)
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn devnet_type_for_chain_type(chain_type: ChainType) -> DevnetType {
+    DevnetType::from(chain_type)
+}

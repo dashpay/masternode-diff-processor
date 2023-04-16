@@ -55,6 +55,21 @@ pub enum DevnetType {
     WhiteRussian = 4,
 }
 
+impl From<DevnetType> for ChainType {
+    fn from(orig: DevnetType) -> Self {
+        ChainType::DevNet(orig)
+    }
+}
+
+impl From<ChainType> for DevnetType {
+    fn from(orig: ChainType) -> Self {
+        match orig {
+            ChainType::DevNet(devnet_type) => devnet_type,
+            _ => panic!("Can't get DevnetType from ChainType {:?}", orig)
+        }
+    }
+}
+
 impl From<i16> for DevnetType {
     fn from(orig: i16) -> Self {
         match orig {
