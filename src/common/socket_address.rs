@@ -10,6 +10,13 @@ pub struct SocketAddress {
     pub port: u16,
 }
 
+impl std::fmt::Display for SocketAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}:{}", self.ip_address, self.port)?;
+        Ok(())
+    }
+}
+
 impl Encodable for SocketAddress {
     #[inline]
     fn consensus_encode<S: io::Write>(&self, mut s: S) -> Result<usize, io::Error> {

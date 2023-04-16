@@ -11,5 +11,6 @@ pub use crate::chain::common::chain_type::ChainType;
 pub use self::llmq_snapshot_skip_mode::LLMQSnapshotSkipMode;
 pub use self::llmq_type::{DKGParams, LLMQParams, LLMQType};
 pub use self::llmq_version::LLMQVersion;
+pub use self::masternode_type::MasternodeType;
 pub use self::merkle_tree::MerkleTree;
 pub use self::socket_address::SocketAddress;

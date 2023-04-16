@@ -225,11 +225,8 @@ impl FromFFI for types::MasternodeEntry {
                     acc
                 },
             ),
-            known_confirmed_at_height: if self.known_confirmed_at_height > 0 {
-                Some(self.known_confirmed_at_height)
-            } else {
-                None
-            },
+            known_confirmed_at_height: (self.known_confirmed_at_height > 0)
+                .then_some(self.known_confirmed_at_height),
             update_height: self.update_height,
             key_id_voting: UInt160(*self.key_id_voting),
             is_valid: self.is_valid,

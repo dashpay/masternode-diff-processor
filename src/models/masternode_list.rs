@@ -82,37 +82,21 @@ impl MasternodeList {
     }
 
     pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<UInt256>> {
-        if block_height == u32::MAX {
-            println!("hashes_for_merkle_root: unknown block {:?}", self.block_hash);
-            None
-        } else {
+        (block_height != u32::MAX).then_some({
             let mut pro_tx_hashes = self.reversed_pro_reg_tx_hashes();
             pro_tx_hashes.sort_by(|&s1, &s2| s1.clone().reversed().cmp(&s2.clone().reversed()));
-            let mns = self.masternodes.clone();
-            let entry_hashes = pro_tx_hashes
-                .clone()
-                .into_iter()
-                .map(|hash| {
-                    let h = *hash;
-                    let mn = &mns[&h];
-                    mn.entry_hash_at(block_height)
-                })
-                .collect::<Vec<UInt256>>();
-            Some(entry_hashes)
-        }
+            pro_tx_hashes
+                .iter()
+                .map(|hash| (&self.masternodes[hash]).entry_hash_at(block_height))
+                .collect::<Vec<_>>()
+        })
     }
 
     fn hashes_for_quorum_merkle_root(&self) -> Vec<UInt256> {
-        let mut llmq_commitment_hashes: Vec<UInt256> =
-            self.quorums
-                .clone()
-                .into_values()
-                .fold(Vec::new(), |mut acc, q_map| {
-                    let quorum_hashes: Vec<UInt256> =
-                        q_map.into_values().map(|entry| entry.entry_hash).collect();
-                    acc.extend(quorum_hashes);
-                    acc
-                });
+        let mut llmq_commitment_hashes = self.quorums
+            .values()
+            .flat_map(|q_map| q_map.values().map(|entry| entry.entry_hash))
+            .collect::<Vec<_>>();
         llmq_commitment_hashes.sort();
         llmq_commitment_hashes
     }
@@ -125,6 +109,7 @@ impl MasternodeList {
         // we need to check that the coinbase is in the transaction hashes we got back
         // and is in the merkle block
         if let Some(mn_merkle_root) = self.masternode_merkle_root {
+            println!("has_valid_mn_list_root: {} == {}", tx.merkle_root_mn_list, mn_merkle_root);
             tx.merkle_root_mn_list == mn_merkle_root
         } else {
             false
@@ -160,17 +145,13 @@ impl MasternodeList {
         }
         let mut buffer: Vec<u8> = Vec::new();
         if let Some(hash) =
-            entry.confirmed_hash_hashed_with_provider_registration_transaction_hash_at(block_height)
+            entry.confirmed_hash_hashed_with_pro_reg_tx_hash_at(block_height)
         {
-            hash.consensus_encode(&mut buffer).unwrap();
+            hash.enc(&mut buffer);
         }
-        modifier.consensus_encode(&mut buffer).unwrap();
+        modifier.enc(&mut buffer);
         let score = UInt256(sha256::Hash::hash(&buffer).into_inner());
-        if score.is_zero() || score.0.is_empty() {
-            None
-        } else {
-            Some(score)
-        }
+        (!score.is_zero() && !score.0.is_empty()).then_some(score)
     }
 
     pub fn quorum_entry_for_platform_with_quorum_hash(

@@ -1,9 +1,6 @@
-use common::{LLMQParams, LLMQType};
-use hashes::{sha256d, Hash};
 use std::collections::{BTreeMap, HashSet};
 use std::ptr::null;
-use crate::{common, models, types};
-use crate::consensus::{Encodable, encode};
+use crate::{common, common::{LLMQParams, LLMQType}, models, types};
 use crate::crypto::byte_util::{ConstDecodable, Reversable, Zeroable};
 use crate::crypto::data_ops::{Data, inplace_intersection};
 use crate::crypto::UInt256;
@@ -270,13 +267,10 @@ impl MasternodeProcessor {
             let mut old_mn_keys: HashSet<UInt256> = base_masternodes.keys().cloned().collect();
             modified_masternode_keys = inplace_intersection(&mut new_mn_keys, &mut old_mn_keys);
         }
-        let mut modified_masternodes: BTreeMap<UInt256, models::MasternodeEntry> =
-            modified_masternode_keys
-                .into_iter()
-                .fold(BTreeMap::new(), |mut acc, hash| {
-                    acc.insert(hash, added_or_modified_masternodes[&hash].clone());
-                    acc
-                });
+        let mut modified_masternodes = modified_masternode_keys
+            .into_iter()
+            .map(|hash| (hash, added_or_modified_masternodes[&hash].clone()))
+            .collect::<BTreeMap<_, _>>();
 
         let mut masternodes = if !base_masternodes.is_empty() {
             let mut old_mnodes = base_masternodes;
@@ -420,12 +414,8 @@ impl MasternodeProcessor {
     ) -> Vec<models::MasternodeEntry> {
         let scored_masternodes = masternodes
             .into_iter()
-            .fold(BTreeMap::new(), |mut map, entry| {
-                if let Some(score) = models::MasternodeList::masternode_score(&entry, quorum_modifier, block_height) {
-                    map.insert(score, entry);
-                }
-                map
-            });
+            .filter_map(|entry| models::MasternodeList::masternode_score(&entry, quorum_modifier, block_height).map(|score| (score, entry)))
+            .collect::<BTreeMap<_, _>>();
         Self::sort_scored_masternodes(scored_masternodes)
     }
 
@@ -437,18 +427,6 @@ impl MasternodeProcessor {
     ) -> Vec<models::MasternodeEntry> {
         let scored_masternodes = models::MasternodeList::score_masternodes_map(masternodes, quorum_modifier, block_height);
         Self::sort_scored_masternodes(scored_masternodes)
-    }
-
-    // Same as in LLMQEntry
-    // TODO: migrate to LLMQEntry
-    fn build_llmq_modifier(llmq_type: LLMQType, block_hash: UInt256) -> UInt256 {
-        let mut buffer: Vec<u8> = Vec::with_capacity(33);
-        let offset: &mut usize = &mut 0;
-        *offset += encode::VarInt(llmq_type as u64)
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += block_hash.consensus_encode(&mut buffer).unwrap();
-        UInt256(sha256d::Hash::hash(&buffer).into_inner())
     }
 
     // Reconstruct quorum members at index from snapshot
@@ -469,14 +447,12 @@ impl MasternodeProcessor {
         match self.lookup_block_hash_by_height(work_block_height) {
             None => panic!("missing block for height: {}", work_block_height),
             Some(work_block_hash) => {
-                if let Some(masternode_list) =
-                    self.find_masternode_list(work_block_hash, cached_lists, unknown_lists)
-                {
+                if let Some(masternode_list) = self.find_masternode_list(work_block_hash, cached_lists, unknown_lists) {
                     if let Some(snapshot) = self.find_snapshot(work_block_hash, cached_snapshots) {
                         let mut i: u32 = 0;
                         // TODO: partition with enumeration doesn't work here, so need to change
                         // nodes.into_iter().enumerate().partition(|&(i, _)| snapshot.member_list.bit_is_true_at_le_index(i as u32))
-                        let quorum_modifier = Self::build_llmq_modifier(llmq_type, work_block_hash);
+                        let quorum_modifier = models::LLMQEntry::build_llmq_quorum_hash(llmq_type, work_block_hash);
                         let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height);
                         let scored_sorted_masternodes = Self::sort_scored_masternodes(scored_masternodes);
                         let (used_at_h, unused_at_h) = scored_sorted_masternodes
@@ -538,9 +514,7 @@ impl MasternodeProcessor {
         match self.lookup_block_hash_by_height(work_block_height) {
             None => panic!("missing block for height: {}", work_block_height),
             Some(work_block_hash) => {
-                if let Some(masternode_list) =
-                    self.find_masternode_list(work_block_hash, cached_lists, unknown_lists)
-                {
+                if let Some(masternode_list) = self.find_masternode_list(work_block_hash, cached_lists, unknown_lists) {
                     if masternode_list.masternodes.len() < quarter_size {
                         println!("models list at {}: {} has less masternodes ({}) then required for quarter size: ({})", work_block_height, work_block_hash, masternode_list.masternodes.len(), quarter_size);
                         quarter_quorum_members
@@ -566,20 +540,11 @@ impl MasternodeProcessor {
                             });
                         });
                         masternode_list.masternodes.into_values().for_each(|mn| {
-                            if mn.is_valid
-                                && masternodes_used_at_h
-                                    .iter()
-                                    .filter(|node|
-                                        mn.provider_registration_transaction_hash
-                                            == node.provider_registration_transaction_hash
-                                    )
-                                    .count()
-                                    == 0
-                            {
+                            if mn.is_valid && !masternodes_used_at_h.iter().any(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash) {
                                 masternodes_unused_at_h.push(mn);
                             }
                         });
-                        let modifier = Self::build_llmq_modifier(params.r#type, work_block_hash);
+                        let modifier = models::LLMQEntry::build_llmq_quorum_hash(params.r#type, work_block_hash);
                         let sorted_used_mns_list = Self::valid_masternodes_for_rotated_quorum_map(
                             masternodes_used_at_h,
                             modifier,
@@ -610,12 +575,8 @@ impl MasternodeProcessor {
                                 used_mns_count + quarter_quorum_members.get(i).unwrap().len() < sorted_combined_mns_list_len {
                                 let mn = sorted_combined_mns_list.get(idx as usize).unwrap();
                                 let mut skip = true;
-                                if masternodes_used_at_h_indexed_at_i
-                                    .iter()
-                                    .filter(|&node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash)
-                                    .count()
-                                    == 0
-                                {
+                                if !masternodes_used_at_h_indexed_at_i.iter()
+                                    .any(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash) {
                                     masternodes_used_at_h_indexed_at_i.push(mn.clone());
                                     quarter_quorum_members.get_mut(i).unwrap().push(mn.clone());
                                     updated = true;
@@ -894,73 +855,11 @@ impl MasternodeProcessor {
         block_height: u32,
         mut has_valid_quorums: bool,
     ) {
+        println!("validate_signature for quorum: {:?}", quorum.llmq_type);
+        // TODO: Exclude rotated quorums from validation here ???????
         if quorum.llmq_type == LLMQType::Llmqtype60_75 {
             has_valid_quorums &= true;
         } else {
-            // let all_commitment_aggregated_signature = quorum.all_commitment_aggregated_signature;
-            // let threshold_signature = quorum.threshold_signature;
-            // let public_key = quorum.public_key;
-            // let commitment_hash = quorum.generate_commitment_hash();
-            // let version = quorum.version;
-            // let use_legacy = version.use_bls_legacy();
-            // let keys = (0..count)
-            //     .into_iter()
-            //     .map(|i| {
-            //         let item = *(*(items.add(i)));
-            //         let key = UInt384(item.data);
-            //         let version = item.version;
-            //         if version < 2 {
-            //             G1Element::from_bytes_legacy(key.as_bytes()).unwrap()
-            //         } else {
-            //             G1Element::from_bytes(key.as_bytes()).unwrap()
-            //         }
-            //     })
-            //     .collect::<Vec<G1Element>>();
-            // let all_commitment_aggregated_signature_validated = verify_secure_aggregated(commitment_hash, all_commitment_aggregated_signature, keys, use_legacy);
-            // if !all_commitment_aggregated_signature_validated {
-            //     println!("••• Issue with all_commitment_aggregated_signature_validated: {}", all_commitment_aggregated_signature);
-            //     return false;
-            // }
-            // // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
-            // // This is an aggregated BLS signature verification.
-            // let quorum_signature_validated = verify_quorum_signature(commitment_hash, threshold_signature, public_key, use_legacy);
-            // if !quorum_signature_validated {
-            //     println!("••• Issue with quorum_signature_validated");
-            //     return false;
-            // }
-            // println!("••• Quorum validated");
-            // true
-            //
-            //
-            //
-            // let operator_pks: Vec<*mut types::OperatorPublicKey> = (0..valid_masternodes.len())
-            //     .into_iter()
-            //     .filter_map(|i| {
-            //         match quorum
-            //             .signers_bitset
-            //             .as_slice()
-            //             .bit_is_true_at_le_index(i as u32)
-            //         {
-            //             true => Some(boxed(valid_masternodes[i].operator_public_key_at(block_height).encode())),
-            //             false => None,
-            //         }
-            //     })
-            //     .collect();
-            // let operator_public_keys_count = operator_pks.len();
-            // let is_valid_signature = unsafe {
-            //     (self.validate_llmq)(
-            //         boxed(types::LLMQValidationData {
-            //             items: boxed_vec(operator_pks),
-            //             count: operator_public_keys_count,
-            //             commitment_hash: boxed(quorum.generate_commitment_hash().0),
-            //             all_commitment_aggregated_signature: boxed(quorum.all_commitment_aggregated_signature.0),
-            //             threshold_signature: boxed(quorum.threshold_signature.0),
-            //             public_key: boxed(quorum.public_key.0),
-            //             version: quorum.version
-            //         }),
-            //         self.opaque_context,
-            //     )
-            // };
             let is_valid_signature = quorum.validate(valid_masternodes, block_height);
             let is_valid_payload = quorum.validate_payload();
             has_valid_quorums &= is_valid_payload && is_valid_signature;

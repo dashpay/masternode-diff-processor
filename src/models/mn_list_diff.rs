@@ -80,7 +80,7 @@ impl MNListDiff {
             // BLS Legacy
             0
         };
-        let masternode_read_ctx = MasternodeReadContext(block_height, protocol_version, version);
+        let masternode_read_ctx = MasternodeReadContext(block_height, version);
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
         let mut deleted_masternode_hashes: Vec<UInt256> =
             Vec::with_capacity(deleted_masternode_count as usize);

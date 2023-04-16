@@ -1,16 +1,14 @@
 use byte::{BytesExt, TryRead};
 use std::collections::BTreeMap;
-use crate::common::{Block, SocketAddress};
-use crate::common::masternode_type::MasternodeType;
+use crate::common::{Block, MasternodeType, SocketAddress};
 use crate::consensus::Encodable;
-use crate::crypto::{UInt128, UInt160, UInt256, UInt384, byte_util::Zeroable};
-use crate::hashes::{sha256, sha256d, Hash};
+use crate::crypto::{UInt160, UInt256, byte_util::Zeroable};
 use crate::models::OperatorPublicKey;
 use crate::util::data_ops::short_hex_string_from;
 
-// (block_height, protocol_version, bls_version)
+// (block height, list diff version (2: BLSBasic))
 #[derive(Clone, Copy)]
-pub struct MasternodeReadContext(pub u32, pub u32, pub u16);
+pub struct MasternodeReadContext(pub u32, pub u16);
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct MasternodeEntry {
@@ -31,6 +29,7 @@ pub struct MasternodeEntry {
     pub platform_node_id: UInt160,
     pub entry_hash: UInt256,
 }
+
 impl std::fmt::Debug for MasternodeEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MasternodeEntry")
@@ -56,15 +55,13 @@ impl std::fmt::Debug for MasternodeEntry {
 
 impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
     fn try_read(bytes: &'a [u8], context: MasternodeReadContext) -> byte::Result<(Self, usize)> {
-        let MasternodeReadContext (block_height, protocol_version, diff_version) = context;
+        let MasternodeReadContext (block_height, diff_version) = context;
         let offset = &mut 0;
         let provider_registration_transaction_hash =
             bytes.read_with::<UInt256>(offset, byte::LE)?;
         let confirmed_hash = bytes.read_with::<UInt256>(offset, byte::LE)?;
-        let ip_address = bytes.read_with::<UInt128>(offset, byte::LE)?;
-        let port = bytes.read_with::<u16>(offset, byte::BE)?;
-        let socket_address = SocketAddress { ip_address, port };
-        let operator_public_key = bytes.read_with::<UInt384>(offset, byte::LE)?;
+        let socket_address = bytes.read_with::<SocketAddress>(offset, ())?;
+        let operator_public_key = bytes.read_with::<OperatorPublicKey>(offset, diff_version)?;
         let key_id_voting = bytes.read_with::<UInt160>(offset, byte::LE)?;
         let is_valid = bytes.read_with::<u8>(offset, byte::LE)
             .unwrap_or(0);
@@ -74,7 +71,7 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
             MasternodeType::Regular
         };
         let (platform_http_port, platform_node_id) = if mn_type == MasternodeType::HighPerformance {
-            (bytes.read_with::<u16>(offset, byte::LE)?.swap_bytes(),
+            (bytes.read_with::<u16>(offset, byte::BE)?,
              bytes.read_with::<UInt160>(offset, byte::LE)?)
         } else {
             (0u16, UInt160::MIN)
@@ -84,12 +81,12 @@ impl<'a> TryRead<'a, MasternodeReadContext> for MasternodeEntry {
             confirmed_hash,
             socket_address,
             key_id_voting,
-            OperatorPublicKey { data: operator_public_key, version: diff_version },
+            operator_public_key,
             is_valid,
             mn_type,
             platform_http_port,
             platform_node_id,
-            block_height
+            block_height,
         );
         if !entry.confirmed_hash.is_zero() && block_height != u32::MAX {
             entry.known_confirmed_at_height = Some(block_height);
@@ -111,7 +108,7 @@ impl MasternodeEntry {
         platform_node_id: UInt160,
         update_height: u32,
     ) -> Self {
-        let entry_hash = MasternodeEntry::calculate_entry_hash(
+        let entry_hash = Self::calculate_entry_hash(
             provider_registration_transaction_hash,
             confirmed_hash,
             socket_address,
@@ -120,7 +117,7 @@ impl MasternodeEntry {
             is_valid,
             mn_type,
             platform_http_port,
-            platform_node_id
+            platform_node_id,
         );
         Self {
             provider_registration_transaction_hash,
@@ -144,7 +141,7 @@ impl MasternodeEntry {
         }
     }
 
-    fn calculate_entry_hash(
+    pub fn calculate_entry_hash(
         provider_registration_transaction_hash: UInt256,
         confirmed_hash: UInt256,
         socket_address: SocketAddress,
@@ -159,7 +156,7 @@ impl MasternodeEntry {
         provider_registration_transaction_hash.enc(&mut writer);
         confirmed_hash.enc(&mut writer);
         socket_address.enc(&mut writer);
-        operator_public_key.data.enc(&mut writer);
+        operator_public_key.enc(&mut writer);
         key_id_voting.enc(&mut writer);
         is_valid.enc(&mut writer);
         if operator_public_key.is_basic() {
@@ -169,36 +166,32 @@ impl MasternodeEntry {
                 platform_node_id.enc(&mut writer);
             }
         }
-        UInt256(sha256d::Hash::hash(&writer).into_inner())
+        UInt256::sha256d(writer)
     }
 
     pub fn confirmed_hash_at(&self, block_height: u32) -> Option<UInt256> {
-        self.known_confirmed_at_height.and_then(|h| (h <= block_height)
-            .then_some(self.confirmed_hash))
+        self.known_confirmed_at_height
+            .and_then(|h| (h <= block_height)
+                .then_some(self.confirmed_hash))
     }
 
     pub fn update_confirmed_hash(&mut self, hash: UInt256) {
         self.confirmed_hash = hash;
         if !self.provider_registration_transaction_hash.is_zero() {
-            self.update_confirmed_hash_hashed_with_provider_registration_transaction_hash();
+            self.update_confirmed_hash_hashed_with_pro_reg_tx_hash();
         }
     }
 
-    pub fn update_confirmed_hash_hashed_with_provider_registration_transaction_hash(&mut self) {
-        let hash = Self::hash_confirmed_hash(
-            self.confirmed_hash,
-            self.provider_registration_transaction_hash,
-        );
+    pub fn update_confirmed_hash_hashed_with_pro_reg_tx_hash(&mut self) {
+        let hash = Self::hash_confirmed_hash(self.confirmed_hash, self.provider_registration_transaction_hash);
         self.confirmed_hash_hashed_with_provider_registration_transaction_hash = Some(hash)
     }
 
-    pub fn confirmed_hash_hashed_with_provider_registration_transaction_hash_at(
+    pub fn confirmed_hash_hashed_with_pro_reg_tx_hash_at(
         &self,
         block_height: u32,
     ) -> Option<UInt256> {
-        if self.known_confirmed_at_height.is_none()
-            || self.known_confirmed_at_height? <= block_height
-        {
+        if self.known_confirmed_at_height.is_none() || self.known_confirmed_at_height? <= block_height {
             self.confirmed_hash_hashed_with_provider_registration_transaction_hash
         } else {
             Some(Self::hash_confirmed_hash(
@@ -209,12 +202,10 @@ impl MasternodeEntry {
     }
 
     pub fn host(&self) -> String {
-        let ip = self.socket_address.ip_address;
-        let port = self.socket_address.port;
-        format!("{}:{}", ip.to_string(), port.to_string())
+        format!("{}", self.socket_address)
     }
 
-    pub fn payload_data(&self) -> UInt256 {
+    /*pub fn payload_data(&self) -> UInt256 {
         Self::calculate_entry_hash(
             self.provider_registration_transaction_hash,
             self.confirmed_hash,
@@ -224,12 +215,12 @@ impl MasternodeEntry {
             u8::from(self.is_valid),
             self.mn_type,
             self.platform_http_port,
-            self.platform_node_id
+            self.platform_node_id,
         )
-    }
+    }*/
 
-    pub fn hash_confirmed_hash(confirmed_hash: UInt256, pro_reg_tx_hash: UInt256) -> UInt256 {
-        UInt256(sha256::Hash::hash(&[pro_reg_tx_hash.0, confirmed_hash.0].concat()).into_inner())
+    pub fn hash_confirmed_hash(confirmed_hash: UInt256, provider_registration_transaction_hash: UInt256) -> UInt256 {
+        UInt256::sha256(&[provider_registration_transaction_hash.0, confirmed_hash.0].concat())
     }
 
     pub fn is_valid_at(&self, block_height: u32) -> bool {
@@ -283,7 +274,7 @@ impl MasternodeEntry {
             let distance = height - block_height;
             if distance < min_distance {
                 min_distance = distance;
-                println!("SME Hash for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {}", self.provider_registration_transaction_hash, hash, used_hash, block_height);
+                println!("SME Hash for proTxHash {:?} : Using {hash} instead of {used_hash} for list at block height {block_height}", self.provider_registration_transaction_hash);
                 used_hash = hash;
             }
         }
