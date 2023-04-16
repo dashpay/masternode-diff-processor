@@ -104,6 +104,24 @@ pub extern "C" fn chain_type_for_devnet_type(devnet_type: DevnetType) -> ChainTy
 
 /// # Safety
 #[no_mangle]
+pub extern "C" fn chain_type_is_devnet_any(chain_type: ChainType) -> bool {
+    chain_type.is_devnet_any()
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn devnet_identifier_for_chain_type(chain_type: ChainType) -> *mut c_char {
+    chain_type.devnet_identifier().to_c_string_ptr()
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn devnet_version_for_chain_type(chain_type: ChainType) -> i16 {
+    chain_type.devnet_version().unwrap_or(i16::MAX)
+}
+
+/// # Safety
+#[no_mangle]
 pub extern "C" fn devnet_type_for_chain_type(chain_type: ChainType) -> DevnetType {
     DevnetType::from(chain_type)
 }
