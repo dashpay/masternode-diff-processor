@@ -8,7 +8,6 @@ pub mod masternode_entry;
 pub mod masternode_list;
 pub mod mn_list_diff;
 pub mod operator_public_key;
-pub mod rotation_info;
 pub mod snapshot;
 
 pub use self::llmq_entry::LLMQEntry;
@@ -18,7 +17,6 @@ pub use self::masternode_entry::MasternodeEntry;
 pub use self::masternode_list::MasternodeList;
 pub use self::mn_list_diff::MNListDiff;
 pub use self::operator_public_key::OperatorPublicKey;
-pub use self::rotation_info::LLMQRotationInfo;
 pub use self::snapshot::LLMQSnapshot;
 
 impl_bytes_decodable!(LLMQEntry);
