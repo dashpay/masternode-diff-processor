@@ -564,8 +564,8 @@ pub unsafe extern "C" fn key_ecdsa_public_key_data(key: *mut ECDSAKey) -> ByteAr
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_ecdsa_secret_key_is_empty(key: *const c_char, chain_type: i16) -> bool {
-    ECDSAKey::key_with_private_key(CStr::from_ptr(key).to_str().unwrap(), ChainType::from(chain_type))
+pub unsafe extern "C" fn key_ecdsa_secret_key_is_empty(key: *const c_char, chain_type: ChainType) -> bool {
+    ECDSAKey::key_with_private_key(CStr::from_ptr(key).to_str().unwrap(), chain_type)
         .map_or(true, |key| key.seckey.is_zero())
 }
 

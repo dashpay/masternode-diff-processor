@@ -47,22 +47,22 @@ impl From<ChainType> for i16 {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
 pub enum DevnetType {
-    JackDaniels,
-    Devnet333,
-    Chacha,
+    JackDaniels = 0,
+    Devnet333 = 1,
+    Chacha = 2,
     #[default]
-    Mojito,
-    WhiteRussian
+    Mojito = 3,
+    WhiteRussian = 4,
 }
 
 impl From<i16> for DevnetType {
     fn from(orig: i16) -> Self {
         match orig {
-            2 => DevnetType::JackDaniels,
-            3 => DevnetType::Devnet333,
-            4 => DevnetType::Chacha,
-            5 => DevnetType::Mojito,
-            6 => DevnetType::WhiteRussian,
+            0 => DevnetType::JackDaniels,
+            1 => DevnetType::Devnet333,
+            2 => DevnetType::Chacha,
+            3 => DevnetType::Mojito,
+            4 => DevnetType::WhiteRussian,
             _ => DevnetType::JackDaniels,
         }
     }
@@ -71,11 +71,11 @@ impl From<i16> for DevnetType {
 impl From<DevnetType> for i16 {
     fn from(value: DevnetType) -> Self {
         match value {
-            DevnetType::JackDaniels => 2,
-            DevnetType::Devnet333 => 3,
-            DevnetType::Chacha => 4,
-            DevnetType::Mojito => 5,
-            DevnetType::WhiteRussian => 6,
+            DevnetType::JackDaniels => 0,
+            DevnetType::Devnet333 => 1,
+            DevnetType::Chacha => 2,
+            DevnetType::Mojito => 3,
+            DevnetType::WhiteRussian => 4,
         }
     }
 }

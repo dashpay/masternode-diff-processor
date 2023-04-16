@@ -1,5 +1,5 @@
 use std::slice;
-use crate::chain::ScriptMap;
+use crate::common::ChainType;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, Reversable};
 use crate::crypto::{UInt160, UInt256};
@@ -25,12 +25,12 @@ pub unsafe extern "C" fn pro_reg_tx_payload_collateral_digest(
     operator_reward: u16,
     owner_key_hash: *const u8,
     voter_key_hash: *const u8,
-    chain_type: i16) -> ByteArray {
+    chain_type: ChainType) -> ByteArray {
     let payload = slice::from_raw_parts(payload, payload_len);
     let script_payout = slice::from_raw_parts(script_payout, script_payout_len);
     let owner_key_hash = UInt160::from(slice::from_raw_parts(owner_key_hash, 20));
     let voter_key_hash = UInt160::from(slice::from_raw_parts(voter_key_hash, 20));
-    let script_map = ScriptMap::from(chain_type);
+    let script_map = chain_type.script_map();
     let mut writer = Vec::<u8>::new();
     DASH_MESSAGE_MAGIC.to_string().enc(&mut writer);
     let payout_address = address::with_script_pub_key(&script_payout.to_vec(), &script_map)

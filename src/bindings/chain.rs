@@ -71,6 +71,12 @@ pub extern "C" fn chain_transaction_version(chain_type: ChainType) -> u16 {
 
 /// # Safety
 #[no_mangle]
+pub extern "C" fn chain_coin_type(chain_type: ChainType) -> u32 {
+    chain_type.coin_type()
+}
+
+/// # Safety
+#[no_mangle]
 pub extern "C" fn chain_devnet_version(devnet_type: DevnetType) -> u16 {
     devnet_type.version()
 }
