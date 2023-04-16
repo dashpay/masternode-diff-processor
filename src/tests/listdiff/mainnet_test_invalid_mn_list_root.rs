@@ -17,7 +17,7 @@ fn mainnet_test_invalid_mn_list_root() {
     let masternode_list_1761054 = masternode_list_from_json("MNLIST_1761054_1666771101.811508_saveMasternodeList.json".to_string());
     let masternode_list_1761048 = masternode_list_from_json("MNLIST_1761048_1666773093.153379_saveMasternodeList.json".to_string());
 
-    let bytes = message_from_file("MNL_1761054_1761100.dat".to_string());
+    let bytes = message_from_file("MNL_1761054_1761100.dat");
     let processor = unsafe {
         &mut *register_processor(
             get_merkle_root_by_hash_default,

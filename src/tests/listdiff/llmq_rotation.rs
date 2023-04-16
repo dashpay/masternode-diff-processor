@@ -10,7 +10,7 @@ use crate::bindings::masternode::process_qrinfo_from_message;
 // #[test]
 // Deprecated
 fn test_llmq_rotation() {
-    let bytes = message_from_file("qrinfo--1-5078.dat".to_string());
+    let bytes = message_from_file("qrinfo--1-5078.dat");
     let length = bytes.len();
     let c_array = bytes.as_ptr();
     let use_insight_as_backup = false;
@@ -72,7 +72,7 @@ pub unsafe extern "C" fn block_height_lookup_5078(
 
 #[test]
 fn test_llmq_rotation_2() {
-    let bytes = message_from_file("QRINFO_1_8344.dat".to_string());
+    let bytes = message_from_file("QRINFO_1_8344.dat");
     let use_insight_as_backup = false;
     let chain = ChainType::DevNet(DevnetType::Devnet333);
     let cache = unsafe { &mut *processor_create_cache() };
@@ -454,7 +454,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_default_333(
 
 #[test]
 fn test_devnet_333() {
-    let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
+    let bytes = message_from_file("QRINFO_1_21976.dat");
     let chain = ChainType::DevNet(DevnetType::Devnet333);
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
@@ -515,7 +515,7 @@ fn test_processor_devnet_333() {
         )
     };
     let cache = unsafe { &mut *processor_create_cache() };
-    let bytes = message_from_file("QRINFO_1_21976.dat".to_string());
+    let bytes = message_from_file("QRINFO_1_21976.dat");
     let context = &mut (FFIContext {
         chain,
         is_dip_0024: true,
@@ -741,7 +741,7 @@ fn test_processor_devnet_333_2() {
         blocks: vec![]
     });
 
-    let mnldiff_bytes = message_from_file("mnlistdiff--1-25480.dat".to_string());
+    let mnldiff_bytes = message_from_file("mnlistdiff--1-25480.dat");
 
     let result = process_mnlistdiff_from_message_internal(
         mnldiff_bytes.as_ptr(),
@@ -754,7 +754,7 @@ fn test_processor_devnet_333_2() {
         context as *mut _ as *mut std::ffi::c_void,
     );
 
-    let bytes = message_from_file("qrinfo--1-24868.dat".to_string());
+    let bytes = message_from_file("qrinfo--1-24868.dat");
     context.is_dip_0024 = true;
     let result = process_qrinfo_from_message_internal(
         bytes.as_ptr(),
@@ -1449,7 +1449,7 @@ fn test_jack_daniels() {
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
 
-    let qrinfo_bytes = message_from_file("QRINFO_1_107966.dat".to_string());
+    let qrinfo_bytes = message_from_file("QRINFO_1_107966.dat");
 
     let result = process_qrinfo_from_message_internal(
         qrinfo_bytes.as_ptr(),

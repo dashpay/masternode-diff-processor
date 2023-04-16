@@ -300,9 +300,9 @@ pub mod tests {
         buffer
     }
 
-    pub fn message_from_file(name: String) -> Vec<u8> {
+    pub fn message_from_file(name: &str) -> Vec<u8> {
         let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-        let filepath = format!("{}/files/{}", crate_dir, name.as_str());
+        let filepath = format!("{}/files/{}", crate_dir, name);
         println!("{:?}", filepath);
         get_file_as_byte_vec(&filepath)
     }

@@ -1,5 +1,4 @@
 use byte::BytesExt;
-use hashes::{sha256d, Hash};
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::BytesDecodable;
 use crate::crypto::{UInt256, VarBytes};
@@ -49,14 +48,9 @@ impl<'a> MerkleTree<'a> {
             |hash, _flag| hash,
             |left, right| {
                 let mut buffer: Vec<u8> = Vec::with_capacity(64);
-                left.consensus_encode(&mut buffer).unwrap();
-                right
-                    .unwrap_or(left)
-                    .consensus_encode(&mut buffer)
-                    .unwrap();
-                let hash = sha256d::Hash::hash(&buffer);
-                let value = hash.into_inner();
-                Some(UInt256(value))
+                left.enc(&mut buffer);
+                right.unwrap_or(left).enc(&mut buffer);
+                Some(UInt256::sha256d(buffer))
             },
         )
     }

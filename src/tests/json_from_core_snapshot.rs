@@ -163,7 +163,7 @@ pub struct MNList {
 }
 
 pub fn masternode_list_from_json(filename: String) -> models::MasternodeList {
-    list_to_list(serde_json::from_slice(&message_from_file(filename)).unwrap())
+    list_to_list(serde_json::from_slice(&message_from_file(filename.as_str())).unwrap())
 }
 
 pub fn list_to_list(value: MNList) -> models::MasternodeList {

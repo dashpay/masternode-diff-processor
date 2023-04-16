@@ -11,7 +11,7 @@ use crate::tests::block_store::init_testnet_store;
 fn test_mnl_saving_to_disk() {
     // testMNLSavingToDisk
     let chain = ChainType::TestNet;
-    let bytes = message_from_file("ML_at_122088.dat".to_string());
+    let bytes = message_from_file("ML_at_122088.dat");
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {
         chain,

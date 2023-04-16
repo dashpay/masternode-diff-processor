@@ -9,7 +9,7 @@ use crate::tests::listdiff::llmq_rotation::should_process_isd_quorum;
 
 #[test]
 pub fn test_from_snapshot() {
-    let qrinfo: QRInfo = serde_json::from_slice(&message_from_file("snapshot_0000021715c8575620382ceee42cc7556bac5ed395eaf9c75e2119aa2876a1e0.json".to_string())).unwrap();
+    let qrinfo: QRInfo = serde_json::from_slice(&message_from_file("snapshot_0000021715c8575620382ceee42cc7556bac5ed395eaf9c75e2119aa2876a1e0.json")).unwrap();
     let chain = ChainType::TestNet;
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut (FFIContext {

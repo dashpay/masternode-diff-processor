@@ -106,7 +106,7 @@ fn test_basic_bls_scheme() {
         cache,
         blocks: vec![]
     }) as *mut _ as *mut std::ffi::c_void;
-    let bytes = message_from_file("MNL_1_9247.dat".to_string());
+    let bytes = message_from_file("MNL_1_9247.dat");
     let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
@@ -253,7 +253,7 @@ fn test_core_19_beta_6() {
             MerkleBlock::new(4765, "574e8d4a407fd54b9c0ec1ec0eb76e0a9ebc39cf4846356d8b32aab3e5000000", "888e68ec280bfbc012d7cce43e34faf790165f75e6c77ada040f20657e2c97db"),
         ]
     });
-    let bytes = message_from_file("MNL_1_4765.dat".to_string());
+    let bytes = message_from_file("MNL_1_4765.dat");
     let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
@@ -266,7 +266,6 @@ fn test_core_19_beta_6() {
         context as *mut _ as *mut std::ffi::c_void,
     )};
     let result = unsafe { *result };
-    println!("Result: {:#?}", &result);
     assert_diff_result(context, result);
 }
 
@@ -298,7 +297,7 @@ fn test_core_19_rc_2_testnet() {
         cache,
         blocks: init_testnet_store()
     });
-    let bytes = message_from_file("MNL_TESTNET_CORE_19.dat".to_string());
+    let bytes = message_from_file("MNL_TESTNET_CORE_19.dat");
     let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),

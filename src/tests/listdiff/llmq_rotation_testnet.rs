@@ -15,14 +15,14 @@ fn testnet_quorum_quarters() {
     let block_height_8840 = 1738840;
     let block_height_8888 = 1738888;
 
-    let qrinfo_8792: QRInfo = serde_json::from_slice(&message_from_file("1738792.txt".to_string())).unwrap();
-    let qrinfo_8840: QRInfo = serde_json::from_slice(&message_from_file("1738840.txt".to_string())).unwrap();
-    let qrinfo_8888: QRInfo = serde_json::from_slice(&message_from_file("1738888.txt".to_string())).unwrap();
-    let qrinfo_8936: QRInfo = serde_json::from_slice(&message_from_file("1738936.txt".to_string())).unwrap();
+    let qrinfo_8792: QRInfo = serde_json::from_slice(&message_from_file("1738792.txt")).unwrap();
+    let qrinfo_8840: QRInfo = serde_json::from_slice(&message_from_file("1738840.txt")).unwrap();
+    let qrinfo_8888: QRInfo = serde_json::from_slice(&message_from_file("1738888.txt")).unwrap();
+    let qrinfo_8936: QRInfo = serde_json::from_slice(&message_from_file("1738936.txt")).unwrap();
 
-    let diff_8792: ListDiff = serde_json::from_slice(&message_from_file("1738792_diff.txt".to_string())).unwrap();
-    let diff_8840: ListDiff = serde_json::from_slice(&message_from_file("1738840_diff.txt".to_string())).unwrap();
-    let diff_8888: ListDiff = serde_json::from_slice(&message_from_file("1738888_diff.txt".to_string())).unwrap();
+    let diff_8792: ListDiff = serde_json::from_slice(&message_from_file("1738792_diff.txt")).unwrap();
+    let diff_8840: ListDiff = serde_json::from_slice(&message_from_file("1738840_diff.txt")).unwrap();
+    let diff_8888: ListDiff = serde_json::from_slice(&message_from_file("1738888_diff.txt")).unwrap();
 
     let list_diff_8792 = masternode_list_from_genesis_diff(diff_8792, |_| block_height_8792, false);
     let list_diff_8840 = masternode_list_from_genesis_diff(diff_8840, |_| block_height_8840, false);
@@ -57,9 +57,9 @@ fn testnet_quorum_quarters() {
 
     let context = &mut (FFIContext { chain, cache, is_dip_0024: true, blocks: init_mainnet_store() });
 
-    let bytes = message_from_file("QRINFO_0_1739226.dat".to_string());
-    let old_bytes = message_from_file("QRINFO_0_1740902.dat".to_string());
-    let old_bytes2 = message_from_file("QRINFO_0_1740910.dat".to_string());
+    let bytes = message_from_file("QRINFO_0_1739226.dat");
+    let old_bytes = message_from_file("QRINFO_0_1740902.dat");
+    let old_bytes2 = message_from_file("QRINFO_0_1740910.dat");
     processor.opaque_context = context as *mut _ as *mut std::ffi::c_void;
     processor.use_insight_as_backup = true;
     processor.genesis_hash = context.genesis_as_ptr();

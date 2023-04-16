@@ -347,7 +347,7 @@ fn init_hashes() -> Vec<UInt256> {
 fn testnet_test_retrieve_saved_hashes() {
     let chain = ChainType::TestNet;
     let context = &mut (FFIContext { chain, is_dip_0024: false, cache: &mut Default::default(), blocks: init_testnet_store() });
-    let bytes_122064 = message_from_file("MNL_0_122064.dat".to_string());
+    let bytes_122064 = message_from_file("MNL_0_122064.dat");
     let processor = unsafe {
         &mut *register_processor(
             get_merkle_root_by_hash_default,
@@ -378,7 +378,7 @@ fn testnet_test_retrieve_saved_hashes() {
             context as *mut _ as *mut std::ffi::c_void,
     )};
     assert!(result_122064.is_valid(), "Result must be valid");
-    let bytes_122088 = message_from_file("MNL_122064_122088.dat".to_string());
+    let bytes_122088 = message_from_file("MNL_122064_122088.dat");
     let result_122088 = unsafe {
         *process_mnlistdiff_from_message(
             bytes_122088.as_ptr(),

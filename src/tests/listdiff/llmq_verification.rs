@@ -14,7 +14,7 @@ use crate::tests::block_store::init_testnet_store;
 #[test]
 fn testnet_llmq_verification() {
     //testTestnetQuorumVerification
-    let bytes = message_from_file("MNL_0_122928.dat".to_string());
+    let bytes = message_from_file("MNL_0_122928.dat");
     let use_insight_as_backup = false;
     let chain = ChainType::TestNet;
     let base_masternode_list_hash: *const u8 = null_mut();
@@ -59,7 +59,7 @@ fn testnet_llmq_verification() {
     let is_valid = result_119064.is_valid();
     println!("is_valid: {}", is_valid);
     if is_valid {
-        let bytes = message_from_file("MNL_122928_123000.dat".to_string());
+        let bytes = message_from_file("MNL_122928_123000.dat");
         let block_hash_119064 = UInt256(unsafe { *result_119064.block_hash });
         let masternode_list_119064 = unsafe { *result_119064.masternode_list };
         let masternode_list_119064_decoded = unsafe { masternode_list_119064.decode() };
@@ -136,7 +136,7 @@ pub unsafe extern "C" fn masternode_list_save_119064(
 #[test]
 fn testnet_llmq_verification_using_processor_and_cache() {
     //testTestnetQuorumVerification
-    let bytes = message_from_file("MNL_0_122928.dat".to_string());
+    let bytes = message_from_file("MNL_0_122928.dat");
     let use_insight_as_backup = false;
     let chain = ChainType::TestNet;
     let cache = unsafe { &mut *processor_create_cache() };
@@ -182,7 +182,7 @@ fn testnet_llmq_verification_using_processor_and_cache() {
     let is_valid = result_119064.is_valid();
     println!("is_valid: {}", is_valid);
     if is_valid {
-        let bytes = message_from_file("MNL_122928_123000.dat".to_string());
+        let bytes = message_from_file("MNL_122928_123000.dat");
         let block_hash_119064 = UInt256(unsafe { *result_119064.block_hash });
         let masternode_list_119064 = unsafe { *result_119064.masternode_list };
         let masternode_list_119064_decoded = unsafe { masternode_list_119064.decode() };

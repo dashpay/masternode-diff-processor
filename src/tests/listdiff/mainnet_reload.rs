@@ -81,7 +81,7 @@ pub fn load_masternode_lists_for_files(
 
     for file in files {
         println!("load_masternode_lists_for_files: [{}]", file);
-        let bytes = message_from_file(file);
+        let bytes = message_from_file(file.as_str());
         let result = unsafe { process_mnlistdiff_from_message(
             bytes.as_ptr(),
             bytes.len(),
