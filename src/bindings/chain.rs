@@ -6,6 +6,17 @@ use crate::types::opaque_key::AsCStringPtr;
 
 /// # Safety
 #[no_mangle]
+pub extern "C" fn chain_type_index(chain_type: ChainType) -> i16 {
+    chain_type.into()
+}
+
+#[no_mangle]
+pub extern "C" fn chain_type_from_index(index: i16) -> ChainType {
+    ChainType::from(index)
+}
+
+/// # Safety
+#[no_mangle]
 pub extern "C" fn chain_magic_number(chain_type: ChainType) -> u32 {
     chain_type.magic()
 }
