@@ -17,10 +17,10 @@ use crate::processing::{MasternodeProcessor, MasternodeProcessorCache, Processin
 pub unsafe extern "C" fn process_mnlistdiff_from_message(
     message_arr: *const u8,
     message_length: usize,
+    chain_type: ChainType,
     use_insight_as_backup: bool,
     is_from_snapshot: bool,
     protocol_version: u32,
-    genesis_hash: *const u8,
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
@@ -31,7 +31,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
     println!("process_mnlistdiff_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
-    processor.genesis_hash = genesis_hash;
+    processor.chain_type = chain_type;
     let message: &[u8] = slice::from_raw_parts(message_arr, message_length as usize);
     let list_diff = unwrap_or_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor
         .lookup_block_height_by_hash(hash), protocol_version));
@@ -43,7 +43,7 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
             return boxed(types::MNListDiffResult::default_with_error(error));
         }
     }
-    let result = processor.get_list_diff_result_with_base_lookup(list_diff, true, cache);
+    let result = processor.get_list_diff_result_with_base_lookup(list_diff, true, false, false, cache);
     println!("process_mnlistdiff_from_message <- {:?} ms", instant.elapsed().as_millis());
     boxed(result)
 }
@@ -57,10 +57,11 @@ pub unsafe extern "C" fn process_mnlistdiff_from_message(
 pub unsafe extern "C" fn process_qrinfo_from_message(
     message: *const u8,
     message_length: usize,
+    chain_type: ChainType,
     use_insight_as_backup: bool,
     is_from_snapshot: bool,
+    is_rotated_quorums_presented: bool,
     protocol_version: u32,
-    genesis_hash: *const u8,
     processor: *mut MasternodeProcessor,
     cache: *mut MasternodeProcessorCache,
     context: *const std::ffi::c_void,
@@ -71,11 +72,11 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     let cache = &mut *cache;
     processor.opaque_context = context;
     processor.use_insight_as_backup = use_insight_as_backup;
-    processor.genesis_hash = genesis_hash;
+    processor.chain_type = chain_type;
     println!( "process_qrinfo_from_message -> {:?} {:p} {:p} {:p}", instant, processor, cache, context);
     let offset = &mut 0;
     let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
-        processor.get_list_diff_result_with_base_lookup(list_diff, should_process_quorums, cache)
+        processor.get_list_diff_result_with_base_lookup(list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache)
     };
     let read_list_diff =
         |offset: &mut usize| processor.read_list_diff_from_message(message, offset, protocol_version);

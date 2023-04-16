@@ -16,6 +16,7 @@ pub trait IHaveChainSettings {
     fn is_evolution_enabled(&self) -> bool;
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
 pub enum ChainType {
     #[default]
@@ -43,6 +44,7 @@ impl From<ChainType> for i16 {
         }
     }
 }
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
 pub enum DevnetType {
     JackDaniels,
@@ -52,6 +54,32 @@ pub enum DevnetType {
     Mojito,
     WhiteRussian
 }
+
+impl From<i16> for DevnetType {
+    fn from(orig: i16) -> Self {
+        match orig {
+            2 => DevnetType::JackDaniels,
+            3 => DevnetType::Devnet333,
+            4 => DevnetType::Chacha,
+            5 => DevnetType::Mojito,
+            6 => DevnetType::WhiteRussian,
+            _ => DevnetType::JackDaniels,
+        }
+    }
+}
+
+impl From<DevnetType> for i16 {
+    fn from(value: DevnetType) -> Self {
+        match value {
+            DevnetType::JackDaniels => 2,
+            DevnetType::Devnet333 => 3,
+            DevnetType::Chacha => 4,
+            DevnetType::Mojito => 5,
+            DevnetType::WhiteRussian => 6,
+        }
+    }
+}
+
 
 impl DevnetType {
     pub fn identifier(&self) -> String {
@@ -203,6 +231,8 @@ impl IHaveChainSettings for DevnetType {
 
     fn genesis_hash(&self) -> UInt256 {
         UInt256::from_hex(match self {
+            DevnetType::JackDaniels => "79ee40288949fd61132c025761d4f065e161d60a88aab4c03e613ca8718d1d26",
+            DevnetType::Chacha => "8862eca4bdb5255b51dc72903b8a842f6ffe7356bc40c7b7a7437b8e4556e220",
             DevnetType::Mojito => "739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357",
             DevnetType::WhiteRussian => "9163d6958065ca5e73c36f0f2474ce618846260c215f5cba633bd0003585cb35",
             _ => "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c",

@@ -7,7 +7,6 @@ use crate::lib_tests::tests::{add_insight_lookup_default, FFIContext, get_block_
 use crate::models;
 use crate::tests::block_store::init_mainnet_store;
 use crate::tests::json_from_core_snapshot::{block_hash_to_block_hash, ListDiff, masternode_list_from_genesis_diff, QRInfo, snapshot_to_snapshot};
-use crate::tests::listdiff::llmq_rotation::should_process_isd_quorum;
 
 #[test]
 fn testnet_quorum_quarters() {
@@ -46,7 +45,6 @@ fn testnet_quorum_quarters() {
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_isd_quorum,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -62,7 +60,7 @@ fn testnet_quorum_quarters() {
     let old_bytes2 = message_from_file("QRINFO_0_1740910.dat");
     processor.opaque_context = context as *mut _ as *mut std::ffi::c_void;
     processor.use_insight_as_backup = true;
-    processor.genesis_hash = context.genesis_as_ptr();
+    processor.chain_type = chain;
 
     processor.save_masternode_list(block_hash_8792, &masternode_list_8792);
     processor.save_masternode_list(block_hash_8840, &masternode_list_8840);
@@ -109,8 +107,8 @@ fn testnet_quorum_quarters() {
     processor.save_snapshot(block_hash_8936_h_2c, snapshot_8936_h_2c);
     processor.save_snapshot(block_hash_8936_h_3c, snapshot_8936_h_3c);
 
-    let old_result = process_qrinfo_from_message_internal(old_bytes.as_ptr(), old_bytes.len(), false, 70221, context.genesis_as_ptr(), processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
-    let old_result2 = process_qrinfo_from_message_internal(old_bytes2.as_ptr(), old_bytes2.len(), false, 70221, context.genesis_as_ptr(), processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
+    let old_result = process_qrinfo_from_message_internal(old_bytes.as_ptr(), old_bytes.len(), chain, false, true, 70221, processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
+    let old_result2 = process_qrinfo_from_message_internal(old_bytes2.as_ptr(), old_bytes2.len(), chain, false, true, 70221, processor, context.cache, context as *mut _ as *mut std::ffi::c_void);
     // println!("old_result tip: {}", old_result.result_at_tip.block_hash.clone().reversed()); // 1740902
     // println!("old_result h: {}", old_result.result_at_h.block_hash.clone().reversed()); // 1738648
     // println!("old_result h-c: {}", old_result.result_at_h_c.block_hash.clone().reversed()); // 1738360
@@ -126,9 +124,10 @@ fn testnet_quorum_quarters() {
     let result = process_qrinfo_from_message_internal(
         bytes.as_ptr(),
         bytes.len(),
+        chain,
         false,
+        true,
         70221,
-        context.genesis_as_ptr(),
         processor,
         context.cache,
         context as *mut _ as *mut std::ffi::c_void

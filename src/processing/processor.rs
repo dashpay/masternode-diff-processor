@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 use std::ptr::null;
 use crate::{common, common::{LLMQParams, LLMQType}, models, types};
-use crate::crypto::{byte_util::{ConstDecodable, Reversable, Zeroable}, data_ops::Data, UInt256};
+use crate::chain::common::chain_type::IHaveChainSettings;
+use crate::common::ChainType;
+use crate::crypto::{byte_util::{Reversable, Zeroable}, data_ops::Data, UInt256};
 use crate::ffi::boxer::boxed;
 use crate::ffi::callbacks;
-use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback};
+use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi::to::ToFFI;
 use crate::processing::{MasternodeProcessorCache, MNListDiffResult, ProcessingError};
 
@@ -13,7 +15,7 @@ use crate::processing::{MasternodeProcessorCache, MNListDiffResult, ProcessingEr
 pub struct MasternodeProcessor {
     /// External Masternode Manager Diff Message Context
     pub opaque_context: *const std::ffi::c_void,
-    pub genesis_hash: *const u8,
+    pub chain_type: ChainType,
     pub use_insight_as_backup: bool,
     pub get_block_height_by_hash: GetBlockHeightByHash,
     pub get_merkle_root_by_hash: MerkleRootLookup,
@@ -24,7 +26,6 @@ pub struct MasternodeProcessor {
     save_masternode_list: MasternodeListSave,
     destroy_masternode_list: MasternodeListDestroy,
     add_insight: AddInsightBlockingLookup,
-    should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
@@ -49,7 +50,6 @@ impl MasternodeProcessor {
         save_masternode_list: MasternodeListSave,
         destroy_masternode_list: MasternodeListDestroy,
         add_insight: AddInsightBlockingLookup,
-        should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
         destroy_hash: HashDestroy,
         destroy_snapshot: LLMQSnapshotDestroy,
         should_process_diff_with_range: ShouldProcessDiffWithRange,
@@ -64,12 +64,11 @@ impl MasternodeProcessor {
             save_masternode_list,
             destroy_masternode_list,
             add_insight,
-            should_process_llmq_of_type,
             destroy_hash,
             destroy_snapshot,
             should_process_diff_with_range,
             opaque_context: null(),
-            genesis_hash: null(),
+            chain_type: ChainType::MainNet,
             use_insight_as_backup: false,
         }
     }
@@ -80,7 +79,7 @@ impl MasternodeProcessor {
         cached_lists: &BTreeMap<UInt256, models::MasternodeList>,
         unknown_lists: &mut Vec<UInt256>,
     ) -> Option<models::MasternodeList> {
-        let genesis_hash = UInt256::from_const(self.genesis_hash).unwrap();
+        let genesis_hash = self.chain_type.genesis_hash();
         if block_hash.is_zero() {
             // If it's a zero block we don't expect models list here
             None
@@ -123,6 +122,8 @@ impl MasternodeProcessor {
         &self,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
+        is_dip_0024: bool,
+        is_rotated_quorums_presented: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
         let base_block_hash = list_diff.base_block_hash;
@@ -131,13 +132,15 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result(base_list, list_diff, should_process_quorums, cache)
+        self.get_list_diff_result(base_list, list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache)
     }
 
     pub(crate) fn get_list_diff_result_internal_with_base_lookup(
         &self,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
+        is_dip_0024: bool,
+        is_rotated_quorums_presented: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
         let base_list = self.find_masternode_list(
@@ -145,7 +148,7 @@ impl MasternodeProcessor {
             &cache.mn_lists,
             &mut cache.needed_masternode_lists,
         );
-        self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, cache)
+        self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache)
     }
 
     pub(crate) fn get_list_diff_result(
@@ -153,9 +156,11 @@ impl MasternodeProcessor {
         base_list: Option<models::MasternodeList>,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
+        is_dip_0024: bool,
+        is_rotated_quorums_presented: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> types::MNListDiffResult {
-        let result = self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, cache);
+        let result = self.get_list_diff_result_internal(base_list, list_diff, should_process_quorums, is_dip_0024, is_rotated_quorums_presented, cache);
         println!("get_list_diff_result: {:#?}", result);
         result.encode()
     }
@@ -178,6 +183,8 @@ impl MasternodeProcessor {
         base_list: Option<models::MasternodeList>,
         list_diff: models::MNListDiff,
         should_process_quorums: bool,
+        is_dip_0024: bool,
+        is_rotated_quorums_presented: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> MNListDiffResult {
         let skip_removed_masternodes = list_diff.version > 2;
@@ -203,6 +210,8 @@ impl MasternodeProcessor {
             list_diff.deleted_quorums,
             should_process_quorums,
             skip_removed_masternodes,
+            is_dip_0024,
+            is_rotated_quorums_presented,
             cache,
         );
         let masternode_list = models::MasternodeList::new(
@@ -300,6 +309,8 @@ impl MasternodeProcessor {
         deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
         should_process_quorums: bool,
         skip_removed_masternodes: bool,
+        is_dip_0024: bool,
+        is_rotated_quorums_presented: bool,
         cache: &mut MasternodeProcessorCache,
     ) -> (
         BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
@@ -309,7 +320,7 @@ impl MasternodeProcessor {
         let has_valid_quorums = true;
         if should_process_quorums {
             for (&llmq_type, llmqs_of_type) in &mut added_quorums {
-                if self.should_process_quorum(llmq_type) {
+                if self.should_process_quorum(llmq_type, is_dip_0024, is_rotated_quorums_presented) {
                     for (&llmq_block_hash, quorum) in llmqs_of_type {
                         if let Some(models::MasternodeList { masternodes, .. }) = self
                             .find_masternode_list(
@@ -801,8 +812,14 @@ impl MasternodeProcessor {
         )
     }
 
-    pub fn should_process_quorum(&self, llmq_type: LLMQType) -> bool {
-        unsafe { (self.should_process_llmq_of_type)(llmq_type.into(), self.opaque_context) }
+    pub fn should_process_quorum(&self, llmq_type: LLMQType, is_dip_0024: bool, is_rotated_quorums_presented: bool) -> bool {
+        if self.chain_type.isd_llmq_type() == llmq_type {
+            is_dip_0024 && is_rotated_quorums_presented
+        } else if is_dip_0024 { /*skip old quorums here for now*/
+            false
+        } else {
+            self.chain_type.should_process_llmq_of_type(llmq_type)
+        }
     }
 
     pub fn should_process_diff_with_range(

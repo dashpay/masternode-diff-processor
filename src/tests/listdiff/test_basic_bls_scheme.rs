@@ -4,7 +4,7 @@ use hashes::hex::FromHex;
 use crate::{models, types};
 use crate::bindings::common::{processor_create_cache, register_processor};
 use crate::bindings::masternode::process_mnlistdiff_from_message;
-use crate::chain::common::chain_type::{DevnetType, IHaveChainSettings};
+use crate::chain::common::chain_type::DevnetType;
 use crate::common::ChainType;
 use crate::crypto::UInt256;
 use crate::ffi::boxer::boxed;
@@ -53,16 +53,6 @@ unsafe extern "C" fn get_block_hash_by_height_chacha(
     }
 }
 
-
-pub unsafe extern "C" fn should_process_llmq_of_type_chacha(
-    llmq_type: u8,
-    context: *const std::ffi::c_void,
-) -> bool {
-    llmq_type == 101
-    //println!("should_process_llmq_of_type_chacha: {}", llmq_type);
-    //true
-}
-
 pub unsafe extern "C" fn get_masternode_list_at_9192(
     block_hash: *mut [u8; 32],
     context: *const std::ffi::c_void,
@@ -79,9 +69,6 @@ pub unsafe extern "C" fn get_masternode_list_at_9192(
 #[test]
 fn test_basic_bls_scheme() {
     let chain = ChainType::DevNet(DevnetType::Chacha);
-    let genesis =
-        UInt256::from_hex("8862eca4bdb5255b51dc72903b8a842f6ffe7356bc40c7b7a7437b8e4556e220")
-            .unwrap();
     let processor = unsafe {
         register_processor(
             get_merkle_root_for_chacha,
@@ -93,7 +80,6 @@ fn test_basic_bls_scheme() {
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_llmq_of_type_chacha,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -110,10 +96,10 @@ fn test_basic_bls_scheme() {
     let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
+        chain,
         false,
         true,
         70225,
-        genesis.0.as_ptr(),
         processor,
         cache,
         context,
@@ -166,14 +152,6 @@ pub unsafe extern "C" fn get_masternode_list_mojito(
     // let encoded = list.encode();
     // boxed(encoded)
 }
-pub unsafe extern "C" fn should_process_llmq_of_type_mojito(
-    llmq_type: u8,
-    context: *const std::ffi::c_void,
-) -> bool {
-    llmq_type == 101
-    //println!("should_process_llmq_of_type_chacha: {}", llmq_type);
-    //true
-}
 
 unsafe extern "C" fn get_merkle_root_for_white_russian(
     block_hash: *mut [u8; 32],
@@ -187,27 +165,6 @@ unsafe extern "C" fn get_merkle_root_for_white_russian(
     boxed(merkle_root.0) as *mut _
 }
 
-pub unsafe extern "C" fn should_process_llmq_of_type_white_russian(
-    llmq_type: u8,
-    context: *const std::ffi::c_void,
-) -> bool {
-    llmq_type == 106
-    //println!("should_process_llmq_of_type_chacha: {}", llmq_type);
-    //true
-}
-// unsafe extern "C" fn get_block_height_by_hash_white_russian(
-//     block_hash: *mut [u8; 32],
-//     _context: *const std::ffi::c_void,
-// ) -> u32 {
-//     let h = UInt256(*(block_hash));
-//     println!("get_block_height_by_hash_white_russian: {}", h);
-//     let orig_s = h.clone().to_string();
-//     match orig_s.as_str() {
-//         "739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357" => 1,
-//         "720ea2e4e7f6b31debe9bb852e1e4cdfdf10bed9827f0ef6527cfa0261010000" => 4450,
-//         _ => u32::MAX,
-//     }
-// }
 unsafe extern "C" fn get_block_hash_by_height_white_russian(
     block_height: u32,
     _context: *const std::ffi::c_void,
@@ -223,9 +180,6 @@ unsafe extern "C" fn get_block_hash_by_height_white_russian(
 #[test]
 fn test_core_19_beta_6() {
     let chain = ChainType::DevNet(DevnetType::WhiteRussian);
-    let genesis =
-        UInt256::from_hex("9163d6958065ca5e73c36f0f2474ce618846260c215f5cba633bd0003585cb35")
-            .unwrap();
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_default,
@@ -237,7 +191,6 @@ fn test_core_19_beta_6() {
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_llmq_of_type_white_russian,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -257,10 +210,10 @@ fn test_core_19_beta_6() {
     let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
+        chain,
         false,
         true,
         70227,
-        genesis.0.as_ptr(),
         processor,
         context.cache,
         context as *mut _ as *mut std::ffi::c_void,
@@ -284,7 +237,6 @@ fn test_core_19_rc_2_testnet() {
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_llmq_of_type_white_russian,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -301,10 +253,10 @@ fn test_core_19_rc_2_testnet() {
     let result = unsafe { process_mnlistdiff_from_message(
         bytes.as_ptr(),
         bytes.len(),
+        chain,
         false,
         true,
         70223,
-        chain.genesis_hash().0.as_ptr(),
         processor,
         context.cache,
         context as *mut _ as *mut std::ffi::c_void,

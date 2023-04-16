@@ -18,7 +18,7 @@ pub mod tests {
     use crate::chain::common::chain_type::{ChainType, IHaveChainSettings};
     use crate::consensus::encode;
     use crate::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384};
-    use crate::{common, models};
+    use crate::models;
     use crate::processing::{MasternodeProcessorCache, MasternodeProcessor, MNListDiffResult, ProcessingError, QRInfoResult};
     use crate::{unwrap_or_diff_processing_failure, unwrap_or_qr_processing_failure, unwrap_or_return, types};
     use crate::tests::block_store::init_testnet_store;
@@ -150,9 +150,10 @@ pub mod tests {
     pub fn process_mnlistdiff_from_message_internal(
         message_arr: *const u8,
         message_length: usize,
+        chain_type: ChainType,
         use_insight_as_backup: bool,
         protocol_version: u32,
-        genesis_hash: *const u8,
+        // genesis_hash: *const u8,
         processor: *mut MasternodeProcessor,
         cache: *mut MasternodeProcessorCache,
         context: *const std::ffi::c_void,
@@ -165,11 +166,11 @@ pub mod tests {
         );
         processor.opaque_context = context;
         processor.use_insight_as_backup = use_insight_as_backup;
-        processor.genesis_hash = genesis_hash;
+        processor.chain_type = chain_type;
         let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
         let list_diff =
             unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash), protocol_version));
-        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, cache);
+        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, false, false, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",
             std::time::Instant::now(),
@@ -182,9 +183,10 @@ pub mod tests {
     pub fn process_qrinfo_from_message_internal(
         message: *const u8,
         message_length: usize,
+        chain_type: ChainType,
         use_insight_as_backup: bool,
+        is_rotated_quorums_presented: bool,
         protocol_version: u32,
-        genesis_hash: *const u8,
         processor: *mut MasternodeProcessor,
         cache: *mut MasternodeProcessorCache,
         context: *const std::ffi::c_void,
@@ -194,7 +196,7 @@ pub mod tests {
         let processor = unsafe { &mut *processor };
         processor.opaque_context = context;
         processor.use_insight_as_backup = use_insight_as_backup;
-        processor.genesis_hash = genesis_hash;
+        processor.chain_type = chain_type;
         let cache = unsafe { &mut *cache };
         println!(
             "process_qrinfo_from_message --: {:?} {:?} {:?}",
@@ -204,7 +206,7 @@ pub mod tests {
         let read_list_diff =
             |offset: &mut usize| processor.read_list_diff_from_message(message, offset, protocol_version);
         let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
-            processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, cache)
+            processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache)
         };
         let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
         let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
@@ -494,41 +496,6 @@ pub mod tests {
         boxed(merkle_root.0) as *mut _
     }
 
-    pub unsafe extern "C" fn should_process_llmq_of_type(
-        llmq_type: u8,
-        context: *const std::ffi::c_void,
-    ) -> bool {
-        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-
-        let quorum_type: u8 = match data.chain {
-            ChainType::MainNet => common::LLMQType::Llmqtype400_60.into(),
-            ChainType::TestNet => common::LLMQType::Llmqtype50_60.into(),
-            ChainType::DevNet(_) => common::LLMQType::LlmqtypeDevnetDIP0024.into(),
-        };
-        llmq_type == quorum_type
-    }
-
-    pub unsafe extern "C" fn should_process_llmq_of_type_actual(
-        llmq_type: u8,
-        context: *const std::ffi::c_void,
-    ) -> bool {
-        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        let r#type = common::LLMQType::from(llmq_type);
-        let chain = data.chain;
-        let is_isd = chain.isd_llmq_type() == r#type;
-        let is_qr_context = data.is_dip_0024;
-        if is_isd {
-            is_qr_context
-        } else if is_qr_context /*skip old quorums here for now*/ {
-            false
-        } else {
-            chain.chain_locks_type() == r#type ||
-                chain.is_llmq_type() == r#type ||
-                chain.platform_type() == r#type ||
-                is_isd
-        }
-    }
-
     pub unsafe extern "C" fn get_block_hash_by_height_from_insight(block_height: u32, context: *const std::ffi::c_void) -> *mut u8 {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         match data.blocks.iter().find(|block| block.height == block_height) {
@@ -621,7 +588,6 @@ pub mod tests {
                 masternode_list_save_default,
                 masternode_list_destroy_default,
                 add_insight_lookup_default,
-                should_process_llmq_of_type,
                 hash_destroy_default,
                 snapshot_destroy_default,
                 should_process_diff_with_range_default,
@@ -631,10 +597,10 @@ pub mod tests {
         let result = unsafe { process_mnlistdiff_from_message(
             c_array,
             length,
+            chain,
             use_insight_as_backup,
             false,
             70221,
-            chain.genesis_hash().0.as_ptr(),
             processor,
             cache,
             context,

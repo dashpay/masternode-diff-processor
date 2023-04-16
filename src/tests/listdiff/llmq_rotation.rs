@@ -1,5 +1,5 @@
 use crate::ffi::boxer::boxed;
-use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, should_process_llmq_of_type, snapshot_destroy_default, FFIContext};
+use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default, FFIContext};
 use crate::chain::common::chain_type::{ChainType, DevnetType, IHaveChainSettings};
 use crate::common::LLMQType;
 use crate::crypto::byte_util::{Reversable, UInt256};
@@ -33,7 +33,6 @@ fn test_llmq_rotation() {
             masternode_list_save_default,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_llmq_of_type,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -42,10 +41,11 @@ fn test_llmq_rotation() {
     let result = unsafe { process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
+        chain,
         use_insight_as_backup,
         false,
+        true,
         70221,
-        chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
         context,
@@ -94,7 +94,6 @@ fn test_llmq_rotation_2() {
             masternode_list_save_default,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_llmq_of_type,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -103,10 +102,11 @@ fn test_llmq_rotation_2() {
     let result = unsafe { process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
+        chain,
         use_insight_as_backup,
         false,
+        true,
         70221,
-        chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
         context,
@@ -475,7 +475,6 @@ fn test_devnet_333() {
             masternode_list_save_default,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_llmq_of_type,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -484,10 +483,11 @@ fn test_devnet_333() {
     let result = unsafe { process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
+        chain,
         false,
         false,
+        true,
         70221,
-        chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
         context,
@@ -508,7 +508,6 @@ fn test_processor_devnet_333() {
             masternode_list_save_default,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_llmq_of_type,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -526,11 +525,11 @@ fn test_processor_devnet_333() {
     let result = unsafe { process_qrinfo_from_message(
         bytes.as_ptr(),
         bytes.len(),
-        // merkle_root: UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf").unwrap().0.as_ptr(),
+        chain,
         false,
         false,
+        true,
         70221,
-        chain.genesis_hash().0.as_ptr(),
         processor,
         cache,
         context,
@@ -728,7 +727,6 @@ fn test_processor_devnet_333_2() {
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_llmq_of_type_333_2,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -746,9 +744,9 @@ fn test_processor_devnet_333_2() {
     let result = process_mnlistdiff_from_message_internal(
         mnldiff_bytes.as_ptr(),
         mnldiff_bytes.len(),
+        chain,
         false,
         70221,
-        chain.genesis_hash().0.as_ptr(),
         processor,
         context.cache,
         context as *mut _ as *mut std::ffi::c_void,
@@ -759,9 +757,10 @@ fn test_processor_devnet_333_2() {
     let result = process_qrinfo_from_message_internal(
         bytes.as_ptr(),
         bytes.len(),
+        chain,
         false,
+        true,
         70221,
-        chain.genesis_hash().0.as_ptr(),
         processor,
         context.cache,
         context as *mut _ as *mut std::ffi::c_void,
@@ -769,13 +768,6 @@ fn test_processor_devnet_333_2() {
     println!("Result: {:#?}", &result);
     assert!(result.result_at_h.has_valid_mn_list_root, "Invalid masternodes root");
     // assert!(result.result_at_h.has_valid_llmq_list_root, "Invalid quorums root");
-}
-
-pub unsafe extern "C" fn should_process_llmq_of_type_333_2(
-    llmq_type: u8,
-    context: *const std::ffi::c_void,
-) -> bool {
-    true
 }
 
 unsafe extern "C" fn get_merkle_root_by_hash_333_2(
@@ -1421,9 +1413,6 @@ unsafe extern "C" fn get_merkle_root_by_hash_333_2(
 #[test]
 fn test_jack_daniels() {
     let chain = ChainType::DevNet(DevnetType::JackDaniels);
-    let genesis =
-        UInt256::from_hex("79ee40288949fd61132c025761d4f065e161d60a88aab4c03e613ca8718d1d26")
-            .unwrap();
     let processor = unsafe {
         register_processor(
             get_merkle_root_by_hash_jack_daniels,
@@ -1435,7 +1424,6 @@ fn test_jack_daniels() {
             masternode_list_save_in_cache,
             masternode_list_destroy_default,
             add_insight_lookup_default,
-            should_process_isd_quorum,
             hash_destroy_default,
             snapshot_destroy_default,
             should_process_diff_with_range_default,
@@ -1454,9 +1442,10 @@ fn test_jack_daniels() {
     let result = process_qrinfo_from_message_internal(
         qrinfo_bytes.as_ptr(),
         qrinfo_bytes.len(),
+        chain,
         false,
+        true,
         70221,
-        genesis.0.as_ptr(),
         processor,
         cache,
         context,
@@ -1504,13 +1493,6 @@ unsafe extern "C" fn get_merkle_root_by_hash_jack_daniels(
         h, merkle_root
     );
     boxed(merkle_root.0) as *mut _
-}
-
-pub unsafe extern "C" fn should_process_llmq_of_type_jack_daniels(
-    llmq_type: u8,
-    context: *const std::ffi::c_void,
-) -> bool {
-    true
 }
 
 pub unsafe extern "C" fn should_process_isd_quorum(

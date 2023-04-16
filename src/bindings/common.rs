@@ -3,7 +3,7 @@ use std::os::raw::c_char;
 use crate::crypto::byte_util::ConstDecodable;
 use crate::crypto::UInt256;
 use crate::ffi::boxer::boxed;
-use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback};
+use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange};
 use crate::ffi::unboxer::{unbox_any, unbox_block, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_masternode_list, unbox_mn_list_diff_result, unbox_qr_info_result, unbox_vec_ptr};
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache};
 use crate::types;
@@ -21,7 +21,6 @@ pub unsafe extern "C" fn register_processor(
     save_masternode_list: MasternodeListSave,
     destroy_masternode_list: MasternodeListDestroy,
     add_insight: AddInsightBlockingLookup,
-    should_process_llmq_of_type: ShouldProcessLLMQTypeCallback,
     destroy_hash: HashDestroy,
     destroy_snapshot: LLMQSnapshotDestroy,
     should_process_diff_with_range: ShouldProcessDiffWithRange,
@@ -36,12 +35,9 @@ pub unsafe extern "C" fn register_processor(
         save_masternode_list,
         destroy_masternode_list,
         add_insight,
-        should_process_llmq_of_type,
-        // validate_llmq,
         destroy_hash,
         destroy_snapshot,
         should_process_diff_with_range,
-        // log_message,
     );
     println!("register_processor: {:?}", processor);
     boxed(processor)

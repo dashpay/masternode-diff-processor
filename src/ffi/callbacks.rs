@@ -7,8 +7,6 @@ use crate::processing::ProcessingError;
 
 pub type AddInsightBlockingLookup =
     unsafe extern "C" fn(block_hash: *mut [u8; 32], context: *const c_void);
-pub type ShouldProcessLLMQTypeCallback =
-    unsafe extern "C" fn(llmq_type: u8, context: *const c_void) -> bool;
 pub type ShouldProcessDiffWithRange = unsafe extern "C" fn(
     base_block_hash: *mut [u8; 32],
     block_hash: *mut [u8; 32],
