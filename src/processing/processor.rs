@@ -1,9 +1,7 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::ptr::null;
 use crate::{common, common::{LLMQParams, LLMQType}, models, types};
-use crate::crypto::byte_util::{ConstDecodable, Reversable, Zeroable};
-use crate::crypto::data_ops::{Data, inplace_intersection};
-use crate::crypto::UInt256;
+use crate::crypto::{byte_util::{ConstDecodable, Reversable, Zeroable}, data_ops::Data, UInt256};
 use crate::ffi::boxer::boxed;
 use crate::ffi::callbacks;
 use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetBlockHeightByHash, GetLLMQSnapshotByBlockHash, HashDestroy, LLMQSnapshotDestroy, MasternodeListDestroy, MasternodeListLookup, MasternodeListSave, MerkleRootLookup, SaveLLMQSnapshot, ShouldProcessDiffWithRange, ShouldProcessLLMQTypeCallback};
@@ -255,59 +253,50 @@ impl MasternodeProcessor {
         BTreeMap<UInt256, models::MasternodeEntry>,
         BTreeMap<UInt256, models::MasternodeEntry>,
     ) {
-        let mut added_masternodes = added_or_modified_masternodes.clone();
-        let mut modified_masternode_keys: HashSet<UInt256> = HashSet::new();
-        if !base_masternodes.is_empty() {
-            let base_masternodes = base_masternodes.clone();
-            base_masternodes.iter().for_each(|(h, _e)| {
-                added_masternodes.remove(h);
-            });
-            let mut new_mn_keys: HashSet<UInt256> =
-                added_or_modified_masternodes.keys().cloned().collect();
-            let mut old_mn_keys: HashSet<UInt256> = base_masternodes.keys().cloned().collect();
-            modified_masternode_keys = inplace_intersection(&mut new_mn_keys, &mut old_mn_keys);
-        }
-        let mut modified_masternodes = modified_masternode_keys
-            .into_iter()
-            .map(|hash| (hash, added_or_modified_masternodes[&hash].clone()))
+        let added_masternodes = added_or_modified_masternodes
+            .iter()
+            .filter(|(k, _)| !base_masternodes.contains_key(k))
+            .map(|(k, v)| (*k, v.clone()))
+            .collect::<BTreeMap<_, _>>();
+
+        let mut modified_masternodes = added_or_modified_masternodes
+            .iter()
+            .filter(|(k, _)| base_masternodes.contains_key(k))
+            .map(|(k, v)| (*k, v.clone()))
             .collect::<BTreeMap<_, _>>();
 
         let mut masternodes = if !base_masternodes.is_empty() {
-            let mut old_mnodes = base_masternodes;
+            let mut old_masternodes = base_masternodes;
             for hash in deleted_masternode_hashes {
-                old_mnodes.remove(&hash.clone().reversed());
+                old_masternodes.remove(&hash.clone().reversed());
             }
-            old_mnodes.extend(added_masternodes.clone());
-            old_mnodes
+            old_masternodes.extend(added_masternodes.clone());
+            old_masternodes
         } else {
             added_masternodes.clone()
         };
-        modified_masternodes
-            .iter_mut()
-            .for_each(|(hash, modified)| {
-                if let Some(old) = masternodes.get_mut(hash) {
-                    if old.update_height < modified.update_height {
-                        modified.update_with_previous_entry(old, common::Block {
-                                    height: block_height,
-                                    hash: block_hash,
-                        });
-                        if !old.confirmed_hash.is_zero() &&
-                            old.known_confirmed_at_height.is_some() &&
-                            old.known_confirmed_at_height.unwrap() > block_height {
-                            old.known_confirmed_at_height = Some(block_height);
-                        }
+
+        for (hash, modified) in &mut modified_masternodes {
+            if let Some(old) = masternodes.get_mut(hash) {
+                if old.update_height < modified.update_height {
+                    modified.update_with_previous_entry(old, block_height, block_hash);
+                    if !old.confirmed_hash.is_zero() &&
+                        old.known_confirmed_at_height.is_some() &&
+                        old.known_confirmed_at_height.unwrap() > block_height {
+                        old.known_confirmed_at_height = Some(block_height);
                     }
-                    masternodes.insert(*hash, modified.clone());
                 }
-            });
+                masternodes.insert(*hash, modified.clone());
+            }
+        }
         (added_masternodes, modified_masternodes, masternodes)
     }
 
     #[allow(clippy::type_complexity)]
     pub fn classify_quorums(
         &self,
-        base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
-        added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
+        mut base_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
+        mut added_quorums: BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
         deleted_quorums: BTreeMap<LLMQType, Vec<UInt256>>,
         should_process_quorums: bool,
         skip_removed_masternodes: bool,
@@ -318,11 +307,10 @@ impl MasternodeProcessor {
         bool,
     ) {
         let has_valid_quorums = true;
-        let mut added = added_quorums;
         if should_process_quorums {
-            added.iter_mut().for_each(|(&llmq_type, llmqs_of_type)| {
+            for (&llmq_type, llmqs_of_type) in &mut added_quorums {
                 if self.should_process_quorum(llmq_type) {
-                    llmqs_of_type.iter_mut().for_each(|(&llmq_block_hash, quorum)| {
+                    for (&llmq_block_hash, quorum) in llmqs_of_type {
                         if let Some(models::MasternodeList { masternodes, .. }) = self
                             .find_masternode_list(
                                 llmq_block_hash,
@@ -337,33 +325,26 @@ impl MasternodeProcessor {
                                 llmq_block_hash,
                                 masternodes,
                                 cache,
-                            )
+                            );
                         }
-                    });
+                    }
                 }
-            });
+            }
         }
-        let mut quorums = base_quorums;
-        quorums.extend(
-            added
-                .clone()
-                .into_iter()
-                .filter(|(key, _entries)| !quorums.contains_key(key))
-                .collect::<BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>>(),
-        );
-        quorums.iter_mut().for_each(|(llmq_type, llmq_map)| {
-            if let Some(keys_to_delete) = deleted_quorums.get(llmq_type) {
-                keys_to_delete.iter().for_each(|key| {
-                    (*llmq_map).remove(key);
-                });
+        for (llmq_type, keys_to_delete) in &deleted_quorums {
+            if let Some(llmq_map) = base_quorums.get_mut(llmq_type) {
+                for key in keys_to_delete {
+                    llmq_map.remove(key);
+                }
             }
-            if let Some(keys_to_add) = added.get(llmq_type) {
-                keys_to_add.clone().into_iter().for_each(|(key, entry)| {
-                    (*llmq_map).insert(key, entry);
-                });
-            }
-        });
-        (added, quorums, has_valid_quorums)
+        }
+        for (llmq_type, keys_to_add) in added_quorums.iter() {
+            base_quorums
+                .entry(*llmq_type)
+                .or_insert_with(BTreeMap::new)
+                .extend(keys_to_add.clone());
+        }
+        (added_quorums, base_quorums, has_valid_quorums)
     }
 
     pub fn validate_quorum(
@@ -620,13 +601,8 @@ impl MasternodeProcessor {
         index: usize,
     ) {
         if let Some(indexed_quarter) = quarter.get(index) {
-            indexed_quarter.iter().for_each(|member| {
-                if let Some(quarter_members) = quorum_members.get_mut(index) {
-                    quarter_members.push(member.clone());
-                } else {
-                    quorum_members.insert(index, vec![member.clone()]);
-                }
-            })
+            quorum_members.resize_with(index + 1, Vec::new);
+            quorum_members.get_mut(index).unwrap().extend(indexed_quarter.iter().cloned());
         }
     }
 
@@ -876,6 +852,6 @@ impl MasternodeProcessor {
         offset: &mut usize,
         protocol_version: u32
     ) -> Option<models::MNListDiff> {
-        models::MNListDiff::new(message, offset, |hash| self.lookup_block_height_by_hash(hash), protocol_version)
+        models::MNListDiff::new(message, offset, |block_hash| self.lookup_block_height_by_hash(block_hash), protocol_version)
     }
 }

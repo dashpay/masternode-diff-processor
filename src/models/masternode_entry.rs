@@ -285,7 +285,8 @@ impl MasternodeEntry {
         short_hex_string_from(&self.provider_registration_transaction_hash.0)
     }
 
-    pub fn update_with_previous_entry(&mut self, entry: &mut MasternodeEntry, block: Block) {
+    pub fn update_with_previous_entry(&mut self, entry: &mut MasternodeEntry, block_height: u32, block_hash: UInt256) {
+        let block = Block::new(block_height, block_hash);
         self.previous_validity = entry
             .previous_validity
             .clone()
