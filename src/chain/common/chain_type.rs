@@ -80,6 +80,19 @@ impl From<DevnetType> for i16 {
     }
 }
 
+impl From<&str> for DevnetType {
+    fn from(value: &str) -> Self {
+        match value {
+            "jack-daniels" => DevnetType::JackDaniels,
+            "333" => DevnetType::Devnet333,
+            "chacha" => DevnetType::Chacha,
+            "mojito" => DevnetType::Mojito,
+            "white-russian" => DevnetType::WhiteRussian,
+            _ => panic!("Devnet with name: {} not supported", value)
+        }
+    }
+}
+
 
 impl DevnetType {
     pub fn identifier(&self) -> String {

@@ -1,3 +1,4 @@
+use std::ffi::CStr;
 use std::os::raw::c_char;
 use crate::chain::common::chain_type::DevnetType;
 use crate::common::ChainType;
@@ -67,4 +68,11 @@ pub extern "C" fn chain_devnet_version(devnet_type: DevnetType) -> u16 {
 #[no_mangle]
 pub extern "C" fn chain_devnet_identifier(devnet_type: DevnetType) -> *mut c_char {
     devnet_type.identifier().to_c_string_ptr()
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn chain_devnet_from_identifier(identifier: *const c_char) -> DevnetType {
+    let c_str = unsafe { CStr::from_ptr(identifier) };
+    DevnetType::from(c_str.to_str().unwrap())
 }
