@@ -100,16 +100,8 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     let diff_h_2c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let diff_h_3c = unwrap_or_qr_result_failure!(read_list_diff(offset));
     let extra_share = message.read_with::<bool>(offset, ()).unwrap_or(false);
-    let snapshot_at_h_4c = if extra_share {
-        Some(unwrap_or_qr_result_failure!(read_snapshot(offset)))
-    } else {
-        None
-    };
-    let diff_h_4c = if extra_share {
-        Some(unwrap_or_qr_result_failure!(read_list_diff(offset)))
-    } else {
-        None
-    };
+    let snapshot_at_h_4c = extra_share.then_some(unwrap_or_qr_result_failure!(read_snapshot(offset)));
+    let diff_h_4c = extra_share.then_some(unwrap_or_qr_result_failure!(read_list_diff(offset)));
     processor.save_snapshot(diff_h_c.block_hash, snapshot_at_h_c.clone());
     processor.save_snapshot(diff_h_2c.block_hash, snapshot_at_h_2c.clone());
     processor.save_snapshot(diff_h_3c.block_hash, snapshot_at_h_3c.clone());
@@ -143,7 +135,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     let mut snapshots: Vec<models::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
     for _i in 0..quorum_snapshot_list_count {
         let snapshot = unwrap_or_qr_result_failure!(read_snapshot(offset));
-        snapshots.push(snapshot.clone());
+        snapshots.push(snapshot);
     }
     let mn_list_diff_list_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> =
