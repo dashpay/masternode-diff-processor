@@ -577,7 +577,7 @@ impl MasternodeProcessor {
                                 if idx == initial_loop_idx {
                                     // we made full "while" loop
                                     if !updated {
-                                        // there are not enough MNs, there is nothing we can do here
+                                        println!("there are not enough MNs {}: {} then required for quarter size: ({})", work_block_height, work_block_hash, quarter_size);
                                         break;
                                     }
                                     // reset and try again
