@@ -2,7 +2,9 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use crate::chain::common::chain_type::DevnetType;
 use crate::common::ChainType;
+use crate::ffi::ByteArray;
 use crate::types::opaque_key::AsCStringPtr;
+use crate::util::data_append::DataAppend;
 
 /// # Safety
 #[no_mangle]
@@ -104,4 +106,10 @@ pub extern "C" fn chain_type_for_devnet_type(devnet_type: DevnetType) -> ChainTy
 #[no_mangle]
 pub extern "C" fn devnet_type_for_chain_type(chain_type: ChainType) -> DevnetType {
     DevnetType::from(chain_type)
+}
+
+/// # Safety
+#[no_mangle]
+pub extern "C" fn devnet_genesis_coinbase_message(devnet_type: DevnetType, protocol_version: u32) -> ByteArray {
+    Vec::<u8>::devnet_genesis_coinbase_message(devnet_type, protocol_version).into()
 }

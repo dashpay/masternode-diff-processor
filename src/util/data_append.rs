@@ -1,20 +1,21 @@
 use hashes::{Hash, sha256d};
 use crate::blockdata::opcodes::all::{OP_CHECKSIG, OP_DUP, OP_EQUAL, OP_EQUALVERIFY, OP_HASH160, OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4, OP_RETURN};
+use crate::chain::common::chain_type::DevnetType;
 use crate::chain::params::{BITCOIN_SCRIPT_ADDRESS, ScriptMap};
-use crate::consensus::Encodable;
+use crate::consensus::{Encodable, WriteExt};
 use crate::util::base58;
 use crate::util::script::{op_len, ScriptElement};
 
 pub trait DataAppend: std::io::Write {
     fn from_coinbase_message(message: &String, height: u32) -> Self;
-    fn devnet_genesis_coinbase_message(identifier: &String, version: u16, protocol_version: u32) -> Self;
+    fn devnet_genesis_coinbase_message(devnet_type: DevnetType, protocol_version: u32) -> Self;
     fn script_pub_key_for_address(address: &str, script_map: &ScriptMap) -> Self;
     fn credit_burn_script_pub_key_for_address(address: &String, script_map: &ScriptMap) -> Self;
     fn proposal_info(proposal_info: Vec<u8>) -> Self;
     fn shapeshift_memo_for_address(address: String) -> Self;
 
     fn append_coinbase_message<W: std::io::Write>(&self, message: &String, height: u32, writer: W) -> W;
-    fn append_devnet_genesis_coinbase_message(identifier: &String, version: u16, protocol_version: u32, writer: Self) -> Self;
+    fn append_devnet_genesis_coinbase_message(devnet_type: DevnetType, protocol_version: u32, writer: Self) -> Self;
     fn append_credit_burn_script_pub_key_for_address(address: &String, script_map: &ScriptMap, writer: Self) -> Self;
     fn append_proposal_info(proposal_info: &Vec<u8>, writer: Self) -> Self;
     fn append_script_pub_key_for_address(address: &str, script_map: &ScriptMap, writer: Self) -> Self;
@@ -37,8 +38,8 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         // Self::append_coinbase_message(message, height, Vec::<u8>::new())
     }
 
-    fn devnet_genesis_coinbase_message(identifier: &String, version: u16, protocol_version: u32) -> Self {
-        Self::append_devnet_genesis_coinbase_message(identifier, version, protocol_version, Vec::<u8>::new())
+    fn devnet_genesis_coinbase_message(devnet_type: DevnetType, protocol_version: u32) -> Self {
+        Self::append_devnet_genesis_coinbase_message(devnet_type, protocol_version, Vec::<u8>::new())
     }
 
     fn script_pub_key_for_address(address: &str, script_map: &ScriptMap) -> Self {
@@ -89,13 +90,17 @@ impl DataAppend for Vec<u8> /* io::Write */ {
         writer
     }
 
-    fn append_devnet_genesis_coinbase_message(identifier: &String, version: u16, protocol_version: u32, mut writer: Self) -> Self {
+    fn append_devnet_genesis_coinbase_message(devnet_type: DevnetType, protocol_version: u32, mut writer: Self) -> Self {
         // A little weirder
-        // uint8_t l = (uint8_t)[devnetIdentifier lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-        // todo: check
         0x51u8.enc(&mut writer);
-        (identifier.len() as u8).enc(&mut writer);
-        identifier.enc(&mut writer);
+        let identifier = devnet_type.identifier();
+        let bytes = identifier.as_bytes();
+        let len: u8 = bytes.len() as u8;
+        len.enc(&mut writer);
+        writer.emit_slice(bytes).unwrap();
+        //if protocol_version >= 70221 {
+        //  [self appendUInt8:version + 0x50];
+        //}
         writer
     }
 
