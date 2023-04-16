@@ -328,6 +328,14 @@ impl ChainType {
         SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::from(0x7f000001), self.standard_port()))
     }
 
+    pub fn transaction_version(&self) -> u16 {
+        match self {
+            ChainType::MainNet => 1,
+            ChainType::TestNet => 1,
+            _ => 3,
+        }
+    }
+
     pub fn base_reward(&self) -> u64 {
         match self {
             ChainType::MainNet => 5 * DUFFS,

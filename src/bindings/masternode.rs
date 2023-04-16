@@ -226,31 +226,30 @@ pub extern "C" fn masternode_hash_confirmed_hash(confirmed_hash: *const u8, pro_
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn quorum_type_for_is_locks(chain_id: i16) -> LLMQType {
-    ChainType::from(chain_id).is_llmq_type()
+pub extern "C" fn quorum_type_for_is_locks(chain_type: ChainType) -> LLMQType {
+    chain_type.is_llmq_type()
 }
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn quorum_type_for_isd_locks(chain_id: i16) -> LLMQType {
-    ChainType::from(chain_id).isd_llmq_type()
+pub extern "C" fn quorum_type_for_isd_locks(chain_type: ChainType) -> LLMQType {
+    chain_type.isd_llmq_type()
 }
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn quorum_type_for_chain_locks(chain_id: i16) -> LLMQType {
-    ChainType::from(chain_id).chain_locks_type()
+pub extern "C" fn quorum_type_for_chain_locks(chain_type: ChainType) -> LLMQType {
+    chain_type.chain_locks_type()
 }
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn quorum_type_for_platform(chain_id: i16) -> LLMQType {
-    ChainType::from(chain_id).platform_type()
+pub extern "C" fn quorum_type_for_platform(chain_type: ChainType) -> LLMQType {
+    chain_type.platform_type()
 }
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn quorum_should_process_type_for_chain(llmq_type: LLMQType, chain_id: i16) -> bool {
-    let chain_type = ChainType::from(chain_id);
+pub extern "C" fn quorum_should_process_type_for_chain(llmq_type: LLMQType, chain_type: ChainType) -> bool {
     chain_type.should_process_llmq_of_type(llmq_type)
 }

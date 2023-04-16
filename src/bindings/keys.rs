@@ -9,7 +9,6 @@ use crate::chain::bip::bip32;
 use crate::chain::bip::bip38::BIP38;
 use crate::chain::common::chain_type::IHaveChainSettings;
 use crate::chain::derivation::{BIP32_HARD, IndexPath};
-use crate::chain::ScriptMap;
 use crate::common::ChainType;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, clone_into_array, ConstDecodable, Reversable, Zeroable};
@@ -261,8 +260,8 @@ pub unsafe extern "C" fn key_has_private_key(key: *mut OpaqueKey) -> bool {
 // serializedPrivateKeyForChain
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_serialized_private_key_for_chain(key: *mut OpaqueKey, chain_id: i16) -> *mut c_char {
-    let script = ScriptMap::from(chain_id);
+pub unsafe extern "C" fn key_serialized_private_key_for_chain(key: *mut OpaqueKey, chain_type: ChainType) -> *mut c_char {
+    let script = chain_type.script_map();
     match *key {
         OpaqueKey::ECDSA(ptr) => (&*ptr).serialized_private_key_for_script(&script),
         OpaqueKey::BLSLegacy(ptr) |
@@ -273,10 +272,9 @@ pub unsafe extern "C" fn key_serialized_private_key_for_chain(key: *mut OpaqueKe
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_with_private_key(secret: *const c_char, key_type: KeyKind, chain_id: i16) -> *mut OpaqueKey {
+pub unsafe extern "C" fn key_with_private_key(secret: *const c_char, key_type: KeyKind, chain_type: ChainType) -> *mut OpaqueKey {
     let c_str = unsafe { CStr::from_ptr(secret) };
     let private_key_string = c_str.to_str().unwrap();
-    let chain_type = ChainType::from(chain_id);
     match key_type {
         KeyKind::ECDSA => ECDSAKey::key_with_private_key(private_key_string, chain_type).to_opaque_ptr(),
         KeyKind::BLS => BLSKey::key_with_private_key(private_key_string, true).to_opaque_ptr(),
@@ -444,7 +442,7 @@ pub unsafe extern "C" fn serialized_key_private_keys_at_index_paths(
     derivation_indexes: *const u8,
     derivation_hardened: *const bool,
     derivation_len: usize,
-    chain_id: i16,
+    chain_type: ChainType,
 ) -> *mut OpaqueSerializedKeys {
     let seed_bytes = slice::from_raw_parts(seed, seed_len);
     let index_paths = slice::from_raw_parts(index_paths, index_paths_len);
@@ -452,7 +450,7 @@ pub unsafe extern "C" fn serialized_key_private_keys_at_index_paths(
     key_type.key_with_seed_data(seed_bytes)
         .and_then(|top_key| top_key.private_derive_to_256bit_derivation_path(&derivation_path))
         .map_or(null_mut(), |derivation_path_extended_key| {
-            let script = ScriptMap::from(chain_id);
+            let script = chain_type.script_map();
             let keys = index_paths.iter()
                 .map(|p| derivation_path_extended_key.private_derive_to_path(&IndexPath::from(p as *const IndexPathData))
                     .map(|private_key| CString::new(private_key.serialized_private_key_for_script(&script))
@@ -582,10 +580,10 @@ pub unsafe extern "C" fn key_ecdsa_compact_sign(key: *mut ECDSAKey, digest: *con
 /// # Safety
 /// decrypts & serializes a BIP38 key using the given passphrase or returns NULL if passphrase is incorrect
 #[no_mangle]
-pub unsafe extern "C" fn key_ecdsa_with_bip38_key(private_key: *const c_char, passphrase: *const c_char, chain_id: i16) -> *mut c_char {
+pub unsafe extern "C" fn key_ecdsa_with_bip38_key(private_key: *const c_char, passphrase: *const c_char, chain_type: ChainType) -> *mut c_char {
     let private_key = CStr::from_ptr(private_key).to_str().unwrap();
     let passphrase = CStr::from_ptr(passphrase).to_str().unwrap();
-    let script = ScriptMap::from(chain_id);
+    let script = chain_type.script_map();
     ECDSAKey::key_with_bip38_key(private_key, passphrase, &script)
         .map(|key| key.serialized_private_key_for_script(&script))
         .to_c_string_ptr()
@@ -611,33 +609,31 @@ pub unsafe extern "C" fn key_ecdsa_with_seed_data(ptr: *const u8, len: usize) ->
 /// # Safety
 /// For test only
 #[no_mangle]
-pub unsafe extern "C" fn key_ecdsa_serialized_private_master_from_seed_data(ptr: *const u8, len: usize, chain_id: i16) -> *mut c_char {
+pub unsafe extern "C" fn key_ecdsa_serialized_private_master_from_seed_data(ptr: *const u8, len: usize, chain_type: ChainType) -> *mut c_char {
     let seed = slice::from_raw_parts(ptr, len);
     if seed.is_empty() {
         return null_mut();
     }
     let seed_key = UInt512::bip32_seed_key(seed);
     let key = bip32::Key::new(0, 0, UInt256::MIN, UInt256::from(&seed_key.0[32..]), seed_key.0[..32].to_vec(), false)
-        .serialize(ChainType::from(chain_id));
+        .serialize(chain_type);
     CString::new(key).unwrap().into_raw()
 }
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_ecdsa_with_private_key(secret: *const c_char, chain_id: i16) -> *mut ECDSAKey {
+pub unsafe extern "C" fn key_ecdsa_with_private_key(secret: *const c_char, chain_type: ChainType) -> *mut ECDSAKey {
     let c_str = unsafe { CStr::from_ptr(secret) };
     let private_key_string = c_str.to_str().unwrap();
-    let chain_type = ChainType::from(chain_id);
     ECDSAKey::key_with_private_key(private_key_string, chain_type)
         .map_or(null_mut(), |key| boxed(key))
 }
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_ecdsa_public_key_data_for_private_key(secret: *const c_char, chain_id: i16) -> ByteArray {
+pub unsafe extern "C" fn key_ecdsa_public_key_data_for_private_key(secret: *const c_char, chain_type: ChainType) -> ByteArray {
     let c_str = unsafe { CStr::from_ptr(secret) };
     let private_key_string = c_str.to_str().unwrap();
-    let chain_type = ChainType::from(chain_id);
     ECDSAKey::key_with_private_key(private_key_string, chain_type)
         .map(|key| key.public_key_data())
         .into()
@@ -650,17 +646,17 @@ pub unsafe extern "C" fn key_ecdsa_has_private_key(key: *mut ECDSAKey) -> bool {
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_ecdsa_serialized_private_key_for_chain(key: *mut ECDSAKey, chain_id: i16) -> *mut c_char {
-    (&*key).serialized_private_key_for_script(&ScriptMap::from(chain_id))
+pub unsafe extern "C" fn key_ecdsa_serialized_private_key_for_chain(key: *mut ECDSAKey, chain_type: ChainType) -> *mut c_char {
+    (&*key).serialized_private_key_for_script(&chain_type.script_map())
         .to_c_string_ptr()
 }
 
 // + (NSString *)serializedAuthPrivateKeyFromSeed:(NSData *)seed forChain:(DSChain *)chain
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_ecdsa_serialized_auth_private_key_for_chain(seed: *const u8, seed_len: usize, chain_id: i16) -> *mut c_char {
+pub unsafe extern "C" fn key_ecdsa_serialized_auth_private_key_for_chain(seed: *const u8, seed_len: usize, chain_type: ChainType) -> *mut c_char {
     let seed = slice::from_raw_parts(seed, seed_len);
-    let script_map = ScriptMap::from(chain_id);
+    let script_map = chain_type.script_map();
     ECDSAKey::serialized_auth_private_key_from_seed(seed, script_map)
         .to_c_string_ptr()
 }
@@ -699,10 +695,10 @@ pub unsafe extern "C" fn key_create_ecdsa_from_secret(ptr: *const u8, len: usize
 /// Deserializes extended private key from string and create opaque pointer to ECDSAKey
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_create_ecdsa_from_serialized_extended_private_key(key: *const c_char, chain_id: i16) -> *mut ECDSAKey {
+pub unsafe extern "C" fn key_create_ecdsa_from_serialized_extended_private_key(key: *const c_char, chain_type: ChainType) -> *mut ECDSAKey {
     // NSData *extendedPrivateKey = [self deserializedExtendedPrivateKey:serializedExtendedPrivateKey onChain:chain];
     // [DSECDSAKey keyWithSecret:*(UInt256 *)extendedPrivateKey.bytes compressed:YES];
-    (CStr::from_ptr(key).to_str().unwrap(), ChainType::from(chain_id))
+    (CStr::from_ptr(key).to_str().unwrap(), chain_type)
         .try_into()
         .ok()
         .and_then(|key: bip32::Key| ECDSAKey::key_with_secret_data(&key.extended_key_data(), true))
@@ -775,20 +771,18 @@ pub unsafe extern "C" fn key_serialized_extended_private_key_from_seed(
     derivation_indexes: *const u8,
     derivation_hardened: *const bool,
     derivation_len: usize,
-    chain_id: i16) -> *mut c_char {
+    chain_type: ChainType) -> *mut c_char {
     let secret_slice = unsafe { slice::from_raw_parts(secret, secret_len) };
     let index_path = IndexPath::from((derivation_indexes, derivation_hardened, derivation_len));
-    let chain_type = ChainType::from(chain_id);
     ECDSAKey::serialized_extended_private_key_from_seed(secret_slice, index_path, chain_type)
         .to_c_string_ptr()
 }
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn ecdsa_public_key_hash_from_secret(secret: *const c_char, chain_id: i16) -> ByteArray {
+pub extern "C" fn ecdsa_public_key_hash_from_secret(secret: *const c_char, chain_type: ChainType) -> ByteArray {
     let c_str = unsafe { CStr::from_ptr(secret) };
     let private_key_string = c_str.to_str().unwrap();
-    let chain_type = ChainType::from(chain_id);
     ECDSAKey::key_with_private_key(private_key_string, chain_type)
         .map(|key| key.hash160())
         .into()
@@ -798,8 +792,8 @@ pub extern "C" fn ecdsa_public_key_hash_from_secret(secret: *const c_char, chain
 
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_address_for_key(key: *mut OpaqueKey, chain_id: i16) -> *mut c_char {
-    let script_map = ScriptMap::from(chain_id);
+pub unsafe extern "C" fn key_address_for_key(key: *mut OpaqueKey, chain_type: ChainType) -> *mut c_char {
+    let script_map = chain_type.script_map();
     CString::new(match *key {
         OpaqueKey::ECDSA(ptr) => (&*ptr).address_with_public_key_data(&script_map),
         OpaqueKey::BLSLegacy(ptr) |
@@ -809,31 +803,31 @@ pub unsafe extern "C" fn key_address_for_key(key: *mut OpaqueKey, chain_id: i16)
 }
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn key_address_with_public_key_data(data: *const u8, len: usize, chain_id: i16) -> *mut c_char {
-    let map = ScriptMap::from(chain_id);
+pub unsafe extern "C" fn key_address_with_public_key_data(data: *const u8, len: usize, chain_type: ChainType) -> *mut c_char {
+    let map = chain_type.script_map();
     let data = slice::from_raw_parts(data, len);
     address::with_public_key_data(data, &map)
         .to_c_string_ptr()
 }
 /// # Safety
 #[no_mangle]
-pub extern "C" fn address_for_ecdsa_key(key: *mut ECDSAKey, chain_id: i16) -> *mut c_char {
+pub extern "C" fn address_for_ecdsa_key(key: *mut ECDSAKey, chain_type: ChainType) -> *mut c_char {
     let key = unsafe { &*key };
-    let script_map = ScriptMap::from(chain_id);
+    let script_map = chain_type.script_map();
     key.address_with_public_key_data(&script_map).to_c_string_ptr()
 }
 /// # Safety
 #[no_mangle]
-pub extern "C" fn address_for_bls_key(key: *mut BLSKey, chain_id: i16) -> *mut c_char {
+pub extern "C" fn address_for_bls_key(key: *mut BLSKey, chain_type: ChainType) -> *mut c_char {
     let key = unsafe { &*key };
-    let script_map = ScriptMap::from(chain_id);
+    let script_map = chain_type.script_map();
     key.address_with_public_key_data(&script_map).to_c_string_ptr()
 }
 /// # Safety
 #[no_mangle]
-pub extern "C" fn address_for_ed25519_key(key: *mut ED25519Key, chain_id: i16) -> *mut c_char {
+pub extern "C" fn address_for_ed25519_key(key: *mut ED25519Key, chain_type: ChainType) -> *mut c_char {
     let key = unsafe { &*key };
-    let script_map = ScriptMap::from(chain_id);
+    let script_map = chain_type.script_map();
     key.address_with_public_key_data(&script_map).to_c_string_ptr()
 }
 
@@ -844,9 +838,9 @@ pub extern "C" fn address_for_ed25519_key(key: *mut ED25519Key, chain_id: i16) -
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn address_for_ecdsa_key_recovered_from_compact_sig(data: *const u8, len: usize, digest: *const u8, chain_id: i16) -> *mut c_char {
+pub extern "C" fn address_for_ecdsa_key_recovered_from_compact_sig(data: *const u8, len: usize, digest: *const u8, chain_type: ChainType) -> *mut c_char {
     let compact_sig = unsafe { slice::from_raw_parts(data, len) };
-    let script_map = ScriptMap::from(chain_id);
+    let script_map = chain_type.script_map();
     UInt256::from_const(digest)
         .and_then(|message_digest| ECDSAKey::key_with_compact_sig(compact_sig, message_digest))
         .map(|key| key.address_with_public_key_data(&script_map))
@@ -854,7 +848,7 @@ pub extern "C" fn address_for_ecdsa_key_recovered_from_compact_sig(data: *const 
 }
 /// # Safety
 #[no_mangle]
-pub extern "C" fn ecdsa_public_key_unique_id_from_derived_key_data(data: *const u8, len: usize, chain_id: i16) -> u64 {
+pub extern "C" fn ecdsa_public_key_unique_id_from_derived_key_data(data: *const u8, len: usize, chain_type: ChainType) -> u64 {
     let derived_key_data = unsafe { slice::from_raw_parts(data, len) };
     let seed_key = UInt512::bip32_seed_key(derived_key_data);
     let secret = UInt256::from(&seed_key.0[..32]);
@@ -862,7 +856,7 @@ pub extern "C" fn ecdsa_public_key_unique_id_from_derived_key_data(data: *const 
         .map_or(0, |public_key| {
             let data = public_key.public_key_data();
             let mut writer = SecVec::new();
-            ChainType::from(chain_id).genesis_hash().enc(&mut writer);
+            chain_type.genesis_hash().enc(&mut writer);
             writer.extend(data);
             // one way injective function?
             UInt256::sha256(writer.as_slice()).u64_le()
@@ -871,10 +865,10 @@ pub extern "C" fn ecdsa_public_key_unique_id_from_derived_key_data(data: *const 
 
 /// # Safety
 #[no_mangle]
-pub extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len: usize, chain_id: i16) -> *mut c_char {
+pub extern "C" fn ecdsa_address_from_public_key_data(data: *const u8, len: usize, chain_type: ChainType) -> *mut c_char {
     let public_key_data = unsafe { slice::from_raw_parts(data, len) };
     ECDSAKey::key_with_public_key_data(public_key_data)
-        .map(|key| key.address_with_public_key_data(&ScriptMap::from(chain_id)))
+        .map(|key| key.address_with_public_key_data(&chain_type.script_map()))
         .to_c_string_ptr()
 }
 
@@ -942,8 +936,8 @@ pub unsafe extern "C" fn deprecated_incorrect_extended_public_key_from_seed(seed
 // + (NSData *)deserializedExtendedPrivateKey:(NSString *)extendedPrivateKeyString onChain:(DSChain *)chain;
 /// # Safety
 #[no_mangle]
-pub unsafe extern "C" fn deserialized_extended_private_key(ptr: *const c_char, chain_id: i16) -> ByteArray {
-    (CStr::from_ptr(ptr).to_str().unwrap(), ChainType::from(chain_id))
+pub unsafe extern "C" fn deserialized_extended_private_key(ptr: *const c_char, chain_type: ChainType) -> ByteArray {
+    (CStr::from_ptr(ptr).to_str().unwrap(), chain_type)
         .try_into()
         .ok()
         .map(|key: bip32::Key| key.extended_key_data())
