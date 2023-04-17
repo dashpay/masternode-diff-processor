@@ -3,7 +3,6 @@ use std::os::raw::{c_char, c_ulong, c_void};
 use std::ptr::null_mut;
 use std::slice;
 use byte::BytesExt;
-use hashes::hex::ToHex;
 use secp256k1::Scalar;
 use crate::chain::bip::bip32;
 use crate::chain::bip::bip38::BIP38;
@@ -173,7 +172,6 @@ pub extern "C" fn key_create_ed25519_from_extened_public_key_data(ptr: *const u8
 pub extern "C" fn key_derive_key_from_extened_private_key_data_for_index_path(secret: *const u8, secret_len: usize, key_type: KeyKind, indexes: *const c_ulong, length: usize) -> *mut OpaqueKey {
     let bytes = unsafe { slice::from_raw_parts(secret, secret_len) };
     let path = IndexPath::from_ffi(indexes, length);
-    println!("key_derive_key_from_extened_private_key_data_for_index_path: {:?} {} {:?}", key_type, bytes.to_hex(), path);
     match key_type {
         KeyKind::ECDSA => ECDSAKey::key_with_extended_private_key_data(bytes)
             .and_then(|key| key.private_derive_to_path(&path))
