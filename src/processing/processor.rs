@@ -840,7 +840,6 @@ impl MasternodeProcessor {
         unsafe { (self.add_insight)(boxed(block_hash.0), self.opaque_context) }
     }
 
-    /// Calls c++ BLS lib via FFI
     fn validate_signature(
         &self,
         valid_masternodes: Vec<models::MasternodeEntry>,
@@ -850,13 +849,13 @@ impl MasternodeProcessor {
     ) {
         println!("validate_signature for quorum: {:?}", quorum.llmq_type);
         // TODO: Exclude rotated quorums from validation here ???????
-        if quorum.llmq_type == LLMQType::Llmqtype60_75 {
-            has_valid_quorums &= true;
-        } else {
+        // if quorum.llmq_type == LLMQType::Llmqtype60_75 {
+        //     has_valid_quorums &= true;
+        // } else {
             let is_valid_signature = quorum.validate(valid_masternodes, block_height);
             let is_valid_payload = quorum.validate_payload();
             has_valid_quorums &= is_valid_payload && is_valid_signature;
-        }
+        // }
 
         if has_valid_quorums {
             quorum.verified = true;
