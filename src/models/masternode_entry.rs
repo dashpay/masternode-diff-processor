@@ -255,6 +255,7 @@ impl MasternodeEntry {
             let distance = height - block_height;
             if distance < min_distance {
                 min_distance = distance;
+                println!("SME operator public key for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {block_height}", key, used_previous_operator_public_key_at_block_hash, self.provider_registration_transaction_hash);
                 used_previous_operator_public_key_at_block_hash = key;
             }
         }

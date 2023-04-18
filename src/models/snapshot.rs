@@ -4,6 +4,7 @@ use hashes::hex::ToHex;
 use crate::common::LLMQSnapshotSkipMode;
 use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::BytesDecodable;
+use crate::crypto::data_ops::Data;
 use crate::impl_bytes_decodable;
 use crate::models::MasternodeEntry;
 
@@ -73,17 +74,21 @@ impl LLMQSnapshot {
         self.member_list.len() + 1 + 2 + self.skip_list.len() * 2
     }
 
+    pub fn member_is_true_at_index(&self, i: u32) -> bool {
+        self.member_list.bit_is_true_at_le_index(i)
+    }
+
     pub fn apply_skip_strategy(
         &self,
         sorted_combined_mns_list: Vec<MasternodeEntry>,
-        quorum_num: usize,
+        quorum_count: usize,
         quarter_size: usize,
     ) -> Vec<Vec<MasternodeEntry>> {
-        let mut quarter_quorum_members = Vec::<Vec<MasternodeEntry>>::with_capacity(quorum_num);
+        let mut quarter_quorum_members = Vec::<Vec<MasternodeEntry>>::with_capacity(quorum_count);
         match self.skip_list_mode {
             LLMQSnapshotSkipMode::NoSkipping => {
                 let mut iter = sorted_combined_mns_list.iter();
-                (0..quorum_num).for_each(|_i| {
+                (0..quorum_count).for_each(|_i| {
                     let mut quarter = Vec::<MasternodeEntry>::new();
                     while quarter.len() < quarter_size {
                         if let Some(node) = iter.next() {
@@ -107,7 +112,7 @@ impl LLMQSnapshot {
                 });
                 let mut index: usize = 0;
                 let mut idxk: usize = 0;
-                (0..quorum_num).for_each(|_i| {
+                (0..quorum_count).for_each(|_i| {
                     let mut quarter = Vec::<MasternodeEntry>::new();
                     while quarter.len() < quarter_size {
                         if let Some(_skipped) = processed_skip_list.get(idxk) {
@@ -124,7 +129,7 @@ impl LLMQSnapshot {
                 });
             }
             LLMQSnapshotSkipMode::SkipExcept => {
-                (0..quorum_num).for_each(|_i| {
+                (0..quorum_count).for_each(|_i| {
                     let mut quarter = Vec::<MasternodeEntry>::new();
                     self.skip_list.iter().for_each(|unskipped| {
                         if let Some(node) = sorted_combined_mns_list.get(*unskipped as usize) {

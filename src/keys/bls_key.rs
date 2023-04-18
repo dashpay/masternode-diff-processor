@@ -6,6 +6,7 @@ use crate::consensus::Encodable;
 use crate::crypto::{UInt256, UInt384, UInt768, byte_util::{AsBytes, BytesDecodable, Zeroable}, UInt160};
 use crate::keys::{IKey, KeyKind, dip14::{IChildKeyDerivation, SignKey}};
 use crate::keys::crypto_data::{CryptoData, DHKey};
+use crate::models::OperatorPublicKey;
 use crate::util::{base58, data_ops::hex_with_data, sec_vec::SecVec};
 
 #[derive(Clone, Debug, Default)]
@@ -456,23 +457,38 @@ impl BLSKey {
         }
     }
 
-    pub fn verify_secure_aggregated(digest: UInt256, signature: UInt768, public_keys: Vec<BLSKey>, use_legacy: bool) -> bool {
+    pub fn verify_secure_aggregated(commitment_hash: UInt256, signature: UInt768, operator_keys: Vec<OperatorPublicKey>, use_legacy: bool) -> bool {
+        let message = commitment_hash.as_bytes();
+        let public_keys = operator_keys.iter().filter_map(|key| {
+            if key.is_legacy() {
+                G1Element::from_bytes_legacy(&key.data.0)
+            } else {
+                G1Element::from_bytes(&key.data.0)
+            }.ok()
+        }).collect::<Vec<_>>();
         if use_legacy {
-            if let Ok(bls_signature) = G2Element::from_bytes_legacy(signature.as_bytes()) {
-                let bls_public_keys: Vec<_> = public_keys.into_iter().filter_map(|pk| pk.bls_public_key().ok()).collect::<Vec<_>>();
-                LegacySchemeMPL::new().verify_secure(bls_public_keys.iter().collect::<Vec<&G1Element>>(), digest.as_bytes(), &bls_signature)
-            } else {
-                false
-            }
+            G2Element::from_bytes_legacy(signature.as_bytes())
+                .map_or(false, |sig| LegacySchemeMPL::new()
+                    .verify_secure(public_keys.iter().collect::<Vec<&G1Element>>(), message, &sig))
         } else {
-            if let Ok(bls_signature) = G2Element::from_bytes(signature.as_bytes()) {
-                let bls_public_keys: Vec<_> = public_keys.into_iter().filter_map(|pk| pk.bls_public_key().ok()).collect::<Vec<_>>();
-                BasicSchemeMPL::new().verify_secure(bls_public_keys.iter().collect::<Vec<&G1Element>>(), digest.as_bytes(), &bls_signature)
-            } else {
-                false
-            }
+            G2Element::from_bytes(signature.as_bytes())
+                .map_or(false, |sig| BasicSchemeMPL::new()
+                    .verify_secure(public_keys.iter().collect::<Vec<&G1Element>>(), message, &sig))
         }
     }
+
+    pub fn verify_quorum_signature(message: &[u8], threshold_signature: &[u8], public_key: &[u8], use_legacy: bool) -> bool {
+        if use_legacy {
+            G1Element::from_bytes_legacy(public_key)
+                .map_or(false, |pk| G2Element::from_bytes_legacy(threshold_signature)
+                    .map_or(false, |sig| LegacySchemeMPL::new().verify(&pk, message, &sig)))
+        } else {
+            G1Element::from_bytes(public_key)
+                .map_or(false, |pk| G2Element::from_bytes(threshold_signature)
+                    .map_or(false, |sig| BasicSchemeMPL::new().verify(&pk, message, &sig)))
+        }
+    }
+
 
     pub fn verify_aggregated_signature(signature: UInt768, public_keys: Vec<BLSKey>, messages: Vec<Vec<u8>>, use_legacy: bool) -> bool {
         let bls_public_keys = public_keys.iter().filter_map(|key| key.bls_public_key().ok()).collect::<Vec<_>>();

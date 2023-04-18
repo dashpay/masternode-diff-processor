@@ -193,6 +193,17 @@ impl MasternodeList {
         hashes
     }
 
+    pub fn has_masternode(&self, provider_registration_transaction_hash: UInt256) -> bool {
+        // self.masternodes.contains_key(provider_registration_transaction_hash)
+        self.masternodes.values().any(|node| node.provider_registration_transaction_hash == provider_registration_transaction_hash)
+    }
+
+    pub fn has_valid_masternode(&self, provider_registration_transaction_hash: UInt256) -> bool {
+        self.masternodes.values()
+            .find(|node| node.provider_registration_transaction_hash == provider_registration_transaction_hash)
+            .map_or(false, |node| node.is_valid)
+        // self.masternodes.values().any(|node| node.provider_registration_transaction_hash == provider_registration_transaction_hash)
+    }
 }
 
 impl MasternodeList {

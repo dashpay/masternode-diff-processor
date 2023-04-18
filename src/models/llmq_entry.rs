@@ -1,10 +1,10 @@
-use bls_signatures::{BasicSchemeMPL, G1Element, G2Element, LegacySchemeMPL, Scheme};
 use byte::{BytesExt, ctx::{Bytes, Endian}, TryRead, LE};
 use hashes::hex::ToHex;
 use std::convert::Into;
 use crate::common::{LLMQType, LLMQVersion};
 use crate::consensus::{encode::VarInt, Encodable, WriteExt};
 use crate::crypto::{byte_util::AsBytes, data_ops::Data, UInt256, UInt384, UInt768};
+use crate::keys::BLSKey;
 use crate::models;
 
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
@@ -216,19 +216,13 @@ impl LLMQEntry {
         let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
         let llmq_type = VarInt(self.llmq_type as u64);
-        *offset += llmq_type.consensus_encode(&mut buffer).unwrap();
-        *offset += self.llmq_hash.consensus_encode(&mut buffer).unwrap();
-        *offset += self
-            .valid_members_count
-            .consensus_encode(&mut buffer)
-            .unwrap();
+        *offset += llmq_type.enc(&mut buffer);
+        *offset += self.llmq_hash.enc(&mut buffer);
+        *offset += self.valid_members_count.enc(&mut buffer);
         buffer.emit_slice(&self.valid_members_bitset).unwrap();
         *offset += self.valid_members_bitset.len();
-        *offset += self.public_key.consensus_encode(&mut buffer).unwrap();
-        *offset += self
-            .verification_vector_hash
-            .consensus_encode(&mut buffer)
-            .unwrap();
+        *offset += self.public_key.enc(&mut buffer);
+        *offset += self.verification_vector_hash.enc(&mut buffer);
         buffer
     }
 
@@ -316,57 +310,20 @@ impl LLMQEntry {
     }
 }
 
-// TODO: combine with BLSKey
 impl LLMQEntry {
-    fn verify_secure_aggregated(message: &[u8], signature: &[u8], public_keys: Vec<G1Element>, use_legacy: bool) -> bool {
-        let bls_signature = match if use_legacy {
-            G2Element::from_bytes_legacy(signature)
-        } else {
-            G2Element::from_bytes(signature)
-        } {
-            Ok(signature) => signature,
-            Err(err) => {
-                println!("verify_secure_aggregated (legacy = {}): error: {}", use_legacy, err);
-                return false;
-            }
-        };
-        let keys = public_keys.iter().collect::<Vec<_>>();
-        if use_legacy {
-            LegacySchemeMPL::new().verify_secure(keys, message, &bls_signature)
-        } else {
-            BasicSchemeMPL::new().verify_secure(keys, message, &bls_signature)
-        }
-    }
-
-    fn verify_quorum_signature(message: &[u8], threshold_signature: &[u8], public_key: &[u8], use_legacy: bool) -> bool {
-        if use_legacy {
-            LegacySchemeMPL::new()
-                .verify(&G1Element::from_bytes_legacy(public_key).unwrap(), message, &G2Element::from_bytes_legacy(threshold_signature).unwrap())
-        } else {
-            BasicSchemeMPL::new()
-                .verify(&G1Element::from_bytes(public_key).unwrap(), message, &G2Element::from_bytes(threshold_signature).unwrap())
-        }
-    }
 
     pub fn validate(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> bool {
         let commitment_hash = self.generate_commitment_hash();
         let use_legacy = self.version.use_bls_legacy();
-        let operator_keys = (0..valid_masternodes.len()).into_iter().filter_map(|i| {
-            match self.signers_bitset.as_slice().bit_is_true_at_le_index(i as u32) {
-                true => {
-                    let key = valid_masternodes[i].operator_public_key_at(block_height);
-                    if key.is_legacy() {
-                        G1Element::from_bytes_legacy(key.data.as_bytes())
-                    } else {
-                        G1Element::from_bytes(key.data.as_bytes())
-                    }.ok()
-                },
-                false => None
-            }
-        }).collect::<Vec<_>>();
-        let all_commitment_aggregated_signature_validated = Self::verify_secure_aggregated(
-            commitment_hash.as_bytes(),
-            self.all_commitment_aggregated_signature.as_bytes(),
+        let operator_keys = valid_masternodes
+            .iter()
+            .enumerate()
+            .filter_map(|(i, node)| self.signers_bitset.bit_is_true_at_le_index(i as u32)
+                .then_some(node.operator_public_key_at(block_height)))
+            .collect::<Vec<_>>();
+        let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(
+            commitment_hash,
+            self.all_commitment_aggregated_signature,
             operator_keys,
             use_legacy);
         if !all_commitment_aggregated_signature_validated {
@@ -375,7 +332,7 @@ impl LLMQEntry {
         }
         // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
         // This is an aggregated BLS signature verification.
-        let quorum_signature_validated = Self::verify_quorum_signature(commitment_hash.as_bytes(), self.threshold_signature.as_bytes(), self.public_key.as_bytes(), use_legacy);
+        let quorum_signature_validated = BLSKey::verify_quorum_signature(commitment_hash.as_bytes(), self.threshold_signature.as_bytes(), self.public_key.as_bytes(), use_legacy);
         if !quorum_signature_validated {
             println!("••• Issue with quorum_signature_validated");
             return false;

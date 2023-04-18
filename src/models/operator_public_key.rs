@@ -1,4 +1,5 @@
 use std::io;
+use bls_signatures::G1Element;
 use byte::{BytesExt, TryRead};
 use crate::consensus::Encodable;
 use crate::crypto::UInt384;
@@ -30,5 +31,15 @@ impl<'a> TryRead<'a, u16> for OperatorPublicKey {
     fn try_read(bytes: &'a [u8], version: u16) -> byte::Result<(Self, usize)> {
         let data = bytes.read_with::<UInt384>(&mut 0, byte::LE)?;
         Ok((OperatorPublicKey { data, version }, 48))
+    }
+}
+
+impl From<OperatorPublicKey> for Option<G1Element> {
+    fn from(value: OperatorPublicKey) -> Self {
+        if value.is_legacy() {
+            G1Element::from_bytes_legacy(&value.data.0)
+        } else {
+            G1Element::from_bytes(&value.data.0)
+        }.ok()
     }
 }

@@ -12,3 +12,4 @@ pub mod masternode_list_saving_to_disk;
 pub mod test_basic_bls_scheme;
 pub mod test_mainnet_checkpoints;
 pub mod testnet_test_retrieving;
+pub mod testnet_core19;

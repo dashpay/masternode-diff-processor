@@ -130,7 +130,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
             unwrap_or_qr_result_failure!(models::LLMQEntry::from_bytes(message, offset)).encode(),
         ));
     }
-    let quorum_snapshot_list_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
+    let quorum_snapshot_list_count = 0;
     let mut quorum_snapshot_list_vec: Vec<*mut types::LLMQSnapshot> =
         Vec::with_capacity(quorum_snapshot_list_count);
     let mut snapshots: Vec<models::LLMQSnapshot> = Vec::with_capacity(quorum_snapshot_list_count);
@@ -138,7 +138,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
         let snapshot = unwrap_or_qr_result_failure!(read_snapshot(offset));
         snapshots.push(snapshot);
     }
-    let mn_list_diff_list_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
+    let mn_list_diff_list_count = 0;
     let mut mn_list_diff_list_vec: Vec<*mut types::MNListDiffResult> =
         Vec::with_capacity(mn_list_diff_list_count);
     assert_eq!(

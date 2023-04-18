@@ -14,10 +14,10 @@ pub enum LLMQVersion {
 }
 impl LLMQVersion {
     pub fn use_bls_legacy(&self) -> bool {
-        *self == LLMQVersion::Default || *self == LLMQVersion::Indexed
+        *self == Self::Default || *self == Self::Indexed
     }
     pub fn use_rotated_quorums(&self) -> bool {
-        *self == LLMQVersion::Indexed || *self == LLMQVersion::BLSBasicIndexed
+        *self == Self::Indexed || *self == Self::BLSBasicIndexed
     }
 }
 

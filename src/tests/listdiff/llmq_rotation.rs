@@ -1,7 +1,6 @@
 use crate::ffi::boxer::boxed;
 use crate::lib_tests::tests::{add_insight_lookup_default, get_block_hash_by_height_default, get_llmq_snapshot_by_block_hash_default, get_masternode_list_by_block_hash_default, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_default, masternode_list_save_in_cache, message_from_file, process_mnlistdiff_from_message_internal, process_qrinfo_from_message_internal, save_llmq_snapshot_default, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default, FFIContext};
-use crate::chain::common::chain_type::{ChainType, DevnetType, IHaveChainSettings};
-use crate::common::LLMQType;
+use crate::chain::common::chain_type::{ChainType, DevnetType};
 use crate::crypto::byte_util::{Reversable, UInt256};
 use crate::hashes::hex::{FromHex, ToHex};
 use crate::bindings::common::{processor_create_cache, register_processor};
@@ -1493,12 +1492,4 @@ unsafe extern "C" fn get_merkle_root_by_hash_jack_daniels(
         h, merkle_root
     );
     boxed(merkle_root.0) as *mut _
-}
-
-pub unsafe extern "C" fn should_process_isd_quorum(
-    llmq_type: u8,
-    context: *const std::ffi::c_void,
-) -> bool {
-    let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-    LLMQType::from(llmq_type) == data.chain.isd_llmq_type()
 }

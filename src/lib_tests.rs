@@ -346,6 +346,7 @@ pub mod tests {
         let block = data.block_for_hash(block_hash).unwrap_or(&MerkleBlock { hash: UInt256::MIN, height: u32::MAX, merkleroot: UInt256::MIN });
         let height = block.height;
         // println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
+        println!("{}: {},", height, block_hash_reversed);
         height
     }
 
