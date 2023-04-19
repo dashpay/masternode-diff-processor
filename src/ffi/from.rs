@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::slice;
-use crate::{common, encode, models, tx, types};
-use crate::crypto::{UInt128, UInt160, UInt256, UInt384, UInt768};
-use crate::crypto::byte_util::Reversable;
+use crate::{common, models, tx, types};
+use crate::consensus::encode;
+use crate::crypto::{byte_util::Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::ffi::to::ToFFI;
 use crate::tx::transaction;
 
@@ -95,6 +95,7 @@ impl FromFFI for types::CoinbaseTransaction {
             } else {
                 Some(UInt256(*self.merkle_root_llmq_list))
             },
+            locked_amount: self.locked_amount
         }
     }
 }
@@ -120,10 +121,7 @@ impl FromFFI for types::MasternodeList {
                 BTreeMap::new(),
                 |mut acc, i| {
                     let value = (*(*self.masternodes.add(i))).decode();
-                    let key = value
-                        .provider_registration_transaction_hash
-                        .clone()
-                        .reversed();
+                    let key = value.provider_registration_transaction_hash.reversed();
                     acc.insert(key, value);
                     acc
                 },
@@ -224,14 +222,14 @@ impl FromFFI for types::MasternodeEntry {
                     acc
                 },
             ),
-            known_confirmed_at_height: if self.known_confirmed_at_height > 0 {
-                Some(self.known_confirmed_at_height)
-            } else {
-                None
-            },
+            known_confirmed_at_height: (self.known_confirmed_at_height > 0)
+                .then_some(self.known_confirmed_at_height),
             update_height: self.update_height,
             key_id_voting: UInt160(*self.key_id_voting),
             is_valid: self.is_valid,
+            mn_type: self.mn_type.into(),
+            platform_http_port: self.platform_http_port,
+            platform_node_id: UInt160(*self.platform_node_id),
             entry_hash: UInt256(*self.entry_hash),
         }
     }

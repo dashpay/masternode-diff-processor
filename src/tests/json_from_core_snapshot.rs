@@ -3,12 +3,9 @@ use std::num::ParseIntError;
 use byte::BytesExt;
 use byte::ctx::Bytes;
 use serde::{Deserialize, Serialize};
-use crate::common::{LLMQSnapshotSkipMode, LLMQType, SocketAddress};
-use crate::common::llmq_version::LLMQVersion;
+use crate::common::{LLMQSnapshotSkipMode, LLMQType, LLMQVersion, MasternodeType, SocketAddress};
 use crate::consensus::encode::VarInt;
-use crate::crypto::{UInt160, UInt256, UInt384, UInt768, VarBytes};
-use crate::crypto::byte_util::{BytesDecodable, Reversable};
-use crate::crypto::var_array::VarArray;
+use crate::crypto::{byte_util::{BytesDecodable, Reversable}, UInt160, UInt256, UInt384, UInt768, VarArray, VarBytes};
 use crate::hashes::hex::FromHex;
 use crate::lib_tests::tests::message_from_file;
 use crate::models;
@@ -162,7 +159,7 @@ pub struct MNList {
 }
 
 pub fn masternode_list_from_json(filename: String) -> models::MasternodeList {
-    list_to_list(serde_json::from_slice(&message_from_file(filename)).unwrap())
+    list_to_list(serde_json::from_slice(&message_from_file(filename.as_str())).unwrap())
 }
 
 pub fn list_to_list(value: MNList) -> models::MasternodeList {
@@ -296,23 +293,18 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
             let key_id_voting = UInt160::from_bytes(&voting_bytes, &mut 0).unwrap();
             let public_key = UInt384::from_hex(node.pub_key_operator.as_str()).unwrap();
             let version = node.version;
-            let is_valid = node.is_valid;
+            let is_valid = u8::from(node.is_valid);
             let operator_public_key = OperatorPublicKey {
                 data: public_key,
                 version: version.unwrap_or(0)
             };
-            let mut masternode = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, if is_valid { 1 } else { 0 });
-            if let Some(update_height) = node.update_height {
-                masternode.update_height = update_height;
-            }
+            let update_height = node.update_height.unwrap_or(0);
+            let mut masternode = models::MasternodeEntry::new(provider_registration_transaction_hash, confirmed_hash, socket_address, key_id_voting, operator_public_key, is_valid, MasternodeType::Regular, 0, UInt160::MIN, update_height);
             masternode.known_confirmed_at_height = node.known_confirmed_at_height;
             masternode
         })
         .fold(BTreeMap::new(), |mut acc, entry| {
-            let hash = entry
-                .provider_registration_transaction_hash
-                .clone()
-                .reversed();
+            let hash = entry.provider_registration_transaction_hash.reversed();
             acc.insert(hash, entry);
             acc
         });
@@ -364,8 +356,8 @@ fn vec_to_arr<T, const N: usize>(v: Vec<T>) -> [T; N] {
 
 pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
     diff: ListDiff, block_height_lookup: BHL, is_bls_basic: bool) -> models::MNListDiff {
-    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reversed();
-    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reversed();
+    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reverse();
+    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reverse();
     let cb_tx_bytes = Vec::from_hex(diff.cb_tx.as_str()).unwrap();
     let coinbase_transaction = CoinbaseTransaction::from_bytes(&cb_tx_bytes, &mut 0).unwrap();
     // let tree_bytes = diff.cb_tx_merkle_tree.as_bytes();

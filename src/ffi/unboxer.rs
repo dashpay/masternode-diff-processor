@@ -1,6 +1,10 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
+
+use std::ffi::CString;
+use std::os::raw::c_char;
 use crate::types;
+use crate::types::opaque_key::{OpaqueKey, OpaqueKeys, OpaqueSerializedKeys};
 
 /// # Safety
 pub unsafe fn unbox_any<T: ?Sized>(any: *mut T) -> Box<T> {
@@ -41,6 +45,7 @@ pub unsafe fn unbox_masternode_entry(x: *mut types::MasternodeEntry) {
     unbox_vec_ptr(entry.previous_validity, entry.previous_validity_count);
     unbox_any(entry.provider_registration_transaction_hash);
     unbox_any(entry.ip_address);
+    unbox_any(entry.platform_node_id);
 }
 
 /// # Safety
@@ -332,5 +337,38 @@ pub unsafe fn unbox_qr_info_result(result: *mut types::QRInfoResult) {
             res.mn_list_diff_list,
             res.mn_list_diff_list_count,
         ));
+    }
+}
+
+/// # Safety
+pub unsafe fn unbox_string(data: *mut c_char) {
+    let _ = CString::from_raw(data);
+}
+
+pub unsafe fn unbox_opaque_key(data: *mut OpaqueKey) {
+    let k = unbox_any(data);
+    match *k {
+        OpaqueKey::ECDSA(key) => { let _ = unbox_any(key); },
+        OpaqueKey::BLSLegacy(key) |
+        OpaqueKey::BLSBasic(key) => { let _ = unbox_any(key); },
+        OpaqueKey::ED25519(key) => { let _ = unbox_any(key); },
+    };
+}
+
+/// # Safety
+pub unsafe fn unbox_opaque_keys(data: *mut OpaqueKeys) {
+    let res = unbox_any(data);
+    let keys = unbox_vec_ptr(res.keys, res.len);
+    for &x in keys.iter() {
+        unbox_opaque_key(x);
+    }
+}
+
+/// # Safety
+pub unsafe fn unbox_opaque_serialized_keys(data: *mut OpaqueSerializedKeys) {
+    let res = unbox_any(data);
+    let keys = unbox_vec_ptr(res.keys, res.len);
+    for &x in keys.iter() {
+        unbox_string(x)
     }
 }

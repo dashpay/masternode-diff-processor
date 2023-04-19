@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
+use crate::{common, models, tx, types};
+use crate::crypto::UInt256;
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;
-use crate::{common, models, tx, types, UInt256};
 
 pub trait ToFFI {
     type Item: FromFFI;
@@ -100,6 +101,7 @@ impl ToFFI for tx::CoinbaseTransaction {
             } else {
                 boxed(self.merkle_root_llmq_list.unwrap().0)
             },
+            locked_amount: self.locked_amount
         }
     }
 }
@@ -202,6 +204,9 @@ impl ToFFI for models::MasternodeEntry {
         let port = self.socket_address.port;
         let is_valid = self.is_valid;
         let update_height = self.update_height;
+        let mn_type: u16 = self.mn_type.into();
+        let platform_http_port = self.platform_http_port;
+        let platform_node_id = boxed(self.platform_node_id.0);
         Self::Item {
             confirmed_hash,
             confirmed_hash_hashed_with_provider_registration_transaction_hash,
@@ -220,6 +225,9 @@ impl ToFFI for models::MasternodeEntry {
             ip_address,
             port,
             update_height,
+            mn_type,
+            platform_http_port,
+            platform_node_id
         }
     }
 }

@@ -9,23 +9,18 @@ pub mod tests {
     use std::io::Read;
     use std::ptr::null_mut;
     use std::{env, fs, slice};
+    use crate::bindings::common::{processor_create_cache, register_processor};
+    use crate::bindings::masternode::process_mnlistdiff_from_message;
     use crate::ffi::boxer::boxed;
     use crate::ffi::from::FromFFI;
     use crate::ffi::to::ToFFI;
     use crate::ffi::unboxer::unbox_any;
-    use crate::common::chain_type::{ChainType, IHaveChainSettings};
+    use crate::chain::common::chain_type::{ChainType, IHaveChainSettings};
     use crate::consensus::encode;
-    use crate::crypto::byte_util::{
-        BytesDecodable, Reversable, UInt256, UInt384, UInt768,
-    };
-    use crate::{common, models};
-    use crate::processing::processor_cache::MasternodeProcessorCache;
-    use crate::processing::{MNListDiffResult, QRInfoResult};
-    use crate::{
-        process_mnlistdiff_from_message, processor_create_cache, register_processor,
-        unwrap_or_diff_processing_failure, unwrap_or_qr_processing_failure, unwrap_or_return,
-        MasternodeProcessor, ProcessingError, types
-    };
+    use crate::crypto::byte_util::{BytesDecodable, Reversable, UInt256, UInt384};
+    use crate::models;
+    use crate::processing::{MasternodeProcessorCache, MasternodeProcessor, MNListDiffResult, ProcessingError, QRInfoResult};
+    use crate::{unwrap_or_diff_processing_failure, unwrap_or_qr_processing_failure, unwrap_or_return, types};
     use crate::tests::block_store::init_testnet_store;
 
     // This regex can be used to omit timestamp etc. while replacing after paste from xcode console log
@@ -69,6 +64,23 @@ pub mod tests {
         pub merkleroot: UInt256,
     }
 
+    impl MerkleBlock {
+        pub fn new(height: u32, hash: &str, merkle_root: &str) -> MerkleBlock {
+            MerkleBlock {
+                height,
+                hash: UInt256::from_hex(hash).unwrap(),
+                merkleroot: if merkle_root.is_empty() { UInt256::MIN } else { UInt256::from_hex(merkle_root).unwrap() } }
+        }
+
+        pub fn reversed(height: u32, hash: &str, merkle_root: &str) -> MerkleBlock {
+            MerkleBlock {
+                height,
+                hash: UInt256::from_hex(hash).unwrap().reverse(),
+                merkleroot: UInt256::from_hex(merkle_root).unwrap_or(UInt256::MIN)
+            }
+        }
+    }
+
     #[derive(Serialize, Deserialize)]
     struct Block {
         pub hash: String,
@@ -100,7 +112,7 @@ pub mod tests {
         pub digest: UInt256,
     }
     pub fn get_block_from_insight_by_hash(hash: UInt256) -> Option<MerkleBlock> {
-        let path = format!("https://testnet-insight.dashevo.org/insight-api-dash/block/{}", hash.clone().reversed().0.to_hex().as_str());
+        let path = format!("https://testnet-insight.dashevo.org/insight-api-dash/block/{}", hash.reversed().0.to_hex().as_str());
         request_block(path)
     }
     pub fn get_block_from_insight_by_height(height: u32) -> Option<MerkleBlock> {
@@ -115,7 +127,7 @@ pub mod tests {
                 Ok(json) => {
                     let block: Block = serde_json::from_value(json).unwrap();
                     let merkle_block = MerkleBlock {
-                        hash: UInt256::from_hex(block.hash.as_str()).unwrap().reversed(),
+                        hash: UInt256::from_hex(block.hash.as_str()).unwrap().reverse(),
                         height: block.height as u32,
                         merkleroot: UInt256::from_hex(block.merkleroot.as_str()).unwrap()
                     };
@@ -138,27 +150,27 @@ pub mod tests {
     pub fn process_mnlistdiff_from_message_internal(
         message_arr: *const u8,
         message_length: usize,
+        chain_type: ChainType,
         use_insight_as_backup: bool,
         protocol_version: u32,
-        genesis_hash: *const u8,
+        // genesis_hash: *const u8,
         processor: *mut MasternodeProcessor,
         cache: *mut MasternodeProcessorCache,
         context: *const std::ffi::c_void,
     ) -> MNListDiffResult {
         let processor = unsafe { &mut *processor };
         let cache = unsafe { &mut *cache };
-        let is_bls_basic = protocol_version >= 20225;
         println!(
             "process_mnlistdiff_from_message_internal.start: {:?}",
             std::time::Instant::now()
         );
         processor.opaque_context = context;
         processor.use_insight_as_backup = use_insight_as_backup;
-        processor.genesis_hash = genesis_hash;
+        processor.chain_type = chain_type;
         let message: &[u8] = unsafe { slice::from_raw_parts(message_arr, message_length as usize) };
         let list_diff =
-            unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash), is_bls_basic));
-        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, cache);
+            unwrap_or_diff_processing_failure!(models::MNListDiff::new(message, &mut 0, |hash| processor.lookup_block_height_by_hash(hash), protocol_version));
+        let result = processor.get_list_diff_result_internal_with_base_lookup(list_diff, true, false, false, cache);
         println!(
             "process_mnlistdiff_from_message_internal.finish: {:?} {:#?}",
             std::time::Instant::now(),
@@ -171,9 +183,10 @@ pub mod tests {
     pub fn process_qrinfo_from_message_internal(
         message: *const u8,
         message_length: usize,
+        chain_type: ChainType,
         use_insight_as_backup: bool,
+        is_rotated_quorums_presented: bool,
         protocol_version: u32,
-        genesis_hash: *const u8,
         processor: *mut MasternodeProcessor,
         cache: *mut MasternodeProcessorCache,
         context: *const std::ffi::c_void,
@@ -183,18 +196,17 @@ pub mod tests {
         let processor = unsafe { &mut *processor };
         processor.opaque_context = context;
         processor.use_insight_as_backup = use_insight_as_backup;
-        processor.genesis_hash = genesis_hash;
+        processor.chain_type = chain_type;
         let cache = unsafe { &mut *cache };
         println!(
             "process_qrinfo_from_message --: {:?} {:?} {:?}",
             processor, processor.opaque_context, cache
         );
-        let is_bls_basic = protocol_version >= 20225;
         let offset = &mut 0;
         let read_list_diff =
-            |offset: &mut usize| processor.read_list_diff_from_message(message, offset, is_bls_basic);
+            |offset: &mut usize| processor.read_list_diff_from_message(message, offset, protocol_version);
         let mut process_list_diff = |list_diff: models::MNListDiff, should_process_quorums: bool| {
-            processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, cache)
+            processor.get_list_diff_result_internal_with_base_lookup(list_diff, should_process_quorums, true, is_rotated_quorums_presented, cache)
         };
         let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
         let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
@@ -290,19 +302,15 @@ pub mod tests {
         buffer
     }
 
-    pub fn message_from_file(name: String) -> Vec<u8> {
-        let executable = env::current_exe().unwrap();
-        let path = match executable.parent() {
-            Some(name) => name,
-            _ => panic!(),
-        };
-        let filepath = format!("{}/../../../files/{}", path.display(), name.as_str());
+    pub fn message_from_file(name: &str) -> Vec<u8> {
+        let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+        let filepath = format!("{}/files/{}", crate_dir, name);
         println!("{:?}", filepath);
         get_file_as_byte_vec(&filepath)
     }
     pub fn assert_diff_result(context: &mut FFIContext, result: types::MNListDiffResult) {
         let masternode_list = unsafe { (*result.masternode_list).decode() };
-        print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.clone().reversed());
+        //print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.reversed());
         let bh = context.block_for_hash(masternode_list.block_hash).unwrap().height;
         assert!(
             result.has_found_coinbase,
@@ -334,10 +342,11 @@ pub mod tests {
     ) -> u32 {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let block_hash = UInt256(*block_hash);
-        let block_hash_reversed = block_hash.clone().reversed();
+        let block_hash_reversed = block_hash.reversed();
         let block = data.block_for_hash(block_hash).unwrap_or(&MerkleBlock { hash: UInt256::MIN, height: u32::MAX, merkleroot: UInt256::MIN });
         let height = block.height;
-        println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
+        // println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
+        //println!("{}: {},", height, block_hash_reversed);
         height
     }
 
@@ -355,7 +364,7 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         if let Some(block) = data.block_for_height(block_height) {
             let block_hash = block.hash;
-            println!("get_block_hash_by_height_from_context: {}: {:?}", block_height, block_hash.clone().reversed());
+            // println!("get_block_hash_by_height_from_context: {}: {:?}", block_height, block_hash.clone().reversed());
             boxed(block_hash.0) as *mut _
         } else {
             null_mut()
@@ -403,7 +412,7 @@ pub mod tests {
     ) -> *mut types::MasternodeList {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        println!("get_masternode_list_by_block_hash_from_cache: {}", h);
+        //println!("get_masternode_list_by_block_hash_from_cache: {}", h);
         if let Some(list) = data.cache.mn_lists.get(&h) {
             println!("get_masternode_list_by_block_hash_from_cache: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
             let encoded = list.encode();
@@ -445,8 +454,8 @@ pub mod tests {
         base_block_hash: *mut [u8; 32],
         block_hash: *mut [u8; 32],
         context: *const std::ffi::c_void,
-    ) -> u8 {
-        ProcessingError::None.into()
+    ) -> ProcessingError {
+        ProcessingError::None
     }
     pub unsafe extern "C" fn snapshot_destroy_default(_snapshot: *mut types::LLMQSnapshot) {}
     pub unsafe extern "C" fn add_insight_lookup_default(
@@ -472,107 +481,20 @@ pub mod tests {
         true
     }
 
-    pub unsafe extern "C" fn log_default(
-        message: *const libc::c_char,
-        _context: *const std::ffi::c_void,
-    ) {
-        let c_str = std::ffi::CStr::from_ptr(message);
-        println!("{:?}", c_str.to_str().unwrap());
-    }
-
     pub unsafe extern "C" fn get_merkle_root_by_hash_default(
         block_hash: *mut [u8; 32],
         context: *const std::ffi::c_void,
     ) -> *mut u8 {
         let block_hash = UInt256(*block_hash);
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        let block_hash_reversed = block_hash.clone().reversed().0.to_hex();
+        let block_hash_reversed = block_hash.reversed().0.to_hex();
         let merkle_root = if let Some(block) = data.block_for_hash(block_hash) {
-            block.merkleroot.clone().reversed()
+            block.merkleroot.reversed()
         } else {
             UInt256::from_hex("0000000000000000000000000000000000000000000000000000000000000000").unwrap()
         };
-        println!("get_merkle_root_by_hash_default {} ({}) => ({})", block_hash, block_hash_reversed, merkle_root);
+        //println!("get_merkle_root_by_hash_default {} ({}) => ({})", block_hash, block_hash_reversed, merkle_root);
         boxed(merkle_root.0) as *mut _
-    }
-
-    pub unsafe extern "C" fn should_process_llmq_of_type(
-        llmq_type: u8,
-        context: *const std::ffi::c_void,
-    ) -> bool {
-        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-
-        let quorum_type: u8 = match data.chain {
-            ChainType::MainNet => common::LLMQType::Llmqtype400_60.into(),
-            ChainType::TestNet => common::LLMQType::Llmqtype50_60.into(),
-            ChainType::DevNet(_) => common::LLMQType::LlmqtypeDevnetDIP0024.into(),
-        };
-        llmq_type == quorum_type
-    }
-
-    pub unsafe extern "C" fn should_process_llmq_of_type_actual(
-        llmq_type: u8,
-        context: *const std::ffi::c_void,
-    ) -> bool {
-        let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        let r#type = common::LLMQType::from(llmq_type);
-        let chain = data.chain;
-        let is_isd = chain.isd_llmq_type() == r#type;
-        let is_qr_context = data.is_dip_0024;
-        if is_isd {
-            is_qr_context
-        } else if is_qr_context /*skip old quorums here for now*/ {
-            false
-        } else {
-            chain.chain_locks_type() == r#type ||
-                chain.is_llmq_type() == r#type ||
-                chain.platform_type() == r#type ||
-                is_isd
-        }
-    }
-
-    pub unsafe extern "C" fn validate_llmq_callback(
-        data: *mut types::LLMQValidationData,
-        _context: *const std::ffi::c_void,
-    ) -> bool {
-        let result = unbox_any(data);
-        let types::LLMQValidationData {
-            items,
-            count,
-            commitment_hash,
-            all_commitment_aggregated_signature,
-            threshold_signature,
-            public_key,
-            version
-        } = *result;
-        println!(
-            "validate_quorum_callback: {:?}, {}, {:?}, {:?}, {:?}, {:?}, {:?}",
-            items,
-            count,
-            commitment_hash,
-            all_commitment_aggregated_signature,
-            threshold_signature,
-            public_key,
-            version
-        );
-
-        let all_commitment_aggregated_signature = UInt768(*all_commitment_aggregated_signature);
-        let threshold_signature = UInt768(*threshold_signature);
-        let public_key = UInt384(*public_key);
-        let commitment_hash = UInt256(*commitment_hash);
-
-        let infos = (0..count)
-            .into_iter()
-            .map(|i| {
-                let item = *(*items.add(i));
-                AggregationInfo {
-                    public_key: UInt384(item.data),
-                    version: item.version,
-                    digest: commitment_hash,
-                }
-            })
-            .collect::<Vec<AggregationInfo>>();
-        true
     }
 
     pub unsafe extern "C" fn get_block_hash_by_height_from_insight(block_height: u32, context: *const std::ffi::c_void) -> *mut u8 {
@@ -608,11 +530,11 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let hash = UInt256(*block_hash);
         match data.blocks.iter().find(|block| block.hash == hash) {
-            Some(block) => boxed(block.merkleroot.clone().reversed().0) as *mut _,
+            Some(block) => boxed(block.merkleroot.reversed().0) as *mut _,
             None => match get_block_from_insight_by_hash(hash) {
                 Some(block) => {
                     data.blocks.push(block);
-                    boxed(block.merkleroot.clone().reversed().0) as *mut _
+                    boxed(block.merkleroot.reversed().0) as *mut _
                 },
                 None => boxed(UInt256::MIN.0) as *mut _
             }
@@ -667,22 +589,19 @@ pub mod tests {
                 masternode_list_save_default,
                 masternode_list_destroy_default,
                 add_insight_lookup_default,
-                should_process_llmq_of_type,
-                validate_llmq_callback,
                 hash_destroy_default,
                 snapshot_destroy_default,
                 should_process_diff_with_range_default,
-                log_default,
             )
         };
 
         let result = unsafe { process_mnlistdiff_from_message(
             c_array,
             length,
+            chain,
             use_insight_as_backup,
             false,
-            20221,
-            chain.genesis_hash().0.as_ptr(),
+            70221,
             processor,
             cache,
             context,
@@ -700,7 +619,7 @@ pub mod tests {
                     .unwrap()
                     .read_with::<UInt256>(&mut 0, byte::LE)
                     .unwrap()
-                    .reversed()
+                    .reverse()
             })
             .collect();
         verify_hashes.sort();

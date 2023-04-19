@@ -1,6 +1,5 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
-use hashes::{sha256d, Hash};
 use crate::consensus::encode::VarInt;
 use crate::consensus::Encodable;
 use crate::crypto::UInt256;
@@ -13,6 +12,7 @@ pub struct CoinbaseTransaction {
     pub height: u32,
     pub merkle_root_mn_list: UInt256,
     pub merkle_root_llmq_list: Option<UInt256>,
+    pub locked_amount: u64,
 }
 
 impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
@@ -29,16 +29,23 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
         } else {
             None
         };
+        let locked_amount = if coinbase_transaction_version >= 3 {
+            bytes.read_with::<u64>(offset, byte::LE)?
+        } else {
+            u64::MAX
+        };
         base.tx_type = Coinbase;
         base.payload_offset = *offset;
+        assert!((coinbase_transaction_version >= 3 && locked_amount != u64::MAX) || (coinbase_transaction_version < 3 && locked_amount == u64::MAX), "For cbtx with version {} assets locked amount is {}", coinbase_transaction_version, locked_amount);
         let mut tx = Self {
             base,
             coinbase_transaction_version,
             height,
             merkle_root_mn_list,
             merkle_root_llmq_list,
+            locked_amount
         };
-        tx.base.tx_hash = Some(UInt256(sha256d::Hash::hash(&tx.to_data()).into_inner()));
+        tx.base.tx_hash = Some(UInt256::sha256d(tx.to_data()));
         Ok((tx, *offset))
     }
 }
@@ -46,20 +53,16 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
 impl CoinbaseTransaction {
     fn payload_data(&self) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
-        let offset: &mut usize = &mut 0;
-        *offset += self
-            .coinbase_transaction_version
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += self.height.consensus_encode(&mut buffer).unwrap();
-        *offset += self
-            .merkle_root_mn_list
-            .consensus_encode(&mut buffer)
-            .unwrap();
+        self.coinbase_transaction_version.enc(&mut buffer);
+        self.height.enc(&mut buffer);
+        self.merkle_root_mn_list.enc(&mut buffer);
         if self.coinbase_transaction_version >= 2 {
             if let Some(llmq_list) = self.merkle_root_llmq_list {
-                *offset += llmq_list.consensus_encode(&mut buffer).unwrap();
+                llmq_list.enc(&mut buffer);
             }
+        }
+        if self.coinbase_transaction_version >= 3 {
+            self.locked_amount.enc(&mut buffer);
         }
         buffer
     }
@@ -77,27 +80,24 @@ impl CoinbaseTransaction {
             &self.base.outputs,
             self.base.lock_time,
         );
-        let offset: &mut usize = &mut 0;
         let payload = self.payload_data();
-        *offset += payload.consensus_encode(&mut buffer).unwrap();
+        payload.enc(&mut buffer);
         buffer
     }
 
     pub fn has_found_coinbase(&mut self, hashes: &[UInt256]) -> bool {
-        if let Some(coinbase_hash) = self.base.tx_hash {
-            self.has_found_coinbase_internal(coinbase_hash, hashes)
-        } else {
-            let coinbase_hash = UInt256(sha256d::Hash::hash(&self.to_data()).into_inner());
-            self.base.tx_hash = Some(coinbase_hash);
-            self.has_found_coinbase_internal(coinbase_hash, hashes)
-        }
+        let coinbase_hash = match self.base.tx_hash {
+            Some(hash) => hash,
+            None => {
+                let hash = UInt256::sha256d(self.to_data());
+                self.base.tx_hash = Some(hash);
+                hash
+            }
+        };
+        self.has_found_coinbase_internal(coinbase_hash, hashes)
     }
 
     fn has_found_coinbase_internal(&self, coinbase_hash: UInt256, hashes: &[UInt256]) -> bool {
-        hashes
-            .iter()
-            .filter(|&h| coinbase_hash.cmp(h).is_eq())
-            .count()
-            > 0
+        hashes.iter().any(|h| coinbase_hash == *h)
     }
 }

@@ -1,14 +1,11 @@
-use byte::ctx::{Bytes, Endian};
-use byte::{BytesExt, TryRead, LE};
+use byte::{BytesExt, ctx::{Bytes, Endian}, TryRead, LE};
 use hashes::hex::ToHex;
 use std::convert::Into;
-use crate::common::llmq_version::LLMQVersion;
-use crate::common::LLMQType;
-use crate::consensus::encode::VarInt;
-use crate::consensus::{Encodable, WriteExt};
-use crate::crypto::data_ops::Data;
-use crate::crypto::{UInt256, UInt384, UInt768};
-use crate::hashes::{sha256d, Hash};
+use crate::common::{LLMQType, LLMQVersion};
+use crate::consensus::{encode::VarInt, Encodable, WriteExt};
+use crate::crypto::{byte_util::AsBytes, data_ops::Data, UInt256, UInt384, UInt768};
+use crate::keys::BLSKey;
+use crate::models;
 
 #[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
 pub struct LLMQEntry {
@@ -59,7 +56,6 @@ impl<'a> TryRead<'a, Endian> for LLMQEntry {
         let version = bytes.read_with::<LLMQVersion>(offset, LE)?;
         let llmq_type = bytes.read_with::<LLMQType>(offset, LE)?;
         let llmq_hash = bytes.read_with::<UInt256>(offset, LE)?;
-
         let index = if version.use_rotated_quorums() {
             Some(bytes.read_with::<u16>(offset, LE)?)
         } else {
@@ -124,7 +120,7 @@ impl LLMQEntry {
             threshold_signature,
             all_commitment_aggregated_signature,
         );
-        let entry_hash = UInt256(sha256d::Hash::hash(q_data.as_slice()).into_inner());
+        let entry_hash = UInt256::sha256d(q_data);
         //println!("LLMQEntry::new({}, {:?}, {}, {:?}, {}, {}, {}, {}, {}, {}, {}, {}) = {}", version, llmq_type, llmq_hash, index, signers_count, signers_bitset.to_hex(), valid_members_count, valid_members_bitset.to_hex(), public_key, verification_vector_hash, threshold_signature, all_commitment_aggregated_signature, entry_hash);
         Self {
             version,
@@ -205,33 +201,28 @@ impl LLMQEntry {
         )
     }
 
+    pub fn build_llmq_quorum_hash(llmq_type: LLMQType, llmq_hash: UInt256) -> UInt256 {
+        let mut writer: Vec<u8> = Vec::with_capacity(33);
+        VarInt(llmq_type as u64).enc(&mut writer);
+        llmq_hash.enc(&mut writer);
+        UInt256::sha256d(writer)
+    }
+
     pub fn llmq_quorum_hash(&self) -> UInt256 {
-        let mut buffer: Vec<u8> = Vec::with_capacity(33);
-        let offset: &mut usize = &mut 0;
-        *offset += VarInt(self.llmq_type as u64)
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += self.llmq_hash.consensus_encode(&mut buffer).unwrap();
-        UInt256(sha256d::Hash::hash(&buffer).into_inner())
+        Self::build_llmq_quorum_hash(self.llmq_type, self.llmq_hash)
     }
 
     pub fn commitment_data(&self) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
         let offset: &mut usize = &mut 0;
         let llmq_type = VarInt(self.llmq_type as u64);
-        *offset += llmq_type.consensus_encode(&mut buffer).unwrap();
-        *offset += self.llmq_hash.consensus_encode(&mut buffer).unwrap();
-        *offset += self
-            .valid_members_count
-            .consensus_encode(&mut buffer)
-            .unwrap();
+        *offset += llmq_type.enc(&mut buffer);
+        *offset += self.llmq_hash.enc(&mut buffer);
+        *offset += self.valid_members_count.enc(&mut buffer);
         buffer.emit_slice(&self.valid_members_bitset).unwrap();
         *offset += self.valid_members_bitset.len();
-        *offset += self.public_key.consensus_encode(&mut buffer).unwrap();
-        *offset += self
-            .verification_vector_hash
-            .consensus_encode(&mut buffer)
-            .unwrap();
+        *offset += self.public_key.enc(&mut buffer);
+        *offset += self.verification_vector_hash.enc(&mut buffer);
         buffer
     }
 
@@ -240,19 +231,17 @@ impl LLMQEntry {
         request_id: UInt256,
         llmq_type: LLMQType,
     ) -> UInt256 {
-        let mut buffer: Vec<u8> = Vec::new();
-        let offset: &mut usize = &mut 0;
         let llmq_type = VarInt(llmq_type as u64);
-        *offset += llmq_type.consensus_encode(&mut buffer).unwrap();
-        *offset += self.llmq_hash.consensus_encode(&mut buffer).unwrap();
-        *offset += request_id.consensus_encode(&mut buffer).unwrap();
-        UInt256(sha256d::Hash::hash(&buffer).into_inner())
+        let mut buffer: Vec<u8> = Vec::with_capacity(llmq_type.len() + 64);
+        llmq_type.enc(&mut buffer);
+        self.llmq_hash.enc(&mut buffer);
+        request_id.enc(&mut buffer);
+        UInt256::sha256d(buffer)
     }
 
     pub fn generate_commitment_hash(&mut self) -> UInt256 {
         if self.commitment_hash.is_none() {
-            let data = self.commitment_data();
-            self.commitment_hash = Some(UInt256(sha256d::Hash::hash(&data).into_inner()));
+            self.commitment_hash = Some(UInt256::sha256d(self.commitment_data()));
         }
         self.commitment_hash.unwrap()
     }
@@ -315,6 +304,46 @@ impl LLMQEntry {
             self.valid_members_bitset.as_slice().true_bits_count();
         if valid_members_bitset_true_bits_count < quorum_threshold {
             println!("Error: The number of set bits in the validMembers bitvector {} must be at least >= quorumThreshold {}", valid_members_bitset_true_bits_count, quorum_threshold);
+            return false;
+        }
+        true
+    }
+}
+
+impl LLMQEntry {
+
+    pub fn verify(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> bool {
+        println!("LLMQ::verify at {}: {:?}", block_height, self.llmq_type);
+        if !self.validate_payload() {
+            return false;
+        }
+        self.verified = self.validate(valid_masternodes, block_height);
+        self.verified
+    }
+
+    pub fn validate(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> bool {
+        let commitment_hash = self.generate_commitment_hash();
+        let use_legacy = self.version.use_bls_legacy();
+        let operator_keys = valid_masternodes
+            .iter()
+            .enumerate()
+            .filter_map(|(i, node)| self.signers_bitset.bit_is_true_at_le_index(i as u32)
+                .then_some(node.operator_public_key_at(block_height)))
+            .collect::<Vec<_>>();
+        let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(
+            commitment_hash,
+            self.all_commitment_aggregated_signature,
+            operator_keys,
+            use_legacy);
+        if !all_commitment_aggregated_signature_validated {
+            println!("••• Issue with all_commitment_aggregated_signature_validated: {}", self.all_commitment_aggregated_signature);
+            return false;
+        }
+        // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
+        // This is an aggregated BLS signature verification.
+        let quorum_signature_validated = BLSKey::verify_quorum_signature(commitment_hash.as_bytes(), self.threshold_signature.as_bytes(), self.public_key.as_bytes(), use_legacy);
+        if !quorum_signature_validated {
+            println!("••• Issue with quorum_signature_validated");
             return false;
         }
         true

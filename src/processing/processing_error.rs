@@ -1,5 +1,5 @@
 #[warn(non_camel_case_types)]
-#[repr(u8)]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 pub enum ProcessingError {
     None = 0,

@@ -7,6 +7,7 @@ use crate::crypto::byte_util::{BytesDecodable, Reversable};
 use crate::crypto::var_array::VarArray;
 use crate::crypto::UInt256;
 use crate::models::{LLMQEntry, MasternodeEntry};
+use crate::models::masternode_entry::MasternodeReadContext;
 use crate::tx::CoinbaseTransaction;
 
 #[derive(Clone)]
@@ -58,7 +59,7 @@ impl MNListDiff {
         message: &[u8],
         offset: &mut usize,
         block_height_lookup: F,
-        is_bls_basic: bool,
+        protocol_version: u32,
     ) -> Option<Self> {
         let base_block_hash = UInt256::from_bytes(message, offset)?;
         let block_hash = UInt256::from_bytes(message, offset)?;
@@ -72,11 +73,14 @@ impl MNListDiff {
             Err(_err) => { return None; },
         };
         let coinbase_transaction = CoinbaseTransaction::from_bytes(message, offset)?;
-        let version = if is_bls_basic {
+        let version = if protocol_version >= 70225 {
+            // BLS Basic
             u16::from_bytes(message, offset)?
         } else {
+            // BLS Legacy
             0
         };
+        let masternode_read_ctx = MasternodeReadContext(block_height, version);
         let deleted_masternode_count = VarInt::from_bytes(message, offset)?.0;
         let mut deleted_masternode_hashes: Vec<UInt256> =
             Vec::with_capacity(deleted_masternode_count as usize);
@@ -88,17 +92,14 @@ impl MNListDiff {
             ..added_masternode_count)
             .into_iter()
             .filter_map(|_i| {
-                // assert_eq!(message.len(), MN_ENTRY_PAYLOAD_LENGTH);
-                let mut entry = MasternodeEntry::from_bytes(message, offset)?;
-                entry.update_with_block_height(block_height);
-                entry.update_with_bls_version(version);
+                let entry = message.read_with::<MasternodeEntry>(offset, masternode_read_ctx).ok()?;
                 Some(entry)
             })
             .fold(BTreeMap::new(), |mut acc, entry| {
                 let hash = entry
                     .provider_registration_transaction_hash
                     .clone()
-                    .reversed();
+                    .reverse();
                 acc.insert(hash, entry);
                 acc
             });

@@ -14,6 +14,7 @@ pub struct CoinbaseTransaction {
     pub height: u32,
     pub merkle_root_mn_list: *mut [u8; 32],
     pub merkle_root_llmq_list: *mut [u8; 32],
+    pub locked_amount: u64,
 }
 impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
     fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {
@@ -29,6 +30,11 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
         } else {
             null_mut()
         };
+        let locked_amount = if coinbase_transaction_version >= 3 {
+            bytes.read_with::<u64>(offset, LE)?
+        } else {
+            u64::MAX
+        };
         Ok((
             Self {
                 base,
@@ -36,6 +42,7 @@ impl<'a> TryRead<'a, Endian> for CoinbaseTransaction {
                 height,
                 merkle_root_mn_list,
                 merkle_root_llmq_list,
+                locked_amount
             },
             *offset,
         ))

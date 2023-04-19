@@ -314,6 +314,11 @@ pub trait Encodable {
     ///
     /// The only errors returned are errors propagated from the writer.
     fn consensus_encode<W: io::Write>(&self, writer: W) -> Result<usize, io::Error>;
+
+    /// laconic shorthand + supress unwrap panic
+    fn enc<W: io::Write>(&self, writer: W) -> usize {
+        self.consensus_encode(writer).unwrap()
+    }
 }
 
 /// Data which can be encoded in a consensus-consistent way

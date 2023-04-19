@@ -3,6 +3,7 @@ pub mod processing_error;
 pub mod processor;
 pub mod processor_cache;
 pub mod qr_info_result;
+pub mod keys_cache;
 
 pub use self::mn_listdiff_result::MNListDiffResult;
 pub use self::processing_error::ProcessingError;

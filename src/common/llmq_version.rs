@@ -1,10 +1,10 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, TryWrite};
-use crate::BytesDecodable;
 use crate::consensus::Encodable;
+use crate::crypto::byte_util::BytesDecodable;
 
 #[warn(non_camel_case_types)]
-#[repr(u16)]
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 pub enum LLMQVersion {
     Default = 1,
@@ -14,10 +14,10 @@ pub enum LLMQVersion {
 }
 impl LLMQVersion {
     pub fn use_bls_legacy(&self) -> bool {
-        *self == LLMQVersion::Default || *self == LLMQVersion::Indexed
+        *self == Self::Default || *self == Self::Indexed
     }
     pub fn use_rotated_quorums(&self) -> bool {
-        *self == LLMQVersion::Indexed || *self == LLMQVersion::BLSBasicIndexed
+        *self == Self::Indexed || *self == Self::BLSBasicIndexed
     }
 }
 
