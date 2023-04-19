@@ -46,12 +46,12 @@ pub fn test_from_snapshot() {
 
     println!("rotated_quorums at h ({}: {})", mn_list_diff_h.block_height, mn_list_diff_h.block_hash);
     let cached_blocks = &context.blocks;
-    let get_height = |hash: UInt256| cached_blocks.iter().find(|block| block.hash == hash.clone().reversed()).unwrap().height;
+    let get_height = |hash: UInt256| cached_blocks.iter().find(|block| block.hash == hash.reversed()).unwrap().height;
     let cached_llmq_members = &mut context.cache.llmq_members;
     let cached_llmq_indexed_members = &mut context.cache.llmq_indexed_members;
     if let Some(rotated_quorums_h) = mn_list_diff_h.added_quorums.get(&chain.isd_llmq_type()) {
         rotated_quorums_h.iter().for_each(|(&llmq_block_hash, entry)| {
-            println!("rotated_quorum: ({}: {})", llmq_block_hash, llmq_block_hash.clone().reversed());
+            println!("rotated_quorum: ({}: {})", llmq_block_hash, llmq_block_hash.reversed());
             let llmq_block_height = get_height(llmq_block_hash);
             println!("rotated_quorum: ({}: {})\n {:#?}", llmq_block_height, llmq_block_hash, entry);
 

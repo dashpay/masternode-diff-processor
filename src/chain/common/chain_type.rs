@@ -199,8 +199,8 @@ impl IHaveChainSettings for ChainType {
 
     fn genesis_hash(&self) -> UInt256 {
         match self {
-            ChainType::MainNet => UInt256::from_hex("00000ffd590b1485b3caadc19b22e6379c733355108f107a430458cdf3407ab6").unwrap().reversed(),
-            ChainType::TestNet => UInt256::from_hex("00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c").unwrap().reversed(),
+            ChainType::MainNet => UInt256::from_hex("00000ffd590b1485b3caadc19b22e6379c733355108f107a430458cdf3407ab6").unwrap().reverse(),
+            ChainType::TestNet => UInt256::from_hex("00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c").unwrap().reverse(),
             ChainType::DevNet(devnet_type) => devnet_type.genesis_hash(),
         }
     }
@@ -264,7 +264,7 @@ impl IHaveChainSettings for DevnetType {
             DevnetType::Mojito => "739507391fa00da48a2ecae5df3b5e40b4432243603db6dafe33ca6b4966e357",
             DevnetType::WhiteRussian => "9163d6958065ca5e73c36f0f2474ce618846260c215f5cba633bd0003585cb35",
             _ => "00000bafbc94add76cb75e2ec92894837288a481e5c005f6563d91623bf8bc2c",
-        }).unwrap().reversed()
+        }).unwrap().reverse()
     }
 
     fn genesis_height(&self) -> u32 {
@@ -317,7 +317,7 @@ impl ChainType {
             UInt256::from_hex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap()
         } else {
             UInt256::from_hex("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").unwrap()
-        }.reversed()
+        }.reverse()
     }
 
     pub fn max_proof_of_work_target(&self) -> u32 {

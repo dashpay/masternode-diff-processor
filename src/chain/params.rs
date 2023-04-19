@@ -272,7 +272,7 @@ pub fn create_devnet_params_for_type(r#type: DevnetType) -> Params {
 
 impl Params {
     pub fn max_proof_of_work(&self) -> UInt256 {
-        UInt256::from_hex(self.max_proof_of_work).unwrap().reversed()
+        UInt256::from_hex(self.max_proof_of_work).unwrap().reverse()
     }
 
     /// Contract Parameters

@@ -312,6 +312,15 @@ impl LLMQEntry {
 
 impl LLMQEntry {
 
+    pub fn verify(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> bool {
+        println!("LLMQ::verify at {}: {:?}", block_height, self.llmq_type);
+        if !self.validate_payload() {
+            return false;
+        }
+        self.verified = self.validate(valid_masternodes, block_height);
+        self.verified
+    }
+
     pub fn validate(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> bool {
         let commitment_hash = self.generate_commitment_hash();
         let use_legacy = self.version.use_bls_legacy();

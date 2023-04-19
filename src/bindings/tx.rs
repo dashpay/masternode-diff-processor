@@ -35,7 +35,7 @@ pub unsafe extern "C" fn pro_reg_tx_payload_collateral_digest(
     DASH_MESSAGE_MAGIC.to_string().enc(&mut writer);
     let payout_address = address::with_script_pub_key(&script_payout.to_vec(), &script_map)
         .expect("Can't extract payout address");
-    let payload_hash = UInt256::sha256d(payload).reversed();
+    let payload_hash = UInt256::sha256d(payload).reverse();
     let owner_address = address::from_hash160_for_script_map(&owner_key_hash, &script_map);
     let voter_address = address::from_hash160_for_script_map(&voter_key_hash, &script_map);
     let payload_collateral_string = format!("{}|{}|{}|{}|{}", payout_address, operator_reward, owner_address, voter_address, payload_hash);

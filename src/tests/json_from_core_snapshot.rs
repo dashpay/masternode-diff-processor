@@ -304,10 +304,7 @@ pub fn nodes_to_masternodes(value: Vec<Node>) -> BTreeMap<UInt256, models::Maste
             masternode
         })
         .fold(BTreeMap::new(), |mut acc, entry| {
-            let hash = entry
-                .provider_registration_transaction_hash
-                .clone()
-                .reversed();
+            let hash = entry.provider_registration_transaction_hash.reversed();
             acc.insert(hash, entry);
             acc
         });
@@ -359,8 +356,8 @@ fn vec_to_arr<T, const N: usize>(v: Vec<T>) -> [T; N] {
 
 pub fn masternode_list_from_genesis_diff<BHL: Fn(UInt256) -> u32 + Copy>(
     diff: ListDiff, block_height_lookup: BHL, is_bls_basic: bool) -> models::MNListDiff {
-    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reversed();
-    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reversed();
+    let base_block_hash = UInt256::from_hex(diff.base_block_hash.as_str()).unwrap().reverse();
+    let block_hash = UInt256::from_hex(diff.block_hash.as_str()).unwrap().reverse();
     let cb_tx_bytes = Vec::from_hex(diff.cb_tx.as_str()).unwrap();
     let coinbase_transaction = CoinbaseTransaction::from_bytes(&cb_tx_bytes, &mut 0).unwrap();
     // let tree_bytes = diff.cb_tx_merkle_tree.as_bytes();

@@ -99,7 +99,7 @@ impl MNListDiff {
                 let hash = entry
                     .provider_registration_transaction_hash
                     .clone()
-                    .reversed();
+                    .reverse();
                 acc.insert(hash, entry);
                 acc
             });

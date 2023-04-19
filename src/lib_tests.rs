@@ -75,7 +75,7 @@ pub mod tests {
         pub fn reversed(height: u32, hash: &str, merkle_root: &str) -> MerkleBlock {
             MerkleBlock {
                 height,
-                hash: UInt256::from_hex(hash).unwrap().reversed(),
+                hash: UInt256::from_hex(hash).unwrap().reverse(),
                 merkleroot: UInt256::from_hex(merkle_root).unwrap_or(UInt256::MIN)
             }
         }
@@ -112,7 +112,7 @@ pub mod tests {
         pub digest: UInt256,
     }
     pub fn get_block_from_insight_by_hash(hash: UInt256) -> Option<MerkleBlock> {
-        let path = format!("https://testnet-insight.dashevo.org/insight-api-dash/block/{}", hash.clone().reversed().0.to_hex().as_str());
+        let path = format!("https://testnet-insight.dashevo.org/insight-api-dash/block/{}", hash.reversed().0.to_hex().as_str());
         request_block(path)
     }
     pub fn get_block_from_insight_by_height(height: u32) -> Option<MerkleBlock> {
@@ -127,7 +127,7 @@ pub mod tests {
                 Ok(json) => {
                     let block: Block = serde_json::from_value(json).unwrap();
                     let merkle_block = MerkleBlock {
-                        hash: UInt256::from_hex(block.hash.as_str()).unwrap().reversed(),
+                        hash: UInt256::from_hex(block.hash.as_str()).unwrap().reverse(),
                         height: block.height as u32,
                         merkleroot: UInt256::from_hex(block.merkleroot.as_str()).unwrap()
                     };
@@ -310,7 +310,7 @@ pub mod tests {
     }
     pub fn assert_diff_result(context: &mut FFIContext, result: types::MNListDiffResult) {
         let masternode_list = unsafe { (*result.masternode_list).decode() };
-        print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.clone().reversed());
+        //print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.reversed());
         let bh = context.block_for_hash(masternode_list.block_hash).unwrap().height;
         assert!(
             result.has_found_coinbase,
@@ -342,11 +342,11 @@ pub mod tests {
     ) -> u32 {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let block_hash = UInt256(*block_hash);
-        let block_hash_reversed = block_hash.clone().reversed();
+        let block_hash_reversed = block_hash.reversed();
         let block = data.block_for_hash(block_hash).unwrap_or(&MerkleBlock { hash: UInt256::MIN, height: u32::MAX, merkleroot: UInt256::MIN });
         let height = block.height;
         // println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
-        println!("{}: {},", height, block_hash_reversed);
+        //println!("{}: {},", height, block_hash_reversed);
         height
     }
 
@@ -487,13 +487,13 @@ pub mod tests {
     ) -> *mut u8 {
         let block_hash = UInt256(*block_hash);
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
-        let block_hash_reversed = block_hash.clone().reversed().0.to_hex();
+        let block_hash_reversed = block_hash.reversed().0.to_hex();
         let merkle_root = if let Some(block) = data.block_for_hash(block_hash) {
-            block.merkleroot.clone().reversed()
+            block.merkleroot.reversed()
         } else {
             UInt256::from_hex("0000000000000000000000000000000000000000000000000000000000000000").unwrap()
         };
-        println!("get_merkle_root_by_hash_default {} ({}) => ({})", block_hash, block_hash_reversed, merkle_root);
+        //println!("get_merkle_root_by_hash_default {} ({}) => ({})", block_hash, block_hash_reversed, merkle_root);
         boxed(merkle_root.0) as *mut _
     }
 
@@ -530,11 +530,11 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let hash = UInt256(*block_hash);
         match data.blocks.iter().find(|block| block.hash == hash) {
-            Some(block) => boxed(block.merkleroot.clone().reversed().0) as *mut _,
+            Some(block) => boxed(block.merkleroot.reversed().0) as *mut _,
             None => match get_block_from_insight_by_hash(hash) {
                 Some(block) => {
                     data.blocks.push(block);
-                    boxed(block.merkleroot.clone().reversed().0) as *mut _
+                    boxed(block.merkleroot.reversed().0) as *mut _
                 },
                 None => boxed(UInt256::MIN.0) as *mut _
             }
@@ -619,7 +619,7 @@ pub mod tests {
                     .unwrap()
                     .read_with::<UInt256>(&mut 0, byte::LE)
                     .unwrap()
-                    .reversed()
+                    .reverse()
             })
             .collect();
         verify_hashes.sort();

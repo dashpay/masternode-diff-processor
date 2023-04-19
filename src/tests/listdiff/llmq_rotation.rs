@@ -116,7 +116,7 @@ unsafe extern "C" fn block_height_lookup_(
     block_hash: *mut [u8; 32],
     _context: *const std::ffi::c_void,
 ) -> u32 {
-    let mut h = UInt256(*(block_hash));
+    let h = UInt256(*(block_hash));
     let orig_s = h.clone().to_string();
     let rev = h.reversed();
     let rev_s = rev.to_string();
@@ -140,49 +140,49 @@ unsafe extern "C" fn get_block_hash_by_height_(
         5334 => {
             UInt256::from_hex("00000072f3c73d891d86546f259ba2cd87d1aa655c447640a4257f6a8e6f7018")
                 .unwrap()
-                .reversed()
+                .reverse()
                 .0
                 .as_ptr()
         }
         4207 => {
             UInt256::from_hex("000000a451ba6459b3ce6128a5e8f273f9bc2010645dd4721e1b51efce18dda7")
                 .unwrap()
-                .reversed()
+                .reverse()
                 .0
                 .as_ptr()
         }
         4192 => {
             UInt256::from_hex("000000076aeba26f76a5d0e12e11c9b4d35d7232f1bbae6c47b4d8bef4a12b62")
                 .unwrap()
-                .reversed()
+                .reverse()
                 .0
                 .as_ptr()
         }
         4168 => {
             UInt256::from_hex("00000179987c39850ddd901eec6bfd0a508ec54fb6a0cd28481481aa0adf56b6")
                 .unwrap()
-                .reversed()
+                .reverse()
                 .0
                 .as_ptr()
         }
         4144 => {
             UInt256::from_hex("00000028bd64fd360dba79acf7cb3bae6cea18553c7232894a2ace15ada70940")
                 .unwrap()
-                .reversed()
+                .reverse()
                 .0
                 .as_ptr()
         }
         4120 => {
             UInt256::from_hex("000002410622902b361d1e2194f2072c6409c6f22ef5fea854d3326a27075713")
                 .unwrap()
-                .reversed()
+                .reverse()
                 .0
                 .as_ptr()
         }
         4096 => {
             UInt256::from_hex("000001f340d35fe89d1924de57ccbf63a7a09347835e6e4990ee2df12a4a67f9")
                 .unwrap()
-                .reversed()
+                .reverse()
                 .0
                 .as_ptr()
         }
@@ -226,7 +226,7 @@ unsafe extern "C" fn block_height_lookup_333_2(
     _context: *const std::ffi::c_void,
 ) -> u32 {
     let h = UInt256(*(block_hash));
-    let orig_s = h.clone().reversed().to_string();
+    let orig_s = h.reversed().to_string();
     match orig_s.as_str() {
         "0000086ccc192b07450acf188eba3d0360058dd43793fc622e0b7744cad5cbed" => 24869,
         "000003227cf2f83a1faa683ece5b875abeb555ebf1252f62cb28a96d459bcc11" => 24868,
@@ -447,7 +447,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_default_333(
     _context: *const std::ffi::c_void,
 ) -> *mut u8 {
     boxed(UInt256::from_hex("0df2b5537f108386f42acbd9f7b5aa5dfab907b83c0212c7074e1209f2d78ddf")
-        .unwrap().reversed()
+        .unwrap().reverse()
         .0) as * mut _
 }
 
@@ -774,7 +774,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_333_2(
     _context: *const std::ffi::c_void,
 ) -> *const u8 {
     let h = UInt256(*(block_hash));
-    let orig_s = h.clone().reversed().to_string();
+    let orig_s = h.reversed().to_string();
     let root = match orig_s.as_str() {
         "0000086ccc192b07450acf188eba3d0360058dd43793fc622e0b7744cad5cbed" => {
             "52b4cb95e82f827e916b9a5a95198203cb7d60d892932bfc64aa9496c79631e7"
@@ -1406,7 +1406,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_333_2(
         }
         _ => "0000000000000000000000000000000000000000000000000000000000000000",
     };
-    UInt256::from_hex(root).unwrap().reversed().0.as_ptr()
+    UInt256::from_hex(root).unwrap().reverse().0.as_ptr()
 }
 
 #[test]
@@ -1486,7 +1486,7 @@ unsafe extern "C" fn get_merkle_root_by_hash_jack_daniels(
     let h = UInt256(*(block_hash));
     let merkle_root =
         UInt256::from_hex("601bb47971ab483aec1ee77074a785036edbb7ce543d868881aa4e04a39490c0")
-            .unwrap().reversed();
+            .unwrap().reverse();
     println!(
         "get_merkle_root_by_hash_jack_daniels: {}: {}",
         h, merkle_root

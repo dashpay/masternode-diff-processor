@@ -400,7 +400,7 @@ fn testnet_test_retrieve_saved_hashes() {
     let reloaded_list_122064 = context.cache.mn_lists.get(&block_hash_122064).unwrap();
     let reloaded_list_122088 = context.cache.mn_lists.get(&block_hash_122088).unwrap();
 
-    let entry_hash = UInt256::from_hex("1bde434d4f68064d3108a09443ea45b4a6c6ac1f537a533efc36878cef2eb10f").unwrap().clone().reversed();
+    let entry_hash = UInt256::from_hex("1bde434d4f68064d3108a09443ea45b4a6c6ac1f537a533efc36878cef2eb10f").unwrap().reverse();
     let entry_122064 = list_122064.masternodes.get(&entry_hash).unwrap();
     let entry_122088 = list_122088.masternodes.get(&entry_hash).unwrap();
     assert_ne!(entry_122064, entry_122088, "These should NOT be the same object (unless we changed how this worked)");
@@ -421,9 +421,9 @@ fn testnet_test_retrieve_saved_hashes() {
     assert_eq!(local_hashes_122064, hashes_122064, "Hashes for 122064 must be equal");
 
     let mut entry_hashes = local_hashes_122064.iter().map(|hash| reloaded_list_122064.masternodes.get(hash).unwrap().entry_hash).collect::<Vec<UInt256>>();
-    entry_hashes.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
+    entry_hashes.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
     let mut reloaded_entry_hashes = hashes_122064.iter().map(|hash| reloaded_list_122064.masternodes.get(hash).unwrap().entry_hash).collect::<Vec<UInt256>>();
-    reloaded_entry_hashes.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
+    reloaded_entry_hashes.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
 
     assert_eq!(reloaded_entry_hashes, entry_hashes, "Entry hashes must be equal");
     assert_eq!(reloaded_list_122064.reversed_pro_reg_tx_hashes(), list_122064.reversed_pro_reg_tx_hashes(), "pro reg tx hashes must be equal");

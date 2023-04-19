@@ -18,3 +18,14 @@ impl LLMQIndexedHash {
         LLMQIndexedHash { index, hash }
     }
 }
+
+impl From<(UInt256, usize)> for LLMQIndexedHash {
+    fn from(value: (UInt256, usize)) -> Self {
+        Self::new(value.0, value.1 as u32)
+    }
+}
+impl From<(UInt256, u32)> for LLMQIndexedHash {
+    fn from(value: (UInt256, u32)) -> Self {
+        Self::new(value.0, value.1)
+    }
+}

@@ -1,5 +1,4 @@
 use std::cmp::min;
-use hashes::{sha256, Hash};
 use std::collections::BTreeMap;
 use crate::common::LLMQType;
 use crate::models::{LLMQEntry, MasternodeEntry};
@@ -84,7 +83,7 @@ impl MasternodeList {
     pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<UInt256>> {
         (block_height != u32::MAX).then_some({
             let mut pro_tx_hashes = self.reversed_pro_reg_tx_hashes();
-            pro_tx_hashes.sort_by(|&s1, &s2| s1.clone().reversed().cmp(&s2.clone().reversed()));
+            pro_tx_hashes.sort_by(|&s1, &s2| s1.reversed().cmp(&s2.reversed()));
             pro_tx_hashes
                 .iter()
                 .map(|hash| (&self.masternodes[hash]).entry_hash_at(block_height))
@@ -109,7 +108,7 @@ impl MasternodeList {
         // we need to check that the coinbase is in the transaction hashes we got back
         // and is in the merkle block
         if let Some(mn_merkle_root) = self.masternode_merkle_root {
-            println!("has_valid_mn_list_root: {} == {}", tx.merkle_root_mn_list, mn_merkle_root);
+            //println!("has_valid_mn_list_root: {} == {}", tx.merkle_root_mn_list, mn_merkle_root);
             tx.merkle_root_mn_list == mn_merkle_root
         } else {
             false
@@ -150,7 +149,7 @@ impl MasternodeList {
             hash.enc(&mut buffer);
         }
         modifier.enc(&mut buffer);
-        let score = UInt256(sha256::Hash::hash(&buffer).into_inner());
+        let score = UInt256::sha256(&buffer);
         (!score.is_zero() && !score.0.is_empty()).then_some(score)
     }
 
@@ -175,7 +174,7 @@ impl MasternodeList {
         self.quorums.get(&llmq_type)?.values().for_each(|entry| {
             let ordering_hash = entry
                 .ordering_hash_for_request_id(request_id, llmq_type)
-                .reversed();
+                .reverse();
             if lowest_value > ordering_hash {
                 lowest_value = ordering_hash;
                 first_quorum = Some(entry);
@@ -189,7 +188,7 @@ impl MasternodeList {
 
     pub fn sorted_reversed_pro_reg_tx_hashes(&self) -> Vec<&UInt256> {
         let mut hashes = self.reversed_pro_reg_tx_hashes();
-        hashes.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
+        hashes.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
         hashes
     }
 
@@ -214,7 +213,8 @@ impl MasternodeList {
     ) -> BTreeMap<UInt256, MasternodeEntry> {
         masternodes
             .into_iter()
-            .filter_map(|(_, entry)| Self::masternode_score(&entry, quorum_modifier, block_height).map(|score| (score, entry)))
+            .filter_map(|(_, entry)| Self::masternode_score(&entry, quorum_modifier, block_height)
+                .map(|score| (score, entry)))
             .collect()
     }
 
@@ -223,7 +223,7 @@ impl MasternodeList {
         let masternodes_in_list_count = masternodes.len();
         let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
         let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
-        scores.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
+        scores.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
         let mut valid_masternodes: Vec<MasternodeEntry> = Vec::new();
         let count = min(masternodes_in_list_count, scores.len());
         for score in scores.iter().take(count) {

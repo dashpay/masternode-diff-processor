@@ -121,10 +121,7 @@ impl FromFFI for types::MasternodeList {
                 BTreeMap::new(),
                 |mut acc, i| {
                     let value = (*(*self.masternodes.add(i))).decode();
-                    let key = value
-                        .provider_registration_transaction_hash
-                        .clone()
-                        .reversed();
+                    let key = value.provider_registration_transaction_hash.reversed();
                     acc.insert(key, value);
                     acc
                 },

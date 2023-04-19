@@ -15,7 +15,8 @@ pub trait AsBytes {
 }
 
 pub trait Reversable {
-    fn reversed(&mut self) -> Self;
+    fn reverse(&mut self) -> Self;
+    fn reversed(&self) -> Self;
 }
 
 pub trait Zeroable {
@@ -216,10 +217,18 @@ macro_rules! define_bytes_to_big_uint {
             }
         }
 
+
+        // TODO: as it's often use to compare hashes
+        // it's needs to be optimized
         impl Reversable for $uint_type {
-            fn reversed(&mut self) -> Self {
+            fn reverse(&mut self) -> Self {
                 self.0.reverse();
                 *self
+            }
+            fn reversed(&self) -> Self {
+                let mut s = self.0.clone();
+                s.reverse();
+                $uint_type(s)
             }
         }
         impl FromHex for $uint_type {
@@ -549,7 +558,7 @@ impl UInt256 {
     }
 
     pub fn add_be(&self, a: UInt256) -> UInt256 {
-        self.clone().reversed().add_le(a.clone().reversed()).reversed()
+        self.reversed().add_le(a.reversed()).reverse()
     }
 
     // add 1u64
