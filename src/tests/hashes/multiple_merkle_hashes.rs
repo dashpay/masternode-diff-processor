@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use byte::{BytesExt, LE};
 use hashes::hex::{FromHex, ToHex};
+use secp256k1::rand::{Rng, thread_rng};
 use crate::chain::ScriptMap;
 use crate::common::merkle_tree::MerkleTree;
 use crate::consensus::encode::VarInt;
@@ -177,29 +178,20 @@ pub fn test_bits_are_true_operations() {
     assert!(data.bit_is_true_at_le_index(68), "This must be true");
 }
 
-// pub fn uint256_shift_left_le(a: UInt256, mut bits: u8) -> UInt256 {
-    // let r = [0u8; 32];
-    // let k = bits / 64;
-    // bits = bits % 64;
-    // for i in 0..4 {
-    //     if i + k + 1 < 4 && bits != 0 {
-    //         r[i + k + 1] |= a.0[i] << bits;
-    //     }
-    //     if i + k < 4 {
-    //         r[i + k] |= a.0[i] << bits;
-    //     }
-    // }
-    // UInt256(r)
+const LEN: usize = 500;
+#[test]
+pub fn test_bits_are_true_operations_random() {
+    let mut data: [u8; LEN] = [0u8; LEN];
+    for i in 0..32 {
+        data[i] = thread_rng().gen();
+    }
+    let vec = data.to_vec();
+    (0..LEN).into_iter().for_each(|i| {
+        println!("vec: {}", vec.bit_is_true_at_le_index(i as u32));
+        println!("arr: {}", data.bit_is_true_at_le_index(i as u32));
+    });
 
-    // for (int i = 0; i < 4; i++) {
-    //     if (i + k + 1 < 4 && bits != 0)
-    //     r.u64[i + k + 1] |= (a.u64[i] >> (64 - bits));
-    //     if (i + k < 4)
-    //     r.u64[i + k] |= (a.u64[i] << bits);
-    // }
-    // return r;
-// }
-
+}
 
 #[test]
 pub fn test_bitwise_ops() {

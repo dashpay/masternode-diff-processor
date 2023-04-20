@@ -10,6 +10,38 @@ use crate::ffi::unboxer::{unbox_any, unbox_block, unbox_llmq_snapshot, unbox_llm
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache};
 use crate::types;
 
+
+/// Initializes logger (it could be initialize only once)
+#[no_mangle]
+pub unsafe extern "C" fn register_rust_logger() {
+    // Get the path to the cache directory.
+    let cache_path = match dirs_next::cache_dir() {
+        Some(path) => path,
+        None => panic!("Failed to find the cache directory"),
+    };
+
+    // Create the log directory if it doesn't exist.
+    let log_dir = cache_path.join("Logs");
+    if !log_dir.exists() {
+        std::fs::create_dir_all(&log_dir).expect("Failed to create log directory");
+    }
+
+    // Create the log file inside the cache directory.
+    let log_file_path = log_dir.join("processor.log");
+    println!("Log file create at: {:?}", log_file_path);
+    let log_file = File::create(log_file_path)
+        .expect("Failed to create log file");
+    match CombinedLogger::init(
+        vec![
+            TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
+            WriteLogger::new(LevelFilter::Info, Config::default(), log_file),
+        ]
+    ) {
+        Ok(()) => println!("Logger initialized"),
+        Err(err) => println!("Failed to init logger: {}", err)
+    }
+}
+
 /// Register all the callbacks for use across FFI
 /// # Safety
 #[no_mangle]
@@ -41,32 +73,6 @@ pub unsafe extern "C" fn register_processor(
         destroy_snapshot,
         should_process_diff_with_range,
     );
-    // Get the path to the cache directory.
-    let cache_path = match dirs_next::cache_dir() {
-        Some(path) => path,
-        None => panic!("Failed to find the cache directory"),
-    };
-
-    // Create the log directory if it doesn't exist.
-    let log_dir = cache_path.join("Logs");
-    if !log_dir.exists() {
-        std::fs::create_dir_all(&log_dir).expect("Failed to create log directory");
-    }
-
-    // Create the log file inside the cache directory.
-    let log_file_path = log_dir.join("processor.log");
-    println!("Log file create at: {:?}", log_file_path);
-    let log_file = File::create(log_file_path)
-        .expect("Failed to create log file");
-    match CombinedLogger::init(
-        vec![
-            TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
-            WriteLogger::new(LevelFilter::Info, Config::default(), log_file),
-        ]
-    ) {
-        Ok(()) => println!("Logger initialized"),
-        Err(err) => println!("Failed to init logger: {}", err)
-    }
     println!("register_processor: {:?}", processor);
     boxed(processor)
 }
