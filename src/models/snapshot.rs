@@ -75,7 +75,7 @@ impl LLMQSnapshot {
     }
 
     pub fn member_is_true_at_index(&self, i: u32) -> bool {
-        self.member_list.bit_is_true_at_le_index(i)
+        self.member_list.as_slice().bit_is_true_at_le_index(i)
     }
 
     pub fn apply_skip_strategy(

@@ -327,7 +327,7 @@ impl LLMQEntry {
         let operator_keys = valid_masternodes
             .iter()
             .enumerate()
-            .filter_map(|(i, node)| self.signers_bitset.bit_is_true_at_le_index(i as u32)
+            .filter_map(|(i, node)| self.signers_bitset.as_slice().bit_is_true_at_le_index(i as u32)
                 .then_some(node.operator_public_key_at(block_height)))
             .collect::<Vec<_>>();
         let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(
