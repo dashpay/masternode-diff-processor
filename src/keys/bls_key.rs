@@ -233,7 +233,7 @@ impl BLSKey {
             bls_extended_private_key.extended_public_key()
         };
         if extended_public_key_opt.is_err() {
-            println!("Can't restore extended_public_key");
+            warn!("Can't restore extended_public_key");
             return None;
         }
         let extended_public_key = extended_public_key_opt.unwrap();
@@ -246,7 +246,7 @@ impl BLSKey {
         let bls_private_key = bls_extended_private_key.private_key();
         let bls_public_key_opt = bls_private_key.g1_element();
         if bls_public_key_opt.is_err() {
-            println!("Can't restore bls_public_key");
+            warn!("Can't restore bls_public_key");
             return None;
         }
         let bls_public_key = bls_public_key_opt.unwrap();
@@ -265,7 +265,7 @@ impl BLSKey {
                 use_legacy,
             })
         } else {
-            println!("Can't restore secret_key");
+            warn!("Can't restore secret_key");
             return None;
         }
     }

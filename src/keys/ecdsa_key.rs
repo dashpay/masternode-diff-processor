@@ -255,7 +255,7 @@ impl IKey for ECDSAKey {
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         if self.seckey.is_zero() {
-            println!("There is no seckey for sign");
+            warn!("There is no seckey for sign");
             return vec![];
         }
         match (Self::message_from_bytes(data), self.secret_key()) {
@@ -457,7 +457,7 @@ impl ECDSAKey {
     pub fn compact_sign(&self, message_digest: UInt256) -> [u8; 65] {
         let mut sig = [0u8; 65];
         if self.seckey.is_zero() {
-            println!("Can't sign with a public key");
+            warn!("Can't sign with a public key");
             return sig;
         }
         let secp = secp256k1::Secp256k1::new();

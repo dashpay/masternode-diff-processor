@@ -1,5 +1,7 @@
 use std::ffi::CString;
+use std::fs::File;
 use std::os::raw::c_char;
+use simplelog::{ColorChoice, CombinedLogger, Config, LevelFilter, TerminalMode, TermLogger, WriteLogger};
 use crate::crypto::byte_util::ConstDecodable;
 use crate::crypto::UInt256;
 use crate::ffi::boxer::boxed;
@@ -39,6 +41,12 @@ pub unsafe extern "C" fn register_processor(
         destroy_snapshot,
         should_process_diff_with_range,
     );
+    CombinedLogger::init(
+        vec![
+            TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
+            WriteLogger::new(LevelFilter::Info, Config::default(), File::create("processor.log").unwrap()),
+        ]
+    ).unwrap();
     println!("register_processor: {:?}", processor);
     boxed(processor)
 }

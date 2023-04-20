@@ -38,8 +38,8 @@ impl<'a> std::fmt::Debug for MasternodeList {
             .field("known_height", &self.known_height)
             .field("masternode_merkle_root", &self.masternode_merkle_root.unwrap_or(UInt256::MIN))
             .field("llmq_merkle_root", &self.llmq_merkle_root.unwrap_or(UInt256::MIN))
-            .field("masternodes", &self.masternodes.len())
-            .field("quorums", &self.quorums.len())
+            .field("masternodes", &self.masternodes)
+            .field("quorums", &self.quorums)
             .finish()
     }
 }
@@ -122,7 +122,7 @@ impl MasternodeList {
             && ct_q_merkle_root.is_some()
             && ct_q_merkle_root.unwrap() == q_merkle_root.unwrap();
         if !has_valid_quorum_list_root {
-            println!("LLMQ Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
+            warn!("LLMQ Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
                      tx.height,
                      tx.base.version,
                      tx.merkle_root_llmq_list,

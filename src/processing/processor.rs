@@ -234,25 +234,30 @@ impl MasternodeProcessor {
         self.cache_masternode_list(block_hash, masternode_list.clone(), cache);
         let needed_masternode_lists = cache.needed_masternode_lists.clone();
         cache.needed_masternode_lists.clear();
-        MNListDiffResult {
+        let has_found_coinbase = coinbase_transaction.has_found_coinbase(&merkle_tree.hashes);
+        let desired_merkle_root = self.lookup_merkle_root_by_hash(block_hash).unwrap_or(UInt256::MIN);
+        let has_valid_coinbase = merkle_tree.has_root(desired_merkle_root);
+        let has_valid_mn_list_root = masternode_list.has_valid_mn_list_root(&coinbase_transaction);
+        let has_valid_llmq_list_root = !quorums_active || masternode_list.has_valid_llmq_list_root(&coinbase_transaction);
+        let result = MNListDiffResult {
             error_status: ProcessingError::None,
             base_block_hash,
             block_hash,
-            has_found_coinbase: coinbase_transaction.has_found_coinbase(&merkle_tree.hashes),
-            has_valid_coinbase: merkle_tree.has_root(
-                self.lookup_merkle_root_by_hash(block_hash)
-                    .unwrap_or(UInt256::MIN),
-            ),
-            has_valid_mn_list_root: masternode_list.has_valid_mn_list_root(&coinbase_transaction),
-            has_valid_llmq_list_root: !quorums_active
-                || masternode_list.has_valid_llmq_list_root(&coinbase_transaction),
+            has_found_coinbase,
+            has_valid_coinbase,
+            has_valid_mn_list_root,
+            has_valid_llmq_list_root,
             has_valid_quorums,
             masternode_list,
             added_masternodes,
             modified_masternodes,
             added_quorums,
             needed_masternode_lists,
-        }
+        };
+        info!("••• RESULT ({}{}{}) •••", u8::from(should_process_quorums), u8::from(is_dip_0024), u8::from(is_rotated_quorums_presented));
+        info!("{:?}", result);
+        info!("••••••••••••••");
+        result
     }
 
     pub fn classify_masternodes(
@@ -384,6 +389,7 @@ impl MasternodeProcessor {
                 quorum.llmq_quorum_hash(),
                 block_height)
         };
+        info!("••• validate_quorum ({}: {:?}: {:?}) •••", block_height, quorum, valid_masternodes);
         quorum.verify(valid_masternodes, block_height)
     }
 
@@ -450,11 +456,11 @@ impl MasternodeProcessor {
                         sorted_combined_mns_list.extend(sorted_used_at_h);
                         snapshot.apply_skip_strategy(sorted_combined_mns_list, quorum_count, quarter_size)
                     } else {
-                        println!("MISSING: snapshot for block at height: {}: {}", work_block_height, work_block_hash);
+                        info!("MISSING: snapshot for block at height: {}: {}", work_block_height, work_block_hash);
                         vec![]
                     }
                 } else {
-                    println!("MISSING: masternode_list for block at height: {}: {}", work_block_height, work_block_hash);
+                    info!("MISSING: masternode_list for block at height: {}: {}", work_block_height, work_block_hash);
                     vec![]
                 }
             }
@@ -462,8 +468,8 @@ impl MasternodeProcessor {
     }
 
     fn log_masternodes(vec: &Vec<models::MasternodeEntry>, prefix: String) {
-        println!("{}", prefix);
-        vec.iter().for_each(|m| println!("{:?}", m.provider_registration_transaction_hash));
+        info!("{}", prefix);
+        vec.iter().for_each(|m| info!("{:?}", m.provider_registration_transaction_hash));
     }
 
     // Determine quorum members at new index

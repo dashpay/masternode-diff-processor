@@ -34,6 +34,8 @@ core2 = { version = "0.4.0", optional = true, default-features = false }
 rs-x11-hash = "0.1.4"
 zeroize = "1.5.7"
 bip38 = { git = "https://github.com/pankcuf/bip38", rev = "87abd21" }
+log = { version = "0.4.*", features = ["std"] }
+simplelog = "0.12.1"
 
 [dev-dependencies]
 base64 = "0.21.0"
