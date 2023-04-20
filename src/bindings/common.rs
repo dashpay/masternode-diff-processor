@@ -41,10 +41,11 @@ pub unsafe extern "C" fn register_processor(
         destroy_snapshot,
         should_process_diff_with_range,
     );
+    let log_file = File::create(dirs_next::cache_dir().unwrap().join("processor.log"));
     CombinedLogger::init(
         vec![
             TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
-            WriteLogger::new(LevelFilter::Info, Config::default(), File::create("processor.log").unwrap()),
+            WriteLogger::new(LevelFilter::Info, Config::default(), log_file.unwrap()),
         ]
     ).unwrap();
     println!("register_processor: {:?}", processor);

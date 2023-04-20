@@ -36,7 +36,7 @@ zeroize = "1.5.7"
 bip38 = { git = "https://github.com/pankcuf/bip38", rev = "87abd21" }
 log = { version = "0.4.*", features = ["std"] }
 simplelog = "0.12.1"
-
+dirs-next = "2.0.0"
 [dev-dependencies]
 base64 = "0.21.0"
 serde = { version = "1.0.144", features = ["derive"] }
