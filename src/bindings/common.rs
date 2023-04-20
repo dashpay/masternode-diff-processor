@@ -48,7 +48,7 @@ pub unsafe extern "C" fn register_processor(
     };
 
     // Create the log directory if it doesn't exist.
-    let log_dir = cache_path.join("logs");
+    let log_dir = cache_path.join("rust-logs");
     if !log_dir.exists() {
         std::fs::create_dir_all(&log_dir).expect("Failed to create log directory");
     }
