@@ -1,7 +1,7 @@
 use std::ptr::null_mut;
 use bls_signatures::{BasicSchemeMPL, G1Element, G2Element, Scheme};
 use hashes::hex::FromHex;
-use crate::bindings::common::{processor_create_cache, register_processor};
+use crate::bindings::common::{processor_create_cache, register_processor, register_rust_logger};
 use crate::bindings::masternode::{process_mnlistdiff_from_message, process_qrinfo_from_message};
 use crate::common::ChainType;
 use crate::crypto::{UInt256, UInt384, UInt768};
@@ -142,6 +142,7 @@ fn test_qrinfo_core19() {
     let chain = ChainType::TestNet;
     let cache = unsafe { &mut *processor_create_cache() };
     let context = &mut FFIContext { chain, is_dip_0024: false, cache, blocks: init_testnet_store() };
+    unsafe { register_rust_logger(); }
     let processor = processor();
 
     let result = process_mnlistdiff(message_from_file("MNL_0_868888.dat"), processor, context, 70227);
@@ -221,7 +222,13 @@ fn test_qrinfo_core19() {
     let result = process_mnlistdiff(message_from_file("MNL_869790_869791.dat"), processor, context, 70227);
     context.is_dip_0024 = true;
     let result = process_qrinfo(message_from_file("QRINFO_0_870235.dat"), processor, context);
-    // assert_diff_result(context, result);
+
+    assert_diff_result(context, unsafe { *result.result_at_h_4c });
+    assert_diff_result(context, unsafe { *result.result_at_h_3c });
+    assert_diff_result(context, unsafe { *result.result_at_h_2c });
+    assert_diff_result(context, unsafe { *result.result_at_h_c });
+    //assert_diff_result(context, unsafe { *result.result_at_h });
+    assert_diff_result(context, unsafe { *result.result_at_tip });
 }
 
 // #[test]

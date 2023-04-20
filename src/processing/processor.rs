@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::ptr::null;
+use secp256k1::rand::{Rng, thread_rng};
 use crate::{common, common::{LLMQParams, LLMQType}, models, types};
 use crate::chain::common::chain_type::IHaveChainSettings;
 use crate::common::ChainType;
@@ -390,6 +391,14 @@ impl MasternodeProcessor {
                 block_height)
         };
         info!("••• validate_quorum ({}: {:?}: {:?}) •••", block_height, quorum, valid_masternodes);
+        // TMP Generate test for verification with this data
+        info!("#[test]");
+        info!("fn test_{}() {{", thread_rng().gen_range(0..8184));
+        info!("  let block_height = {};", block_height);
+        info!("  let mut quorum = {:?};", quorum);
+        info!("  let valid_masternodes = vec!{:?};", valid_masternodes);
+        info!("  assert!(quorum.validate(valid_masternodes, block_height));");
+        info!("}}");
         quorum.verify(valid_masternodes, block_height)
     }
 

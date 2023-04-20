@@ -35,10 +35,9 @@ pub unsafe extern "C" fn register_rust_logger() {
         vec![
             TermLogger::new(LevelFilter::Error, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
             TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
-            WriteLogger::new(LevelFilter::Error, Config::default(), &log_file),
-            WriteLogger::new(LevelFilter::Debug, Config::default(), &log_file),
-            WriteLogger::new(LevelFilter::Warn, Config::default(), &log_file),
-            WriteLogger::new(LevelFilter::Info, Config::default(), &log_file),
+            WriteLogger::new(LevelFilter::Error, Config::default(), log_file.try_clone().unwrap()),
+            WriteLogger::new(LevelFilter::Warn, Config::default(), log_file.try_clone().unwrap()),
+            WriteLogger::new(LevelFilter::Info, Config::default(), log_file.try_clone().unwrap()),
         ]
     ) {
         Ok(()) => println!("Logger initialized"),

@@ -26,23 +26,32 @@ pub struct LLMQEntry {
     pub saved: bool,
     pub commitment_hash: Option<UInt256>,
 }
+
+pub struct VecHex(pub Vec<u8>);
+impl std::fmt::Debug for VecHex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Vec::from_hex(\"{}\").unwrap()", self.0.to_hex())
+    }
+}
+
 impl std::fmt::Debug for LLMQEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LLMQEntry")
             .field("version", &self.version)
             .field("llmq_hash", &self.llmq_hash)
-            .field("index", &self.index.unwrap_or(0))
+            .field("index", &self.index)
             .field("public_key", &self.public_key)
             .field("threshold_signature", &self.threshold_signature)
             .field("verification_vector_hash", &self.verification_vector_hash)
             .field("all_commitment_aggregated_signature", &self.all_commitment_aggregated_signature)
             .field("llmq_type", &self.llmq_type)
-            .field("signers_bitset", &self.signers_bitset.to_hex())
+            .field("signers_bitset", &VecHex(self.signers_bitset.clone()))
             .field("signers_count", &self.signers_count)
-            .field("valid_members_bitset", &self.valid_members_bitset.to_hex())
+            .field("valid_members_bitset", &VecHex(self.valid_members_bitset.clone()))
             .field("valid_members_count", &self.valid_members_count)
             .field("entry_hash", &self.entry_hash)
             .field("verified", &self.verified)
+            .field("saved", &self.saved)
             .field("commitment_hash", &self.commitment_hash)
             .finish()
     }
@@ -312,7 +321,6 @@ impl LLMQEntry {
 
     pub fn verify(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> bool {
         info!("• LLMQ::verify at {}: {:?}", block_height, self.llmq_type);
-
         if !self.validate_payload() {
             return false;
         }
@@ -329,10 +337,7 @@ impl LLMQEntry {
             .filter_map(|(i, node)| self.signers_bitset.as_slice().bit_is_true_at_le_index(i as u32)
                 .then_some(node.operator_public_key_at(block_height)))
             .collect::<Vec<_>>();
-        info!("• validate: commitment_hash: {:?}", commitment_hash);
-        info!("• validate: signature: {:?}", self.all_commitment_aggregated_signature);
-        info!("• validate: operator_keys: {:?}", operator_keys);
-        info!("• validate: use_legacy: {:?}", use_legacy);
+        // info!("let operator_keys = vec![{:?}];", operator_keys);
         let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(
             commitment_hash,
             self.all_commitment_aggregated_signature,

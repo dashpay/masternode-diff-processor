@@ -214,10 +214,17 @@ macro_rules! define_bytes_to_big_uint {
         }
         impl std::fmt::Debug for $uint_type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{}", self.0.to_hex())?;
+                let uint_type_str = stringify!($uint_type);
+                write!(f, "{}::from_hex(\"{}\").unwrap()", uint_type_str, self.0.to_hex())?;
                 Ok(())
             }
         }
+        // impl std::fmt::Debug for $uint_type {
+        //     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        //         write!(f, "{}", self.0.to_hex())?;
+        //         Ok(())
+        //     }
+        // }
         impl Encodable for $uint_type {
             #[inline]
             fn consensus_encode<W: std::io::Write>(&self, mut writer: W) -> std::result::Result<usize, std::io::Error> {
