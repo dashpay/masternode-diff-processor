@@ -33,8 +33,12 @@ pub unsafe extern "C" fn register_rust_logger() {
         .expect("Failed to create log file");
     match CombinedLogger::init(
         vec![
+            TermLogger::new(LevelFilter::Error, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
             TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
-            WriteLogger::new(LevelFilter::Info, Config::default(), log_file),
+            WriteLogger::new(LevelFilter::Error, Config::default(), &log_file),
+            WriteLogger::new(LevelFilter::Debug, Config::default(), &log_file),
+            WriteLogger::new(LevelFilter::Warn, Config::default(), &log_file),
+            WriteLogger::new(LevelFilter::Info, Config::default(), &log_file),
         ]
     ) {
         Ok(()) => println!("Logger initialized"),
@@ -83,7 +87,6 @@ pub unsafe extern "C" fn register_processor(
 pub unsafe extern "C" fn unregister_processor(processor: *mut MasternodeProcessor) {
     println!("unregister_processor: {:?}", processor);
     let unboxed = unbox_any(processor);
-    // unbox_any(unboxed.genesis_hash);
 }
 
 /// Initialize opaque cache to store needed information between FFI calls
