@@ -188,3 +188,71 @@ fn test_bls_basic_signature_verify_secure_aggregated() {
     test_bls_verify_random_signature_using_scheme(LegacySchemeMPL::new());
     test_bls_verify_random_signature_using_scheme(BasicSchemeMPL::new());
 }
+
+#[test]
+fn test_bls_llmq_50_60() {
+    // LLMQ::verify at 871584: Llmqtype50_60
+    let commitment_hash = UInt256::from_hex("0f602593b3ea2d71d14728edce3e92a29d800e6745baf7de5ac3c3a2a2c627f5").unwrap();
+    let signature = UInt768::from_hex("a97b10b1b24fd6aa0f958f73dcbab59e4bfca46647189cf0e186e25e355d74752a3069f6d030118860717068c611fcf513c6b1aafb75c1010bd76085f43e32401a1e58ba7f20acc99aefc7c00f9b04ce346767804095b7e014a68192614da077").unwrap();
+    let operator_keys = vec![
+        OperatorPublicKey { data: UInt384::from_hex("a2fea620ee07107d6611b7ccf5726e0e8247a131a3f129eb2b3195fe0fc1a91044af42a839915161e2105944252c59aa").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("890f1ca955443740346b5b4b0bfb8251f040074b5a2feb77e54add831bf34aaf1d84207691f6f5aa5e702152a496fadc").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("9130b42d6eb505e811dfb18ff87c4bcacde56b76a7d47a8db88ca26e75f5c2eebdd767d440f375784f9d1f127f57c977").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("94e81203caa5c0cc305b5e0f3ae7a388b974a629358e4e83e50a25b2c2a387e3d114c7c82e2b23c25b65585220e63c99").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("99c6bb8f02fe03ebfe9f3c8900dd764e6f379ca1061b8dbd8ce6b6b139489c9083a84ee60f2aca4ae114797abc07d945").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("ac290b31d2e878c2d7235efb0c61f423aa37742a31318e61f8bb0bd6c110a892dc244512fec12a8b0fe7cbb08e12be28").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("a42c53c3aa11ae4b985a52ae6a3170bdb58f88ec04c62013f9322bd5fda4417939836b6f41741dd864c348103a1155d3").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("96ca29d03ef4897a22fe467bb58c52448c63bb29534502305e8ff142ac03907fae0851ff2528e4878ef51bfa3d5a1f22").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("852057284a7a9dbccb97fbaea3425104901dc661b69294a55c7ca800ed18d37df7ccc02367b5d6836ee4f6b052249a1d").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("97596d7a72b65531fffd5f610752422d6e286c975f30d026092f7900f8015073bd6f6d1b85dd3981814c093910e7dac6").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b05caab51ff07a2f8d69972fd6ec09f6f9893cf6dfc49775f5a2db2ea7a8a525bbaf4e7e369d06590f6f2e8e4658d4dc").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("8aeb5c2757211202b3afd2033ec1b4ef2dfe376ba5c6c07b45e6a7460afa4086423c4a704eb9a781514fbc513e190a62").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("8c9bf080a96d13b356b01e734618a77225f03b3e92684f252ccbd313764a9fd9247bde6b00d92f6b5669043e77860453").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("94e199beb2a2a59166a12a851ef158928bc5efc25b39eb78b3a428b25384609d8c03548a94e77c0c941c90c68a4187d8").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b2823797ad456d53ce1e6bde84e8a19164ff88a73ccd242ec48d9c6a479f2a049e214c7e8ec2243b7ea74ca6144ab2c5").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("8196970badc74d068ec1226ffd4a656313decef59d792237a32e6ff56cd4e43030c436025831a4a3d0306a616f033810").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("adeed4d18add0ef5a7dff743a206786ab2dcc1b4aff679a61577dea99b62fb24dd56e3fe7ff65fa0be964dc5d7967c3e").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("95a577f51dc6fd7fa4621f0a4601e48fd65418a89c2af2afef725fb4f053a8ee5841cd3fdae39ebdf5a202e0c4deca23").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("82ce863d0843ca66b4a64d94c0d84ec15980ea04e4444ac4d4188f38cc0da4d6d2360b8a2046725b682862255af6a48c").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("a26fc7f30c49215b98d5cb47a350f888a306c52fa42c77e765b55288e622f03859273cae7e1cac99e67f7a9a96a6aa2c").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b37befcc17d16d4154ea8bbe82e9bd52e2ecd825dd9a43f58730d594d87cceebcb41e11461319fd71bfc08d0a0545200").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("84c0ca8535c114f8f1b369f339b2653e7126610f5170b223970f4e63ad7b55ea2f61a08e263b51fb03f6940d655690f9").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b3ea90ebcf0d8e332e37e5ac3c676653bb1203e8db7604bb0ac64a9b655b553de514e9bff5eeb86bb3ef9178375392f9").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("875b907b6d6c12aa111da0e102186b9d06f4e065969b60732207f18c2c5d0deb8ecba47cb4c0929647db0e2fae6f08ca").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("a42d732a03847819b1e2675ac48b9af4a1c92b310ecacc42c428ff902099cc47d08ecd4616da55d185463855aee99f79").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("ac9c5c77fe321ff0a115d1ba5bf7462063ef21a82ba796415f4ee538bf9e8a6a49707530c72cbb6b60026c46ff1b9443").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("8e9855b2ee991f988e446b60dcd637f33a782baf1e755785ca058f0398133bf3a95e4e77d4168c13c47d7e3fb1e3ecfc").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("93146b3252f408f1cffc875b12b61f56c1ae02113b24c0b5aaedcda4a9b509332c8c4587450074f3e0906aaf3ceca754").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b9d1a6a4f7f817d2e004134d96fa0c831433e9c649726ba8567f447d1b2394209bc1ef184a93c707054fb6816790de30").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b888fe437eab3af5a7fee4e0164705458a6fda97ae390d69721a5f1d3830ec330fb53c6a29588f1f94f69adcff04ca09").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("90d4c6a24d00d70fe961b77d58eff318bb6cd00c122bcfa20f92d65d03b9fd3afa5a0effc90810103a53d53ab155f764").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("8fa5377eb256323aace31b45c3e48ea110404b053cb80e8043bd1e44de1705130548e4ab28738816251ea57a7fc10324").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b2cafe1870e043973b2f1fded8de3d5a66dac5ade46aa0995157077efee92d852857bc7f03ed69c92723a58f8bd2926e").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("aa0ede82d78a0a8f4c2332d431c7be496c3aa09349ed3b2db30f7eb7dcc7b6e580a9d71f7d76bdaca1b3670e0cf4cd3c").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("97f78abcee6d2ed68bf2c82afbf56ef9af67313e2eb655ea5178850907cb3057cae0bb5a1d09f161057bf62f9d4890c6").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("80ea87eef15f38c1a844d77348e687794c601277011c933026cdfdb649524632b055feea3539abc48472cb447d281d65").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("8ad4f577d067630f6fd15f4d2aefdb9456d648b71cb7253d47511acc81dd5ddb69a03c848322aa11e5242f66afde5a2a").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("92730062f122f937b29f69536db3ad36980b88004eadc2ca341425d432723d67e53a4f55786c54017d77c1bd1df6b310").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("81f24418ec73b09b00514dba8fb18d6d8af1dc2ff93d594bf987911f3b98d659eb43286cd450b7e1ee5978b361660d73").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b0051db915bd86bd938746c14440b11ee3b2801cbc6d6c1c912e8b41ea5eb1d8f852abf220ae91ecdb6da094846c1ba8").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("80a2e66a810493a91b5ed1a8ef8ac4be41543598f5b4765a6f5d6339078ab88030817dc9c9bdb60c7c7a02d7787d6f2e").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("95f9da603c572257802a689964ca8f4d96f9b94f33ab75968c9cb6c730a28d50b7bb72ac2cfceee6ab0755ead9cb53cd").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("90e3caa7ae519505a6e1f3b56d3a99865f70e48f772ac431c3964a33cce7fe1e736d43ec3343ad843faaaa2b2bb3a921").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b7d5f022c3b6c314bde5171ead1616e4c27f0e9a48a9a9dc3a7227a62d42213b93c8a4c32af18bd8ff931b7732782e09").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b32f6fc90c9dcaacdf9d836a2a7e60d090fe5e55b0b02f5a4f608a4b8235ba5aa7abc4e05f9387d1d942adc57c87f5b7").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("911a30e0a5f2f5135dcc5f09498e4ba5de22c7680f396599f7f29b91ac569c3d4336bc157443cf8c06682bfb5abb2271").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("b4a637afe3810d73e3402b5d6a398e45222ba846a339f1c3570aa8e3f7f5b9d7acef08ac234cce4f706671498330a599").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("8dc75e865b89e96560b38fae96f1d0a5438795778e68b705a506046245ca5dbbedb09e2379eea4c9bde0d0fd4fe05080").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("882cbd9118474316f40b800e43f94a121928f256fd340098ff0ad81a902c4326dda4b42737d52739482f2baa80c487cc").unwrap(), version: 2 },
+        OperatorPublicKey { data: UInt384::from_hex("92fa57a5676925e8dfe3b340df2132f5844ad9f89594b04efa28fb4fb884fe21f411fa49120ed7a60ce9381a54232a10").unwrap(), version: 2 }
+    ];
+    let use_legacy = false;
+
+    let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(
+        commitment_hash,
+        signature,
+        operator_keys,
+        use_legacy);
+    assert!(all_commitment_aggregated_signature_validated);
+}
+
