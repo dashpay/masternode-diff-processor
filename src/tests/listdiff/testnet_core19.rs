@@ -1,4 +1,5 @@
 use std::ptr::null_mut;
+use bls_signatures::{BasicSchemeMPL, G1Element, G2Element, Scheme};
 use hashes::hex::FromHex;
 use crate::bindings::common::{processor_create_cache, register_processor};
 use crate::bindings::masternode::{process_mnlistdiff_from_message, process_qrinfo_from_message};

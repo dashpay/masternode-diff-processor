@@ -41,13 +41,32 @@ pub unsafe extern "C" fn register_processor(
         destroy_snapshot,
         should_process_diff_with_range,
     );
-    let log_file = File::create(dirs_next::cache_dir().unwrap().join("processor.log"));
-    CombinedLogger::init(
+    // Get the path to the cache directory.
+    let cache_path = match dirs_next::cache_dir() {
+        Some(path) => path,
+        None => panic!("Failed to find the cache directory"),
+    };
+
+    // Create the log directory if it doesn't exist.
+    let log_dir = cache_path.join("logs");
+    if !log_dir.exists() {
+        std::fs::create_dir_all(&log_dir).expect("Failed to create log directory");
+    }
+
+    // Create the log file inside the cache directory.
+    let log_file_path = log_dir.join("processor.log");
+    println!("Log file create at: {:?}", log_file_path);
+    let log_file = File::create(log_file_path)
+        .expect("Failed to create log file");
+    match CombinedLogger::init(
         vec![
             TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
-            WriteLogger::new(LevelFilter::Info, Config::default(), log_file.unwrap()),
+            WriteLogger::new(LevelFilter::Info, Config::default(), log_file),
         ]
-    ).unwrap();
+    ) {
+        Ok(()) => println!("Logger initialized"),
+        Err(err) => println!("Failed to init logger: {}", err)
+    }
     println!("register_processor: {:?}", processor);
     boxed(processor)
 }
