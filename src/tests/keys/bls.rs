@@ -1,9 +1,11 @@
-use bls_signatures::{PrivateKey, G1Element};
+use bls_signatures::{PrivateKey, G1Element, Scheme, BasicSchemeMPL, G2Element, LegacySchemeMPL};
 use byte::BytesExt;
 use hashes::hex::{FromHex, ToHex};
 use hashes::{Hash, sha256d};
+use secp256k1::rand::{Rng, thread_rng};
 use crate::keys::{BLSKey, IKey};
 use crate::crypto::{UInt256, UInt384, UInt768};
+use crate::crypto::byte_util::Random;
 use crate::models::OperatorPublicKey;
 
 #[test]
@@ -162,4 +164,27 @@ fn test_bls_signature_verify_secure_aggregated() {
         .map(|s| OperatorPublicKey { data: UInt384::from_hex(s).unwrap(), version: 1})
         .collect::<Vec<_>>();
     assert!(BLSKey::verify_secure_aggregated(commitment_hash, members_signature, operator_keys, true));
+}
+
+fn test_bls_verify_random_signature_using_scheme<S: Scheme>(schema: S) {
+    let len: usize = thread_rng().gen_range(0..30);
+    let mut vec_pks = Vec::with_capacity(len);
+    let mut vec_sigs = Vec::with_capacity(len);
+    let hash = UInt256::random().0;
+    for _i in 0..len {
+        let private_key = PrivateKey::from_bip32_seed(&UInt256::random().0);
+        let signature = schema.sign(&private_key, &hash);
+        let public_key = private_key.g1_element().unwrap();
+        vec_sigs.push(signature);
+        vec_pks.push( public_key);
+    }
+    let signature = schema.aggregate_sigs(vec_sigs.iter().collect::<Vec<&G2Element>>());
+    let public_key = schema.aggregate_public_keys(vec_pks.iter().collect::<Vec<&G1Element>>());
+    assert!(schema.verify(&public_key, &hash, &signature));
+}
+
+#[test]
+fn test_bls_basic_signature_verify_secure_aggregated() {
+    test_bls_verify_random_signature_using_scheme(LegacySchemeMPL::new());
+    test_bls_verify_random_signature_using_scheme(BasicSchemeMPL::new());
 }

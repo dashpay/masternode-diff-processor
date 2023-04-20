@@ -533,7 +533,7 @@ impl MasternodeProcessor {
                             let sorted_combined_mns_list_len = sorted_combined_mns_list.len();
                             let mut updated = false;
                             let initial_loop_idx = idx;
-                            while quarter_quorum_members[i].len() < quarter_size /*&& used_mns_count + quarter_quorum_members[i].len() < sorted_combined_mns_list_len*/ {
+                            while quarter_quorum_members[i].len() < quarter_size && used_mns_count + quarter_quorum_members[i].len() < sorted_combined_mns_list_len {
                                 let mn = sorted_combined_mns_list.get(idx as usize).unwrap();
                                 // TODO: replace masternodes with smart pointers to avoid cloning
                                 if masternodes_used_at_h_indexed_at_i.iter().any(|node| mn.provider_registration_transaction_hash == node.provider_registration_transaction_hash) {

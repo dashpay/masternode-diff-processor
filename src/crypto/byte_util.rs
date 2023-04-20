@@ -23,6 +23,10 @@ pub trait Zeroable {
     fn is_zero(&self) -> bool;
 }
 
+pub trait Random {
+    fn random() -> Self where Self: Sized;
+}
+
 pub trait MutDecodable<'a, T: TryRead<'a, Endian>> {
     fn from_mut(bytes: *mut u8) -> Option<T>;
 }
@@ -72,6 +76,20 @@ macro_rules! impl_ffi_bytearray {
 }
 
 
+#[macro_export]
+macro_rules! impl_random {
+    ($var_type: ident, $byte_len: expr) => {
+        impl Random for $var_type {
+            fn random() -> Self where Self: Sized {
+                let mut data: [u8; $byte_len] = [0u8; $byte_len];
+                for i in 0..32 {
+                    data[i] = thread_rng().gen();
+                }
+                $var_type(data)
+            }
+        }
+    }
+}
 
 #[macro_export]
 macro_rules! impl_bytes_decodable {
@@ -174,7 +192,7 @@ macro_rules! define_try_write_from_big_uint {
 #[macro_export]
 macro_rules! define_bytes_to_big_uint {
     ($uint_type: ident, $byte_len: expr) => {
-
+        impl_random!($uint_type, $byte_len);
         define_try_read_to_big_uint!($uint_type, $byte_len);
         define_try_write_from_big_uint!($uint_type);
         impl_decodable!($uint_type, $byte_len);
@@ -290,19 +308,6 @@ define_bytes_to_big_uint!(UInt768, 96);
 
 define_bytes_to_big_uint!(ECPoint, 33);
 
-pub trait Random {
-    fn random() -> Self where Self: Sized;
-}
-
-impl Random for UInt256 {
-    fn random() -> UInt256 {
-        let mut data: [u8; 32] = [0u8; 32];
-        for i in 0..32 {
-            data[i] = thread_rng().gen();
-        }
-        UInt256(data)
-    }
-}
 pub const fn merge<const N: usize>(mut buf: [u8; N], bytes: &[u8]) -> [u8; N] {
     let mut i = 0;
     while i < bytes.len() {

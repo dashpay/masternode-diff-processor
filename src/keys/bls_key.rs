@@ -377,6 +377,19 @@ impl BLSKey {
             .map(|pk| if self.use_legacy { *pk.serialize_legacy() } else { *pk.serialize() })
     }
 
+    pub fn public_key_uint(&self) -> UInt384 {
+        self.bls_public_key_serialized()
+            .map_or(UInt384::MIN, |key| UInt384(key))
+    }
+
+    pub fn bls_version(&self) -> u16 {
+        if self.use_legacy {
+            1
+        } else {
+            2
+        }
+    }
+
     /// Signing
     pub fn sign_data(&self, data: &[u8]) -> UInt768 {
         if self.seckey.is_zero() && self.extended_private_key_data.is_empty() {
@@ -500,6 +513,13 @@ impl BLSKey {
         } else {
             BasicSchemeMPL::new().aggregate_verify(keys, messages, &G2Element::from_bytes(bytes).unwrap())
         }
+    }
+
+    pub fn public_key_and_signature_from_seed<S: Scheme>(schema: S, seed: &[u8], message: &[u8]) -> (G1Element, G2Element) {
+        let private_key = PrivateKey::from_bip32_seed(seed);
+        let signature = schema.sign(&private_key, message);
+        let public_key = private_key.g1_element().unwrap();
+        (public_key, signature)
     }
 }
 
