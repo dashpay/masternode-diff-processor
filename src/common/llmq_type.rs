@@ -35,6 +35,7 @@ pub const DKG_TEST: DKGParams = DKGParams {
     mining_window_end: 18,
     bad_votes_threshold: 2,
 };
+
 pub const DKG_DEVNET: DKGParams = DKGParams {
     interval: 24,
     phase_blocks: 2,
@@ -165,6 +166,18 @@ pub const LLMQ_TEST_DIP00024: LLMQParams = LLMQParams {
     keep_old_connections: 3,
     recovery_members: 3,
 };
+pub const LLMQ_TEST_INSTANT_SEND: LLMQParams = LLMQParams {
+    r#type: LLMQType::LlmqtypeTestInstantSend,
+    name: "llmq_test_instantsend",
+    size: 3,
+    min_size: 2,
+    threshold: 2,
+    dkg_params: DKG_TEST,
+    signing_active_quorum_count: 2,
+    keep_old_connections: 3,
+    recovery_members: 3,
+};
+
 pub const LLMQ_DEVNET: LLMQParams = LLMQParams {
     r#type: LLMQType::LlmqtypeDevnet,
     name: "llmq_devnet",
@@ -286,6 +299,7 @@ pub enum LLMQType {
     LlmqtypeDevnet = 101,           // 10 members, 6 (60%) threshold, one per hour
     LlmqtypeTestV17 = 102, // 3 members, 2 (66%) threshold, one per hour. Params might differ when -llmqtestparams is used
     LlmqtypeTestDIP0024 = 103, // 4 members, 2 (66%) threshold, one per hour. Params might differ when -llmqtestparams is used
+    LlmqtypeTestInstantSend = 104, // 3 members, 2 (66%) threshold, one per hour. Params might differ when -llmqtestparams is used
     LlmqtypeDevnetDIP0024 = 105, // 8 members, 4 (50%) threshold, one per hour. Params might differ when -llmqdevnetparams is used
     LlmqtypeTestnetPlatform = 106, // 8 members, 4 (50%) threshold, one per hour. Params might differ when -llmqdevnetparams is used
     LlmqtypeDevnetPlatform = 107, // 8 members, 4 (50%) threshold, one per hour. Params might differ when -llmqdevnetparams is used
@@ -305,6 +319,7 @@ impl LLMQType {
             LLMQType::LlmqtypeDevnet => LLMQ_DEVNET,
             LLMQType::LlmqtypeTestV17 => LLMQ_V017,
             LLMQType::LlmqtypeTestDIP0024 => LLMQ_TEST_DIP00024,
+            LLMQType::LlmqtypeTestInstantSend => LLMQ_TEST_INSTANT_SEND,
             LLMQType::LlmqtypeDevnetDIP0024 => LLMQ_0024,
             LLMQType::LlmqtypeTestnetPlatform => LLMQ_TEST_PLATFORM,
             LLMQType::LlmqtypeDevnetPlatform => LLMQ_DEV_PLATFORM,
@@ -337,6 +352,7 @@ impl From<u8> for LLMQType {
             101 => LLMQType::LlmqtypeDevnet,
             102 => LLMQType::LlmqtypeTestV17,
             103 => LLMQType::LlmqtypeTestDIP0024,
+            104 => LLMQType::LlmqtypeTestInstantSend,
             105 => LLMQType::LlmqtypeDevnetDIP0024,
             106 => LLMQType::LlmqtypeTestnetPlatform,
             _ => LLMQType::LlmqtypeUnknown,
@@ -358,6 +374,7 @@ impl From<LLMQType> for u8 {
             LLMQType::LlmqtypeDevnet => 101,
             LLMQType::LlmqtypeTestV17 => 102,
             LLMQType::LlmqtypeTestDIP0024 => 103,
+            LLMQType::LlmqtypeTestInstantSend => 104,
             LLMQType::LlmqtypeDevnetDIP0024 => 105,
             LLMQType::LlmqtypeTestnetPlatform => 106,
             LLMQType::LlmqtypeDevnetPlatform => 107,

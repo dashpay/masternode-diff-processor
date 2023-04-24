@@ -9,8 +9,8 @@ pub mod tests {
     use std::io::Read;
     use std::ptr::null_mut;
     use std::{env, fs, slice};
-    use crate::bindings::common::{processor_create_cache, register_processor};
-    use crate::bindings::masternode::process_mnlistdiff_from_message;
+    use crate::bindings::common::{processor_create_cache, register_processor, register_rust_logger};
+    use crate::bindings::masternode::{process_mnlistdiff_from_message, process_qrinfo_from_message};
     use crate::ffi::boxer::boxed;
     use crate::ffi::from::FromFFI;
     use crate::ffi::to::ToFFI;
@@ -21,7 +21,7 @@ pub mod tests {
     use crate::models;
     use crate::processing::{MasternodeProcessorCache, MasternodeProcessor, MNListDiffResult, ProcessingError, QRInfoResult};
     use crate::{unwrap_or_diff_processing_failure, unwrap_or_qr_processing_failure, unwrap_or_return, types};
-    use crate::tests::block_store::init_testnet_store;
+    use crate::tests::block_store::{init_mainnet_store, init_testnet_store};
 
     // This regex can be used to omit timestamp etc. while replacing after paste from xcode console log
     // So it's bascically cut off such an expression "2022-09-11 15:31:59.445343+0300 DashSync_Example[41749:2762015]"
@@ -302,12 +302,83 @@ pub mod tests {
         buffer
     }
 
+    pub fn register_cache<'a>() -> &'a mut MasternodeProcessorCache {
+        let cache = unsafe { &mut *processor_create_cache() };
+        cache
+    }
+
+    pub fn create_default_context(chain: ChainType, is_dip_0024: bool, cache: &mut MasternodeProcessorCache) -> FFIContext {
+        let blocks = match chain {
+            ChainType::MainNet => init_mainnet_store(),
+            ChainType::TestNet => init_testnet_store(),
+            _ => vec![],
+        };
+        FFIContext { chain, is_dip_0024, cache, blocks }
+    }
+
+    pub fn register_logger() {
+        unsafe { register_rust_logger(); }
+    }
+
+    pub fn register_default_processor() -> *mut MasternodeProcessor {
+        unsafe {
+            register_processor(
+                get_merkle_root_by_hash_default,
+                get_block_height_by_hash_from_context,
+                get_block_hash_by_height_from_context,
+                get_llmq_snapshot_by_block_hash_from_context,
+                save_llmq_snapshot_in_cache,
+                get_masternode_list_by_block_hash_from_cache,
+                masternode_list_save_in_cache,
+                masternode_list_destroy_default,
+                add_insight_lookup_default,
+                hash_destroy_default,
+                snapshot_destroy_default,
+                should_process_diff_with_range_default,
+            )
+        }
+    }
+
+    pub fn process_mnlistdiff(bytes: Vec<u8>, processor: *mut MasternodeProcessor, context: &mut FFIContext, version: u32, use_insight: bool, is_from_snapshot: bool) -> types::MNListDiffResult {
+        unsafe {
+            *process_mnlistdiff_from_message(
+                bytes.as_ptr(),
+                bytes.len(),
+                context.chain,
+                use_insight,
+                is_from_snapshot,
+                version,
+                processor,
+                context.cache,
+                context as *mut _ as *mut std::ffi::c_void,
+            )
+        }
+    }
+
+    pub fn process_qrinfo(bytes: Vec<u8>, processor: *mut MasternodeProcessor, context: &mut FFIContext, version: u32, use_insight: bool, is_from_snapshot: bool) -> types::QRInfoResult {
+        unsafe {
+            *process_qrinfo_from_message(
+                bytes.as_ptr(),
+                bytes.len(),
+                context.chain,
+                use_insight,
+                is_from_snapshot,
+                true,
+                version,
+                processor,
+                context.cache,
+                context as *mut _ as *mut std::ffi::c_void,
+            )
+        }
+    }
+
     pub fn message_from_file(name: &str) -> Vec<u8> {
         let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
         let filepath = format!("{}/files/{}", crate_dir, name);
         println!("{:?}", filepath);
         get_file_as_byte_vec(&filepath)
     }
+
     pub fn assert_diff_result(context: &mut FFIContext, result: types::MNListDiffResult) {
         let masternode_list = unsafe { (*result.masternode_list).decode() };
         //print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.reversed());
@@ -392,7 +463,7 @@ pub mod tests {
         let h = UInt256(*(block_hash));
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         if let Some(snapshot) = data.cache.llmq_snapshots.get(&h) {
-            println!("get_llmq_snapshot_by_block_hash_from_context: {}: {:?}", h, snapshot);
+            //println!("get_llmq_snapshot_by_block_hash_from_context: {}: {:?}", h, snapshot);
             boxed(snapshot.encode())
         } else {
             null_mut()

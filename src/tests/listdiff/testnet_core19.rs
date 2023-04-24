@@ -1,234 +1,136 @@
-use std::ptr::null_mut;
+use std::collections::BTreeMap;
 use bls_signatures::{BasicSchemeMPL, G1Element, G2Element, Scheme};
 use hashes::hex::FromHex;
-use crate::bindings::common::{processor_create_cache, register_processor, register_rust_logger};
-use crate::bindings::masternode::{process_mnlistdiff_from_message, process_qrinfo_from_message};
-use crate::common::ChainType;
-use crate::crypto::{UInt256, UInt384, UInt768};
+use crate::common::{ChainType, LLMQType, LLMQVersion, SocketAddress};
+use crate::common::MasternodeType::{HighPerformance, Regular};
+use crate::consensus::encode::VarInt;
+use crate::crypto::{UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::ffi::from::FromFFI;
 use crate::keys::BLSKey;
-use crate::lib_tests::tests::{add_insight_lookup_default, assert_diff_result, FFIContext, get_block_hash_by_height_from_context, get_block_height_by_hash_from_context, get_llmq_snapshot_by_block_hash_from_context, get_masternode_list_by_block_hash_from_cache, get_merkle_root_by_hash_default, hash_destroy_default, masternode_list_destroy_default, masternode_list_save_in_cache, message_from_file, save_llmq_snapshot_in_cache, should_process_diff_with_range_default, snapshot_destroy_default};
-use crate::models::OperatorPublicKey;
-use crate::processing::MasternodeProcessor;
-use crate::tests::block_store::init_testnet_store;
-use crate::types;
-
-fn processor() -> *mut MasternodeProcessor {
-    unsafe {
-        register_processor(
-            get_merkle_root_by_hash_default,
-            get_block_height_by_hash_from_context,
-            get_block_hash_by_height_from_context,
-            get_llmq_snapshot_by_block_hash_from_context,
-            save_llmq_snapshot_in_cache,
-            get_masternode_list_by_block_hash_from_cache,
-            masternode_list_save_in_cache,
-            masternode_list_destroy_default,
-            add_insight_lookup_default,
-            hash_destroy_default,
-            snapshot_destroy_default,
-            should_process_diff_with_range_default,
-        )
-    }
-}
-
-fn process_mnlistdiff(bytes: Vec<u8>, processor: *mut MasternodeProcessor, context: &mut FFIContext, version: u32) -> types::MNListDiffResult {
-    unsafe {
-        *process_mnlistdiff_from_message(
-            bytes.as_ptr(),
-            bytes.len(),
-            ChainType::TestNet,
-            false,
-            true,
-            version,
-            processor,
-            context.cache,
-            context as *mut _ as *mut std::ffi::c_void,
-        )
-    }
-}
-
-
+use crate::lib_tests::tests::{assert_diff_result, create_default_context, message_from_file, process_mnlistdiff, process_qrinfo, register_cache, register_default_processor, register_logger};
+use crate::models::{LLMQEntry, MasternodeEntry, OperatorPublicKey};
 
 // #[test]
 fn test_core19rc10() {
     // 85.209.243.24 (/Dash Core:18.2.1/ protocol 70227)
-    let chain = ChainType::TestNet;
-    let base_masternode_list_hash: *const u8 = null_mut();
-    let cache = unsafe { &mut *processor_create_cache() };
-    let context = &mut FFIContext {
-        chain,
-        is_dip_0024: false,
-        cache,
-        blocks: init_testnet_store()
-    };
-    let processor = processor();
-    let result = process_mnlistdiff(message_from_file("MNT530000.dat"), processor, context, 70219);
+    let cache = register_cache();
+    let context = &mut create_default_context(ChainType::TestNet, false, cache);
+    let processor = register_default_processor();
+    let result = process_mnlistdiff(message_from_file("MNT530000.dat"), processor, context, 70219, false, true);
     assert_diff_result(context, result);
     unsafe {
         context.cache.mn_lists.insert(UInt256(*result.block_hash), (*result.masternode_list).decode());
     }
     // let result = process_mnlistdiff(message_from_file("MNL_530000_867700.dat".to_string()), processor, context, 70227);
-    let result = process_mnlistdiff(message_from_file("MNL_530000_867700.dat"), processor, context, 70227);
+    let result = process_mnlistdiff(message_from_file("MNL_530000_867700.dat"), processor, context, 70227, false, true);
     // let result = process_mnlistdiff(message_from_file("MNL_530000_867700.dat".to_string()), processor, context, 70227);
     assert_diff_result(context, result);
 }
 
 // #[test]
 fn test_core19_70224() {
-    let chain = ChainType::TestNet;
-    let base_masternode_list_hash: *const u8 = null_mut();
-    let cache = unsafe { &mut *processor_create_cache() };
-    let context = &mut FFIContext {
-        chain,
-        is_dip_0024: false,
-        cache,
-        blocks: init_testnet_store()
-    };
-    let processor = processor();
-    let result = process_mnlistdiff(message_from_file("MNT530000.dat"), processor, context, 70219);
+    let cache = register_cache();
+    let context = &mut create_default_context(ChainType::TestNet, false, cache);
+    let processor = register_default_processor();
+    let result = process_mnlistdiff(message_from_file("MNT530000.dat"), processor, context, 70219, false, true);
     assert_diff_result(context, result);
     unsafe {
         context.cache.mn_lists.insert(UInt256(*result.block_hash), (*result.masternode_list).decode());
     }
-    let result = process_mnlistdiff(message_from_file("MNL_530000_868301.dat"), processor, context, 70224);
+    let result = process_mnlistdiff(message_from_file("MNL_530000_868301.dat"), processor, context, 70224, false, true);
     // let result = process_mnlistdiff(message_from_file("MNL_530000_868301.dat"), processor, context, 70227);
     assert_diff_result(context, result);
 }
 
 // #[test]
 fn test_core19_70227() {
-    let chain = ChainType::TestNet;
-    let base_masternode_list_hash: *const u8 = null_mut();
-    let cache = unsafe { &mut *processor_create_cache() };
-    let context = &mut FFIContext {
-        chain,
-        is_dip_0024: false,
-        cache,
-        blocks: init_testnet_store()
-    };
-    let processor = processor();
-    let result = process_mnlistdiff(message_from_file("MNT530000.dat"), processor, context, 70219);
-    // let result = process_mnlistdiff(message_from_file("MNT530000.dat"), processor, context, 70227);
+    let cache = register_cache();
+    let context = &mut create_default_context(ChainType::TestNet, false, cache);
+    let processor = register_default_processor();
+    let result = process_mnlistdiff(message_from_file("MNT530000.dat"), processor, context, 70219, false, true);
     // assert_diff_result(context, result);
     unsafe {
         let list = (*result.masternode_list).decode();
-
         context.cache.mn_lists.insert(UInt256(*result.block_hash), list);
     }
-    let result = process_mnlistdiff(message_from_file("MNL_530000_868321.dat"), processor, context, 70227);
+    let result = process_mnlistdiff(message_from_file("MNL_530000_868321.dat"), processor, context, 70227, false, true);
     assert_diff_result(context, result);
 }
 
-fn process_qrinfo(bytes: Vec<u8>, processor: *mut MasternodeProcessor, context: &mut FFIContext) -> types::QRInfoResult {
-    unsafe {
-        *process_qrinfo_from_message(
-            bytes.as_ptr(),
-            bytes.len(),
-            ChainType::TestNet,
-            false,
-            true,
-            true,
-            70227,
-            processor,
-            context.cache,
-            context as *mut _ as *mut std::ffi::c_void,
-        )
-    }
-}
-
-#[test]
-fn test_qrinfo_core19() {
-    let chain = ChainType::TestNet;
-    let cache = unsafe { &mut *processor_create_cache() };
-    let context = &mut FFIContext { chain, is_dip_0024: false, cache, blocks: init_testnet_store() };
-    unsafe { register_rust_logger(); }
-    let processor = processor();
-
-    let result = process_mnlistdiff(message_from_file("MNL_0_868888.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_0_869464.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_0_869760.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_868888_869176.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869176_869464.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869464_869752.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869752_869760.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869760_869761.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869761_869762.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869762_869763.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869763_869764.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869764_869765.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869765_869766.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869766_869767.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869767_869768.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869768_869769.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869769_869770.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869770_869771.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869771_869772.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869772_869773.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869773_869774.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869774_869775.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869775_869776.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869776_869777.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869777_869778.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869778_869779.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869779_869780.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869780_869781.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869781_869782.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869782_869783.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869783_869784.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869784_869785.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869785_869786.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869786_869787.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869787_869788.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869788_869789.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869789_869790.dat"), processor, context, 70227);
-    assert_diff_result(context, result);
-    let result = process_mnlistdiff(message_from_file("MNL_869790_869791.dat"), processor, context, 70227);
+// #[test]
+fn test_mnlistdiff_and_qrinfo_core19() {
+    register_logger();
+    let version = 70227;
+    let cache = register_cache();
+    let context = &mut create_default_context(ChainType::TestNet, false, cache);
+    let processor = register_default_processor();
+    let diffs = vec![
+        "MNL_0_868888.dat",
+        "MNL_0_869464.dat",
+        "MNL_0_869760.dat",
+        "MNL_868888_869176.dat",
+        "MNL_869176_869464.dat",
+        "MNL_869464_869752.dat",
+        "MNL_869752_869760.dat",
+        "MNL_869760_869761.dat",
+        "MNL_869761_869762.dat",
+        "MNL_869762_869763.dat",
+        "MNL_869763_869764.dat",
+        "MNL_869764_869765.dat",
+        "MNL_869765_869766.dat",
+        "MNL_869766_869767.dat",
+        "MNL_869767_869768.dat",
+        "MNL_869768_869769.dat",
+        "MNL_869769_869770.dat",
+        "MNL_869770_869771.dat",
+        "MNL_869771_869772.dat",
+        "MNL_869772_869773.dat",
+        "MNL_869773_869774.dat",
+        "MNL_869774_869775.dat",
+        "MNL_869775_869776.dat",
+        "MNL_869776_869777.dat",
+        "MNL_869777_869778.dat",
+        "MNL_869778_869779.dat",
+        "MNL_869779_869780.dat",
+        "MNL_869780_869781.dat",
+        "MNL_869781_869782.dat",
+        "MNL_869782_869783.dat",
+        "MNL_869783_869784.dat",
+        "MNL_869784_869785.dat",
+        "MNL_869785_869786.dat",
+        "MNL_869786_869787.dat",
+        "MNL_869787_869788.dat",
+        "MNL_869788_869789.dat",
+        "MNL_869789_869790.dat",
+        "MNL_869790_869791.dat",
+    ].iter().for_each(|name| {
+        let result = process_mnlistdiff(message_from_file(name), processor, context, version, false, true);
+        assert_diff_result(context, result);
+    });
     context.is_dip_0024 = true;
-    let result = process_qrinfo(message_from_file("QRINFO_0_870235.dat"), processor, context);
-
+    let result = process_qrinfo(message_from_file("QRINFO_0_870235.dat"), processor, context, version, false, true);
     assert_diff_result(context, unsafe { *result.result_at_h_4c });
     assert_diff_result(context, unsafe { *result.result_at_h_3c });
     assert_diff_result(context, unsafe { *result.result_at_h_2c });
     assert_diff_result(context, unsafe { *result.result_at_h_c });
     //assert_diff_result(context, unsafe { *result.result_at_h });
     assert_diff_result(context, unsafe { *result.result_at_tip });
+}
+
+#[test]
+fn test_qrinfo_core19() {
+    register_logger();
+    let cache = register_cache();
+    let context = &mut create_default_context(ChainType::TestNet, true, cache);
+    let processor = register_default_processor();
+    let result = process_qrinfo(message_from_file("QRINFO_0_870235.dat"), processor, context, 70227, false, true);
+    assert_diff_result(context, unsafe { *result.result_at_h_4c });
+    assert_diff_result(context, unsafe { *result.result_at_h_3c });
+    assert_diff_result(context, unsafe { *result.result_at_h_2c });
+    assert_diff_result(context, unsafe { *result.result_at_h_c });
+    assert_diff_result(context, unsafe { *result.result_at_h });
+    assert_diff_result(context, unsafe { *result.result_at_tip });
+
 }
 
 // #[test]
@@ -338,4 +240,747 @@ fn test_verify_secure2() {
     let public_key = schema.aggregate_public_keys(public_keys.iter().collect::<Vec<&G1Element>>());
     let verified = schema.verify(&public_key, commitment_hash.as_ref(), &signature);
     assert!(verified);
+}
+
+// #[test]
+fn test_verify_secure3() {
+    let llmq_type = LLMQType::Llmqtype25_67;
+    // let block_hash = "000000e6b51b9aba9754e6b4ef996ef1d142d6cfcc032c1fd7fc78ca6663ee0a";
+//////////// validate_quorum 869760: 36d6a3181dd94d461a8242a1ab48bb9cf932f0d2e49af9afc943d2b3b8000000:
+    let mut quorum = LLMQEntry {
+        version: LLMQVersion::BLSBasicDefault,
+        llmq_hash: UInt256::from_hex("36d6a3181dd94d461a8242a1ab48bb9cf932f0d2e49af9afc943d2b3b8000000").unwrap(),
+        index: None,
+        public_key: UInt384::from_hex("a0cf31b8cf35cd23d4ba8f1837db08a03ea70b7184896926978849faaaa83d61c79a1295103e0be3cb75e7dfa8e616f6").unwrap(),
+        threshold_signature: UInt768::from_hex("aaf771a7032aa198b3dd3d58186dbd3b87e50ffb20ea53b0ab5907079109aea144db87141c9ca779802b08909e3ded280c318084f92035eec4570f1cdf1f3150079fd2452c40700b0965c97edb06e8b17dbd343fbfaa1da587a4c9091df3e5cf").unwrap(),
+        verification_vector_hash: UInt256::from_hex("8587b73f6bd63382dc5c97c321135742ec878eb5feccaec2b7d2b2daabb82bbc").unwrap(),
+        all_commitment_aggregated_signature: UInt768::from_hex("85c5262ab4c8e58cde79054b49d477274e1ef554ac9433c391110aa65813c7574e3982d734fb4593f646c70d62c9b68b0d666db5bc27251ea17caa8c0f7d77f1be5ffaeebf88824997a8ab342a2549ac617e9b549a4e375863cb38223952366e").unwrap(),
+        llmq_type: LLMQType::Llmqtype25_67,
+        signers_bitset: Vec::from_hex("ffffff01").unwrap(),
+        signers_count: VarInt(25),
+        valid_members_bitset: Vec::from_hex("ffffff01").unwrap(),
+        valid_members_count: VarInt(25),
+        entry_hash: UInt256::from_hex("514af6a43477f5354d1301fe9302c29f0cdcecfcb9cdbecbc72cd806543afc88").unwrap(),
+        verified: false,
+        saved: false,
+        commitment_hash: None
+    };
+
+    let valid_masternodes = [
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("3ba330d521ffd8d0d7fee89e5b1222a91edd5ee077751bc171cec7b9157bcf9f").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("64e5082da5b5871e199e9607b9901a9bd69be06fd98d779e1da8937e1ea71147").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff12edaa20").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("8b04bcb5cf6d2d6df5979234611da42854a5e69374a29e0c85128caedb53d9c818042613d2f30f3ef782ed37bd8ce161").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("f1b18d69579c40dc8292842f02ff5f511e61609d").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("0b2c6e528a7512c8b504f34c30c38373d34a935d044546405ac8654ee58669e2").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("d9e2dc9e851176b315c763e988d7dfb1164153ef2ad98f5565686acbc2b8b2df").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("69d39d8413d5e25a4048b8269b7f6a2eeaa4b80d3b04812c7e88ef44f0024fff").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff36b838e0").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("a397c930f1927ffb7f7b13101f04e932d13d210de3a6254718cca8e5748941bab4fdb27a48f61f161f0d6cb63b7d3c85").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("849765a81c234c82ecef58cbfb96f2b1fcacf686").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("75007256476bb229815257529aa59e9cf5625e7f8137147de0d50c53e80ce711").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("432ab33e7663f79c28d25eb500edc0a6a17fa7ae2a718ce7efc2e79d3a070ad0").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("d3f738fefbe8e3185edf8f939a06b5bd77130da822fd0dd2b750ad8d1457e86b").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff36d63bae").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("93dac269908111b8b091edbda123d5884f4d47d21225fa319d344b350762a85c6cdbe21804ef9b2cc53a878c72a001d6").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("bae896aae3de540d18e5ea8573182860471082f9").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("f20d3c94aaec665afe13623784afe5e4d6c44edc2c274af5b01a0209e08956bc").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("0378aaa2e2ec71b47ab267aa9b55ec5422740471ce1651c2aee7cad48d8f0f61").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("4b5db3e037a861de2890b1bfaa79bd23fdd678519f4c45a8e9473de35b40b7c5").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff36ba9112").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("b0ea47f22be1644834d8756793f2308f2c5b40afd16ebb98d29a3bd37e437990d4d5930ccfa56c1ea0b4e51d05a49f23").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("bec1b55112fe6dee11593a3ec19e9d7128555218").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("ae3a244b4d5c5b668091aa089e19d2b012cea3d5650671bf247913fbc70558dd").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("2f51f56b6a87988b682020bc75f6e827f36d43559f2adb59cf85d9aaf7ef9257").unwrap(),
+            confirmed_hash: UInt256::from_hex("795cfdb19aff1aaaed00bb62b95dfef5748253be13d0dfc4d783b02ae2000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("0078c2f3872da817c9901bfe498ec26b9bb023c6f30736ba92668fcc6900533c").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff3425306b").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("81ad0f9be5a88ae62ff54fe938dfceea71be03bd4c6a7aebf75896e8d495d310acc4146aa4820bc0e5f5b06579dedea5").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("cf83406065cb65ce74100f3c35a0324bfc92dcb0").unwrap(),
+            is_valid: true,
+            mn_type: HighPerformance,
+            platform_http_port: 41733,
+            platform_node_id: UInt160::from_hex("d96b1b3cefa0553732d9d6cae76666eff869aa02").unwrap(),
+            entry_hash: UInt256::from_hex("816b2025864c75d69c90d89c73e043ce239acabb12b1c940b93b661542225691").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("bc973f3a17c5fa3dd59493b7d2bc41ce472be2401459ca2d96fac25bedb2b7aa").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("ec43d02ceb91ca9fea3cb6e6788fb48de7d2258233563681456f0f08f914dd1e").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff22dcf318").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("818a6d23ae53d6231f7dd73a058f125340e92f6e97897f017d9d9d4e6671bbd92241170dfcdd5a4ab8ef47ef12ddcad5").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("853fd590bbfa10868687b7c648238857248adfb7").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("3460032f52e5b57c80827f180263ad5551cde16a37ce1cff9052a0b47b2233dc").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("b793ac00290abfe0ae6e8e96dd228c0a209d774ecb90b1e7f384e3e975f2aade").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("284033f8d205f3a20ad4368b8069366768256578c817ddbd5c284d321352def4").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff22db21e7").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("97f78abcee6d2ed68bf2c82afbf56ef9af67313e2eb655ea5178850907cb3057cae0bb5a1d09f161057bf62f9d4890c6").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("76c44d67639aaa8fb877f1db08d5e582b570c25d").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("e27008fcb83b8a961b29fffe8b738958ac3bd7111ef0fcff4947d8444aced9f5").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("3316e1e2cc137b2eb03f960324df219b2c5314f12296df4b4619460ae9e7f994").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("316f3728969e8f563c3901fa3dbc4c322aab301c65ab3a983561366f5e32f0a2").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff235b787f").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("b5456e15b572b002651ddd30df525367cc830148fd15496c09a538e9562b102d1326e1ae99f7d37a0ac5f8cd1d4e205c").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("de0c01ad5889c4d3d0cd8dac5f08d329f47d06b8").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("107bf4d92436b91bfaf3e3c44af15cb11f994429d5fadfbdce3d7f0683f0291e").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("d62a3f54945dda86301e5b2118e6962c79b8d6461c075d97f1b926eda4e7dcae").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("bb02707fd56805b7507a2f449c2bc6c95715872c23015eeb1b445d2933ad4a6b").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff12eda5f2").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("807b1f3f16835ebfba6f505f43c6de757bb22ecf27a89703e90e43aedafea3df353a5bd1915b27e8db397d53f0a23f60").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("996eefc4c3da0c2c59fceec99aac79122c44d632").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("56c884c0ced7087c7734b6d8a345d516f102c1aa3158040e404332c595318dd7").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("995ed4288da0f7b3e9af9dfa8f2fcb6dc0389df6030e75c4a8fa4db5cede0d88").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("f2dde5275d2f37113433a3412ac5c2715db7de0532804494558f62815af942ea").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff22dc5551").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("911a30e0a5f2f5135dcc5f09498e4ba5de22c7680f396599f7f29b91ac569c3d4336bc157443cf8c06682bfb5abb2271").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("a9cab48330c4f2058fc7d331b9355b91056c68e1").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("a7e82894e3646eaab698bf52af4bcc9d02adb0737e6104473a28c30fc1006fdc").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("c10a2826f3e775d2d7527b131d5e3620647a6926938061a7ff16b7d0b745efb4").unwrap(),
+            confirmed_hash: UInt256::from_hex("26cb9af0c2dd8555f03dccbc1f209376c344f2a89d021dad06bbe6aa2c020000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("b128a28a8255c2f2c5203982d349d5a15d8c1835f656082e7ac986dcb8d996b1").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff59280f17").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("8450dbbbe82df6808151b83a46f8c531cb240eccfe65f8f0b49f3717056da7268c14e45f0dd14fff8daed28fd353c1b4").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("1546085b56803db4366c2059d4755c8a28796ca3").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("aa7cb9fe35349094fdaf85e6018eae20d38b3208a42e8ff1cc842780a2e81c85").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("f682389d5e0baed394a65cbdd6a666f59271943d935f85c9d05b3433978c9b28").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("8e502ae310ff8f99c3efe28b76bd5d78e0cb7ee005a78f56e58c8576b406da01").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff22d254a3").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("8e2825781a496023c8be61f2bf352ad1094afd6e4f84c4ef331bc727bc149a6dd7e23d78944b8b047c03da44eef1c796").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("1c6031c212e840f9756b8f08e3801cca20b38a62").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("9b94fa8985507f9870305d431008cecd8feb30460696a557cc963d48dca4a7ab").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("0682c86d9afb864697190081adb9b1c4b0268b079edc428e41368fcb1655eff8").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("e966d7de4befc13b268099f4365c17eede37c4bdfcabdccf0466d74322be7dc6").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff235a9dce").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("815ae7a4f88fd79e4659c4b24b32f24d1e92106b867a2c23d1d084cfedd0e2766edd3f0a77f274acd4d1d53fb1ff0218").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("baee5acad0f663430ff83c4e9b9fcb0122789520").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("3d006dfd19d34fdca40d7f85c98bbd196abcf006442ead76e20d0fd93274de4b").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("eed53ba18185f82a82196e11705d4a0e40576cc1884c060188adbc5560ac8b14").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("29f50ee91bbe82d6a6a099b89d1fc5147cbe3ac70d02d16db64f2b0797204509").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff23a2a0b4").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("b5df04cdd8a9ffdad72b2ffaa0bf752b6fe9adc70c59834cca826a7a0f7264e4cbefd351772e30d527bc5aa9019c4ca5").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("e5ccbb0b6af934a3bcb32e3c1d1afe21aaadd582").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("5a16f1ecbe3cbb0780e7005131cb4ead957b88f1a83d1e21466538b42eefbda4").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("b2b69159973619cef08b9add969ba4d1ae18dd33bd62635429d44d93b62d5753").unwrap(),
+            confirmed_hash: UInt256::from_hex("3d7c98b3942c5550e3bfcaa37e37282fd4b29bb40f677a38906e597257000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("4fc89cf01157342238661a79c22bdf80def51eaba53fe98088ed1bed1c83fccc").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffffae22e975").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("87f818e5c2330ac4e7f0ef820f337addf8ab28b07c9d451304d807feda1d764c7074bccbbd941284b0d0276a96cf5e7f").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("ce7f101b7f075273c892063b1b8571311737a576").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("08dd2c380037f78507443f306f60a4b95d888576537a2a5ce7481d0cb45ea30a").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("ab0c1c4d1b59e95ef256598fc2663049f0fcf1a6e4845e80358b7d29c04dcb76").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("eb8b4a877d01aafb185de75812249b709a48d38b0551dba9301acb451fb4408f").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff340a7242").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("87f3bb14d4e16bb20ebdfc97b3b067ebbcea5b0b9725b796e6c62d8a0818eff300261a62b6fbc3bdbaa97b895b66137c").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("93bc1ac3bd2e43eb87e240d2168f56e69b1f1833").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("c965262aa365649a04a917b2eb5cd5f753107c0297448d1a0572dde1e8fe38e3").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("5efba19efb8cb5e105f5b61f9ca2b0f543a0dee8161c0fae961d1e76ee883a07").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("48a1fa1dae598d607a00efc48e52db278426b1f09aad2916c31713257ac571d2").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff22dd5625").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("b8a3692f75e5b9523c38f02c6a7ba91425bf6a6343f8704bccfeefd4844456196bc6b3267b7f3cbb2200c549f4313c42").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("1d8262ba8d79530a35b175b5b47c161e70e0e154").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("320cf222c2340e7463c0a256e8a2e81f41276ace2183a5ead1774453bc9614fc").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("790bd1b645d4cbbb155fe4a4c65b81a285197c6b94ef89b05cd2a024b7a6c441").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("829fe002b9ac51276e4555e47546875cac7c01a17ef0ea84d221eeb8a71be528").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff22dcbbe9").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("87df25a28955c903cc19f836a4daa0842d203cfc0dc5ae9b57b8246a4787ee4c98ea3f2586203315d61f4e77b6c80dc5").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("8164fcd1a488ebde9344cbd205ce705bbe312180").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("edb3cade9b9f40c5ab811743c3a9bb694a78f59f4fb1fdb31caf90011036f239").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("e3fd43389b149f8c4d64f36b1601f05ec3f3ceae0809dbeed137214d11b376a7").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("fda5dbe241b787f39a0e36d6e33a454b5b9d0e5ba12702fc27245250b58753c7").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff22d3acd4").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("89f8a06bd95c1be3cfdcd2516fabc0858c611d63c76da3a5beaa007b9d7c895aa63c0b2887bd584a76892db417a6683f").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("127b867e4c2d040cedaff979c39220c717011dab").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("0c0f28c40747d00857c61d3c661537f7573912a44a74ed51333f224f82a811b0").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("02769272e89a947728aebb2b1ce38a35e47ea334ee53fe29e8a6734cf439ee0c").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("f23d63f18ec98e1e467e5e89f3c22c739bc0729fc9c0d17a27c9a7137d590fa6").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff36bd7deb").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("a80f24b5e040dcbf86c3f468dd28bf45d9e41fbcd127fad56669d9afe358dcdc26e42f0f8b19997b1741dbb99c553aa6").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("b73068d00c048915c175450c366478f783bc455b").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("66ad4b21995106bb17b63a94752e284318d501f34fb1ecd8bea21c64cb3661be").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("d28018e798ccbd797d0b2fc33513d64d60d55c92f4b35f46db169332dae95f4d").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("e9273730016cd6686e327bed5bc61942e409b09ce9acad5c556313f7eb69c80e").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff3422fad6").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("a7be789e5b798cf3a40ff5dc22b0384dc690acadd614067c0f7e6a933b8f0c72c67b3f4b3e666e6fc48369a8161b04e6").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("4bd7db8a067386d8bda99986fd6661186757bf95").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("eea47e59d78ea141719ca2d19358d299c269d8948ec9f5b283e2edc1f2038c66").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("7260b2359075b4e479d94821e1745239384e92da675226464f1fc312682df6b2").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("b486e7118e23a4cb5f7632013217affe8c3ce0e7bfd45d3fbfcf28b4002dba11").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff22de5512").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("875b907b6d6c12aa111da0e102186b9d06f4e065969b60732207f18c2c5d0deb8ecba47cb4c0929647db0e2fae6f08ca").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("a3efa844b6dc22d05e802ebd5d1eb02cca122c25").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("5821d4b7dfe9734350412a08a8b1a8efecead5383a47468a4e98256cec04f08a").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("f5cbcfe4f680596d703098ef1fc0ce9e3950372bda82c25090b79ae880e6932b").unwrap(),
+            confirmed_hash: UInt256::from_hex("4f2ff1d62323f7dc16ccdfb3e3740af47a444871f72f09ac252f62753e000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("c2a3dd61f4c8a7b6e5934e409e9a4e9a48ed6cd9cc14424bdcce020bfb20b362").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff23a3ba6d").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("a7afe7674de986aff5e2e0a173be8c29abed8b5d6f878389ea18be0d43c62ad1ba66a59e9e8d8453aa0ed1a696976758").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("762e689e7bfecbe16bfd0e6138eea642ee0513c5").unwrap(),
+            is_valid: true,
+            mn_type: HighPerformance,
+            platform_http_port: 41733,
+            platform_node_id: UInt160::from_hex("e3053f65754c630ab036f1370bcc6835fedb9c9b").unwrap(),
+            entry_hash: UInt256::from_hex("03430ef59311f9797152779acb03d6c25fca40567b75f84058bf2f5ef3da335a").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("71ce9f30984ba8ff47618bdbb362be8315b11d7be903b37fb9ed2a0010090dca").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("ece3d829df81bd32c1d45bb360600377fa73c619579d1a5daddcb95ec91357bb").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff36d45b94").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("b2823797ad456d53ce1e6bde84e8a19164ff88a73ccd242ec48d9c6a479f2a049e214c7e8ec2243b7ea74ca6144ab2c5").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("b7e99fc3ee4cf3d64c4438fc2a61cba12c0e7319").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("0526b60a35c51286e3685f143e0664d08a155bfdc49f1ae0f76db95709f24e99").unwrap(),
+        },
+        MasternodeEntry {
+            provider_registration_transaction_hash: UInt256::from_hex("608c43a6a23324860eb2d8e6212798506bebac53120c591d6b32aeb0e35edc63").unwrap(),
+            confirmed_hash: UInt256::from_hex("042a425ae2d3289646d71765e97cfe099acdf021aaeabd52393477d845000000").unwrap(),
+            confirmed_hash_hashed_with_provider_registration_transaction_hash: Some(
+                UInt256::from_hex("c83d2ef9b1b1772e173a9f088d0151582f9eeaef3ce5c6ba28c5aac025af112c").unwrap(),
+            ),
+            socket_address: SocketAddress {
+                ip_address: UInt128::from_hex("00000000000000000000ffff235bc5da").unwrap(),
+                port: 19999,
+            },
+            operator_public_key: OperatorPublicKey {
+                data: UInt384::from_hex("93f411bb160a34b3d8254e7c537e1300afed010d4a245e376b81d889020854fb999fe9cbb7430ddee0faf2fe5e711ebb").unwrap(),
+                version: 2,
+            },
+            previous_operator_public_keys: BTreeMap::from([]),
+            previous_entry_hashes: BTreeMap::from([]),
+            previous_validity: BTreeMap::from([]),
+            known_confirmed_at_height: Some(
+                868888,
+            ),
+            update_height: 868888,
+            key_id_voting: UInt160::from_hex("b190542b5c7522f4db19e48033d17c34afd71845").unwrap(),
+            is_valid: true,
+            mn_type: Regular,
+            platform_http_port: 0,
+            platform_node_id: UInt160::from_hex("0000000000000000000000000000000000000000").unwrap(),
+            entry_hash: UInt256::from_hex("76d162d303800ff542f6b69f938b911712717332c0ea4ca061c3e7f341632f39").unwrap(),
+        },
+    ];
+
+    quorum.validate(valid_masternodes.to_vec(), 869760);
+}
+
+//#[test]
+fn test_verify_25_67() {
+    register_logger();
+    let version = 70227;
+    let cache = register_cache();
+    let context = &mut create_default_context(ChainType::TestNet, false, cache);
+    let processor = register_default_processor();
+    let result = process_mnlistdiff(message_from_file("MNL_0_871104.dat"), processor, context, version, false, true);
+    assert_diff_result(context, result);
+    let result = process_mnlistdiff(message_from_file("MNL_0_874011.dat"), processor, context, version, false, true);
+    // assert_diff_result(context, result);
 }

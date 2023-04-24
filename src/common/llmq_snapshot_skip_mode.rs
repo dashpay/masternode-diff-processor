@@ -30,6 +30,16 @@ impl From<u32> for LLMQSnapshotSkipMode {
         }
     }
 }
+impl From<LLMQSnapshotSkipMode> for u32 {
+    fn from(orig: LLMQSnapshotSkipMode) -> Self {
+        match orig {
+            LLMQSnapshotSkipMode::NoSkipping => 0,
+            LLMQSnapshotSkipMode::SkipFirst => 1,
+            LLMQSnapshotSkipMode::SkipExcept => 2,
+            LLMQSnapshotSkipMode::SkipAll => 3,
+        }
+    }
+}
 
 impl<'a> TryRead<'a, Endian> for LLMQSnapshotSkipMode {
     fn try_read(bytes: &'a [u8], _endian: Endian) -> byte::Result<(Self, usize)> {

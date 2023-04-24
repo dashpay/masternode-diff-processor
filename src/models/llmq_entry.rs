@@ -168,26 +168,22 @@ impl LLMQEntry {
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = llmq_type.into();
         let llmq_v: u16 = version.into();
-        *offset += llmq_v.consensus_encode(&mut buffer).unwrap();
-        *offset += llmq_u8.consensus_encode(&mut buffer).unwrap();
-        *offset += llmq_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += llmq_v.enc(&mut buffer);
+        *offset += llmq_u8.enc(&mut buffer);
+        *offset += llmq_hash.enc(&mut buffer);
         if let Some(index) = llmq_index {
-            *offset += index.consensus_encode(&mut buffer).unwrap();
+            *offset += index.enc(&mut buffer);
         }
-        *offset += signers_count.consensus_encode(&mut buffer).unwrap();
+        *offset += signers_count.enc(&mut buffer);
         buffer.emit_slice(signers_bitset).unwrap();
         *offset += signers_bitset.len();
-        *offset += valid_members_count.consensus_encode(&mut buffer).unwrap();
+        *offset += valid_members_count.enc(&mut buffer);
         buffer.emit_slice(valid_members_bitset).unwrap();
         *offset += valid_members_bitset.len();
-        *offset += public_key.consensus_encode(&mut buffer).unwrap();
-        *offset += verification_vector_hash
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += threshold_signature.consensus_encode(&mut buffer).unwrap();
-        *offset += all_commitment_aggregated_signature
-            .consensus_encode(&mut buffer)
-            .unwrap();
+        *offset += public_key.enc(&mut buffer);
+        *offset += verification_vector_hash.enc(&mut buffer);
+        *offset += threshold_signature.enc(&mut buffer);
+        *offset += all_commitment_aggregated_signature.enc(&mut buffer);
         buffer
     }
 
