@@ -83,7 +83,7 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     let read_snapshot = |offset: &mut usize| models::LLMQSnapshot::from_bytes(message, offset);
     let read_var_int = |offset: &mut usize| encode::VarInt::from_bytes(message, offset);
     let mut get_list_diff_result =
-        |list_diff: models::MNListDiff, should_process_quorums: bool| boxed(process_list_diff(list_diff, should_process_quorums));
+        |list_diff: models::MNListDiff, verify_quorums: bool| boxed(process_list_diff(list_diff, verify_quorums));
     let snapshot_at_h_c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_2c = unwrap_or_qr_result_failure!(read_snapshot(offset));
     let snapshot_at_h_3c = unwrap_or_qr_result_failure!(read_snapshot(offset));
@@ -112,16 +112,16 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
             snapshot_at_h_4c.clone().unwrap(),
         );
     }
-    let result_at_tip = get_list_diff_result(diff_tip, false);
-    let result_at_h = get_list_diff_result(diff_h, true);
-    let result_at_h_c = get_list_diff_result(diff_h_c, false);
-    let result_at_h_2c = get_list_diff_result(diff_h_2c, false);
-    let result_at_h_3c = get_list_diff_result(diff_h_3c, false);
     let result_at_h_4c = if extra_share {
         get_list_diff_result(diff_h_4c.unwrap(), false)
     } else {
         null_mut()
     };
+    let result_at_h_3c = get_list_diff_result(diff_h_3c, false);
+    let result_at_h_2c = get_list_diff_result(diff_h_2c, false);
+    let result_at_h_c = get_list_diff_result(diff_h_c, false);
+    let result_at_h = get_list_diff_result(diff_h, true);
+    let result_at_tip = get_list_diff_result(diff_tip, false);
     let last_quorum_per_index_count = 0; //unwrap_or_qr_result_failure!(read_var_int(offset)).0 as usize;
     let mut last_quorum_per_index_vec: Vec<*mut types::LLMQEntry> =
         Vec::with_capacity(last_quorum_per_index_count);

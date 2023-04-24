@@ -9,6 +9,7 @@ pub mod script;
 pub mod data_ops;
 pub mod sec_vec;
 pub mod cc_crypt;
+pub mod java;
 
 pub use self::address::address::from_hash160_for_script_map;
 pub use self::address::address::with_script_pub_key;

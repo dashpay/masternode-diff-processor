@@ -1,16 +1,15 @@
 # masternode-diff-message-processor
 
-Library for processing masternode diff messages
+Library for processing masternode diff messages.
+
+Also it incorporates all the crypto neccessary for spv (x11-hash, ecdsa, bls, ed25519 etc.)
 
 | main | [![Tests](https://github.com/dashpay/masternode-diff-processor/workflows/Tests/badge.svg?branch=main)](https://github.com/dashpay/masternode-diff-processor/actions) | [![codecov](https://codecov.io/gh/dashpay/masternode-diff-processor/branch/main/graph/badge.svg)](https://codecov.io/gh/dashpay/masternode-diff-processor) | ![Lint](https://github.com/dashpay/masternode-diff-processor/workflows/Lint/badge.svg) |
-# TODO
-1. Create integration with BLS signatures
-2. Now it will be necessary to figure out what to do with the external libraries used, keeping in mind our policy regarding this.
-3. Increase code coverage
 
 Run tests: 
 cargo test --package dash-spv-masternode-processor --lib tests
 Run c test-like functions:
+
 ./build.sh && clang c/main.c target/universal/release/libdash_spv_masternode_processor_macos.a -o test && ./test
 
 For fast local testing:

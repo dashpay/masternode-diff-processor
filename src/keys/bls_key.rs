@@ -233,7 +233,7 @@ impl BLSKey {
             bls_extended_private_key.extended_public_key()
         };
         if extended_public_key_opt.is_err() {
-            println!("Can't restore extended_public_key");
+            warn!("Can't restore extended_public_key");
             return None;
         }
         let extended_public_key = extended_public_key_opt.unwrap();
@@ -246,7 +246,7 @@ impl BLSKey {
         let bls_private_key = bls_extended_private_key.private_key();
         let bls_public_key_opt = bls_private_key.g1_element();
         if bls_public_key_opt.is_err() {
-            println!("Can't restore bls_public_key");
+            warn!("Can't restore bls_public_key");
             return None;
         }
         let bls_public_key = bls_public_key_opt.unwrap();
@@ -265,7 +265,7 @@ impl BLSKey {
                 use_legacy,
             })
         } else {
-            println!("Can't restore secret_key");
+            warn!("Can't restore secret_key");
             return None;
         }
     }
@@ -375,6 +375,19 @@ impl BLSKey {
         self.bls_public_key()
             .ok()
             .map(|pk| if self.use_legacy { *pk.serialize_legacy() } else { *pk.serialize() })
+    }
+
+    pub fn public_key_uint(&self) -> UInt384 {
+        self.bls_public_key_serialized()
+            .map_or(UInt384::MIN, |key| UInt384(key))
+    }
+
+    pub fn bls_version(&self) -> u16 {
+        if self.use_legacy {
+            1
+        } else {
+            2
+        }
     }
 
     /// Signing
@@ -500,6 +513,13 @@ impl BLSKey {
         } else {
             BasicSchemeMPL::new().aggregate_verify(keys, messages, &G2Element::from_bytes(bytes).unwrap())
         }
+    }
+
+    pub fn public_key_and_signature_from_seed<S: Scheme>(schema: S, seed: &[u8], message: &[u8]) -> (G1Element, G2Element) {
+        let private_key = PrivateKey::from_bip32_seed(seed);
+        let signature = schema.sign(&private_key, message);
+        let public_key = private_key.g1_element().unwrap();
+        (public_key, signature)
     }
 }
 

@@ -3,6 +3,7 @@ use bls_signatures::G1Element;
 use byte::{BytesExt, TryRead};
 use crate::consensus::Encodable;
 use crate::crypto::UInt384;
+use crate::keys::BLSKey;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct OperatorPublicKey {
@@ -41,5 +42,11 @@ impl From<OperatorPublicKey> for Option<G1Element> {
         } else {
             G1Element::from_bytes(&value.data.0)
         }.ok()
+    }
+}
+
+impl From<BLSKey> for OperatorPublicKey {
+    fn from(key: BLSKey) -> Self {
+        OperatorPublicKey { data: key.public_key_uint(), version: key.bls_version() }
     }
 }

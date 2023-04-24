@@ -26,25 +26,32 @@ pub struct LLMQEntry {
     pub saved: bool,
     pub commitment_hash: Option<UInt256>,
 }
+
+pub struct VecHex(pub Vec<u8>);
+impl std::fmt::Debug for VecHex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Vec::from_hex(\"{}\").unwrap()", self.0.to_hex())
+    }
+}
+
 impl std::fmt::Debug for LLMQEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LLMQEntry")
             .field("version", &self.version)
             .field("llmq_hash", &self.llmq_hash)
-            .field("index", &self.index.unwrap_or(0))
+            .field("index", &self.index)
             .field("public_key", &self.public_key)
             .field("threshold_signature", &self.threshold_signature)
             .field("verification_vector_hash", &self.verification_vector_hash)
             .field("all_commitment_aggregated_signature", &self.all_commitment_aggregated_signature)
             .field("llmq_type", &self.llmq_type)
-            .field("signers_bitset", &self.signers_bitset.to_hex())
-            .field("signers_bitset_length", &self.signers_bitset.len())
+            .field("signers_bitset", &VecHex(self.signers_bitset.clone()))
             .field("signers_count", &self.signers_count)
-            .field("valid_members_bitset", &self.valid_members_bitset.to_hex())
-            .field("valid_members_bitset_length", &self.valid_members_bitset.len())
+            .field("valid_members_bitset", &VecHex(self.valid_members_bitset.clone()))
             .field("valid_members_count", &self.valid_members_count)
             .field("entry_hash", &self.entry_hash)
             .field("verified", &self.verified)
+            .field("saved", &self.saved)
             .field("commitment_hash", &self.commitment_hash)
             .finish()
     }
@@ -161,26 +168,22 @@ impl LLMQEntry {
         let offset: &mut usize = &mut 0;
         let llmq_u8: u8 = llmq_type.into();
         let llmq_v: u16 = version.into();
-        *offset += llmq_v.consensus_encode(&mut buffer).unwrap();
-        *offset += llmq_u8.consensus_encode(&mut buffer).unwrap();
-        *offset += llmq_hash.consensus_encode(&mut buffer).unwrap();
+        *offset += llmq_v.enc(&mut buffer);
+        *offset += llmq_u8.enc(&mut buffer);
+        *offset += llmq_hash.enc(&mut buffer);
         if let Some(index) = llmq_index {
-            *offset += index.consensus_encode(&mut buffer).unwrap();
+            *offset += index.enc(&mut buffer);
         }
-        *offset += signers_count.consensus_encode(&mut buffer).unwrap();
+        *offset += signers_count.enc(&mut buffer);
         buffer.emit_slice(signers_bitset).unwrap();
         *offset += signers_bitset.len();
-        *offset += valid_members_count.consensus_encode(&mut buffer).unwrap();
+        *offset += valid_members_count.enc(&mut buffer);
         buffer.emit_slice(valid_members_bitset).unwrap();
         *offset += valid_members_bitset.len();
-        *offset += public_key.consensus_encode(&mut buffer).unwrap();
-        *offset += verification_vector_hash
-            .consensus_encode(&mut buffer)
-            .unwrap();
-        *offset += threshold_signature.consensus_encode(&mut buffer).unwrap();
-        *offset += all_commitment_aggregated_signature
-            .consensus_encode(&mut buffer)
-            .unwrap();
+        *offset += public_key.enc(&mut buffer);
+        *offset += verification_vector_hash.enc(&mut buffer);
+        *offset += threshold_signature.enc(&mut buffer);
+        *offset += all_commitment_aggregated_signature.enc(&mut buffer);
         buffer
     }
 
@@ -248,7 +251,7 @@ impl LLMQEntry {
 
     fn validate_bitset(bitset: Vec<u8>, count: VarInt) -> bool {
         if bitset.len() != (count.0 as usize + 7) / 8 {
-            println!(
+            warn!(
                 "Error: The byte size of the bitvectors ({}) must match “(quorumSize + 7) / 8 ({})",
                 bitset.len(),
                 (count.0 + 7) / 8
@@ -265,7 +268,7 @@ impl LLMQEntry {
                 None => 0,
             };
             if last_byte & mask != 0 {
-                println!("Error: No out-of-range bits should be set in byte representation of the bitvector");
+                warn!("Error: No out-of-range bits should be set in byte representation of the bitvector");
                 return false;
             }
         }
@@ -278,7 +281,7 @@ impl LLMQEntry {
         let is_valid_signers =
             Self::validate_bitset(self.signers_bitset.clone(), self.signers_count);
         if !is_valid_signers {
-            println!(
+            warn!(
                 "Error: signers_bitset is invalid ({:?} {})",
                 self.signers_bitset, self.signers_count
             );
@@ -287,7 +290,7 @@ impl LLMQEntry {
         let is_valid_members =
             Self::validate_bitset(self.valid_members_bitset.clone(), self.valid_members_count);
         if !is_valid_members {
-            println!(
+            warn!(
                 "Error: valid_members_bitset is invalid ({:?} {})",
                 self.valid_members_bitset, self.valid_members_count
             );
@@ -297,13 +300,13 @@ impl LLMQEntry {
         // The number of set bits in the signers and validMembers bitvectors must be at least >= quorumThreshold
         let signers_bitset_true_bits_count = self.signers_bitset.as_slice().true_bits_count();
         if signers_bitset_true_bits_count < quorum_threshold {
-            println!("Error: The number of set bits in the signers bitvector {} must be at least >= quorumThreshold {}", signers_bitset_true_bits_count, quorum_threshold);
+            warn!("Error: The number of set bits in the signers bitvector {} must be at least >= quorumThreshold {}", signers_bitset_true_bits_count, quorum_threshold);
             return false;
         }
         let valid_members_bitset_true_bits_count =
             self.valid_members_bitset.as_slice().true_bits_count();
         if valid_members_bitset_true_bits_count < quorum_threshold {
-            println!("Error: The number of set bits in the validMembers bitvector {} must be at least >= quorumThreshold {}", valid_members_bitset_true_bits_count, quorum_threshold);
+            warn!("Error: The number of set bits in the validMembers bitvector {} must be at least >= quorumThreshold {}", valid_members_bitset_true_bits_count, quorum_threshold);
             return false;
         }
         true
@@ -313,7 +316,7 @@ impl LLMQEntry {
 impl LLMQEntry {
 
     pub fn verify(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> bool {
-        println!("LLMQ::verify at {}: {:?}", block_height, self.llmq_type);
+        info!("• LLMQ::verify at {}: {:?}", block_height, self.llmq_type);
         if !self.validate_payload() {
             return false;
         }
@@ -327,23 +330,24 @@ impl LLMQEntry {
         let operator_keys = valid_masternodes
             .iter()
             .enumerate()
-            .filter_map(|(i, node)| self.signers_bitset.bit_is_true_at_le_index(i as u32)
+            .filter_map(|(i, node)| self.signers_bitset.as_slice().bit_is_true_at_le_index(i as u32)
                 .then_some(node.operator_public_key_at(block_height)))
             .collect::<Vec<_>>();
+        // info!("let operator_keys = vec![{:?}];", operator_keys);
         let all_commitment_aggregated_signature_validated = BLSKey::verify_secure_aggregated(
             commitment_hash,
             self.all_commitment_aggregated_signature,
             operator_keys,
             use_legacy);
         if !all_commitment_aggregated_signature_validated {
-            println!("••• Issue with all_commitment_aggregated_signature_validated: {}", self.all_commitment_aggregated_signature);
+            warn!("••• Issue with all_commitment_aggregated_signature_validated: {}", self.all_commitment_aggregated_signature);
             return false;
         }
         // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
         // This is an aggregated BLS signature verification.
         let quorum_signature_validated = BLSKey::verify_quorum_signature(commitment_hash.as_bytes(), self.threshold_signature.as_bytes(), self.public_key.as_bytes(), use_legacy);
         if !quorum_signature_validated {
-            println!("••• Issue with quorum_signature_validated");
+            warn!("••• Issue with quorum_signature_validated");
             return false;
         }
         true

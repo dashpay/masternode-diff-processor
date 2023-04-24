@@ -29,19 +29,34 @@ pub struct MasternodeEntry {
     pub platform_node_id: UInt160,
     pub entry_hash: UInt256,
 }
+// Define a wrapper struct for the BTreeMap.
+pub struct CustomDebugBTreeMap<K, V>(pub BTreeMap<K, V>);
+impl<K: std::fmt::Debug, V: std::fmt::Debug> std::fmt::Debug for CustomDebugBTreeMap<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Customize the debug representation here.
+        write!(f, "BTreeMap::from([")?;
+        for (key, value) in &self.0 {
+            write!(f, "({:?}, {:?}), ", key, value)?;
+        }
+        write!(f, "])")
+    }
+}
 
 impl std::fmt::Debug for MasternodeEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let prev_e = CustomDebugBTreeMap(self.previous_entry_hashes.clone());
+        let prev_v = CustomDebugBTreeMap(self.previous_validity.clone());
+        let prev_o = CustomDebugBTreeMap(self.previous_operator_public_keys.clone());
         f.debug_struct("MasternodeEntry")
             .field("provider_registration_transaction_hash", &self.provider_registration_transaction_hash)
             .field("confirmed_hash", &self.confirmed_hash)
-            .field("confirmed_hash_hashed_with_provider_registration_transaction_hash", &self.confirmed_hash_hashed_with_provider_registration_transaction_hash.unwrap_or(UInt256::MIN))
+            .field("confirmed_hash_hashed_with_provider_registration_transaction_hash", &self.confirmed_hash_hashed_with_provider_registration_transaction_hash)
             .field("socket_address", &self.socket_address)
             .field("operator_public_key", &self.operator_public_key)
-            .field("previous_operator_public_keys", &self.previous_operator_public_keys)
-            .field("previous_entry_hashes", &self.previous_entry_hashes)
-            .field("previous_validity", &self.previous_validity)
-            .field("known_confirmed_at_height", &self.known_confirmed_at_height.unwrap_or(0))
+            .field("previous_operator_public_keys", &prev_o)
+            .field("previous_entry_hashes", &prev_e)
+            .field("previous_validity", &prev_v)
+            .field("known_confirmed_at_height", &self.known_confirmed_at_height)
             .field("update_height", &self.update_height)
             .field("key_id_voting", &self.key_id_voting)
             .field("is_valid", &self.is_valid)
@@ -255,7 +270,7 @@ impl MasternodeEntry {
             let distance = height - block_height;
             if distance < min_distance {
                 min_distance = distance;
-                println!("SME operator public key for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {block_height}", key, used_previous_operator_public_key_at_block_hash, self.provider_registration_transaction_hash);
+                info!("SME operator public key for proTxHash {:?} : Using {:?} instead of {:?} for list at block height {block_height}", key, used_previous_operator_public_key_at_block_hash, self.provider_registration_transaction_hash);
                 used_previous_operator_public_key_at_block_hash = key;
             }
         }
@@ -275,7 +290,7 @@ impl MasternodeEntry {
             let distance = height - block_height;
             if distance < min_distance {
                 min_distance = distance;
-                println!("SME Hash for proTxHash {:?} : Using {hash} instead of {used_hash} for list at block height {block_height}", self.provider_registration_transaction_hash);
+                info!("SME Hash for proTxHash {:?} : Using {hash} instead of {used_hash} for list at block height {block_height}", self.provider_registration_transaction_hash);
                 used_hash = hash;
             }
         }

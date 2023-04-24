@@ -88,19 +88,11 @@ impl MNListDiff {
             deleted_masternode_hashes.push(UInt256::from_bytes(message, offset)?);
         }
         let added_masternode_count = VarInt::from_bytes(message, offset)?.0;
-        let added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = (0
-            ..added_masternode_count)
-            .into_iter()
-            .filter_map(|_i| {
-                let entry = message.read_with::<MasternodeEntry>(offset, masternode_read_ctx).ok()?;
-                Some(entry)
-            })
-            .fold(BTreeMap::new(), |mut acc, entry| {
-                let hash = entry
-                    .provider_registration_transaction_hash
-                    .clone()
-                    .reverse();
-                acc.insert(hash, entry);
+        let added_or_modified_masternodes: BTreeMap<UInt256, MasternodeEntry> = (0..added_masternode_count)
+            .fold(BTreeMap::new(), |mut acc, _| {
+                if let Ok(entry) = message.read_with::<MasternodeEntry>(offset, masternode_read_ctx) {
+                    acc.insert(entry.provider_registration_transaction_hash.reversed(), entry);
+                }
                 acc
             });
 

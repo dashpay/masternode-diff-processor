@@ -34,14 +34,14 @@ impl IKey for ED25519Key
 
     fn sign(&self, data: &[u8]) -> Vec<u8> {
         if self.seckey.is_zero() {
-            println!("There is no seckey for sign");
+            warn!("There is no seckey for sign");
             return vec![];
         }
         let signing_key = SigningKey::from_bytes(&self.seckey.0);
         match signing_key.try_sign(data) {
             Ok(signature) => signature.to_vec(),
             Err(err) => {
-                println!("ED25519Key::sign::error {}", err);
+                warn!("ED25519Key::sign::error {}", err);
                 vec![]
             }
         }

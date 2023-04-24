@@ -31,17 +31,17 @@ impl std::fmt::Debug for MNListDiffResult {
                 "validation",
                 &format!(
                     "{}{}{}{}{}",
-                    if self.has_found_coinbase { 1 } else { 0 },
-                    if self.has_valid_coinbase { 1 } else { 0 },
-                    if self.has_valid_mn_list_root { 1 } else { 0 },
-                    if self.has_valid_llmq_list_root { 1 } else { 0 },
-                    if self.has_valid_quorums { 1 } else { 0 }
+                    u8::from(self.has_found_coinbase),
+                    u8::from(self.has_valid_coinbase),
+                    u8::from(self.has_valid_mn_list_root),
+                    u8::from(self.has_valid_llmq_list_root),
+                    u8::from(self.has_valid_quorums)
                 ),
             )
             .field("masternode_list", &self.masternode_list)
-            .field("added_masternodes", &self.added_masternodes.len())
-            .field("modified_masternodes", &self.modified_masternodes.len())
-            .field("added_quorums", &self.added_quorums.len())
+            .field("added_masternodes", &self.added_masternodes)
+            .field("modified_masternodes", &self.modified_masternodes)
+            .field("added_quorums", &self.added_quorums)
             .field("needed_masternode_lists", &self.needed_masternode_lists)
             .finish()
     }

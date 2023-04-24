@@ -1,5 +1,7 @@
 use std::ffi::CString;
+use std::fs::File;
 use std::os::raw::c_char;
+use simplelog::{ColorChoice, CombinedLogger, Config, LevelFilter, TerminalMode, TermLogger, WriteLogger};
 use crate::crypto::byte_util::ConstDecodable;
 use crate::crypto::UInt256;
 use crate::ffi::boxer::boxed;
@@ -7,6 +9,41 @@ use crate::ffi::callbacks::{AddInsightBlockingLookup, GetBlockHashByHeight, GetB
 use crate::ffi::unboxer::{unbox_any, unbox_block, unbox_llmq_snapshot, unbox_llmq_validation_data, unbox_masternode_list, unbox_mn_list_diff_result, unbox_qr_info_result, unbox_vec_ptr};
 use crate::processing::{MasternodeProcessor, MasternodeProcessorCache};
 use crate::types;
+
+
+/// Initializes logger (it could be initialize only once)
+#[no_mangle]
+pub unsafe extern "C" fn register_rust_logger() {
+    // Get the path to the cache directory.
+    let cache_path = match dirs_next::cache_dir() {
+        Some(path) => path,
+        None => panic!("Failed to find the cache directory"),
+    };
+
+    // Create the log directory if it doesn't exist.
+    let log_dir = cache_path.join("Logs");
+    if !log_dir.exists() {
+        std::fs::create_dir_all(&log_dir).expect("Failed to create log directory");
+    }
+
+    // Create the log file inside the cache directory.
+    let log_file_path = log_dir.join("processor.log");
+    println!("Log file create at: {:?}", log_file_path);
+    let log_file = File::create(log_file_path)
+        .expect("Failed to create log file");
+    match CombinedLogger::init(
+        vec![
+            TermLogger::new(LevelFilter::Error, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
+            TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
+            WriteLogger::new(LevelFilter::Error, Config::default(), log_file.try_clone().unwrap()),
+            WriteLogger::new(LevelFilter::Warn, Config::default(), log_file.try_clone().unwrap()),
+            WriteLogger::new(LevelFilter::Info, Config::default(), log_file.try_clone().unwrap()),
+        ]
+    ) {
+        Ok(()) => println!("Logger initialized"),
+        Err(err) => println!("Failed to init logger: {}", err)
+    }
+}
 
 /// Register all the callbacks for use across FFI
 /// # Safety
@@ -49,7 +86,6 @@ pub unsafe extern "C" fn register_processor(
 pub unsafe extern "C" fn unregister_processor(processor: *mut MasternodeProcessor) {
     println!("unregister_processor: {:?}", processor);
     let unboxed = unbox_any(processor);
-    // unbox_any(unboxed.genesis_hash);
 }
 
 /// Initialize opaque cache to store needed information between FFI calls
