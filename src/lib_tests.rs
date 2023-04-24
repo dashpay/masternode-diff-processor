@@ -383,28 +383,12 @@ pub mod tests {
         let masternode_list = unsafe { (*result.masternode_list).decode() };
         //print!("block_hash: {} ({})", masternode_list.block_hash, masternode_list.block_hash.reversed());
         let bh = context.block_for_hash(masternode_list.block_hash).unwrap().height;
-        assert!(
-            result.has_found_coinbase,
-            "Did not find coinbase at height {}",
-            bh
-        );
+        assert!(result.has_found_coinbase, "has no coinbase {}", bh);
         //turned off on purpose as we don't have the coinbase block
         //assert!(result.has_valid_coinbase, "Coinbase not valid at height {}", bh);
-        assert!(
-            result.has_valid_mn_list_root,
-            "rootMNListValid not valid at height {}",
-            bh
-        );
-        assert!(
-            result.has_valid_llmq_list_root,
-            "rootQuorumListValid not valid at height {}",
-            bh
-        );
-        assert!(
-            result.has_valid_quorums,
-            "validQuorums not valid at height {}",
-            bh
-        );
+        assert!(result.has_valid_mn_list_root, "invalid mnl root {}", bh);
+        assert!(result.has_valid_llmq_list_root, "invalid llmq root {}", bh);
+        assert!(result.has_valid_quorums, "has invalid llmq height {}", bh);
     }
 
     pub unsafe extern "C" fn get_block_height_by_hash_from_context(
@@ -485,11 +469,12 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         //println!("get_masternode_list_by_block_hash_from_cache: {}", h);
         if let Some(list) = data.cache.mn_lists.get(&h) {
-            println!("get_masternode_list_by_block_hash_from_cache: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
+            // println!("get_masternode_list_by_block_hash_from_cache: {}: masternodes: {} quorums: {} mn_merkle_root: {:?}, llmq_merkle_root: {:?}", h, list.masternodes.len(), list.quorums.len(), list.masternode_merkle_root, list.llmq_merkle_root);
             let encoded = list.encode();
             // &encoded as *const types::MasternodeList
             boxed(encoded)
         } else {
+            println!("missing list: {},", h.reversed());
             null_mut()
         }
     }

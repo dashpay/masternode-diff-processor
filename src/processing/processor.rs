@@ -368,7 +368,7 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) -> bool {
         let block_height = self.lookup_block_height_by_hash(block_hash);
-        // println!("//////////// validate_quorum {}: {}: {:?}", block_height, block_hash, quorum);
+        println!("//////////// validate_quorum {}: {} ({}): {:?}", block_height, block_hash, block_hash.reversed(), quorum);
         // java::generate_masternode_list_from_map(&masternodes);
         let valid_masternodes = if quorum.index.is_some() {
             self.get_rotated_masternodes_for_quorum(
@@ -416,9 +416,9 @@ impl MasternodeProcessor {
         //     println!("boolean verified = finalCommitment.verify(storedBlock, nodes, true);");
         //     println!("assertTrue(verified);");
         // });
-        // println!("//////////// validate_quorum {} ////////////////", block_height);
+        println!("//////////// validate_quorum {} ////////////////", block_height);
         // println!("{:#?}", valid_masternodes);
-        // println!("{:#?}", valid_masternodes.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
+        println!("{:#?}", valid_masternodes.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
 
         quorum.verify(valid_masternodes, block_height)
     }
