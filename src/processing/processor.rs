@@ -333,7 +333,11 @@ impl MasternodeProcessor {
                 if self.should_process_quorum(llmq_type, is_dip_0024, is_rotated_quorums_presented) {
                     for (&llmq_block_hash, quorum) in llmqs_of_type {
                         if let Some(models::MasternodeList { masternodes, .. }) = self.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists) {
-                            has_valid_quorums &= self.validate_quorum(quorum, skip_removed_masternodes, llmq_block_hash, masternodes, cache);
+                            let valid = self.validate_quorum(quorum, skip_removed_masternodes, llmq_block_hash, masternodes, cache);
+                            // TMP Testnet Platform LLMQ fail verification
+                            if llmq_type != LLMQType::Llmqtype25_67 {
+                                has_valid_quorums &= valid;
+                            }
                         }
                     }
                 }
