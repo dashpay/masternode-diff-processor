@@ -467,7 +467,7 @@ impl MasternodeProcessor {
                     if let Some(snapshot) = self.find_snapshot(work_block_hash, cached_snapshots) {
                         let mut i: u32 = 0;
                         // println!("/////////////quorum_quarter_members_by_snapshot///////////////////");
-                        // println!("{:?}: {}: {}", llmq_type, work_block_height, work_block_hash.reversed());
+                        println!("{:?}: {:?}: {}: {}", llmq_type, snapshot.skip_list_mode, work_block_height, work_block_hash.reversed());
                         // java::generate_snapshot(&snapshot, work_block_height);
                         // java::generate_llmq_hash(llmq_type, work_block_hash.reversed());
                         // java::generate_masternode_list_from_map(&masternode_list.masternodes);
