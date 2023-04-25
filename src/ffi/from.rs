@@ -276,9 +276,11 @@ impl FromFFI for types::LLMQSnapshot {
     type Item = models::LLMQSnapshot;
 
     unsafe fn decode(&self) -> Self::Item {
+        let member_list = Vec::from_raw_parts(self.member_list, self.member_list_length, self.member_list_length);
+        let skip_list = Vec::from_raw_parts(self.skip_list, self.skip_list_length, self.skip_list_length);
         Self::Item {
-            member_list: slice::from_raw_parts(self.member_list, self.member_list_length).to_vec(),
-            skip_list: slice::from_raw_parts::<i32>(self.skip_list, self.skip_list_length).to_vec(),
+            member_list,
+            skip_list,
             skip_list_mode: self.skip_list_mode,
         }
     }

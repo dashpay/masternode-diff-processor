@@ -285,11 +285,13 @@ impl ToFFI for models::LLMQSnapshot {
     type Item = types::LLMQSnapshot;
 
     fn encode(&self) -> Self::Item {
+        let member_list = Box::into_raw(self.member_list.clone().into_boxed_slice()) as *mut u8;
+        let skip_list = Box::into_raw(self.skip_list.clone().into_boxed_slice()) as *mut i32;
         Self::Item {
             member_list_length: self.member_list.len(),
-            member_list: boxed_vec(self.member_list.clone()),
+            member_list,
             skip_list_length: self.skip_list.len(),
-            skip_list: boxed_vec(self.skip_list.to_vec()),
+            skip_list,
             skip_list_mode: self.skip_list_mode,
         }
     }

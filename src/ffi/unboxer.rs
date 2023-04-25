@@ -172,14 +172,11 @@ pub unsafe fn unbox_llmq_indexed_hash(indexed_hash: *mut types::LLMQIndexedHash)
 /// # Safety
 pub unsafe fn unbox_llmq_snapshot(quorum_snapshot: *mut types::LLMQSnapshot) {
     let result = unbox_any(quorum_snapshot);
-    unbox_any(std::ptr::slice_from_raw_parts_mut::<u8>(
-        result.member_list,
-        result.member_list_length,
-    ));
-    unbox_any(std::ptr::slice_from_raw_parts_mut::<i32>(
-        result.skip_list,
-        result.skip_list_length,
-    ));
+    let member_list = unbox_vec_ptr(result.member_list, result.member_list_length);
+    drop(member_list);
+    let skip_list = unbox_vec_ptr(result.skip_list, result.skip_list_length);
+    drop(skip_list);
+
 }
 
 /// # Safety
