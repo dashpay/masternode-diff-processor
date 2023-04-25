@@ -672,13 +672,19 @@ impl MasternodeProcessor {
     ) -> Vec<Vec<models::MasternodeEntry>> {
         let num_quorums = llmq_params.signing_active_quorum_count as usize;
         let cycle_length = llmq_params.dkg_params.interval;
-        // println!("/////////////////////// rotate_members {}: {} /////////", cycle_quorum_base_block_height, cycle_length);
+        println!("/////////////////////// rotate_members {}: {} /////////", cycle_quorum_base_block_height, cycle_length);
         let quorum_base_block_height = cycle_quorum_base_block_height - cycle_length;
         let prev_q_h_m_c = self.quorum_quarter_members_by_snapshot(llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
+        println!("/////////////////////// prev_q_h_m_c : {} /////////", quorum_base_block_height);
+        println!("{:#?}", prev_q_h_m_c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
         let quorum_base_block_height = cycle_quorum_base_block_height - 2 * cycle_length;
         let prev_q_h_m_2c = self.quorum_quarter_members_by_snapshot(llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
+        println!("/////////////////////// prev_q_h_m_2c : {} /////////", quorum_base_block_height);
+        println!("{:#?}", prev_q_h_m_2c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
         let quorum_base_block_height = cycle_quorum_base_block_height - 3 * cycle_length;
         let prev_q_h_m_3c = self.quorum_quarter_members_by_snapshot(llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
+        println!("/////////////////////// prev_q_h_m_3c : {} /////////", quorum_base_block_height);
+        println!("{:#?}", prev_q_h_m_3c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
 
         let mut rotated_members =
             Vec::<Vec<models::MasternodeEntry>>::with_capacity(num_quorums);
@@ -694,6 +700,9 @@ impl MasternodeProcessor {
             unknown_lists,
             skip_removed_masternodes,
         );
+        println!("/////////////////////// new_quarter_members : {} /////////", cycle_quorum_base_block_height);
+        println!("{:#?}", new_quarter_members.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
+
         (0..num_quorums).for_each(|i| {
             Self::add_quorum_members_from_quarter(&mut rotated_members, &prev_q_h_m_3c, i);
             Self::add_quorum_members_from_quarter(&mut rotated_members, &prev_q_h_m_2c, i);
