@@ -471,7 +471,7 @@ impl MasternodeProcessor {
                     if let Some(snapshot) = self.find_snapshot(work_block_hash, cached_snapshots) {
                         let mut i: u32 = 0;
                         println!("•••• quorum_quarter_members_by_snapshot: {:?}: {:?}: {}: {}", llmq_type, snapshot.skip_list_mode, work_block_height, work_block_hash.reversed());
-                        println!("{:#?}", masternode_list);
+                        // println!("{:#?}", masternode_list);
                         println!("••••");
                         // java::generate_snapshot(&snapshot, work_block_height);
                         // java::generate_llmq_hash(llmq_type, work_block_hash.reversed());
@@ -482,8 +482,8 @@ impl MasternodeProcessor {
                         let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height);
                         // java::generate_masternode_list_from_map(&scored_masternodes);
                         let sorted_scored_masternodes = Self::sort_scored_masternodes(scored_masternodes);
-                        println!("//////////////////sorted_scored_masternodes////////////////////");
-                        println!("{:#?}", sorted_scored_masternodes.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
+                        // println!("//////////////////sorted_scored_masternodes////////////////////");
+                        // println!("{:#?}", sorted_scored_masternodes.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
                         let (used_at_h, unused_at_h) = sorted_scored_masternodes
                             .into_iter()
                             .partition(|_| {
@@ -510,8 +510,8 @@ impl MasternodeProcessor {
                         // println!("{:#?}", sorted_unused_at_h.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
                         let mut sorted_combined_mns_list = sorted_unused_at_h;
                         sorted_combined_mns_list.extend(sorted_used_at_h);
-                        println!("////////////sorted_combined_mns_list////////////////");
-                        println!("{:#?}", sorted_combined_mns_list.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
+                        // println!("////////////sorted_combined_mns_list////////////////");
+                        // println!("{:#?}", sorted_combined_mns_list.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
                         snapshot.apply_skip_strategy(sorted_combined_mns_list, quorum_count, quarter_size)
                     } else {
                         info!("MISSING: snapshot for block at height: {}: {}", work_block_height, work_block_hash);
@@ -550,9 +550,9 @@ impl MasternodeProcessor {
             Some(work_block_hash) => {
                 if let Some(masternode_list) = self.find_masternode_list(work_block_hash, cached_lists, unknown_lists) {
                     //java::generate_masternode_list_from_map(&masternode_list.masternodes);
-                    println!("•••• new_quorum_quarter_members: {:?}: (skip_removed: {}) {}: {}", params.r#type, skip_removed_masternodes, work_block_height, work_block_hash.reversed());
-                    println!("{:#?}", masternode_list);
-                    println!("••••");
+                    // println!("•••• new_quorum_quarter_members: {:?}: (skip_removed: {}) {}: {}", params.r#type, skip_removed_masternodes, work_block_height, work_block_hash.reversed());
+                    // println!("{:#?}", masternode_list);
+                    // println!("••••");
                     if masternode_list.masternodes.len() < quarter_size {
                         println!("models list at {}: {} has less masternodes ({}) then required for quarter size: ({})", work_block_height, work_block_hash, masternode_list.masternodes.len(), quarter_size);
                         quarter_quorum_members
@@ -673,19 +673,19 @@ impl MasternodeProcessor {
     ) -> Vec<Vec<models::MasternodeEntry>> {
         let num_quorums = llmq_params.signing_active_quorum_count as usize;
         let cycle_length = llmq_params.dkg_params.interval;
-        println!("/////////////////////// rotate_members {}: {} /////////", cycle_quorum_base_block_height, cycle_length);
+        // println!("/////////////////////// rotate_members {}: {} /////////", cycle_quorum_base_block_height, cycle_length);
         let quorum_base_block_height = cycle_quorum_base_block_height - cycle_length;
         let prev_q_h_m_c = self.quorum_quarter_members_by_snapshot(llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
-        println!("/////////////////////// prev_q_h_m_c : {} /////////", quorum_base_block_height);
-        println!("{:#?}", prev_q_h_m_c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
+        // println!("/////////////////////// prev_q_h_m_c : {} /////////", quorum_base_block_height);
+        // println!("{:#?}", prev_q_h_m_c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
         let quorum_base_block_height = cycle_quorum_base_block_height - 2 * cycle_length;
         let prev_q_h_m_2c = self.quorum_quarter_members_by_snapshot(llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
-        println!("/////////////////////// prev_q_h_m_2c : {} /////////", quorum_base_block_height);
-        println!("{:#?}", prev_q_h_m_2c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
+        // println!("/////////////////////// prev_q_h_m_2c : {} /////////", quorum_base_block_height);
+        // println!("{:#?}", prev_q_h_m_2c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
         let quorum_base_block_height = cycle_quorum_base_block_height - 3 * cycle_length;
         let prev_q_h_m_3c = self.quorum_quarter_members_by_snapshot(llmq_params, quorum_base_block_height, cached_lists, cached_snapshots, unknown_lists);
-        println!("/////////////////////// prev_q_h_m_3c : {} /////////", quorum_base_block_height);
-        println!("{:#?}", prev_q_h_m_3c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
+        // println!("/////////////////////// prev_q_h_m_3c : {} /////////", quorum_base_block_height);
+        // println!("{:#?}", prev_q_h_m_3c.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
 
         let mut rotated_members =
             Vec::<Vec<models::MasternodeEntry>>::with_capacity(num_quorums);
@@ -701,8 +701,8 @@ impl MasternodeProcessor {
             unknown_lists,
             skip_removed_masternodes,
         );
-        println!("/////////////////////// new_quarter_members : {} /////////", cycle_quorum_base_block_height);
-        println!("{:#?}", new_quarter_members.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
+        // println!("/////////////////////// new_quarter_members : {} /////////", cycle_quorum_base_block_height);
+        // println!("{:#?}", new_quarter_members.iter().map(|p| p.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>()).collect::<Vec<_>>());
 
         (0..num_quorums).for_each(|i| {
             Self::add_quorum_members_from_quarter(&mut rotated_members, &prev_q_h_m_3c, i);
