@@ -181,7 +181,13 @@ pub unsafe extern "C" fn process_qrinfo_from_message(
     boxed(result)
 }
 
-
+/// # Safety
+#[no_mangle]
+pub unsafe extern "C" fn processor_cache_masternode_list(block_hash: *const u8, list: *const types::MasternodeList, cache: *mut MasternodeProcessorCache) {
+    let hash = UInt256::from_const(block_hash).unwrap();
+    let list = (*list).decode();
+    (&mut *cache).mn_lists.insert(hash, list);
+}
 
 // - (BOOL)validateWithMasternodeList:(DSMasternodeList *)masternodeList blockHeightLookup:(BlockHeightFinder)blockHeightLookup;
 /// # Safety

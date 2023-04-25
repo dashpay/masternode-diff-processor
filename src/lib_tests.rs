@@ -401,7 +401,9 @@ pub mod tests {
         let block = data.block_for_hash(block_hash).unwrap_or(&MerkleBlock { hash: UInt256::MIN, height: u32::MAX, merkleroot: UInt256::MIN });
         let height = block.height;
         // println!("get_block_height_by_hash_from_context {}: {} ({})", height, block_hash_reversed, block_hash);
-        //println!("{}: {},", height, block_hash_reversed);
+        if height == u32::MAX {
+            println!("{}: {},", height, block_hash_reversed);
+        }
         height
     }
 
@@ -495,7 +497,7 @@ pub mod tests {
         let data: &mut FFIContext = &mut *(context as *mut FFIContext);
         let masternode_list = *masternode_list;
         let masternode_list_decoded = masternode_list.decode();
-        println!("masternode_list_save_in_cache: {}", h);
+        //println!("masternode_list_save_in_cache: {}", h);
         data.cache.mn_lists.insert(h, masternode_list_decoded);
         true
     }
