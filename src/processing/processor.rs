@@ -471,7 +471,7 @@ impl MasternodeProcessor {
                     if let Some(snapshot) = self.find_snapshot(work_block_hash, cached_snapshots) {
                         let mut i: u32 = 0;
                         println!("•••• quorum_quarter_members_by_snapshot: {:?}: {:?}: {}: {}", llmq_type, snapshot.skip_list_mode, work_block_height, work_block_hash.reversed());
-                        println!("{:?}", masternode_list);
+                        println!("{:#?}", masternode_list);
                         println!("••••");
                         // java::generate_snapshot(&snapshot, work_block_height);
                         // java::generate_llmq_hash(llmq_type, work_block_hash.reversed());
@@ -550,7 +550,7 @@ impl MasternodeProcessor {
                 if let Some(masternode_list) = self.find_masternode_list(work_block_hash, cached_lists, unknown_lists) {
                     //java::generate_masternode_list_from_map(&masternode_list.masternodes);
                     println!("•••• new_quorum_quarter_members: {:?}: (skip_removed: {}) {}: {}", params.r#type, skip_removed_masternodes, work_block_height, work_block_hash.reversed());
-                    println!("{:?}", masternode_list);
+                    println!("{:#?}", masternode_list);
                     println!("••••");
                     if masternode_list.masternodes.len() < quarter_size {
                         println!("models list at {}: {} has less masternodes ({}) then required for quarter size: ({})", work_block_height, work_block_hash, masternode_list.masternodes.len(), quarter_size);
