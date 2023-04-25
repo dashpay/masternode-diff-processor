@@ -477,12 +477,13 @@ impl MasternodeProcessor {
                         // java::generate_llmq_hash(llmq_type, work_block_hash.reversed());
                         // java::generate_masternode_list_from_map(&masternode_list.masternodes);
                         let quorum_modifier = models::LLMQEntry::build_llmq_quorum_hash(llmq_type, work_block_hash);
-                        // println!("quorum_modifier: {}", quorum_modifier);
+                        println!("quorum_modifier: {}", quorum_modifier);
+                        println!("snapshot: {:?}", snapshot);
                         let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height);
                         // java::generate_masternode_list_from_map(&scored_masternodes);
                         let sorted_scored_masternodes = Self::sort_scored_masternodes(scored_masternodes);
-                        // println!("//////////////////sorted_scored_masternodes////////////////////");
-                        // println!("{:#?}", sorted_scored_masternodes.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
+                        println!("//////////////////sorted_scored_masternodes////////////////////");
+                        println!("{:#?}", sorted_scored_masternodes.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
                         let (used_at_h, unused_at_h) = sorted_scored_masternodes
                             .into_iter()
                             .partition(|_| {
@@ -509,8 +510,8 @@ impl MasternodeProcessor {
                         // println!("{:#?}", sorted_unused_at_h.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
                         let mut sorted_combined_mns_list = sorted_unused_at_h;
                         sorted_combined_mns_list.extend(sorted_used_at_h);
-                        // println!("////////////sorted_combined_mns_list////////////////");
-                        //println!("{:#?}", sorted_combined_mns_list.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
+                        println!("////////////sorted_combined_mns_list////////////////");
+                        println!("{:#?}", sorted_combined_mns_list.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
                         snapshot.apply_skip_strategy(sorted_combined_mns_list, quorum_count, quarter_size)
                     } else {
                         info!("MISSING: snapshot for block at height: {}: {}", work_block_height, work_block_hash);
