@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::slice;
+use hashes::hex::ToHex;
 use crate::{common, models, tx, types};
 use crate::consensus::encode;
 use crate::crypto::{byte_util::Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
@@ -280,6 +281,7 @@ impl FromFFI for types::LLMQSnapshot {
         let member_list = slice::from_raw_parts(self.member_list as *const u8, self.member_list_length)
                 .to_vec();
         let skip_list = unbox_vec_ptr(self.skip_list, self.skip_list_length);
+        println!("LLMQSnapshot.decode: {:?}: {}: {:?}", self.skip_list_mode, member_list.to_hex(), skip_list);
         Self::Item {
             member_list,
             skip_list,
