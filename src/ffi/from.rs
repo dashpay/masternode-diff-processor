@@ -4,6 +4,7 @@ use crate::{common, models, tx, types};
 use crate::consensus::encode;
 use crate::crypto::{byte_util::Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::ffi::to::ToFFI;
+use crate::ffi::unboxer::unbox_vec_ptr;
 use crate::tx::transaction;
 
 pub trait FromFFI {
@@ -276,8 +277,9 @@ impl FromFFI for types::LLMQSnapshot {
     type Item = models::LLMQSnapshot;
 
     unsafe fn decode(&self) -> Self::Item {
-        let member_list = Vec::from_raw_parts(self.member_list, self.member_list_length, self.member_list_length);
-        let skip_list = Vec::from_raw_parts(self.skip_list, self.skip_list_length, self.skip_list_length);
+        let member_list = slice::from_raw_parts(self.member_list as *const u8, self.member_list_length)
+                .to_vec();
+        let skip_list = unbox_vec_ptr(self.skip_list, self.skip_list_length);
         Self::Item {
             member_list,
             skip_list,
