@@ -289,7 +289,7 @@ impl ToFFI for models::LLMQSnapshot {
             member_list_length: self.member_list.len(),
             member_list: boxed_vec(self.member_list.clone()),
             skip_list_length: self.skip_list.len(),
-            skip_list: boxed_vec(self.skip_list.to_vec()),
+            skip_list: boxed_vec(self.skip_list.clone()),
             skip_list_mode: self.skip_list_mode,
         }
     }

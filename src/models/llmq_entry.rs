@@ -327,6 +327,7 @@ impl LLMQEntry {
     pub fn validate(&mut self, valid_masternodes: Vec<models::MasternodeEntry>, block_height: u32) -> bool {
         let commitment_hash = self.generate_commitment_hash();
         let use_legacy = self.version.use_bls_legacy();
+
         let operator_keys = valid_masternodes
             .iter()
             .enumerate()
@@ -340,16 +341,19 @@ impl LLMQEntry {
             operator_keys,
             use_legacy);
         if !all_commitment_aggregated_signature_validated {
-            warn!("••• Issue with all_commitment_aggregated_signature_validated: {}", self.all_commitment_aggregated_signature);
+            // warn!("••• Issue with all_commitment_aggregated_signature_validated: {}", self.all_commitment_aggregated_signature);
+            println!("••• Issue with all_commitment_aggregated_signature_validated: {}", self.all_commitment_aggregated_signature);
             return false;
         }
         // The sig must validate against the commitmentHash and all public keys determined by the signers bitvector.
         // This is an aggregated BLS signature verification.
         let quorum_signature_validated = BLSKey::verify_quorum_signature(commitment_hash.as_bytes(), self.threshold_signature.as_bytes(), self.public_key.as_bytes(), use_legacy);
         if !quorum_signature_validated {
-            warn!("••• Issue with quorum_signature_validated");
+            println!("••• Issue with quorum_signature_validated");
+            // warn!("••• Issue with quorum_signature_validated");
             return false;
         }
+        println!("••• quorum {:?} validated at {}", self.llmq_type, block_height);
         true
     }
 }

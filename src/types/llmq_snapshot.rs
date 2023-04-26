@@ -17,15 +17,6 @@ pub struct LLMQSnapshot {
     //  Mode of the skip list
     pub skip_list_mode: LLMQSnapshotSkipMode,
 }
-impl std::fmt::Debug for LLMQSnapshot {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LLMQSnapshot")
-            .field("member_list", &self.member_list)
-            .field("skip_list", &self.skip_list)
-            .field("skip_list_mode", &self.skip_list_mode)
-            .finish()
-    }
-}
 
 impl_bytes_decodable!(LLMQSnapshot);
 
@@ -51,21 +42,5 @@ impl<'a> TryRead<'a, Endian> for LLMQSnapshot {
             },
             *offset,
         ))
-    }
-}
-
-impl LLMQSnapshot {
-    pub fn from_data(
-        member_list: Vec<u8>,
-        skip_list: Vec<i32>,
-        skip_list_mode: LLMQSnapshotSkipMode,
-    ) -> Self {
-        Self {
-            member_list_length: member_list.len(),
-            member_list: boxed_vec(member_list),
-            skip_list_length: skip_list.len(),
-            skip_list: boxed_vec(skip_list),
-            skip_list_mode,
-        }
     }
 }

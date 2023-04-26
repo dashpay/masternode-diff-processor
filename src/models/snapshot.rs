@@ -49,20 +49,18 @@ impl<'a> TryRead<'a, Endian> for LLMQSnapshot {
         for _i in 0..skip_list_length {
             skip_list.push(bytes.read_with::<i32>(offset, LE)?);
         }
-        // println!("snapshot ---> skip {:?}", skip_list_mode);
-        // println!("snapshot ---> skip {:?}", member_list.to_hex());
-        // println!("snapshot ---> skip {:?}", skip_list);
         let snapshot = Self {
             member_list: member_list.to_vec(),
             skip_list,
             skip_list_mode,
         };
         // java::generate_snapshot_from_bytes(&bytes[..*offset]);
-        // println!("read_snapshot: {}", bytes[..*offset].to_hex());
         // println!("snapshot: {:?}", snapshot);
         // (0..member_list_length).into_iter().for_each(|i| {
         //     println!("{},", snapshot.member_is_true_at_index(i as u32));
         // });
+        // println!("read_llmqsnapshot: bytes: {}", bytes[..*offset].to_hex());
+        // println!("read_llmqsnapshot: result: {:?}", snapshot);
         Ok((snapshot, *offset))
     }
 }

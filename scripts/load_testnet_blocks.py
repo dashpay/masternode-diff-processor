@@ -26,11 +26,11 @@ for i in range(root, head):
     block_hash = block["hash"]
     block_height  = block["height"]
     merkle_root = block["merkleroot"]
-    print('store.put(new StoredBlock(new Block(params, {}, '
-          'Sha256Hash.wrap(Sha256Hash.wrap("{}").getReversedBytes()), '
-          'Sha256Hash.wrap("{}"), {}, {}, {}, new ArrayList<>()), new BigInteger(Hex.decode("{}")), {}));'
-          .format(block["version"], block["previousblockhash"], merkle_root, block["time"], 0, block["nonce"], block["chainwork"], block_height))
-
+    # print('store.put(new StoredBlock(new Block(params, {}, '
+    #       'Sha256Hash.wrap(Sha256Hash.wrap("{}").getReversedBytes()), '
+    #       'Sha256Hash.wrap("{}"), {}, {}, {}, new ArrayList<>()), new BigInteger(Hex.decode("{}")), {}));'
+    #       .format(block["version"], block["previousblockhash"], merkle_root, block["time"], 0, block["nonce"], block["chainwork"], block_height))
+    print('MerkleBlock::reversed({}, "{}", "{}"), '.format(block_height, block_hash, merkle_root))
     blocks.append(block)
 
 # print('{}'.format(blocks))
