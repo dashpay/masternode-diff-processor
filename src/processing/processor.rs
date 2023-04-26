@@ -332,6 +332,9 @@ impl MasternodeProcessor {
             for (&llmq_type, llmqs_of_type) in &mut added_quorums {
                 if self.should_process_quorum(llmq_type, is_dip_0024, is_rotated_quorums_presented) {
                     for (&llmq_block_hash, quorum) in llmqs_of_type {
+                        // if llmq_type == LLMQType::Llmqtype60_75 {
+                        //     println!("//////////// validate_quorum -> {:?}: {}: {}", llmq_type, self.lookup_block_height_by_hash(llmq_block_hash), llmq_block_hash.reversed());
+                        // }
                         if let Some(models::MasternodeList { masternodes, .. }) = self.find_masternode_list(llmq_block_hash, &cache.mn_lists, &mut cache.needed_masternode_lists) {
                             let valid = self.validate_quorum(quorum, skip_removed_masternodes, llmq_block_hash, masternodes, cache);
                             // TMP Testnet Platform LLMQ fail verification
@@ -368,9 +371,9 @@ impl MasternodeProcessor {
         cache: &mut MasternodeProcessorCache,
     ) -> bool {
         let block_height = self.lookup_block_height_by_hash(block_hash);
-        if quorum.llmq_type == LLMQType::Llmqtype60_75 {
-            println!("//////////// validate_quorum {:?}: {}: {} ({}): {:?}", quorum.llmq_type, block_height, block_hash, block_hash.reversed(), quorum);
-        }
+        // if quorum.llmq_type == LLMQType::Llmqtype60_75 {
+        //     println!("//////////// validate_quorum {:?}: {}: {} ({}): {:?}", quorum.llmq_type, block_height, block_hash, block_hash.reversed(), quorum);
+        // }
         // java::generate_masternode_list_from_map(&masternodes);
         let valid_masternodes = if quorum.index.is_some() {
             self.get_rotated_masternodes_for_quorum(
@@ -418,11 +421,11 @@ impl MasternodeProcessor {
         //     println!("boolean verified = finalCommitment.verify(storedBlock, nodes, true);");
         //     println!("assertTrue(verified);");
         // });
-        if quorum.llmq_type == LLMQType::Llmqtype60_75 {
-            println!("//////////// validate_quorum {} ////////////////", block_height);
-            // println!("{:#?}", valid_masternodes);
-            println!("{:#?}", valid_masternodes.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
-        }
+        // if quorum.llmq_type == LLMQType::Llmqtype60_75 {
+        //     println!("//////////// validate_quorum {} ////////////////", block_height);
+        //     // println!("{:#?}", valid_masternodes);
+        //     println!("{:#?}", valid_masternodes.iter().map(|n| n.provider_registration_transaction_hash.reversed()).collect::<Vec<_>>());
+        // }
 
         quorum.verify(valid_masternodes, block_height)
     }
@@ -470,15 +473,15 @@ impl MasternodeProcessor {
                 if let Some(masternode_list) = self.find_masternode_list(work_block_hash, cached_lists, unknown_lists) {
                     if let Some(snapshot) = self.find_snapshot(work_block_hash, cached_snapshots) {
                         let mut i: u32 = 0;
-                        println!("•••• quorum_quarter_members_by_snapshot: {:?}: {:?}: {}: {}", llmq_type, snapshot.skip_list_mode, work_block_height, work_block_hash.reversed());
+                        // println!("•••• quorum_quarter_members_by_snapshot: {:?}: {:?}: {}: {}", llmq_type, snapshot.skip_list_mode, work_block_height, work_block_hash.reversed());
                         // println!("{:#?}", masternode_list);
-                        println!("••••");
+                        // println!("••••");
                         // java::generate_snapshot(&snapshot, work_block_height);
                         // java::generate_llmq_hash(llmq_type, work_block_hash.reversed());
                         // java::generate_masternode_list_from_map(&masternode_list.masternodes);
                         let quorum_modifier = models::LLMQEntry::build_llmq_quorum_hash(llmq_type, work_block_hash);
-                        println!("quorum_modifier: {}", quorum_modifier);
-                        println!("snapshot: {:?}", snapshot);
+                        // println!("quorum_modifier: {}", quorum_modifier);
+                        // println!("snapshot: {:?}", snapshot);
                         let scored_masternodes = models::MasternodeList::score_masternodes_map(masternode_list.masternodes, quorum_modifier, work_block_height);
                         // java::generate_masternode_list_from_map(&scored_masternodes);
                         let sorted_scored_masternodes = Self::sort_scored_masternodes(scored_masternodes);
@@ -525,10 +528,10 @@ impl MasternodeProcessor {
         }
     }
 
-    fn log_masternodes(vec: &Vec<models::MasternodeEntry>, prefix: String) {
-        info!("{}", prefix);
-        vec.iter().for_each(|m| info!("{:?}", m.provider_registration_transaction_hash));
-    }
+    // fn log_masternodes(vec: &Vec<models::MasternodeEntry>, prefix: String) {
+    //     info!("{}", prefix);
+    //     vec.iter().for_each(|m| info!("{:?}", m.provider_registration_transaction_hash.reversed()));
+    // }
 
     // Determine quorum members at new index
     pub fn new_quorum_quarter_members(
@@ -852,7 +855,7 @@ impl MasternodeProcessor {
 
     pub fn should_process_quorum(&self, llmq_type: LLMQType, is_dip_0024: bool, is_rotated_quorums_presented: bool) -> bool {
         // TODO: what we really wants here for platform quorum type?
-        if self.chain_type.isd_llmq_type() == llmq_type /*|| self.chain_type.platform_type() == llmq_type*/ {
+        if self.chain_type.isd_llmq_type() == llmq_type {
             is_dip_0024 && is_rotated_quorums_presented
         } else if is_dip_0024 { /*skip old quorums here for now*/
             false

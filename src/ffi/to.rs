@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
-use hashes::hex::ToHex;
 use crate::{common, models, tx, types};
 use crate::crypto::UInt256;
 use crate::ffi::boxer::{boxed, boxed_vec};
@@ -286,7 +285,6 @@ impl ToFFI for models::LLMQSnapshot {
     type Item = types::LLMQSnapshot;
 
     fn encode(&self) -> Self::Item {
-        println!("LLMQSnapshot.encode: {:?}: {}: {:?}", self.skip_list_mode, self.member_list.to_hex(), self.skip_list);
         Self::Item {
             member_list_length: self.member_list.len(),
             member_list: boxed_vec(self.member_list.clone()),

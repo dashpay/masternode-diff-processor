@@ -476,7 +476,7 @@ pub mod tests {
             // &encoded as *const types::MasternodeList
             boxed(encoded)
         } else {
-            println!("missing list: {},", h.reversed());
+            println!("missing list: {}: {},", get_block_height_by_hash_from_context(block_hash, context), h.reversed());
             null_mut()
         }
     }

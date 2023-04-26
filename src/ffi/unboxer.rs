@@ -176,7 +176,6 @@ pub unsafe fn unbox_llmq_snapshot(quorum_snapshot: *mut types::LLMQSnapshot) {
     drop(member_list);
     let skip_list = unbox_vec_ptr(result.skip_list, result.skip_list_length);
     drop(skip_list);
-
 }
 
 /// # Safety
