@@ -257,11 +257,8 @@ pub fn create_devnet_params_for_type(r#type: DevnetType) -> Params {
         dpns_contract_id: "",
         dashpay_contract_id: "",
         minimum_difficulty_blocks: match r#type {
-            DevnetType::Chacha => 1000000,
-            DevnetType::Devnet333 => 1000000,
             DevnetType::JackDaniels => 4032,
-            DevnetType::Mojito => 1000000,
-            DevnetType::WhiteRussian => 1000000,
+            _ => 1000000,
         },
         standard_dapi_jrpc_port: 3000,
         // script_map: ScriptMap::TESTNET,
