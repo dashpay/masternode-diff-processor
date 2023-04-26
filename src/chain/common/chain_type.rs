@@ -53,6 +53,9 @@ pub enum DevnetType {
     #[default]
     Mojito = 3,
     WhiteRussian = 4,
+    MiningTest = 5,
+    Mobile2 = 6,
+    Zero = 7,
 }
 
 impl From<DevnetType> for ChainType {
@@ -78,6 +81,9 @@ impl From<i16> for DevnetType {
             2 => DevnetType::Chacha,
             3 => DevnetType::Mojito,
             4 => DevnetType::WhiteRussian,
+            5 => DevnetType::MiningTest,
+            6 => DevnetType::Mobile2,
+            7 => DevnetType::Zero,
             _ => DevnetType::JackDaniels,
         }
     }
@@ -91,6 +97,9 @@ impl From<DevnetType> for i16 {
             DevnetType::Chacha => 2,
             DevnetType::Mojito => 3,
             DevnetType::WhiteRussian => 4,
+            DevnetType::MiningTest => 5,
+            DevnetType::Mobile2 => 6,
+            DevnetType::Zero => 7,
         }
     }
 }
@@ -103,6 +112,9 @@ impl From<&str> for DevnetType {
             "chacha" => DevnetType::Chacha,
             "mojito" => DevnetType::Mojito,
             "white-russian" => DevnetType::WhiteRussian,
+            "miningTest" => DevnetType::MiningTest,
+            "mobile-2" => DevnetType::Mobile2,
+            "0" => DevnetType::Zero,
             _ => panic!("Devnet with name: {} not supported", value)
         }
     }
@@ -117,6 +129,9 @@ impl DevnetType {
             DevnetType::Chacha => "chacha".to_string(),
             DevnetType::Mojito => "mojito".to_string(),
             DevnetType::WhiteRussian => "white-russian".to_string(),
+            DevnetType::MiningTest => "miningTest".to_string(),
+            DevnetType::Mobile2 => "mobile-2".to_string(),
+            DevnetType::Zero => "0".to_string(),
         }
     }
 
@@ -393,15 +408,13 @@ impl ChainType {
                     DevnetType::Chacha => Some("cPTms6Sd7QuhPWXWQSzMbvg2VbEPsWCsLBbR4PBgvfYRzAPazbt3".to_string()),
                     DevnetType::Devnet333 => Some("cQnP9JNQp6oaZrvBtqBWRMeQERMkDyuXyvQh1qaph4FdP6cT2cVa".to_string()),
                     DevnetType::JackDaniels => Some("cTeGz53m7kHgA9L75s4vqFGR89FjYz4D9o44eHfoKjJr2ArbEtwg".to_string()),
-                    DevnetType::Mojito => Some("".to_string()),
-                    DevnetType::WhiteRussian => Some("".to_string())
+                    _ => Some("".to_string())
                 },
                 address: match devnet {
                     DevnetType::Chacha => "ybiRzdGWFeijAgR7a8TJafeNi6Yk6h68ps".to_string(),
                     DevnetType::Devnet333 => "yM6zJAMWoouAZxPvqGDbuHb6BJaD6k4raQ".to_string(),
                     DevnetType::JackDaniels => "yYBanbwp2Pp2kYWqDkjvckY3MosuZzkKp7".to_string(),
-                    DevnetType::Mojito => "".to_string(),
-                    DevnetType::WhiteRussian => "".to_string(),
+                    _ => "".to_string(),
                 }
             }
         }
