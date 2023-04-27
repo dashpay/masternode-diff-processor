@@ -113,7 +113,7 @@ impl From<&str> for DevnetType {
             "mojito" => DevnetType::Mojito,
             "white-russian" => DevnetType::WhiteRussian,
             "miningTest" => DevnetType::MiningTest,
-            "mobile-2" => DevnetType::Mobile2,
+            "devnet-mobile-2" => DevnetType::Mobile2,
             "0" => DevnetType::Zero,
             _ => panic!("Devnet with name: {} not supported", value)
         }
@@ -130,7 +130,7 @@ impl DevnetType {
             DevnetType::Mojito => "mojito".to_string(),
             DevnetType::WhiteRussian => "white-russian".to_string(),
             DevnetType::MiningTest => "miningTest".to_string(),
-            DevnetType::Mobile2 => "mobile-2".to_string(),
+            DevnetType::Mobile2 => "devnet-mobile-2".to_string(),
             DevnetType::Zero => "0".to_string(),
         }
     }

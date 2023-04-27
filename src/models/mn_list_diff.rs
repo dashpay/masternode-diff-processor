@@ -41,10 +41,7 @@ impl std::fmt::Debug for MNListDiff {
             .field("merkle_flags_count", &self.merkle_flags.len())
             .field("coinbase_transaction", &self.coinbase_transaction)
             .field("deleted_masternode_hashes", &self.deleted_masternode_hashes)
-            .field(
-                "added_or_modified_masternodes",
-                &self.added_or_modified_masternodes,
-            )
+            .field("added_or_modified_masternodes", &self.added_or_modified_masternodes)
             .field("deleted_quorums", &self.deleted_quorums)
             .field("added_quorums", &self.added_quorums)
             .field("base_block_height", &self.base_block_height)
