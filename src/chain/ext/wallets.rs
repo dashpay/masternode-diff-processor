@@ -112,10 +112,6 @@ impl WalletCreation for Arc<RwLock<Chain>> {
     }
 
     fn wallet_with_seed_phrase<L: Language>(&self, seed_phrase: &str, is_transient: bool, created_at: u64, chain_type: ChainType) {
-        // chain_type.seed_for_seed_phrase::<L>(seed_phrase)
-        //     .and_then(|seed| Keychain::save_seed_phrase(seed_phrase, created_at, seed.unique_id_as_str()).ok()
-        //         .map(|()| self.wallet_with_seed(seed, is_transient, chain_type)))
-
         match chain_type.seed_for_seed_phrase::<L>(seed_phrase) {
             Some(seed) => match Keychain::save_seed_phrase(seed_phrase, created_at, seed.unique_id_as_str()) {
                 Ok(()) => self.wallet_with_seed(seed, is_transient, chain_type),
@@ -125,6 +121,7 @@ impl WalletCreation for Arc<RwLock<Chain>> {
         }
     }
 
+    // TODO: register transient wallets?
     // registering wallet in chain allows to adjust bloom filter to
     // receiving wallet-related info like transactions etc
     fn register_wallet(&mut self, wallet: Arc<RwLock<Wallet>>) {
