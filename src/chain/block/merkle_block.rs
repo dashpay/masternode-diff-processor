@@ -2,15 +2,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use byte::{BytesExt, TryRead};
 use crate::chain::block::{Block, BLOCK_UNKNOWN_HEIGHT, IBlock, Kind};
-use crate::chain::Chain;
-use crate::chain::chain_lock::ChainLock;
-use crate::chain::checkpoint::Checkpoint;
+use crate::chain::{Chain, ChainLock, Checkpoint};
 use crate::chain::common::ChainType;
 use crate::common::MerkleTree;
-use crate::consensus::Encodable;
-use crate::crypto::byte_util::Zeroable;
-use crate::encode::VarInt;
-use crate::UInt256;
+use crate::consensus::{Encodable, encode::VarInt};
+use crate::crypto::{byte_util::Zeroable, UInt256};
 use crate::util::Shared;
 
 #[derive(Clone, Debug, Default)]

@@ -1,6 +1,5 @@
 use hashes::hex::FromHex;
-use crate::crypto::byte_util::Reversable;
-use crate::UInt256;
+use crate::crypto::{byte_util::Reversable, UInt256};
 
 /// blockchain checkpoints - these are also used as starting points for partial chain downloads,
 /// so they need to be at difficulty transition boundaries in order to verify the block

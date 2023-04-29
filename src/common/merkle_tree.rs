@@ -162,8 +162,6 @@ pub struct MerkleTree<'a> {
     pub flags: &'a [u8],
 }
 
-
-
 impl<'a> MerkleTree<'a> {
 
     pub fn has_root(&self, desired_merkle_root: UInt256) -> bool {
@@ -188,14 +186,9 @@ impl<'a> MerkleTree<'a> {
             |hash, _flag| hash,
             |left, right| {
                 let mut buffer: Vec<u8> = Vec::with_capacity(64);
-                left.consensus_encode(&mut buffer).unwrap();
-                right
-                    .unwrap_or(left)
-                    .consensus_encode(&mut buffer)
-                    .unwrap();
-                let hash = sha256d::Hash::hash(&buffer);
-                let value = hash.into_inner();
-                Some(UInt256(value))
+                left.enc(&mut buffer);
+                right.unwrap_or(left).enc(&mut buffer);
+                Some(UInt256::sha256d(buffer))
             },
         )
     }

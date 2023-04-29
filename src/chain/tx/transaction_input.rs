@@ -1,6 +1,7 @@
 use byte::{BytesExt, LE, TryRead};
 use byte::ctx::Endian;
 use hashes::hex::ToHex;
+use crate::chain::common::DevnetType;
 use crate::crypto::{UInt256, VarBytes};
 use crate::crypto::byte_util::BytesDecodable;
 use crate::crypto::utxo::UTXO;
@@ -62,10 +63,10 @@ impl<'a> TryRead<'a, Endian> for TransactionInput {
 }
 
 impl TransactionInput {
-    pub fn coinbase(identifier: &String, version: u16, protocol_version: u32) -> Self {
+    pub fn coinbase(devnet_type: DevnetType, protocol_version: u32) -> Self {
         TransactionInput {
             index: u32::MAX,
-            signature: Some(Vec::<u8>::devnet_genesis_coinbase_message(identifier, version, protocol_version)),
+            signature: Some(Vec::<u8>::devnet_genesis_coinbase_message(devnet_type, protocol_version)),
             sequence: u32::MAX,
             ..Default::default()
         }

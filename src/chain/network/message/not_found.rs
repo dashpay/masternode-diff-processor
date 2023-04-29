@@ -2,8 +2,8 @@ use std::net::SocketAddr;
 use byte::{BytesExt, TryRead};
 use crate::chain::network::InvType;
 use crate::chain::network::message::inv_hash::InvHash;
-use crate::encode::VarInt;
-use crate::UInt256;
+use crate::consensus::encode::VarInt;
+use crate::crypto::UInt256;
 
 #[derive(Clone, Debug, Default)]
 pub struct NotFound {

@@ -1,7 +1,7 @@
 use crate::chain::{Chain, Wallet};
 use crate::chain::tx::ITransaction;
 use crate::chain::wallet::Account;
-use crate::UInt256;
+use crate::crypto::UInt256;
 use crate::util::Shared;
 
 pub trait Accounts {

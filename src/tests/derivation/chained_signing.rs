@@ -1,14 +1,13 @@
 use std::sync::Weak;
 use crate::chain::common::ChainType;
+use crate::chain::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
+use crate::chain::derivation::protocol::IDerivationPath;
+use crate::chain::derivation::simple_indexed_derivation_path::ISimpleIndexedDerivationPath;
 use crate::chain::ext::wallets::WalletCreation;
 use crate::chains_manager::ChainsManager;
 use crate::crypto::byte_util::{AsBytes, Random};
-use crate::crypto::UInt512;
-use crate::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
-use crate::derivation::protocol::IDerivationPath;
-use crate::derivation::simple_indexed_derivation_path::ISimpleIndexedDerivationPath;
+use crate::crypto::{UInt256, UInt512};
 use crate::keys::{BLSKey, CryptoData, Key};
-use crate::UInt256;
 
 const SEED_PHRASE: &str = "upper renew that grow pelican pave subway relief describe enforce suit hedgehog blossom dose swallow";
 

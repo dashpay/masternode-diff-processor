@@ -1,26 +1,27 @@
 use std::sync::Weak;
 use std::time::SystemTime;
+use std::vec;
 use base64::{alphabet, Engine};
 use base64::engine::{GeneralPurpose, GeneralPurposeConfig};
 use bls_signatures::bip32::ExtendedPrivateKey;
 use hashes::hex::{FromHex, ToHex};
-use crate::UInt256;
-use crate::chain::bip::dip14::{derive_child_private_key, derive_child_private_key_256, derive_child_public_key, derive_child_public_key_256};
+// use crate::chain::bip::dip14::{derive_child_private_key, derive_child_private_key_256, derive_child_public_key, derive_child_public_key_256};
 use crate::chain::common::ChainType;
 use crate::chain::ext::wallets::WalletCreation;
 use crate::chain::wallet::seed::Seed;
 use crate::chains_manager::ChainsManager;
 use crate::crypto::byte_util::AsBytes;
-use crate::crypto::{ECPoint, UInt512};
-use crate::derivation::BIP32_HARD;
-use crate::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
-use crate::derivation::derivation_path::DerivationPath;
-use crate::derivation::derivation_path_reference::DerivationPathReference;
-use crate::derivation::derivation_path_type::DerivationPathType;
-use crate::derivation::incoming_funds_derivation_path::IncomingFundsDerivationPath;
-use crate::derivation::index_path::{IIndexPath, IndexPath};
-use crate::derivation::protocol::IDerivationPath;
-use crate::keys::{BLSKey, CryptoData, ECDSAKey, IKey, Key, KeyType};
+use crate::crypto::{ECPoint, UInt256, UInt512};
+use crate::chain::derivation::BIP32_HARD;
+use crate::chain::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
+use crate::chain::derivation::derivation_path::DerivationPath;
+use crate::chain::derivation::derivation_path_reference::DerivationPathReference;
+use crate::chain::derivation::derivation_path_type::DerivationPathType;
+use crate::chain::derivation::incoming_funds_derivation_path::IncomingFundsDerivationPath;
+use crate::chain::derivation::index_path::{IIndexPath, IndexPath};
+use crate::chain::derivation::protocol::IDerivationPath;
+use crate::keys::{BLSKey, CryptoData, ECDSAKey, IKey, Key, KeyKind};
+use crate::keys::dip14::IChildKeyDerivation;
 use crate::util::{base58, TimeUtil};
 
 #[test]
@@ -51,7 +52,7 @@ fn test_bls_derivation() {
     let chain_type = ChainType::MainNet;
     let seed_data = [1u8, 50, 6, 244, 24, 199, 1, 25].to_vec();
     let mut key_pair = BLSKey::extended_private_key_with_seed_data(&seed_data, true).unwrap();
-    let chain_code = key_pair.chain_code;
+    let chain_code = key_pair.chaincode;
     assert_eq!(chain_code.0.to_hex(), "d8b12555b4cc5578951e4a7c80031e22019cc0dce168b3ed88115311b8feb1e3", "Testing BLS derivation chain code");
     let derivation_path_indexes1 = vec![UInt256::from(77u64)];
     let hardened1 = vec![true];
@@ -59,13 +60,13 @@ fn test_bls_derivation() {
         derivation_path_indexes1,
         hardened1,
         DerivationPathType::ClearFunds,
-        KeyType::BLS,
+        KeyKind::BLS,
         DerivationPathReference::Unknown,
         chain_type,
         Weak::new()
     );
     let key_pair1 = key_pair.private_derive_to_path(&derivation_path1.base_index_path()).unwrap();
-    let chain_code1 = key_pair1.chain_code;
+    let chain_code1 = key_pair1.chaincode;
     assert_eq!(chain_code1.0.to_hex(), "f2c8e4269bb3e54f8179a5c6976d92ca14c3260dd729981e9d15f53049fd698b", "Testing BLS private child derivation returning chain code");
     assert_eq!(key_pair1.public_key_fingerprint(), 0xa8063dcf, "Testing BLS extended private child public key fingerprint");
 
@@ -75,7 +76,7 @@ fn test_bls_derivation() {
         derivation_path_indexes2,
         hardened2,
         DerivationPathType::ClearFunds,
-        KeyType::BLS,
+        KeyKind::BLS,
         DerivationPathReference::Unknown,
         chain_type,
         Weak::new()
@@ -135,7 +136,7 @@ fn test_bip32_serializations_basic() {
         indexes_root,
         hardened_root,
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -166,7 +167,7 @@ fn test_bip32_serializations_basic() {
         vec![UInt256::from(0u64), UInt256::from(1u64)],
         vec![true, false],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -185,7 +186,7 @@ fn test_bip32_serializations_basic() {
         vec![UInt256::from(0u64), UInt256::from(1u64), UInt256::from(2u64)],
         vec![true, false, true],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
 
@@ -205,7 +206,7 @@ fn test_bip32_serializations_basic() {
         vec![UInt256::from(0u64), UInt256::from(1u64), UInt256::from(2u64), UInt256::from(2u64)],
         vec![true, false, true, false],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -223,7 +224,7 @@ fn test_bip32_serializations_basic() {
         vec![UInt256::from(0u64), UInt256::from(1u64), UInt256::from(2u64), UInt256::from(2u64), UInt256::from(1000000000u64)],
         vec![true, false, true, false, false],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -252,7 +253,7 @@ fn test_bip32_serializations_advanced() {
         vec![],
         vec![],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -270,7 +271,7 @@ fn test_bip32_serializations_advanced() {
         vec![UInt256::from(0u64)],
         vec![false],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -288,7 +289,7 @@ fn test_bip32_serializations_advanced() {
         vec![UInt256::from(0u64), UInt256::from(2147483647u64)],
         vec![false, true],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -306,7 +307,7 @@ fn test_bip32_serializations_advanced() {
         vec![UInt256::from(0u64), UInt256::from(2147483647u64), UInt256::from(1u64)],
         vec![false, true, false],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -324,7 +325,7 @@ fn test_bip32_serializations_advanced() {
         vec![UInt256::from(0u64), UInt256::from(2147483647u64), UInt256::from(1u64), UInt256::from(2147483646u64)],
         vec![false, true, false, true],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -342,7 +343,7 @@ fn test_bip32_serializations_advanced() {
         vec![UInt256::from(0u64), UInt256::from(2147483647u64), UInt256::from(1u64), UInt256::from(2147483646u64), UInt256::from(2u64)],
         vec![false, true, false, true, false],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -371,7 +372,7 @@ fn test_bip32_serializations_leading_zeroes() {
         vec![],
         vec![],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -389,7 +390,7 @@ fn test_bip32_serializations_leading_zeroes() {
         vec![UInt256::from(0u64)],
         vec![true],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Root,
         chain_type,
         Weak::new());
@@ -509,15 +510,11 @@ fn test_31_bit_derivation() {
     let mut child_chain = chain.clone();
     let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
     let parent_public_key = parent_secret.public_key_data();
-    let derivation = 0u32;
-    // let mut private_key_data = UInt512::from(secret, chain);
-    // let mut secret = sec
-    derive_child_private_key(&mut secret, &mut chain, derivation);
-    // let child_secret = secret.clone();
-    // chain = UInt256(clone_into_array(&private_key_data.0[32..]));
+    let index_path = IndexPath::index_path_with_index(0u32);
+    ECDSAKey::derive_child_private_key(&mut secret, &mut chain, &index_path, 0);
     let public_key = ECDSAKey::key_with_secret(&secret, true).unwrap().public_key_data();
     let mut pubkey = ECPoint::from(&parent_public_key);
-    derive_child_public_key(&mut pubkey, &mut child_chain, 0);
+    ECDSAKey::derive_child_public_key(&mut pubkey, &mut child_chain, &index_path, 0);
     assert_eq!(chain, child_chain, "the bip32 chains must match");
     assert_eq!(&public_key, pubkey.as_bytes(), "the public keys must match");
 }
@@ -533,14 +530,11 @@ fn test_31_bit_compatibility_mode_derivation() {
     let mut child_chain = chain.clone();
     let parent_secret = ECDSAKey::key_with_secret(&secret, true).unwrap();
     let parent_public_key = parent_secret.public_key_data();
-    // let mut private_key_data = UInt512::from(secret, chain);
-    let derivation = UInt256::MIN;
-    derive_child_private_key_256(&mut secret, &mut chain, derivation.clone(), false);
-    // let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
-    // chain = UInt256(clone_into_array(&private_key_data.0[32..]));
+    let index_path = IndexPath::new_hardened(vec![UInt256::MIN], vec![false]);
+    ECDSAKey::derive_child_private_key(&mut secret, &mut chain, &index_path, 0);
     let public_key = ECDSAKey::key_with_secret(&secret, true).unwrap().public_key_data();
     let mut pubkey = ECPoint::from(&parent_public_key);
-    derive_child_public_key_256(&mut pubkey, &mut child_chain, derivation, false);
+    ECDSAKey::derive_child_public_key(&mut pubkey, &mut child_chain, &index_path, 0);
     assert_eq!(chain, child_chain, "the bip32 chains must match");
     assert_eq!(&public_key, pubkey.as_bytes(), "the public keys must match");
 }
@@ -589,12 +583,11 @@ fn test_256_bit_derivation() {
     let parent_public_key = parent_secret.public_key_data();
     let derivation = UInt256::from([5, 12, 15, 1337]);
     // let mut private_key_data = UInt512::from(secret, chain);
-    derive_child_private_key_256(&mut secret, &mut chain, derivation.clone(), false);
-    // let child_secret = UInt256(clone_into_array(&private_key_data.0[..32]));
-    // chain = UInt256(clone_into_array(&private_key_data.0[32..]));
+    let index_path = IndexPath::new_hardened(vec![derivation], vec![false]);
+    ECDSAKey::derive_child_private_key(&mut secret, &mut chain, &index_path, 0);
     let public_key = ECDSAKey::key_with_secret(&secret, true).unwrap().public_key_data();
     let mut pubkey = ECPoint::from(&parent_public_key);
-    derive_child_public_key_256(&mut pubkey, &mut child_chain, derivation, false);
+    ECDSAKey::derive_child_public_key(&mut pubkey, &mut child_chain, &index_path, 0);
     assert_eq!(chain, child_chain, "the bip32 chains must match");
     assert_eq!(&public_key, pubkey.as_bytes(), "the public keys must match");
     assert_eq!(derivation, UInt256::from_hex("05000000000000000c000000000000000f000000000000003905000000000000").unwrap(), "derivation must match the correct value");
@@ -650,7 +643,8 @@ fn test_base64_extended_public_key_size() {
     let private_key_bls = path_bls.private_key_at_index(0, &seed).unwrap();
     let mut pubkey_data_bls = ext_pubkey_from_master_contact_path.extended_public_key_data().unwrap();
     println!("pubkey_data_bls: {}", pubkey_data_bls.to_hex());
-    pubkey_data_bls.encrypt_with_secret_key(&private_key_bls, &Key::BLS(bob_keypair_bls));
+    <Vec<u8> as CryptoData<Key>>::encrypt_with_secret_key(&mut pubkey_data_bls, &private_key_bls, &Key::BLS(bob_keypair_bls));
+    // pubkey_data_bls.encrypt_with_secret_key(&private_key_bls, &Key::BLS(bob_keypair_bls));
     println!("pubkey_data_bls (encrypted): {}", pubkey_data_bls.to_hex());
     // assert_eq!(base64_engine.encode(pubkey_data_bls).len(), 128, "The size of the base64 should be 128");
     assert_eq!(base64_engine.encode(pubkey_data_bls).len(), 92, "The size of the base64 should be 92");
@@ -661,7 +655,8 @@ fn test_base64_extended_public_key_size() {
     let private_key_ecdsa = path_ecdsa.private_key_at_index(0, &seed).unwrap();
     let mut pubkey_data_ecdsa = ext_pubkey_from_master_contact_path.extended_public_key_data().unwrap();
     println!("pubkey_data_ecdsa: {}", pubkey_data_ecdsa.to_hex());
-    pubkey_data_ecdsa.encrypt_with_secret_key(&private_key_ecdsa, &Key::ECDSA(bob_keypair_ecdsa));
+    <Vec<u8> as CryptoData<Key>>::encrypt_with_secret_key(&mut pubkey_data_ecdsa, &private_key_ecdsa, &Key::ECDSA(bob_keypair_ecdsa));
+    // pubkey_data_ecdsa.encrypt_with_secret_key(&private_key_ecdsa, &Key::ECDSA(bob_keypair_ecdsa));
     println!("pubkey_data_ecdsa (encrypted): {}", pubkey_data_ecdsa.to_hex());
     // assert_eq!(base64_engine.encode(pubkey_data_ecdsa).len(), 128, "The size of the base64 should be 128");
     assert_eq!(base64_engine.encode(pubkey_data_ecdsa).len(), 92, "The size of the base64 should be 128");

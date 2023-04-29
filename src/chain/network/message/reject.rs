@@ -1,8 +1,7 @@
 use byte::{BytesExt, TryRead};
 use byte::ctx::{NULL, Str};
 use crate::chain::network::MessageType;
-use crate::crypto::byte_util::Zeroable;
-use crate::UInt256;
+use crate::crypto::{byte_util::Zeroable, UInt256};
 
 #[derive(Clone, Debug, Default)]
 pub struct Reject {

@@ -190,7 +190,7 @@ impl InstantSendLock {
                 match quorum.upgrade() {
                     Some(quorum) => {
                         if quorum.verified {
-                            self.signature_verified = self.verify_signature_against_quorum(quorum.public_key, quorum.llmq_hash, quorum.use_legacy_bls_scheme());
+                            self.signature_verified = self.verify_signature_against_quorum(quorum.public_key, quorum.llmq_hash, quorum.version.use_bls_legacy());
                             println!("verifying IS signature with offset {}: {}", offset, self.signature_verified);
                             if self.signature_verified {
                                 self.intended_quorum = Some(Arc::downgrade(&quorum));

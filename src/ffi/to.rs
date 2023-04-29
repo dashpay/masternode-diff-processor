@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
 use std::ptr::null_mut;
+use crate::{common, models, tx, types};
+use crate::chain::common::LLMQType;
+use crate::crypto::UInt256;
 use crate::ffi::boxer::{boxed, boxed_vec};
 use crate::ffi::from::FromFFI;
-use crate::{chain, common, models, tx, types, UInt256};
 
 pub trait ToFFI {
     type Item: FromFFI;
@@ -12,12 +14,14 @@ impl ToFFI for tx::TransactionInput {
     type Item = types::TransactionInput;
 
     fn encode(&self) -> Self::Item {
-        let (script, script_length) = self.script.clone().map_or((null_mut(), 0), |data| (boxed_vec(data.clone()), data.len()));
-        let (signature, signature_length) = self.signature.clone().map_or((null_mut(), 0), |data| (boxed_vec(data.clone()), data.len()));
-        // let (signature, signature_length) = match &self.signature {
-        //     Some(data) => (boxed_vec(data.clone()), data.len()),
-        //     None => (null_mut(), 0),
-        // };
+        let (script, script_length) = match &self.script {
+            Some(data) => (boxed_vec(data.clone()), data.len()),
+            None => (null_mut(), 0),
+        };
+        let (signature, signature_length) = match &self.signature {
+            Some(data) => (boxed_vec(data.clone()), data.len()),
+            None => (null_mut(), 0),
+        };
         Self::Item {
             input_hash: boxed(self.input_hash.0),
             index: self.index,
@@ -73,7 +77,11 @@ impl ToFFI for tx::Transaction {
             outputs_count: self.outputs.len(),
             lock_time: self.lock_time,
             version: self.version,
-            tx_hash: self.tx_hash.map_or(null_mut(), |hash| boxed(hash.0)),
+            tx_hash: if self.tx_hash.is_none() {
+                null_mut()
+            } else {
+                boxed(self.tx_hash.unwrap().0)
+            },
             tx_type: self.tx_type,
             payload_offset: self.payload_offset,
             block_height: self.block_height,
@@ -89,7 +97,11 @@ impl ToFFI for tx::CoinbaseTransaction {
             coinbase_transaction_version: self.coinbase_transaction_version,
             height: self.height,
             merkle_root_mn_list: boxed(self.merkle_root_mn_list.0),
-            merkle_root_llmq_list: self.merkle_root_llmq_list.map_or(null_mut(), |hash| boxed(hash.0)),
+            merkle_root_llmq_list: if self.merkle_root_llmq_list.is_none() {
+                null_mut()
+            } else {
+                boxed(self.merkle_root_llmq_list.unwrap().0)
+            },
             locked_amount: self.locked_amount
         }
     }
@@ -102,8 +114,16 @@ impl ToFFI for models::MasternodeList {
         Self::Item {
             block_hash: boxed(self.block_hash.0),
             known_height: self.known_height,
-            masternode_merkle_root: self.masternode_merkle_root.map_or(null_mut(), |hash| boxed(hash.0)),
-            llmq_merkle_root: self.llmq_merkle_root.map_or(null_mut(), |hash| boxed(hash.0)),
+            masternode_merkle_root: if self.masternode_merkle_root.is_none() {
+                null_mut()
+            } else {
+                boxed(self.masternode_merkle_root.unwrap().0)
+            },
+            llmq_merkle_root: if self.llmq_merkle_root.is_none() {
+                null_mut()
+            } else {
+                boxed(self.llmq_merkle_root.unwrap().0)
+            },
             masternodes: encode_masternodes_map(&self.masternodes),
             masternodes_count: self.masternodes.len(),
             llmq_type_maps: encode_quorums_map(&self.quorums),
@@ -120,8 +140,18 @@ impl ToFFI for models::MasternodeEntry {
         let previous_entry_hashes_count = self.previous_entry_hashes.len();
         let previous_validity_count = self.previous_validity.len();
         let confirmed_hash = boxed(self.confirmed_hash.0);
-        let confirmed_hash_hashed_with_provider_registration_transaction_hash = self
-            .confirmed_hash_hashed_with_provider_registration_transaction_hash.map_or(null_mut(), |hash| boxed(hash.0));
+        let confirmed_hash_hashed_with_provider_registration_transaction_hash = if self
+            .confirmed_hash_hashed_with_provider_registration_transaction_hash
+            .is_none()
+        {
+            null_mut()
+        } else {
+            boxed(
+                self.confirmed_hash_hashed_with_provider_registration_transaction_hash
+                    .unwrap()
+                    .0,
+            )
+        };
         let key_id_voting = boxed(self.key_id_voting.0);
         let known_confirmed_at_height = self.known_confirmed_at_height.unwrap_or(0);
         let entry_hash = boxed(self.entry_hash.0);
@@ -175,6 +205,9 @@ impl ToFFI for models::MasternodeEntry {
         let port = self.socket_address.port;
         let is_valid = self.is_valid;
         let update_height = self.update_height;
+        let mn_type: u16 = self.mn_type.into();
+        let platform_http_port = self.platform_http_port;
+        let platform_node_id = boxed(self.platform_node_id.0);
         Self::Item {
             confirmed_hash,
             confirmed_hash_hashed_with_provider_registration_transaction_hash,
@@ -193,6 +226,9 @@ impl ToFFI for models::MasternodeEntry {
             ip_address,
             port,
             update_height,
+            mn_type,
+            platform_http_port,
+            platform_node_id
         }
     }
 }
@@ -202,7 +238,11 @@ impl ToFFI for models::LLMQEntry {
 
     fn encode(&self) -> Self::Item {
         let all_commitment_aggregated_signature = boxed(self.all_commitment_aggregated_signature.0);
-        let commitment_hash = self.commitment_hash.map_or(null_mut(), |hash| boxed(hash.0));
+        let commitment_hash = if self.commitment_hash.is_none() {
+            null_mut()
+        } else {
+            boxed(self.commitment_hash.unwrap().0)
+        };
         let llmq_type = self.llmq_type;
         let entry_hash = boxed(self.entry_hash.0);
         let llmq_hash = boxed(self.llmq_hash.0);
@@ -250,7 +290,7 @@ impl ToFFI for models::LLMQSnapshot {
             member_list_length: self.member_list.len(),
             member_list: boxed_vec(self.member_list.clone()),
             skip_list_length: self.skip_list.len(),
-            skip_list: boxed_vec(self.skip_list.to_vec()),
+            skip_list: boxed_vec(self.skip_list.clone()),
             skip_list_mode: self.skip_list_mode,
         }
     }
@@ -276,7 +316,7 @@ impl ToFFI for common::Block {
 }
 
 pub fn encode_quorums_map(
-    quorums: &BTreeMap<chain::common::LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
+    quorums: &BTreeMap<LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
 ) -> *mut *mut types::LLMQMap {
     boxed_vec(
         quorums

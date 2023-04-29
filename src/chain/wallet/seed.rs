@@ -1,9 +1,8 @@
 use hashes::{Hash, sha256};
 use hashes::hex::ToHex;
 use crate::consensus::Encodable;
-use crate::crypto::UInt512;
+use crate::crypto::{UInt256, UInt512};
 use crate::keys::ECDSAKey;
-use crate::UInt256;
 use crate::util::data_ops::short_hex_string_from;
 
 #[derive(Clone, Debug)]

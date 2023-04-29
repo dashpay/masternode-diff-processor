@@ -55,28 +55,11 @@ impl Data for Vec<u8> {
 
 
 /// Extracts the common values in `a` and `b` into a new set.
-pub fn inplace_intersection<T>(a: &mut HashSet<T>, b: &mut HashSet<T>) -> HashSet<T>
-    where
-        T: std::hash::Hash,
-        T: Eq,
-{
-    let x: HashSet<(T, bool)> = a
-        .drain()
-        .map(|v| {
-            let intersects = b.contains(&v);
-            (v, intersects)
-        })
-        .collect();
-    let mut c = HashSet::new();
-    for (v, is_inter) in x {
-        if is_inter {
-            c.insert(v);
-        } else {
-            a.insert(v);
-        }
-    }
-    b.retain(|v| !c.contains(v));
-    c
+#[inline]
+pub fn inplace_intersection<T>(a: &mut HashSet<T>, b: &HashSet<T>) -> HashSet<T> where T: Hash + Eq + Clone {
+    let intersection: HashSet<T> = a.iter().filter(|v| b.contains(v)).cloned().collect();
+    a.retain(|v| !b.contains(v));
+    intersection
 }
 
 pub fn extract_new_and_unique<T>(a: Vec<T>, b: Vec<T>) -> (Vec<T>, Vec<T>) where T: Clone + Eq + Hash {

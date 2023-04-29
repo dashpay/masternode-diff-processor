@@ -3,7 +3,7 @@ use crate::chain::block::MerkleBlock;
 use crate::chain::{Chain, ChainLock, tx, Wallet};
 use crate::chain::network::Peer;
 use crate::chain::tx::{InstantSendLock, ITransaction, TransactionDirection};
-use crate::UInt256;
+use crate::crypto::UInt256;
 use crate::util::Shared;
 
 pub trait PeerTransactionDelegate {

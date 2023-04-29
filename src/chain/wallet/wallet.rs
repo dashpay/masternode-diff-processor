@@ -8,13 +8,14 @@ use crate::chain::wallet::ext::constants::{BIP39_CREATION_TIME, BIP39_WALLET_UNK
 use crate::chain::wallet::seed::Seed;
 use crate::platform::identity::identity::Identity;
 use crate::storage::keychain::Keychain;
-use crate::{default_shared, UInt256, util};
+use crate::{default_shared, util};
 use crate::chain::Chain;
 use crate::chain::common::chain_type::IHaveChainSettings;
 use crate::chain::common::ChainType;
+use crate::chain::derivation::derivation_path::DerivationPath;
+use crate::chain::derivation::funds_derivation_path::FundsDerivationPath;
 use crate::chain::ext::auth::Authentication;
-use crate::derivation::derivation_path::DerivationPath;
-use crate::derivation::funds_derivation_path::FundsDerivationPath;
+use crate::crypto::UInt256;
 use crate::environment::Environment;
 use crate::storage::manager::managed_context::ManagedContext;
 use crate::util::shared::{Shareable, Shared};

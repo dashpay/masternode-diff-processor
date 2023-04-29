@@ -8,10 +8,11 @@ use crate::consensus::encode::VarInt;
 use crate::crypto::{UInt160, UInt256, UInt384, VarBytes};
 use crate::crypto::byte_util::Zeroable;
 use crate::keys::ecdsa_key::ECDSAKey;
+use crate::util::address::address;
 // use crate::storage::manager::managed_context::ManagedContext;
 // use crate::storage::models::chain::chain::ChainEntity;
 // use crate::storage::models::tx::transaction::NewTransactionEntity;
-use crate::util::{Address, Shared};
+use crate::util::Shared;
 
 #[derive(Clone, Debug, Default)]
 pub struct ProviderUpdateRegistrarTransaction {
@@ -174,7 +175,7 @@ impl ProviderUpdateRegistrarTransaction {
 
     pub fn sign_payload_with_key(&mut self, private_key: &ECDSAKey) {
         // ATTENTION If this ever changes from ECDSA, change the max signature size defined above
-        self.payload_signature = private_key.compact_sign(self.payload_hash());
+        self.payload_signature = private_key.compact_sign(self.payload_hash()).to_vec();
     }
 
     pub fn base_payload_data(&self) -> Vec<u8> {
@@ -192,16 +193,16 @@ impl ProviderUpdateRegistrarTransaction {
 
 
     pub fn payout_address(&mut self) -> Option<String> {
-        Address::with_script_pub_key(&self.script_payout, &self.chain_type().script_map())
+        address::with_script_pub_key(&self.script_payout, &self.chain_type().script_map())
         // Address::with_script_pub_key(&self.script_payout, &self.provider_registration_transaction.unwrap().with(|tx| tx.chain_type().script_map()))
     }
 
     pub fn operator_address(&self) -> Option<String> {
-        Some(Address::with_public_key_data(&self.operator_key.0.to_vec(), &self.chain_type().script_map()))
+        Some(address::with_public_key_data(&self.operator_key.0.to_vec(), &self.chain_type().script_map()))
     }
 
     pub fn voting_address(&self) -> Option<String> {
-        Some(Address::from_hash160_for_script_map(&self.voting_key_hash, &self.chain_type().script_map()))
+        Some(address::from_hash160_for_script_map(&self.voting_key_hash, &self.chain_type().script_map()))
     }
 
     pub fn update_inputs_hash(&mut self) {

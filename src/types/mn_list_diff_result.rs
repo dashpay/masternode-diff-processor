@@ -1,10 +1,11 @@
 use crate::types;
 use std::ptr::null_mut;
+use crate::processing::ProcessingError;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct MNListDiffResult {
-    pub error_status: u8,
+    pub error_status: ProcessingError,
     pub base_block_hash: *mut [u8; 32],
     pub block_hash: *mut [u8; 32],
     pub has_found_coinbase: bool,       //1 byte
@@ -23,7 +24,7 @@ pub struct MNListDiffResult {
     pub needed_masternode_lists_count: usize,
 }
 impl MNListDiffResult {
-    pub fn default_with_error(error: u8) -> Self {
+    pub fn default_with_error(error: ProcessingError) -> Self {
         Self { error_status: error, ..Default::default() }
     }
 }
@@ -31,7 +32,7 @@ impl MNListDiffResult {
 impl Default for MNListDiffResult {
     fn default() -> Self {
         MNListDiffResult {
-            error_status: 0,
+            error_status: ProcessingError::None,
             base_block_hash: null_mut(),
             block_hash: null_mut(),
             has_found_coinbase: false,

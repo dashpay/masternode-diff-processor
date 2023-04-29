@@ -2,7 +2,7 @@ use byte::ctx::Endian;
 use byte::{BytesExt, TryRead};
 use crate::chain::network::InvType;
 use crate::consensus::Encodable;
-use crate::UInt256;
+use crate::crypto::UInt256;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct InvHash {

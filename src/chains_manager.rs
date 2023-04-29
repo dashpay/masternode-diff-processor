@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use reachability_manager_rs::ReachabilityManager;
+// use reachability_manager_rs::ReachabilityManager;
 use crate::chain::Chain;
 use crate::chain::common::chain_type::DevnetType;
 use crate::chain::common::ChainType;
@@ -22,7 +22,7 @@ pub struct ChainsManager {
     // pub devnet_chains: Arc<Vec<RwLock<Chain>>>,
     pub environment: Environment,
     pub authentication_manager: AuthenticationManager,
-    pub reachability_manager: ReachabilityManager,
+    // pub reachability_manager: ReachabilityManager,
 
 }
 default_shared!(Vec<Chain>);
@@ -35,7 +35,7 @@ impl ChainsManager {
             devnet_chains: HashMap::new(),
             environment: Environment::new(Language::English),
             authentication_manager: AuthenticationManager::default(),
-            reachability_manager: ReachabilityManager::new(),
+            // reachability_manager: ReachabilityManager::new(),
         }
     }
     pub fn new_shared() -> Shared<Self> {

@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 use std::slice;
-use crate::{chain, common, encode, models, tx, types};
-use crate::crypto::{UInt128, UInt160, UInt256, UInt384, UInt768};
-use crate::crypto::byte_util::Reversable;
+use crate::{common, models, tx, types};
+use crate::chain::common::LLMQType;
+use crate::consensus::encode;
+use crate::crypto::{byte_util::Reversable, UInt128, UInt160, UInt256, UInt384, UInt768};
 use crate::ffi::to::ToFFI;
 use crate::tx::transaction;
 
@@ -121,10 +122,7 @@ impl FromFFI for types::MasternodeList {
                 BTreeMap::new(),
                 |mut acc, i| {
                     let value = (*(*self.masternodes.add(i))).decode();
-                    let key = value
-                        .provider_registration_transaction_hash
-                        .clone()
-                        .reversed();
+                    let key = value.provider_registration_transaction_hash.reversed();
                     acc.insert(key, value);
                     acc
                 },
@@ -133,7 +131,7 @@ impl FromFFI for types::MasternodeList {
                 BTreeMap::new(),
                 |mut acc, i| {
                     let llmq_map = *(*self.llmq_type_maps.add(i));
-                    let key = chain::common::LLMQType::from(llmq_map.llmq_type);
+                    let key = LLMQType::from(llmq_map.llmq_type);
                     let value: BTreeMap<UInt256, models::LLMQEntry> = (0..llmq_map.count)
                         .into_iter()
                         .fold(BTreeMap::new(), |mut acc, j| {
@@ -225,14 +223,14 @@ impl FromFFI for types::MasternodeEntry {
                     acc
                 },
             ),
-            known_confirmed_at_height: if self.known_confirmed_at_height > 0 {
-                Some(self.known_confirmed_at_height)
-            } else {
-                None
-            },
+            known_confirmed_at_height: (self.known_confirmed_at_height > 0)
+                .then_some(self.known_confirmed_at_height),
             update_height: self.update_height,
             key_id_voting: UInt160(*self.key_id_voting),
             is_valid: self.is_valid,
+            mn_type: self.mn_type.into(),
+            platform_http_port: self.platform_http_port,
+            platform_node_id: UInt160(*self.platform_node_id),
             entry_hash: UInt256(*self.entry_hash),
         }
     }
@@ -279,9 +277,11 @@ impl FromFFI for types::LLMQSnapshot {
     type Item = models::LLMQSnapshot;
 
     unsafe fn decode(&self) -> Self::Item {
+        let member_list = slice::from_raw_parts(self.member_list as *const u8, self.member_list_length).to_vec();
+        let skip_list = slice::from_raw_parts(self.skip_list as *const i32, self.skip_list_length).to_vec();
         Self::Item {
-            member_list: slice::from_raw_parts(self.member_list, self.member_list_length).to_vec(),
-            skip_list: slice::from_raw_parts::<i32>(self.skip_list, self.skip_list_length).to_vec(),
+            member_list,
+            skip_list,
             skip_list_mode: self.skip_list_mode,
         }
     }

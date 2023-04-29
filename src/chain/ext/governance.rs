@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use crate::chain::{Chain, governance};
 use crate::chain::governance::{Object, Vote};
 use crate::chain::network::{GovernanceRequestState, Peer};
-use crate::UInt256;
+use crate::crypto::UInt256;
 use crate::util::Shared;
 
 pub trait PeerGovernanceDelegate: Send + Sync + Debug + Default where Self: Sized {

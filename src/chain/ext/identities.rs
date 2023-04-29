@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use crate::chain::Chain;
+use crate::crypto::UInt256;
 use crate::platform::identity::identity::Identity;
-use crate::UInt256;
 
 pub trait Identities {
     fn identity_for_unique_id_in_wallet_including_foreign_identites(&self, unique_id: UInt256, include_foreign_blockchain_identities: bool) -> Option<Identity>;

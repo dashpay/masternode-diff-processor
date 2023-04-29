@@ -3,11 +3,10 @@ use byte::{BytesExt, TryRead};
 use crate::chain::network::InvType;
 use crate::chain::network::message::inv_hash::InvHash;
 use crate::chain::network::peer::MAX_GETDATA_HASHES;
-use crate::crypto::byte_util::Zeroable;
-use crate::encode::VarInt;
+use crate::consensus::encode::VarInt;
+use crate::crypto::{byte_util::Zeroable, UInt256};
 use crate::network::p2p::state::PeerState;
 use crate::network::p2p::state_flags::PeerStateFlags;
-use crate::UInt256;
 
 #[derive(Clone, Debug)]
 pub struct Inventory {

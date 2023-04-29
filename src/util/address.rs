@@ -8,6 +8,7 @@ pub mod address {
     use crate::util::base58;
     use crate::util::data_append::DataAppend;
     use crate::util::script::ScriptElement;
+    use crate::util::sec_vec::SecVec;
 
     pub fn from_hash160_for_script_map(hash: &UInt160, map: &ScriptMap) -> String {
         let mut writer: Vec<u8> = Vec::new();
@@ -18,14 +19,15 @@ pub mod address {
         base58::encode_slice(&writer)
     }
 
-    pub fn with_public_key_data(data: &Vec<u8>, map: &ScriptMap) -> String {
+    pub fn with_public_key_data(data: &[u8], map: &ScriptMap) -> String {
         // TODO: SecAllocate SecureRandom
         // NSMutableData *d = [NSMutableData secureDataWithCapacity:160 / 8 + 1];
         // let d = SecureBox::new(160 / 8 + 1);
-        let mut d = Vec::<u8>::new();
-        map.pubkey.enc(&mut d);
-        UInt160::hash160(data).enc(&mut d);
-        base58::check_encode_slice(&d)
+        let mut writer = SecVec::with_capacity(21);
+        // let mut d = Vec::<u8>::new();
+        map.pubkey.enc(&mut writer);
+        UInt160::hash160(data).enc(&mut writer);
+        base58::check_encode_slice(&writer)
     }
 
 
@@ -66,17 +68,17 @@ pub mod address {
 
     }
 
-    pub fn is_valid_dash_address_for_script_map(address: &String, map: &ScriptMap) -> bool {
+    pub fn is_valid_dash_address_for_script_map(address: &str, map: &ScriptMap) -> bool {
         if address.len() > 35 {
             return false;
         }
-        match base58::from_check(address.as_str()) {
+        match base58::from_check(address) {
             Ok(d) if d.len() == 21 => d[0] == map.pubkey || d[0] == map.script,
             _ => false
         }
     }
 
-    pub fn is_valid_dash_devnet_address(address: &String) -> bool {
+    pub fn is_valid_dash_devnet_address(address: &str) -> bool {
         is_valid_dash_address_for_script_map(address, &ScriptMap::TESTNET)
     }
 

@@ -3,8 +3,7 @@ use hashes::hex::FromHex;
 use crate::chain::block::{IBlock, merkle_block, MerkleBlock};
 use crate::chain::common::ChainType;
 use crate::chains_manager::ChainsManager;
-use crate::crypto::byte_util::Reversable;
-use crate::UInt256;
+use crate::crypto::{byte_util::Reversable, UInt256};
 use crate::util::Shared;
 
 #[test]

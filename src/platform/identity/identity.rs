@@ -1,4 +1,4 @@
-use crate::UInt256;
+use crate::crypto::UInt256;
 
 #[derive(Clone, Debug, Default, Eq)]
 pub struct Identity {

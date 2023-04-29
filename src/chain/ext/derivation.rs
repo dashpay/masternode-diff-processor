@@ -2,11 +2,11 @@ use std::sync::{Arc, RwLock, Weak};
 use crate::chain::{Chain, Wallet};
 use crate::chain::common::chain_type::IHaveChainSettings;
 use crate::chain::common::ChainType;
+use crate::chain::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
+use crate::chain::derivation::credit_funding_derivation_path::CreditFundingDerivationPath;
+use crate::chain::derivation::masternode_holdings_derivation_path::MasternodeHoldingsDerivationPath;
+use crate::chain::derivation::protocol::IDerivationPath;
 use crate::chain::wallet::seed::Seed;
-use crate::derivation::authentication_keys_derivation_path::AuthenticationKeysDerivationPath;
-use crate::derivation::credit_funding_derivation_path::CreditFundingDerivationPath;
-use crate::derivation::masternode_holdings_derivation_path::MasternodeHoldingsDerivationPath;
-use crate::derivation::protocol::IDerivationPath;
 use crate::storage::manager::managed_context::ManagedContext;
 
 pub trait Derivation {

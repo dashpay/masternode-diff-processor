@@ -2,7 +2,7 @@ use secp256k1::Scalar;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::{AsBytes, clone_into_array};
 use crate::crypto::{ECPoint, UInt256, UInt512};
-use crate::derivation::BIP32_HARD;
+use crate::chain::derivation::BIP32_HARD;
 
 // multiplies secp256k1 generator by 256bit big endian int i and
 // adds the result to ec-point self returns it on success

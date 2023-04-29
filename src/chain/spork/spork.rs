@@ -9,7 +9,7 @@ use crate::consensus::encode::VarInt;
 use crate::crypto::UInt256;
 use crate::keys::ecdsa_key::ECDSAKey;
 use crate::keys::IKey;
-use crate::util::Address;
+use crate::util::address::address;
 
 #[derive(Clone, Debug, Default)]
 pub struct Spork {
@@ -104,7 +104,7 @@ impl Spork {
         } else {
             let message_digest = self.calculate_spork_hash();
             let msg_public_key = ECDSAKey::init_with_compact_sig(signature, message_digest).unwrap();
-            let spork_address = Address::with_public_key_data(&msg_public_key.public_key_data(), &self.chain_type.script_map());
+            let spork_address = address::with_public_key_data(&msg_public_key.public_key_data(), &self.chain_type.script_map());
             self.address() == spork_address.as_str() || (is_updated_signatures && self.check_signature_70208_method(signature))
         }
     }

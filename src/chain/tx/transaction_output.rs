@@ -5,7 +5,7 @@ use crate::chain::ScriptMap;
 use crate::crypto::byte_util::BytesDecodable;
 use crate::crypto::VarBytes;
 use crate::impl_bytes_decodable;
-use crate::util::Address;
+use crate::util::address::address;
 
 #[derive(Clone, Default, PartialEq)]
 pub struct TransactionOutput {
@@ -69,7 +69,7 @@ impl TransactionOutput {
     }
 
     pub fn from_script(amount: u64, script: Vec<u8>, script_map: &ScriptMap) -> Self {
-        Self::new(amount, Some(script.clone()), Address::with_script_pub_key(&script, script_map))
+        Self::new(amount, Some(script.clone()), address::with_script_pub_key(&script, script_map))
     }
 }
 

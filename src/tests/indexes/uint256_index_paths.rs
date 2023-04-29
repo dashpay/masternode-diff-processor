@@ -1,8 +1,7 @@
 use std::cmp::Ordering;
-use crate::crypto::byte_util::Random;
-use crate::derivation::index_path::IIndexPath;
-use crate::derivation::uint256_index_path::UInt256IndexPath;
-use crate::UInt256;
+use crate::crypto::{byte_util::Random, UInt256};
+use crate::chain::derivation::{IIndexPath};
+use crate::chain::derivation::uint256_index_path::UInt256IndexPath;
 
 
 fn generate_random_indexes_for_length(length: usize) -> Vec<UInt256> {

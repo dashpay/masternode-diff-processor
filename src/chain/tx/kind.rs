@@ -10,9 +10,9 @@ use crate::chain::tx::provider_update_revocation_transaction::ProviderUpdateRevo
 use crate::chain::tx::provider_update_service_transaction::ProviderUpdateServiceTransaction;
 use crate::chain::tx::quorum_commitment_transaction::QuorumCommitmentTransaction;
 use crate::chain::tx::transaction::Transaction;
+use crate::crypto::UInt256;
 use crate::network::p2p::state::PeerState;
 use crate::network::p2p::state_flags::PeerStateFlags;
-use crate::UInt256;
 use crate::util::Shared;
 
 #[derive(Clone, Debug)]

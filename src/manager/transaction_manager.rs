@@ -3,8 +3,9 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use crate::chain::{Chain, tx};
 use crate::chain::network::{BloomFilter, Peer};
-use crate::{UInt256, util};
 use crate::chain::common::ChainType;
+use crate::crypto::UInt256;
+use crate::util;
 use crate::util::Shared;
 
 pub trait PublishCallback: Fn(util::Error) + Send + Sync {}
@@ -15,7 +16,7 @@ pub struct TransactionManager {
     pub chain: Shared<Chain>,
     pub chain_type: ChainType,
     published_tx: HashMap<UInt256, tx::Kind>,
-    published_callback: HashMap<UInt256, Arc<dyn PublishCallback>>,
+    published_callback: HashMap<UInt256, Arc<dyn PublishCallback<Output=()>>>,
 
 }
 impl Debug for TransactionManager {

@@ -1,5 +1,5 @@
+use crate::chain::derivation;
 use crate::chain::Wallet;
-use crate::derivation;
 
 pub trait Constants {
     fn extended_private_key_location_string(&self) -> String;

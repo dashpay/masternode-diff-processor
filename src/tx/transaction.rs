@@ -1,7 +1,6 @@
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, LE};
 use hashes::hex::ToHex;
-use hashes::{sha256d, Hash};
 use crate::consensus::encode::VarInt;
 use crate::consensus::Encodable;
 use crate::crypto::{UInt256, VarBytes};
@@ -320,11 +319,7 @@ impl<'a> TryRead<'a, Endian> for Transaction {
             payload_offset: *offset,
             block_height: TX_UNCONFIRMED as u32,
         };
-        tx.tx_hash = if tx_type == TransactionType::Classic {
-            Some(UInt256(sha256d::Hash::hash(&tx.to_data()).into_inner()))
-        } else {
-            None
-        };
+        tx.tx_hash = (tx_type == TransactionType::Classic).then_some(UInt256::sha256d(tx.to_data()));
         Ok((tx, *offset))
     }
 }

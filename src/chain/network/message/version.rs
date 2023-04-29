@@ -2,8 +2,8 @@ use std::io::Read;
 use byte::ctx::Str;
 use byte::{BytesExt, TryRead};
 use crate::chain::common::ChainType;
+use crate::consensus::encode::{Decodable, Error, ReadExt, VarInt};
 use crate::crypto::UInt128;
-use crate::encode::{Decodable, Error, ReadExt, VarInt};
 use crate::manager::peer_manager::{SERVICES_NODE_BLOOM, SERVICES_NODE_NETWORK};
 
 #[derive(Clone, Debug, Default)]

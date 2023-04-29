@@ -4,28 +4,28 @@ use crate::chain::common::ChainType;
 use crate::crypto::byte_util::Reversable;
 use crate::crypto::UInt256;
 
-pub const DUFFS: u64 = 100000000;
-pub const MAX_MONEY: u64 = 21000000 * DUFFS;
+pub(crate) const DUFFS: u64 = 100000000;
+pub(crate) const MAX_MONEY: u64 = 21000000 * DUFFS;
 /// standard tx fee per b of tx size
-pub const TX_FEE_PER_B: u64 = 1;
+pub(crate) const TX_FEE_PER_B: u64 = 1;
 /// standard ix fee per input
-pub const TX_FEE_PER_INPUT: u64 = 10000;
+pub(crate) const TX_FEE_PER_INPUT: u64 = 10000;
 /// estimated size for a typical transaction output
-pub const TX_OUTPUT_SIZE: u64 = 34;
+pub(crate) const TX_OUTPUT_SIZE: u64 = 34;
 /// estimated size for a typical compact pubkey transaction input
-pub const TX_INPUT_SIZE: u64 = 148;
+pub(crate) const TX_INPUT_SIZE: u64 = 148;
 /// no txout can be below this amount
-pub const TX_MIN_OUTPUT_AMOUNT: u64 = TX_FEE_PER_B * 3 * (TX_OUTPUT_SIZE + TX_INPUT_SIZE);
+pub(crate) const TX_MIN_OUTPUT_AMOUNT: u64 = TX_FEE_PER_B * 3 * (TX_OUTPUT_SIZE + TX_INPUT_SIZE);
 /// no tx can be larger than this size in bytes
-pub const TX_MAX_SIZE: u64 = 100000;
+pub(crate) const TX_MAX_SIZE: u64 = 100000;
 /// block height indicating transaction is unconfirmed
 pub const TX_UNCONFIRMED: i32 = i32::MAX;
 
-pub const DEFAULT_FEE_PER_B: u64 = TX_FEE_PER_B;
+pub(crate) const DEFAULT_FEE_PER_B: u64 = TX_FEE_PER_B;
 /// minimum relay fee on a 191byte tx
-pub const MIN_FEE_PER_B: u64 = TX_FEE_PER_B;
+pub(crate) const MIN_FEE_PER_B: u64 = TX_FEE_PER_B;
 /// slightly higher than a 1000bit fee on a 191byte tx
-pub const MAX_FEE_PER_B: u64 = 1000;
+pub(crate) const MAX_FEE_PER_B: u64 = 1000;
 
 pub const DASH_PRIVKEY: u8 = 204;
 pub const DASH_PRIVKEY_TEST: u8 = 239;
@@ -59,6 +59,12 @@ pub struct ScriptMap {
     pub pubkey: u8,
     // DASH_SCRIPT_ADDRESS | DASH_SCRIPT_ADDRESS_TEST
     pub script: u8,
+}
+
+impl From<i16> for ScriptMap {
+    fn from(value: i16) -> Self {
+        ChainType::from(value).script_map()
+    }
 }
 
 impl ScriptMap {
@@ -251,10 +257,8 @@ pub fn create_devnet_params_for_type(r#type: DevnetType) -> Params {
         dpns_contract_id: "",
         dashpay_contract_id: "",
         minimum_difficulty_blocks: match r#type {
-            DevnetType::Chacha => 1000000,
-            DevnetType::Devnet333 => 1000000,
             DevnetType::JackDaniels => 4032,
-            DevnetType::Mojito => 1000000,
+            _ => 1000000,
         },
         standard_dapi_jrpc_port: 3000,
         // script_map: ScriptMap::TESTNET,
@@ -265,7 +269,7 @@ pub fn create_devnet_params_for_type(r#type: DevnetType) -> Params {
 
 impl Params {
     pub fn max_proof_of_work(&self) -> UInt256 {
-        UInt256::from_hex(self.max_proof_of_work).unwrap().reversed()
+        UInt256::from_hex(self.max_proof_of_work).unwrap().reverse()
     }
 
     /// Contract Parameters

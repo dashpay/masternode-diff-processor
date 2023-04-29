@@ -11,7 +11,8 @@ use crate::consensus::encode::VarInt;
 use crate::crypto::byte_util::{Reversable, Zeroable};
 use crate::crypto::UTXO;
 use crate::keys::ecdsa_key::ECDSAKey;
-use crate::util::{Address, Shared};
+use crate::util::address::address;
+use crate::util::Shared;
 
 pub const MASTERNODE_COST: u64 = 100000000000;
 
@@ -271,11 +272,11 @@ impl ProviderRegistrationTransaction {
     }
 
     pub fn owner_address(&self) -> String {
-        Address::from_hash160_for_script_map(&self.owner_key_hash, &self.chain_type().script_map())
+        address::from_hash160_for_script_map(&self.owner_key_hash, &self.chain_type().script_map())
     }
 
     pub fn operator_address(&self) -> String {
-        Address::with_public_key_data(&self.operator_key.0.to_vec(), &self.chain_type().script_map())
+        address::with_public_key_data(&self.operator_key.0.to_vec(), &self.chain_type().script_map())
     }
 
     pub fn operator_key_string(&self) -> String {
@@ -283,7 +284,7 @@ impl ProviderRegistrationTransaction {
     }
 
     pub fn voting_address(&self) -> String {
-        Address::from_hash160_for_script_map(&self.voting_key_hash, &self.chain_type().script_map())
+        address::from_hash160_for_script_map(&self.voting_key_hash, &self.chain_type().script_map())
     }
 
     pub fn holding_address(&self) -> Option<String> {
@@ -293,7 +294,7 @@ impl ProviderRegistrationTransaction {
     }
 
     pub fn payout_address(&self) -> Option<String> {
-        Address::with_script_pub_key(&self.script_payout, &self.chain_type().script_map())
+        address::with_script_pub_key(&self.script_payout, &self.chain_type().script_map())
     }
 
     pub fn location(&self) -> String {

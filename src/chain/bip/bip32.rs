@@ -4,8 +4,9 @@ use crate::chain::common::ChainType;
 use crate::consensus::Encodable;
 use crate::crypto::byte_util::clone_into_array;
 use crate::crypto::UInt256;
-use crate::derivation::BIP32_HARD;
+use crate::chain::derivation::BIP32_HARD;
 use crate::util::{base58, endian};
+use crate::util::sec_vec::SecVec;
 
 #[allow(unused_assignments)]
 
@@ -135,51 +136,6 @@ impl<'a> TryRead<'a, ChainType> for Key {
     }
 }
 
-/*impl TryWrite<ChainType> for Key {
-    fn try_write(self, bytes: &mut [u8], chain_type: ChainType) -> byte::Result<usize> {
-        if self.child.is_31_bits() {
-            let mut child = u32::from_le_bytes(clone_into_array(&self.child.0[..4]));
-            if self.hardened {
-                child |= BIP32_HARD;
-            }
-            child = child.swap_bytes();
-            let is_priv = self.data.len() < 33;
-            bytes[..4].copy_from_slice(&if is_priv { chain_type.bip32_script_map().xprv } else { chain_type.bip32_script_map().xpub });
-            bytes[4] = self.depth;
-            bytes[5..9].copy_from_slice(&self.fingerprint.to_le_bytes());
-            bytes[9..13].copy_from_slice(&child.to_le_bytes());
-            bytes[13..45].copy_from_slice(&self.chaincode.0);
-            if is_priv {
-                bytes[45] = 0;
-                bytes[46..].copy_from_slice(&self.data);
-            } else {
-                bytes[45..].copy_from_slice(&self.data);
-            }
-            Ok(bytes.len())
-        } else {
-            // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:47 + key.length + sizeof(chain)])
-            let is_priv = self.data.len() < 33;
-            let head: [u8; 4] = if is_priv { chain_type.dip14_script_map().dps } else { chain_type.dip14_script_map().dpp };
-            head.enc(bytes);
-            self.depth.enc(bytes);
-            self.fingerprint.enc(bytes);
-            self.hardened.enc(bytes);
-            self.depth.enc(bytes);                // 5
-            self.fingerprint.enc(bytes);          // 9
-            self.hardened.enc(bytes);             // 10
-            self.child.enc(bytes);                // 42
-            self.chaincode.enc(bytes);                // 74
-            if is_priv {
-                0u8.enc(bytes);                 // 75 (prv) / 74 (pub)
-                bytes[46..].copy_from_slice(&self.data);
-            }
-            self.data.enc(bytes);
-            Ok(bytes.len())
-        }
-    }
-}*/
-
-
 impl Key {
     pub fn serialize(&self, chain_type: ChainType) -> String {
         if self.child.is_31_bits() {
@@ -189,7 +145,8 @@ impl Key {
             }
             child = child.swap_bytes();
             // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:14 + key.length + sizeof(chain)])
-            let mut writer = Vec::<u8>::with_capacity(14 + self.data.len() + std::mem::size_of::<UInt256>());
+            // let mut writer = Vec::<u8>::with_capacity(14 + self.data.len() + std::mem::size_of::<UInt256>());
+            let mut writer = SecVec::with_capacity(14 + self.data.len() + std::mem::size_of::<UInt256>());
             let is_priv = self.data.len() < 33;
             writer.extend_from_slice(&if is_priv { chain_type.bip32_script_map().xprv } else { chain_type.bip32_script_map().xpub }); // 4
             self.depth.enc(&mut writer);                // 5
@@ -203,7 +160,8 @@ impl Key {
             base58::check_encode_slice(&writer)
         } else {
             // TODO: SecAlloc ([NSMutableData secureDataWithCapacity:47 + key.length + sizeof(chain)])
-            let mut writer = Vec::<u8>::with_capacity(47 + self.data.len() + std::mem::size_of::<UInt256>());
+            // let mut writer = Vec::<u8>::with_capacity(47 + self.data.len() + std::mem::size_of::<UInt256>());
+            let mut writer = SecVec::with_capacity(47 + self.data.len() + std::mem::size_of::<UInt256>());
             let is_priv = self.data.len() < 33;
             writer.extend_from_slice(&if is_priv { chain_type.dip14_script_map().dps } else { chain_type.dip14_script_map().dpp }); // 4
             self.depth.enc(&mut writer);                // 5

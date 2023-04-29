@@ -1,11 +1,10 @@
 use std::fmt::Debug;
 use std::hash::Hasher;
-use crate::UInt256;
 use crate::chain::Chain;
 use crate::chain::common::ChainType;
 use crate::chain::tx::{InstantSendLock, TransactionInput, TransactionOutput, TransactionType};
 use crate::chain::wallet::Account;
-use crate::crypto::byte_util::AsBytes;
+use crate::crypto::{byte_util::AsBytes, UInt256};
 use crate::keys::ECDSAKey;
 use crate::util::Shared;
 

@@ -1,13 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::chain::block::block::Block;
-use crate::chain::block::full_block::FullBlock;
-use crate::chain::block::IBlock;
-use crate::chain::block::merkle_block::MerkleBlock;
-use crate::chain::Chain;
-use crate::chain::chain_lock::ChainLock;
-use crate::chain::common::ChainType;
-use crate::UInt256;
+use crate::chain::block::{Block, FullBlock, IBlock, MerkleBlock};
+use crate::chain::{Chain, ChainLock, common::ChainType};
+use crate::crypto::UInt256;
 use crate::util::Shared;
 
 #[derive(Clone, Debug)]

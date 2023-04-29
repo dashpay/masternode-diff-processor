@@ -1,8 +1,7 @@
 use crate::chain::Chain;
-use crate::chain::common::chain_type::IHaveChainSettings;
-use crate::chain::common::ChainType;
+use crate::chain::common::{ChainType, IHaveChainSettings};
 use crate::chain::params::{BIP32ScriptMap, DIP14ScriptMap, ScriptMap};
-use crate::UInt256;
+use crate::crypto::UInt256;
 
 pub trait Settings {
     fn r#type(&self) -> ChainType;

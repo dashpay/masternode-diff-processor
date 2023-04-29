@@ -1,29 +1,30 @@
-use byte::{BytesExt, LE, Result, TryRead, TryWrite};
-use byte::ctx::Endian;
-use std::{mem, slice};
-use std::io::Write;
-use std::net::{IpAddr, Ipv4Addr};
+use byte::{BytesExt, ctx::Endian, LE, Result, TryRead, TryWrite};
+use std::{io::Write, mem, net::{IpAddr, Ipv4Addr}, slice};
 use ed25519_dalek::VerifyingKey;
 use hashes::{Hash, hash160, HashEngine, Hmac, HmacEngine, ripemd160, sha1, sha256, sha256d, sha512};
 use secp256k1::rand::{Rng, thread_rng};
 use crate::chain::params::{BIP32_SEED_KEY, ED25519_SEED_KEY};
 use crate::consensus::{Decodable, Encodable, ReadExt, WriteExt};
+use crate::ffi;
 use crate::hashes::{hex::{FromHex, ToHex}, hex};
 use crate::util::base58;
 use crate::util::data_ops::short_hex_string_from;
-
-pub const MN_ENTRY_PAYLOAD_LENGTH: usize = 151;
 
 pub trait AsBytes {
     fn as_bytes(&self) -> &[u8];
 }
 
 pub trait Reversable {
-    fn reversed(&mut self) -> Self;
+    fn reverse(&mut self) -> Self;
+    fn reversed(&self) -> Self;
 }
 
 pub trait Zeroable {
     fn is_zero(&self) -> bool;
+}
+
+pub trait Random {
+    fn random() -> Self where Self: Sized;
 }
 
 pub trait MutDecodable<'a, T: TryRead<'a, Endian>> {
@@ -62,9 +63,43 @@ pub struct UInt768(pub [u8; 96]);
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ECPoint(pub [u8; 33]);
 
-// impl TryFrom<AsRef<[u8]>> for UInt256 {
-//
-// }
+
+#[macro_export]
+macro_rules! impl_ffi_bytearray {
+    ($var_type: ident) => {
+        impl From<$var_type> for ffi::ByteArray {
+            fn from(value: $var_type) -> Self {
+                let vec = value.0.to_vec();
+                vec.into()
+            }
+        }
+        impl From<Option<$var_type>> for ffi::ByteArray {
+            fn from(value: Option<$var_type>) -> Self {
+                if let Some(v) = value {
+                    v.into()
+                } else {
+                    ffi::ByteArray::default()
+                }
+            }
+        }
+    }
+}
+
+
+#[macro_export]
+macro_rules! impl_random {
+    ($var_type: ident, $byte_len: expr) => {
+        impl Random for $var_type {
+            fn random() -> Self where Self: Sized {
+                let mut data: [u8; $byte_len] = [0u8; $byte_len];
+                for i in 0..32 {
+                    data[i] = thread_rng().gen();
+                }
+                $var_type(data)
+            }
+        }
+    }
+}
 
 #[macro_export]
 macro_rules! impl_bytes_decodable {
@@ -76,13 +111,6 @@ macro_rules! impl_bytes_decodable {
         }
     }
 }
-// todo: replace current impl with that:
-// impl<'a, T: TryRead<'a, _>> BytesDecodable<'a, T> for T {
-//     fn from_bytes(bytes: &'a [u8], offset: &mut usize) -> Option<T> {
-//         bytes.read_with::<Self>(offset, byte::LE).ok()
-//     }
-// }
-
 #[macro_export]
 macro_rules! impl_bytes_decodable_lt {
     ($var_type: ident) => {
@@ -115,15 +143,10 @@ macro_rules! impl_decodable {
         }
     }
 }
+
 #[macro_export]
 macro_rules! define_try_from_bytes {
     ($var_type: ident) => {
-        // impl TryInto<$var_type> for &[u8] {
-        //     type Error = byte::Error;
-        //     fn try_into(self) -> std::result::Result<$var_type, Self::Error> {
-        //         self.read_with::<$var_type>(&mut 0, byte::LE)
-        //     }
-        // }
         impl AsRef<[u8]> for $var_type {
             fn as_ref(&self) -> &[u8] {
                 &self.0
@@ -144,7 +167,6 @@ macro_rules! define_try_from_bytes {
                 value.read_with::<$var_type>(&mut 0, byte::LE).unwrap()
             }
         }
-
     }
 }
 
@@ -153,12 +175,11 @@ macro_rules! define_try_read_to_big_uint {
     ($uint_type: ident, $byte_len: expr) => {
         impl<'a> TryRead<'a, Endian> for $uint_type {
             fn try_read(bytes: &'a [u8], endian: Endian) -> Result<(Self, usize)> {
-                let offset = &mut 0;
+                // Ok(($uint_type(bytes[..$byte_len].try_into().unwrap_or([0u8; $byte_len])), $byte_len))
+                let mut offset = 0usize;
                 let mut data: [u8; $byte_len] = [0u8; $byte_len];
-                for _i in 0..$byte_len {
-                    let index = offset.clone();
-                    let chunk = bytes.read_with::<u8>(offset, endian)?;
-                    data[index] = chunk;
+                for i in 0..$byte_len {
+                    data[i] = bytes.read_with::<u8>(&mut offset, endian)?;
                 }
                 Ok(($uint_type(data), $byte_len))
             }
@@ -181,11 +202,12 @@ macro_rules! define_try_write_from_big_uint {
 #[macro_export]
 macro_rules! define_bytes_to_big_uint {
     ($uint_type: ident, $byte_len: expr) => {
-
+        impl_random!($uint_type, $byte_len);
         define_try_read_to_big_uint!($uint_type, $byte_len);
         define_try_write_from_big_uint!($uint_type);
         impl_decodable!($uint_type, $byte_len);
         define_try_from_bytes!($uint_type);
+        impl_ffi_bytearray!($uint_type);
 
         impl std::default::Default for $uint_type {
             fn default() -> Self {
@@ -200,6 +222,13 @@ macro_rules! define_bytes_to_big_uint {
                 Ok(())
             }
         }
+        // Used for code generation sometime while debugging
+        // impl std::fmt::Debug for $uint_type {
+        //     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        //         write!(f, "{}::from_hex(\"{}\").unwrap()", stringify!($uint_type), self.0.to_hex())?;
+        //         Ok(())
+        //     }
+        // }
         impl std::fmt::Debug for $uint_type {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, "{}", self.0.to_hex())?;
@@ -223,10 +252,18 @@ macro_rules! define_bytes_to_big_uint {
             }
         }
 
+
+        // TODO: as it's often use to compare hashes
+        // it's needs to be optimized
         impl Reversable for $uint_type {
-            fn reversed(&mut self) -> Self {
+            fn reverse(&mut self) -> Self {
                 self.0.reverse();
                 *self
+            }
+            fn reversed(&self) -> Self {
+                let mut s = self.0.clone();
+                s.reverse();
+                $uint_type(s)
             }
         }
         impl FromHex for $uint_type {
@@ -248,18 +285,14 @@ macro_rules! define_bytes_to_big_uint {
 
         impl Zeroable for $uint_type {
             fn is_zero(&self) -> bool {
-                for i in 0..$byte_len {
-                    if self.0[i] > 0 {
-                        return false;
-                    }
-                }
-                true
+                !self.0.iter().any(|&byte| byte > 0)
             }
         }
 
         impl $uint_type {
             pub const MIN: Self = $uint_type([0; $byte_len]);
             pub const MAX: Self = $uint_type([!0; $byte_len]);
+            pub const SIZE: usize = $byte_len;
         }
 
         impl AsBytes for $uint_type {
@@ -292,19 +325,6 @@ define_bytes_to_big_uint!(UInt768, 96);
 
 define_bytes_to_big_uint!(ECPoint, 33);
 
-pub trait Random {
-    fn random() -> Self where Self: Sized;
-}
-
-impl Random for UInt256 {
-    fn random() -> UInt256 {
-        let mut data: [u8; 32] = [0u8; 32];
-        for i in 0..32 {
-            data[i] = thread_rng().gen();
-        }
-        UInt256(data)
-    }
-}
 pub const fn merge<const N: usize>(mut buf: [u8; N], bytes: &[u8]) -> [u8; N] {
     let mut i = 0;
     while i < bytes.len() {
@@ -314,11 +334,7 @@ pub const fn merge<const N: usize>(mut buf: [u8; N], bytes: &[u8]) -> [u8; N] {
     buf
 }
 
-pub(crate) fn clone_into_array<A, T>(slice: &[T]) -> A
-    where
-        A: Default + AsMut<[T]>,
-        T: Clone,
-{
+pub fn clone_into_array<A, T>(slice: &[T]) -> A where A: Default + AsMut<[T]>, T: Clone {
     let mut a = A::default();
     <A as AsMut<[T]>>::as_mut(&mut a).clone_from_slice(slice);
     a
@@ -518,8 +534,7 @@ impl UInt256 {
     }
     pub fn x11_hash(data: &[u8]) -> Self {
         let hash = rs_x11_hash::get_x11_hash(&data);
-        UInt256::from_bytes(&hash, &mut 0)
-            .expect("Error x11 hashing")
+        UInt256(hash)
     }
 
     pub fn block_hash_for_dev_net_genesis_block_with_version(version: u32, prev_hash: UInt256, merkle_root: UInt256, timestamp: u32, target: u32, nonce: u32) -> Self {
@@ -565,7 +580,7 @@ impl UInt256 {
     }
 
     pub fn add_be(&self, a: UInt256) -> UInt256 {
-        self.clone().reversed().add_le(a.clone().reversed()).reversed()
+        self.reversed().add_le(a.reversed()).reverse()
     }
 
     // add 1u64
@@ -814,6 +829,14 @@ impl secp256k1::ThirtyTwoByteHash for UInt256 {
     }
 }
 
+impl From<VerifyingKey> for UInt256 {
+    fn from(value: VerifyingKey) -> Self {
+        UInt256(value.to_bytes())
+        // let mut data = [0u8; 33];
+        // data[1..33].copy_from_slice(value.as_bytes());
+        // Self(data)
+    }
+}
 impl From<VerifyingKey> for ECPoint {
     fn from(value: VerifyingKey) -> Self {
         let mut data = [0u8; 33];

@@ -1,11 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use crate::UInt256;
-use crate::chain::{block, Chain};
-use crate::chain::block::MAX_TIME_DRIFT;
-use crate::chain::chain_lock::ChainLock;
-use crate::chain::common::ChainType;
+use crate::chain::{block, block::MAX_TIME_DRIFT, Chain, ChainLock, common::ChainType};
+use crate::crypto::UInt256;
 use crate::util::{Shared, TimeUtil};
 
 pub trait IBlock: Send + Sync {

@@ -4,10 +4,10 @@ use byte::ctx::Endian;
 use security_framework::os::macos::keychain::SecKeychain;
 use crate::chain::common::ChainType;
 use crate::chain::wallet::ext::constants::{accounts_known_key_for_wallet_unique_id, creation_time_unique_id_for_unique_id, did_verify_creation_time_unique_id_for_unique_id, mnemonic_unique_id_for_unique_id};
-use crate::consensus::Encodable;
-use crate::derivation::{wallet_based_extended_private_key_location_string_for_unique_id, wallet_based_extended_public_key_location_string_for_unique_id_and_key_type};
-use crate::encode::VarInt;
-use crate::keys::KeyType;
+use crate::consensus::{Encodable, encode::VarInt};
+use crate::chain::derivation::{wallet_based_extended_private_key_location_string_for_unique_id, wallet_based_extended_public_key_location_string_for_unique_id_and_key_type};
+use crate::keys::KeyKind;
+use crate::util::sec_vec::SecVec;
 
 pub const SEC_ATTR_SERVICE: &str = "org.dashfoundation.dash-spv";
 
@@ -88,7 +88,7 @@ impl Keychain {
         }
     }
 
-    pub fn set_data(key: String, data: Option<Vec<u8>>, authenticated: bool) -> Result<(), security_framework::base::Error> {
+    pub fn set_data(key: String, data: Option<impl AsRef<[u8]>>, authenticated: bool) -> Result<(), security_framework::base::Error> {
         let account = key.as_str();
         // Here we also check keychain item for presence (-25299)
         // This scheme allows not to use single-threaded testing (cargo test -- --test-threads=1)
@@ -96,9 +96,9 @@ impl Keychain {
             .and_then(|keychain| {
                 match (data, keychain.find_generic_password(SEC_ATTR_SERVICE, account)) {
                     (Some(data), Ok((_, mut item))) =>
-                        item.set_password(data.as_slice()),
+                        item.set_password(data.as_ref()),
                     (Some(data), Err(err)) =>
-                        match keychain.add_generic_password(SEC_ATTR_SERVICE, account, data.as_slice()) {
+                        match keychain.add_generic_password(SEC_ATTR_SERVICE, account, data.as_ref()) {
                             Ok(..) => Ok(()),
                             Err(err) if err.code() == -25299 => Ok(()),
                             Err(err) => Err(err),
@@ -309,7 +309,7 @@ impl Keychain {
             .map(|i| i as u32)
     }
 
-    pub fn save_extended_public_key(wallet_unique_id: &str, r#type: KeyType, index_path: String, data: Option<Vec<u8>>) -> Result<(), security_framework::base::Error> {
+    pub fn save_extended_public_key(wallet_unique_id: &str, r#type: KeyKind, index_path: String, data: Option<Vec<u8>>) -> Result<(), security_framework::base::Error> {
         Self::set_data(
             wallet_based_extended_public_key_location_string_for_unique_id_and_key_type(
                 wallet_unique_id,
@@ -317,7 +317,7 @@ impl Keychain {
                 index_path), data, false)
     }
 
-    pub fn save_extended_private_key(wallet_unique_id: &str, data: Option<Vec<u8>>) -> Result<(), security_framework::base::Error> {
+    pub fn save_extended_private_key(wallet_unique_id: &str, data: Option<SecVec>) -> Result<(), security_framework::base::Error> {
         Self::set_data(wallet_based_extended_private_key_location_string_for_unique_id(wallet_unique_id), data, true)
     }
 

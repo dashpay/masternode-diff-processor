@@ -10,7 +10,8 @@ use crate::chain::tx::TransactionType;
 use crate::crypto::{UInt160, UInt256};
 use crate::crypto::byte_util::{AsBytes, clone_into_array, Reversable, Zeroable};
 use crate::crypto::UTXO;
-use crate::util::{Address, Shared};
+use crate::util::address::address;
+use crate::util::Shared;
 
 #[derive(Clone, Debug, Default)]
 pub struct CreditFundingTransaction {
@@ -57,7 +58,7 @@ impl CreditFundingTransaction {
     }
 
     fn credit_burn_address(&self) -> Option<String> {
-        Some(Address::from_hash160_for_script_map(&self.credit_burn_public_key_hash(), &self.chain_type().script_map()))
+        Some(address::from_hash160_for_script_map(&self.credit_burn_public_key_hash(), &self.chain_type().script_map()))
     }
 
     // pub fn used_derivation_path_index_for_wallet(&self, wallet: Weak<Wallet>) -> u32 {

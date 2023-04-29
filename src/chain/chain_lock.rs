@@ -1,13 +1,9 @@
 use byte::{BytesExt, TryRead};
-use crate::chain::Chain;
-use crate::chain::common::chain_type::IHaveChainSettings;
-use crate::chain::common::ChainType;
-use crate::consensus::Encodable;
-use crate::crypto::{UInt384, UInt768};
-use crate::encode::VarInt;
+use crate::chain::{Chain, common::{ChainType, IHaveChainSettings}};
+use crate::consensus::{Encodable, encode::VarInt};
+use crate::crypto::{UInt256, UInt384, UInt768};
 use crate::keys::BLSKey;
 use crate::models::{LLMQEntry, MasternodeList};
-use crate::UInt256;
 use crate::util::Shared;
 
 #[derive(Clone, Debug, Default)]

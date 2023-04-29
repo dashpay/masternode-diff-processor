@@ -2,7 +2,7 @@ use crate::chain::Chain;
 use crate::chain::network::Peer;
 use crate::chain::spork::manager::PeerSporkDelegate;
 use crate::chain::spork::Spork;
-use crate::UInt256;
+use crate::crypto::UInt256;
 use crate::util::Shared;
 
 impl PeerSporkDelegate for Shared<Chain> {

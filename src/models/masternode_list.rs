@@ -1,11 +1,10 @@
-use hashes::{Hash, sha256};
+use std::cmp::min;
 use std::collections::BTreeMap;
 use crate::chain::common::LLMQType;
+use crate::consensus::Encodable;
+use crate::crypto::{byte_util::{Reversable, Zeroable}, UInt256};
 use crate::models::{LLMQEntry, MasternodeEntry};
 use crate::tx::CoinbaseTransaction;
-use crate::consensus::Encodable;
-use crate::crypto::byte_util::{Reversable, Zeroable};
-use crate::crypto::UInt256;
 use crate::util::data_ops::merkle_root_from_hashes;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -38,8 +37,8 @@ impl<'a> std::fmt::Debug for MasternodeList {
             .field("known_height", &self.known_height)
             .field("masternode_merkle_root", &self.masternode_merkle_root.unwrap_or(UInt256::MIN))
             .field("llmq_merkle_root", &self.llmq_merkle_root.unwrap_or(UInt256::MIN))
-            .field("masternodes", &self.masternodes.len())
-            .field("quorums", &self.quorums.len())
+            .field("masternodes", &self.masternodes)
+            .field("quorums", &self.quorums)
             .finish()
     }
 }
@@ -81,37 +80,21 @@ impl MasternodeList {
     }
 
     pub fn hashes_for_merkle_root(&self, block_height: u32) -> Option<Vec<UInt256>> {
-        if block_height == u32::MAX {
-            println!("hashes_for_merkle_root: unknown block {:?}", self.block_hash);
-            None
-        } else {
+        (block_height != u32::MAX).then_some({
             let mut pro_tx_hashes = self.reversed_pro_reg_tx_hashes();
-            pro_tx_hashes.sort_by(|&s1, &s2| s1.clone().reversed().cmp(&s2.clone().reversed()));
-            let mns = self.masternodes.clone();
-            let entry_hashes = pro_tx_hashes
-                .clone()
-                .into_iter()
-                .map(|hash| {
-                    let h = *hash;
-                    let mn = &mns[&h];
-                    mn.entry_hash_at(block_height)
-                })
-                .collect::<Vec<UInt256>>();
-            Some(entry_hashes)
-        }
+            pro_tx_hashes.sort_by(|&s1, &s2| s1.reversed().cmp(&s2.reversed()));
+            pro_tx_hashes
+                .iter()
+                .map(|hash| (&self.masternodes[hash]).entry_hash_at(block_height))
+                .collect::<Vec<_>>()
+        })
     }
 
     fn hashes_for_quorum_merkle_root(&self) -> Vec<UInt256> {
-        let mut llmq_commitment_hashes: Vec<UInt256> =
-            self.quorums
-                .clone()
-                .into_values()
-                .fold(Vec::new(), |mut acc, q_map| {
-                    let quorum_hashes: Vec<UInt256> =
-                        q_map.into_values().map(|entry| entry.entry_hash).collect();
-                    acc.extend(quorum_hashes);
-                    acc
-                });
+        let mut llmq_commitment_hashes = self.quorums
+            .values()
+            .flat_map(|q_map| q_map.values().map(|entry| entry.entry_hash))
+            .collect::<Vec<_>>();
         llmq_commitment_hashes.sort();
         llmq_commitment_hashes
     }
@@ -124,6 +107,7 @@ impl MasternodeList {
         // we need to check that the coinbase is in the transaction hashes we got back
         // and is in the merkle block
         if let Some(mn_merkle_root) = self.masternode_merkle_root {
+            //println!("has_valid_mn_list_root: {} == {}", tx.merkle_root_mn_list, mn_merkle_root);
             tx.merkle_root_mn_list == mn_merkle_root
         } else {
             false
@@ -137,7 +121,7 @@ impl MasternodeList {
             && ct_q_merkle_root.is_some()
             && ct_q_merkle_root.unwrap() == q_merkle_root.unwrap();
         if !has_valid_quorum_list_root {
-            println!("LLMQ Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
+            warn!("LLMQ Merkle root not valid for DML on block {} version {} ({:?} wanted - {:?} calculated)",
                      tx.height,
                      tx.base.version,
                      tx.merkle_root_llmq_list,
@@ -159,17 +143,13 @@ impl MasternodeList {
         }
         let mut buffer: Vec<u8> = Vec::new();
         if let Some(hash) =
-            entry.confirmed_hash_hashed_with_provider_registration_transaction_hash_at(block_height)
+            entry.confirmed_hash_hashed_with_pro_reg_tx_hash_at(block_height)
         {
-            hash.consensus_encode(&mut buffer).unwrap();
+            hash.enc(&mut buffer);
         }
-        modifier.consensus_encode(&mut buffer).unwrap();
-        let score = UInt256(sha256::Hash::hash(&buffer).into_inner());
-        if score.is_zero() || score.0.is_empty() {
-            None
-        } else {
-            Some(score)
-        }
+        modifier.enc(&mut buffer);
+        let score = UInt256::sha256(&buffer);
+        (!score.is_zero() && !score.0.is_empty()).then_some(score)
     }
 
     pub fn quorum_entry_for_platform_with_quorum_hash(
@@ -193,7 +173,7 @@ impl MasternodeList {
         self.quorums.get(&llmq_type)?.values().for_each(|entry| {
             let ordering_hash = entry
                 .ordering_hash_for_request_id(request_id, llmq_type)
-                .reversed();
+                .reverse();
             if lowest_value > ordering_hash {
                 lowest_value = ordering_hash;
                 first_quorum = Some(entry);
@@ -207,8 +187,54 @@ impl MasternodeList {
 
     pub fn sorted_reversed_pro_reg_tx_hashes(&self) -> Vec<&UInt256> {
         let mut hashes = self.reversed_pro_reg_tx_hashes();
-        hashes.sort_by(|&s1, &s2| s2.clone().reversed().cmp(&s1.clone().reversed()));
+        hashes.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
         hashes
     }
 
+    pub fn has_masternode(&self, provider_registration_transaction_hash: UInt256) -> bool {
+        // self.masternodes.contains_key(provider_registration_transaction_hash)
+        self.masternodes.values().any(|node| node.provider_registration_transaction_hash == provider_registration_transaction_hash)
+    }
+
+    pub fn has_valid_masternode(&self, provider_registration_transaction_hash: UInt256) -> bool {
+        self.masternodes.values()
+            .find(|node| node.provider_registration_transaction_hash == provider_registration_transaction_hash)
+            .map_or(false, |node| node.is_valid)
+        // self.masternodes.values().any(|node| node.provider_registration_transaction_hash == provider_registration_transaction_hash)
+    }
+}
+
+impl MasternodeList {
+    pub fn score_masternodes_map(
+        masternodes: BTreeMap<UInt256, MasternodeEntry>,
+        quorum_modifier: UInt256,
+        block_height: u32,
+    ) -> BTreeMap<UInt256, MasternodeEntry> {
+        masternodes
+            .into_iter()
+            .filter_map(|(_, entry)| Self::masternode_score(&entry, quorum_modifier, block_height)
+                .map(|score| (score, entry)))
+            .collect()
+    }
+
+    pub fn get_masternodes_for_quorum(llmq_type: LLMQType, masternodes: BTreeMap<UInt256, MasternodeEntry>, quorum_modifier: UInt256, block_height: u32) -> Vec<MasternodeEntry> {
+        let quorum_count = llmq_type.size();
+        let masternodes_in_list_count = masternodes.len();
+        let mut score_dictionary = Self::score_masternodes_map(masternodes, quorum_modifier, block_height);
+        let mut scores: Vec<UInt256> = score_dictionary.clone().into_keys().collect();
+        scores.sort_by(|&s1, &s2| s2.reversed().cmp(&s1.reversed()));
+        let mut valid_masternodes: Vec<MasternodeEntry> = Vec::new();
+        let count = min(masternodes_in_list_count, scores.len());
+        for score in scores.iter().take(count) {
+            if let Some(masternode) = score_dictionary.get_mut(score) {
+                if (*masternode).is_valid_at(block_height) {
+                    valid_masternodes.push((*masternode).clone());
+                }
+            }
+            if valid_masternodes.len() == quorum_count as usize {
+                break;
+            }
+        }
+        valid_masternodes
+    }
 }

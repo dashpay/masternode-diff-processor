@@ -4,8 +4,7 @@ use crate::chain::chain_lock;
 use crate::chain::chain_lock::ChainLock;
 use crate::chain::common::ChainType;
 use crate::consensus::Encodable;
-use crate::crypto::UInt768;
-use crate::UInt256;
+use crate::crypto::{UInt256, UInt768};
 use crate::util::Shared;
 
 #[test]

@@ -4,7 +4,7 @@ use crate::chain::block::{Block, IBlock, Kind};
 use crate::chain::Chain;
 use crate::chain::chain_lock::ChainLock;
 use crate::chain::common::ChainType;
-use crate::UInt256;
+use crate::crypto::UInt256;
 use crate::util::data_ops::merkle_root_from_hashes;
 use crate::util::Shared;
 

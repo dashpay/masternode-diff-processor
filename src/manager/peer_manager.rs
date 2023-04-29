@@ -10,20 +10,19 @@ use std::time::SystemTime;
 use byte::ctx::Endian;
 use byte::{BytesExt, TryRead, TryWrite};
 use crate::consensus::Encodable;
-use crate::crypto::{UInt128, UInt256};
-use crate::crypto::byte_util::AsBytes;
 use crate::chain::SyncType;
 use crate::chain::chain::Chain;
 use crate::chain::common::ChainType;
 use crate::chain::ext::Settings;
 use crate::chain::network::{BloomFilter, InvType, PeerStatus, PeerType};
 use crate::chain::network::peer::{DAYS_3_TIME_INTERVAL, HOURS_3_TIME_INTERVAL, Peer, WEEK_TIME_INTERVAL};
+use crate::crypto::{UInt128, UInt256};
+use crate::crypto::byte_util::AsBytes;
 use crate::manager::peer_manager_desired_state::PeerManagerDesiredState;
 use crate::models::MasternodeList;
 use crate::storage::{Keychain, UserDefaults};
-use crate::{encode, util};
-use crate::util::Shared;
-use crate::util::time::TimeUtil;
+use crate::{consensus, util};
+use crate::util::{Shared, TimeUtil};
 
 pub const PEER_MAX_CONNECTIONS: usize = 5;
 pub const SETTINGS_FIXED_PEER_KEY: &str = "SETTINGS_FIXED_PEER";
@@ -120,7 +119,7 @@ pub enum Error {
     /// Bitcoin util error
     Util(util::Error),
     /// Bitcoin serialize error
-    Serialize(encode::Error),
+    Serialize(consensus::encode::Error),
     // /// Hammersbald error
     // Hammersbald(hammersbald::Error),
     /// Handshake failure
@@ -155,8 +154,8 @@ impl From<byte::Error> for Error {
     }
 }
 
-impl From<encode::Error> for Error {
-    fn from(value: encode::Error) -> Self {
+impl From<consensus::encode::Error> for Error {
+    fn from(value: consensus::encode::Error) -> Self {
         Error::Serialize(value)
     }
 }

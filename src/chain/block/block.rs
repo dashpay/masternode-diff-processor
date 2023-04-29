@@ -2,14 +2,13 @@ use std::cmp;
 use std::collections::HashMap;
 use std::hash::Hasher;
 use std::sync::Arc;
-use crate::UInt256;
 use crate::chain::block::{IBlock, Kind};
 use crate::chain::Chain;
 use crate::chain::chain_lock::ChainLock;
 use crate::chain::checkpoint::Checkpoint;
 use crate::chain::common::ChainType;
 use crate::consensus::Encodable;
-use crate::crypto::byte_util::{AsBytes, Zeroable};
+use crate::crypto::byte_util::{AsBytes, UInt256, Zeroable};
 use crate::util::Shared;
 
 pub const BLOCK_UNKNOWN_HEIGHT: i32 = i32::MAX;

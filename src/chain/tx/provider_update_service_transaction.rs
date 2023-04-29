@@ -8,10 +8,11 @@ use crate::consensus::encode::VarInt;
 use crate::crypto::{UInt128, UInt256, UInt768, VarBytes};
 use crate::crypto::byte_util::Zeroable;
 use crate::keys::{BLSKey, IKey};
+use crate::util::address::address;
 // use crate::storage::manager::managed_context::ManagedContext;
 // use crate::storage::models::chain::chain::ChainEntity;
 // use crate::storage::models::tx::transaction::NewTransactionEntity;
-use crate::util::{Address, Shared};
+use crate::util::Shared;
 
 #[derive(Clone, Debug, Default)]
 pub struct ProviderUpdateServiceTransaction {
@@ -166,7 +167,7 @@ impl ProviderUpdateServiceTransaction {
     pub fn payout_address(&mut self) -> Option<String> {
         if let Some(tx) = self.provider_registration_transaction() {
             if !self.script_payout.is_empty() {
-                return Address::with_script_pub_key(&self.script_payout, &tx.with(|tx| tx.chain_type().script_map()));
+                return address::with_script_pub_key(&self.script_payout, &tx.with(|tx| tx.chain_type().script_map()));
             }
         }
         None // no payout address

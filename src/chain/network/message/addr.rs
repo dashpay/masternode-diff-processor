@@ -1,8 +1,8 @@
 use std::net::{IpAddr, SocketAddr, SocketAddrV4};
 use std::time::SystemTime;
 use byte::{BytesExt, TryRead};
+use crate::consensus::encode::VarInt;
 use crate::crypto::UInt128;
-use crate::encode::VarInt;
 use crate::manager::peer_manager::SERVICES_NODE_NETWORK;
 use crate::util::TimeUtil;
 

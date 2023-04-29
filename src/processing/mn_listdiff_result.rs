@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
-use crate::{boxed, boxed_vec, chain, models, ToFFI, types, UInt256};
-use crate::ffi::to::{encode_masternodes_map, encode_quorums_map};
+use crate::{models, types};
+use crate::chain::common;
+use crate::crypto::UInt256;
+use crate::ffi::boxer::{boxed, boxed_vec};
+use crate::ffi::to::{encode_masternodes_map, encode_quorums_map, ToFFI};
 use crate::processing::ProcessingError;
 
 pub struct MNListDiffResult {
@@ -15,7 +18,7 @@ pub struct MNListDiffResult {
     pub masternode_list: models::MasternodeList,
     pub added_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
     pub modified_masternodes: BTreeMap<UInt256, models::MasternodeEntry>,
-    pub added_quorums: BTreeMap<chain::common::LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
+    pub added_quorums: BTreeMap<common::LLMQType, BTreeMap<UInt256, models::LLMQEntry>>,
     pub needed_masternode_lists: Vec<UInt256>,
 }
 
@@ -29,17 +32,17 @@ impl std::fmt::Debug for MNListDiffResult {
                 "validation",
                 &format!(
                     "{}{}{}{}{}",
-                    if self.has_found_coinbase { 1 } else { 0 },
-                    if self.has_valid_coinbase { 1 } else { 0 },
-                    if self.has_valid_mn_list_root { 1 } else { 0 },
-                    if self.has_valid_llmq_list_root { 1 } else { 0 },
-                    if self.has_valid_quorums { 1 } else { 0 }
+                    u8::from(self.has_found_coinbase),
+                    u8::from(self.has_valid_coinbase),
+                    u8::from(self.has_valid_mn_list_root),
+                    u8::from(self.has_valid_llmq_list_root),
+                    u8::from(self.has_valid_quorums)
                 ),
             )
             .field("masternode_list", &self.masternode_list)
-            .field("added_masternodes", &self.added_masternodes.len())
-            .field("modified_masternodes", &self.modified_masternodes.len())
-            .field("added_quorums", &self.added_quorums.len())
+            .field("added_masternodes", &self.added_masternodes)
+            .field("modified_masternodes", &self.modified_masternodes)
+            .field("added_quorums", &self.added_quorums)
             .field("needed_masternode_lists", &self.needed_masternode_lists)
             .finish()
     }

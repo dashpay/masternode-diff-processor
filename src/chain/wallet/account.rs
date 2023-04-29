@@ -1,14 +1,15 @@
 use std::collections::HashMap;
-use crate::chain::wallet::seed::Seed;
-use crate::derivation::derivation_path::DerivationPath;
-use crate::derivation::derivation_path_kind::DerivationPathKind;
-use crate::derivation::derivation_path_reference::DerivationPathReference;
-use crate::derivation::funds_derivation_path::FundsDerivationPath;
-use crate::derivation::incoming_funds_derivation_path::IncomingFundsDerivationPath;
-use crate::derivation::protocol::IDerivationPath;
-use crate::{default_shared, UInt256};
 use crate::chain::common::ChainType;
+use crate::chain::derivation::derivation_path::DerivationPath;
+use crate::chain::derivation::derivation_path_kind::DerivationPathKind;
+use crate::chain::derivation::derivation_path_reference::DerivationPathReference;
+use crate::chain::derivation::funds_derivation_path::FundsDerivationPath;
+use crate::chain::derivation::incoming_funds_derivation_path::IncomingFundsDerivationPath;
+use crate::chain::derivation::protocol::IDerivationPath;
 use crate::chain::tx::ITransaction;
+use crate::chain::wallet::seed::Seed;
+use crate::crypto::UInt256;
+use crate::default_shared;
 use crate::util::shared::Shared;
 
 #[derive(Clone, Debug)]

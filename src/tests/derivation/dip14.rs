@@ -1,16 +1,16 @@
 use std::sync::Weak;
 use hashes::hex::FromHex;
 use crate::chain::common::ChainType;
+use crate::chain::derivation::derivation_path::DerivationPath;
+use crate::chain::derivation::derivation_path_feature_purpose::DerivationPathFeaturePurpose;
+use crate::chain::derivation::derivation_path_reference::DerivationPathReference;
+use crate::chain::derivation::derivation_path_type::DerivationPathType;
+use crate::chain::derivation::index_path::{IIndexPath, IndexPath};
+use crate::chain::derivation::protocol::IDerivationPath;
 use crate::chain::ext::wallets::WalletCreation;
 use crate::chains_manager::ChainsManager;
-use crate::derivation::derivation_path::DerivationPath;
-use crate::derivation::derivation_path_feature_purpose::DerivationPathFeaturePurpose;
-use crate::derivation::derivation_path_reference::DerivationPathReference;
-use crate::derivation::derivation_path_type::DerivationPathType;
-use crate::derivation::index_path::{IIndexPath, IndexPath};
-use crate::derivation::protocol::IDerivationPath;
-use crate::keys::{Key, KeyType};
-use crate::UInt256;
+use crate::crypto::UInt256;
+use crate::keys::{Key, KeyKind};
 
 const SEED_PHRASE: &str = "birth kingdom trash renew flavor utility donkey gasp regular alert pave layer";
 
@@ -32,7 +32,7 @@ fn test_256_bit_path_ecdsa_derivation1() {
         ],
         vec![false, true, false],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Unknown,
         chain_type,
         Weak::new());
@@ -68,7 +68,7 @@ fn test_256_bit_path_ecdsa_derivation2() {
         ],
         vec![true, true, true, true, true, true],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Unknown,
         chain_type,
         Weak::new());
@@ -94,7 +94,7 @@ fn test_256_bit_path_ecdsa_derivation3() {
         ],
         vec![false],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Unknown,
         chain_type,
         Weak::new());
@@ -120,7 +120,7 @@ fn test_256_bit_path_ecdsa_derivation4() {
         ],
         vec![false, true],
         DerivationPathType::Unknown,
-        KeyType::ECDSA,
+        KeyKind::ECDSA,
         DerivationPathReference::Unknown,
         chain_type,
         Weak::new());

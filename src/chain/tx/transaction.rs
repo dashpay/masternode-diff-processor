@@ -4,7 +4,7 @@ use byte::{BytesExt, TryRead};
 use secp256k1::rand::{Rng, thread_rng};
 use crate::blockdata::opcodes::all::OP_RETURN;
 use crate::chain::{Chain, ScriptMap};
-use crate::chain::common::ChainType;
+use crate::chain::common::{ChainType, DevnetType};
 use crate::chain::params::{TX_FEE_PER_B, TX_FEE_PER_INPUT, TX_INPUT_SIZE, TX_OUTPUT_SIZE};
 use crate::chain::tx::instant_send_lock::InstantSendLock;
 use crate::chain::tx::protocol::{ITransaction, ReadContext, SIGHASH_ALL, TX_LOCKTIME, TX_UNCONFIRMED, TX_VERSION, TXIN_SEQUENCE};
@@ -12,13 +12,12 @@ use crate::chain::tx::transaction_input::TransactionInput;
 use crate::chain::tx::transaction_output::TransactionOutput;
 use crate::chain::tx::transaction_persistence_status::TransactionPersistenceStatus;
 use crate::chain::tx::TransactionType;
-use crate::consensus::Encodable;
-use crate::crypto::byte_util::Zeroable;
-use crate::encode::VarInt;
+use crate::consensus::{Encodable, encode::VarInt};
+use crate::crypto::{byte_util::Zeroable, UInt256};
 use crate::keys::{ECDSAKey, IKey, Key};
 use crate::platform::identity::identity::Identity;
-use crate::UInt256;
-use crate::util::{Address, Shared};
+use crate::util::address::address;
+use crate::util::Shared;
 use crate::util::data_append::DataAppend;
 
 #[derive(Clone, Debug, Default)]
@@ -81,9 +80,9 @@ impl ITransaction for Transaction {
         // TODO: check may be it worth to keep index with Option<String>
         self.inputs.iter().filter_map(|input| {
             if let Some(script) = &input.script {
-                Address::with_script_pub_key(script, &self.chain_type.script_map())
+                address::with_script_pub_key(script, &self.chain_type.script_map())
             } else if let Some(signature) = &input.signature {
-                Address::with_script_sig(signature, &self.chain_type.script_map())
+                address::with_script_sig(signature, &self.chain_type.script_map())
             } else {
                 None
             }
@@ -317,7 +316,7 @@ impl Transaction {
         if self.chain_type.is_mainnet() {
             self.outputs.iter()
                 .find_map(|output| output.script.as_ref()
-                    .and_then(|script| Address::shapeshift_outbound_for_script(script.clone())))
+                    .and_then(|script| address::shapeshift_outbound_for_script(script.clone())))
         } else {
             None
         }
@@ -326,7 +325,7 @@ impl Transaction {
     pub fn shapeshift_outbound_address_force_script(&self) -> Option<String> {
         self.outputs.iter()
             .find_map(|output| output.script.as_ref()
-                .and_then(|script| Address::shapeshift_outbound_force_script(script.clone())))
+                .and_then(|script| address::shapeshift_outbound_force_script(script.clone())))
     }
 
     fn amount_sent(&self) -> u64 {
@@ -407,7 +406,7 @@ impl Transaction {
                 &self.chain_type.script_map()));
     }
     pub fn add_output_script(&mut self, script: &Vec<u8>, amount: u64) {
-        self.add_output_script_with_address(Some(script.clone()), Address::with_script_pub_key(script, &self.chain_type.script_map()), amount)
+        self.add_output_script_with_address(Some(script.clone()), address::with_script_pub_key(script, &self.chain_type.script_map()), amount)
     }
 
     pub fn add_output_script_with_address(&mut self, script: Option<Vec<u8>>, address: Option<String>, amount: u64) {
@@ -417,7 +416,7 @@ impl Transaction {
                 script.clone(),
                 address.or_else(||
                     script.and_then(|script|
-                        Address::with_script_pub_key(&script, &self.chain_type.script_map())))));
+                        address::with_script_pub_key(&script, &self.chain_type.script_map())))));
     }
 
     pub fn set_input_address(&mut self, address: String, index: usize) {
@@ -573,7 +572,7 @@ impl Transaction {
         let lock_time = self.lock_time;
         for (i, input) in self.inputs.iter_mut().enumerate() {
             if let Some(tx_input_script) = &input.script {
-                if let Some(addr) = Address::with_script_pub_key(tx_input_script, &script_map) {
+                if let Some(addr) = address::with_script_pub_key(tx_input_script, &script_map) {
                     if let Some(key_idx) = addresses.iter().position(|a| *a == addr) {
                         if let Some(key) = keys.get(key_idx) {
                             let data = Self::data_with_subscript_index_static(Some(key_idx as u64), version, tx_type, &inputs, outputs, lock_time);
@@ -659,14 +658,14 @@ impl Transaction {
 }
 
 impl Transaction {
-    pub fn devnet_genesis_coinbase_with_identifier(identifier: String, version: u16, protocol_version: u32, amount: u64, script_map: &ScriptMap) -> UInt256 {
+    pub fn devnet_genesis_coinbase_with_identifier(devnet_type: DevnetType, protocol_version: u32, amount: u64, script_map: &ScriptMap) -> UInt256 {
         let script = OP_RETURN.into_u8().to_le_bytes().to_vec();
         UInt256::sha256d(Self::data_with_subscript_index_static(
             None,
             TX_VERSION as u16,
             TransactionType::Classic,
-            &[TransactionInput::coinbase(&identifier, version, protocol_version)],
-            &[TransactionOutput::new(amount, Some(script.clone()), Address::with_script_pub_key(&script, script_map))],
+            &[TransactionInput::coinbase(devnet_type, protocol_version)],
+            &[TransactionOutput::new(amount, Some(script.clone()), address::with_script_pub_key(&script, script_map))],
             TX_LOCKTIME,
         ))
     }
